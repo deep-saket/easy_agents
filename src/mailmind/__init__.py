@@ -1,0 +1,2 @@
+"""mailmind package."""
+

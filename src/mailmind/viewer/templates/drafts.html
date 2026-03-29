@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Drafts</h2>
+{% for draft in drafts %}
+<article class="item">
+  <h3>{{ draft.subject }}</h3>
+  <div class="meta">{{ draft.created_at }}</div>
+  <pre>{{ draft.body_text }}</pre>
+</article>
+{% else %}
+<p>No drafts created yet.</p>
+{% endfor %}
+{% endblock %}
+

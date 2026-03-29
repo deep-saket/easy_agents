@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Settings & Policies</h2>
+<h3>Runtime</h3>
+<pre>{{ settings }}</pre>
+<h3>Policy</h3>
+<pre>{{ policy.model_dump() }}</pre>
+{% endblock %}
+

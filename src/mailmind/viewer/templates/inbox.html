@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Inbox</h2>
+<form class="search" method="get">
+  <input type="text" name="search" placeholder="Search subject, sender, or body" value="{{ search }}">
+  <button type="submit">Filter</button>
+</form>
+{% for bundle in messages %}
+<article class="item">
+  <h3>{{ bundle.message.subject }}</h3>
+  <div class="meta">{{ bundle.message.from_email }} • {{ bundle.message.received_at }}</div>
+  {% if bundle.classification %}
+  <p>
+    <span class="tag">{{ bundle.classification.category.value }}</span>
+    <span class="tag">score {{ "%.2f"|format(bundle.classification.priority_score) }}</span>
+    <span class="tag">{{ bundle.classification.suggested_action.value }}</span>
+  </p>
+  <p>{{ bundle.classification.summary }}</p>
+  {% endif %}
+  <pre>{{ bundle.message.body_text }}</pre>
+</article>
+{% else %}
+<p>No messages found.</p>
+{% endfor %}
+{% endblock %}
+

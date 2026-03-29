@@ -1,0 +1,2 @@
+[console_scripts]
+mailmind = mailmind.cli.main:main

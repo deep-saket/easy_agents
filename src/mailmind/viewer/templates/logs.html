@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Logs</h2>
+{% for entry in logs %}
+<article class="item">
+  <div class="meta">{{ entry.created_at }} • {{ entry.event_type }}</div>
+  <pre>{{ entry }}</pre>
+</article>
+{% else %}
+<p>No logs written yet.</p>
+{% endfor %}
+{% endblock %}
+

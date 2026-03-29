@@ -1,0 +1,58 @@
+[
+  {
+    "source_id": "gmail-001",
+    "thread_id": "th-001",
+    "from_name": "Research Hiring",
+    "from_email": "talent@deepmind.com",
+    "to": ["user@example.com"],
+    "subject": "Research Scientist role on multimodal reasoning",
+    "body_text": "We are selectively hiring for a Research Scientist role focused on multimodal reasoning and foundation models. Would you be open to a conversation this week?",
+    "received_at": "2026-03-29T08:00:00+00:00",
+    "labels": ["INBOX"]
+  },
+  {
+    "source_id": "gmail-002",
+    "thread_id": "th-002",
+    "from_name": "Founders Circle",
+    "from_email": "hello@deeptechventures.ai",
+    "to": ["user@example.com"],
+    "subject": "Invite-only dinner for deep-tech founders and senior ML engineers",
+    "body_text": "We are hosting an invite-only founder dinner in Bengaluru with deep-tech operators, investors, and senior ML engineers building applied AI companies.",
+    "received_at": "2026-03-29T10:30:00+00:00",
+    "labels": ["INBOX"]
+  },
+  {
+    "source_id": "gmail-003",
+    "thread_id": "th-003",
+    "from_name": "Marketing Team",
+    "from_email": "promo@randomsaas.com",
+    "to": ["user@example.com"],
+    "subject": "Free trial for growth hack webinar series",
+    "body_text": "Join our webinar and free trial to accelerate your sales funnel. Unsubscribe anytime.",
+    "received_at": "2026-03-29T11:15:00+00:00",
+    "labels": ["INBOX", "CATEGORY_PROMOTIONS"]
+  },
+  {
+    "source_id": "gmail-004",
+    "thread_id": "th-004",
+    "from_name": "Alumni Office",
+    "from_email": "connect@iitbombay.org",
+    "to": ["user@example.com"],
+    "subject": "Selective alumni research and startup meetup next week",
+    "body_text": "A small alumni meetup is being organized for researchers, operators, and founders. We would value your presence and a short introduction to your current work.",
+    "received_at": "2026-03-29T12:00:00+00:00",
+    "labels": ["INBOX"]
+  },
+  {
+    "source_id": "gmail-005",
+    "thread_id": "th-005",
+    "from_name": "Former colleague",
+    "from_email": "friend.personal@example.com",
+    "to": ["user@example.com"],
+    "subject": "Need to speak today about something important",
+    "body_text": "Long time. This is personal and important. Please call me today if you can.",
+    "received_at": "2026-03-29T13:45:00+00:00",
+    "labels": ["INBOX"]
+  }
+]
+
