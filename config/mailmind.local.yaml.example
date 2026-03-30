@@ -9,5 +9,6 @@ notifications:
 integrations:
   gmail_client_id: "set-me-locally"
   gmail_client_secret: "set-me-locally"
-  whatsapp_api_key: "set-me-locally"
-
+  twilio_account_sid: "ACxxxxxxxxxxxxxxxx"
+  twilio_auth_token: "set-me-locally"
+  twilio_whatsapp_from: "whatsapp:+14155238886"

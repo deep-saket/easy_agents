@@ -27,7 +27,8 @@ class WhatsAppNotifier(Notifier):
         self._allowlist = allowlist
 
     def send(self, payload: NotificationPayload) -> NotificationAttempt:
-        # TODO: Implement real WhatsApp provider integration with strict allowlist enforcement.
+        # TODO: Implement Twilio WhatsApp sending with TWILIO_ACCOUNT_SID,
+        # TWILIO_AUTH_TOKEN, and a configured WhatsApp-enabled sender.
         if self._allowlist and payload.destination not in self._allowlist:
             return NotificationAttempt(
                 message_id=payload.message_id,
@@ -37,5 +38,4 @@ class WhatsAppNotifier(Notifier):
                 status=NotificationStatus.FAILED,
                 error="Destination is not in the WhatsApp allowlist.",
             )
-        raise NotImplementedError("Real WhatsApp integration is not configured in v0.1.")
-
+        raise NotImplementedError("Real Twilio WhatsApp integration is not configured in v0.1.")

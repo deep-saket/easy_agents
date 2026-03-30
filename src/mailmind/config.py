@@ -73,7 +73,9 @@ class ViewerSettings(BaseModel):
 class IntegrationSettings(BaseModel):
     gmail_client_id: str = ""
     gmail_client_secret: str = ""
-    whatsapp_api_key: str = ""
+    twilio_account_sid: str = ""
+    twilio_auth_token: str = ""
+    twilio_whatsapp_from: str = ""
 
 
 class AppSettings(BaseModel):
@@ -139,7 +141,9 @@ class AppSettings(BaseModel):
             "integrations": {
                 "gmail_client_id": _env_str("MAILMIND_GMAIL_CLIENT_ID"),
                 "gmail_client_secret": _env_str("MAILMIND_GMAIL_CLIENT_SECRET"),
-                "whatsapp_api_key": _env_str("MAILMIND_WHATSAPP_API_KEY"),
+                "twilio_account_sid": _env_str("TWILIO_ACCOUNT_SID"),
+                "twilio_auth_token": _env_str("TWILIO_AUTH_TOKEN"),
+                "twilio_whatsapp_from": _env_str("MAILMIND_TWILIO_WHATSAPP_FROM"),
             },
         })
 

@@ -54,6 +54,7 @@ The container in [`container.py`](/Users/saketm10/Projects/openclaw_agents/src/m
 - Structured audit logs are written separately to JSONL so side effects and domain events remain easy to inspect outside the database.
 - Policies are YAML-driven through [`policies/default_policy.yaml`](/Users/saketm10/Projects/openclaw_agents/policies/default_policy.yaml), which keeps prioritization easy to tune without editing code.
 - External integrations are stubbed safely. Search for `TODO` markers before wiring real Gmail OAuth or WhatsApp provider credentials.
+- For WhatsApp, the config surface now matches Twilio credential names so deployment wiring is less ambiguous.
 - Email content is treated as untrusted input. v0.1 keeps parsing simple and local; richer MIME handling belongs in the real Gmail adapter.
 
 ## Setup
@@ -74,6 +75,7 @@ Runtime settings now load from [`config/mailmind.yaml`](/Users/saketm10/Projects
 - source mode and seed inbox path
 - classifier mode and optional LLM toggle
 - WhatsApp mode, destination, and allowlist
+- Twilio WhatsApp credentials and sender id
 - viewer host and port
 
 Environment variables still override file values when needed. The config path itself can be changed with `MAILMIND_CONFIG_PATH`.
@@ -140,4 +142,5 @@ The test suite covers policy loading, rules classification, repository round-tri
 
 - Gmail: OAuth setup, token persistence, incremental sync state, MIME parsing, and Gmail label/archive actions are still TODOs in [`sources/gmail.py`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/sources/gmail.py).
 - WhatsApp: provider credentials, signed API calls, rate limiting, retry semantics, and delivery receipt handling are still TODOs in [`notifiers/whatsapp.py`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/notifiers/whatsapp.py).
+- Twilio-specific env/config names are `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `MAILMIND_TWILIO_WHATSAPP_FROM`.
 - LLM classification: the optional adapter is a stub that currently falls back to rules and annotates the result.

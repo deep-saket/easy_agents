@@ -13,8 +13,8 @@ runtime:
 notifications:
   whatsapp_mode: fake
   whatsapp_allowlist:
-    - "+911234567890"
-  notification_destination: "+911234567890"
+    - "+918895551384"
+  notification_destination: "+918895551384"
 
 viewer:
   host: 127.0.0.1
@@ -24,5 +24,6 @@ integrations:
   # TODO: Replace with local secret overrides or env vars for real adapters.
   gmail_client_id: ""
   gmail_client_secret: ""
-  whatsapp_api_key: ""
-
+  twilio_account_sid: ""
+  twilio_auth_token: ""
+  twilio_whatsapp_from: ""
