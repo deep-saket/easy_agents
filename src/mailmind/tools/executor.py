@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from mailmind.core.interfaces import MessageRepository
 from mailmind.core.models import ToolExecutionLog
-from mailmind.schemas.tools import ToolExecutionResult
+from mailmind.schemas.tools import ToolCall, ToolExecutionResult
 from mailmind.tools.registry import ToolRegistry
 
 
@@ -34,3 +34,5 @@ class ToolExecutor:
             self.repository.save_tool_log(log)
             raise
 
+    def execute_call(self, call: ToolCall) -> dict:
+        return self.execute(call.tool_name, call.arguments)

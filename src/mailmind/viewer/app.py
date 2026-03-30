@@ -99,4 +99,24 @@ def create_app(container: AppContainer | None = None) -> FastAPI:
         bundles = active_container.repository.list_messages(search=search, only_important=important)
         return [bundle.model_dump(mode="json") for bundle in bundles]
 
+    @app.get("/api/tools")
+    def api_tools() -> list[dict]:
+        return [
+            {
+                "name": tool.name,
+                "description": tool.description,
+                "input_schema": tool.input_schema.__name__,
+                "output_schema": tool.output_schema.__name__,
+            }
+            for tool in active_container.tool_registry.list_tools()
+        ]
+
+    @app.get("/api/tool-logs")
+    def api_tool_logs(limit: int = Query(default=100)) -> list[dict]:
+        return [entry.model_dump(mode="json") for entry in active_container.repository.list_tool_logs(limit=limit)]
+
+    @app.get("/api/agent/run")
+    def api_agent_run(query: str) -> dict:
+        return active_container.agent.run(query)
+
     return app

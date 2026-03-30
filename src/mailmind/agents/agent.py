@@ -2,15 +2,20 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from mailmind.agents.planner import ToolPlanner
+from mailmind.agents.base import BasePlanner
+from mailmind.schemas.tools import AgentRunResult, ToolExecutionResult
 from mailmind.tools.executor import ToolExecutor
 
 
 @dataclass(slots=True)
 class Agent:
-    planner: ToolPlanner
+    planner: BasePlanner
     executor: ToolExecutor
 
     def run(self, query: str) -> dict:
         plan = self.planner.plan(query)
-        return self.executor.execute(plan.tool_name, plan.arguments)
+        results = [
+            ToolExecutionResult.model_validate(self.executor.execute(step.tool_name, step.arguments))
+            for step in plan.steps
+        ]
+        return AgentRunResult(plan=plan, results=results).model_dump(mode="json")

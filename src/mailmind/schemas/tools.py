@@ -13,10 +13,19 @@ class ToolCall(BaseModel):
     arguments: dict[str, Any] = Field(default_factory=dict)
 
 
+class ToolPlan(BaseModel):
+    steps: list[ToolCall] = Field(default_factory=list)
+
+
 class ToolExecutionResult(BaseModel):
     tool_name: str
     status: str
     output: dict[str, Any]
+
+
+class AgentRunResult(BaseModel):
+    plan: ToolPlan
+    results: list[ToolExecutionResult] = Field(default_factory=list)
 
 
 class GmailFetchInput(BaseModel):
@@ -83,4 +92,3 @@ class EmailSummaryInput(BaseModel):
 class EmailSummaryOutput(BaseModel):
     summaries: list[EmailDetail] = Field(default_factory=list)
     combined_summary: str
-

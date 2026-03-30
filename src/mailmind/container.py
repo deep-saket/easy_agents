@@ -4,7 +4,8 @@ from dataclasses import dataclass
 
 from mailmind.LLM.qwen import Qwen3_1_7BLLM
 from mailmind.agents.agent import Agent
-from mailmind.agents.planner import ToolPlanner
+from mailmind.agents.llm_planner import OptionalLLMToolPlanner
+from mailmind.agents.planner import RuleBasedToolPlanner
 from mailmind.approvals.queue import LocalApprovalQueue
 from mailmind.classifiers.llm import OptionalLLMClassifierAdapter
 from mailmind.classifiers.rules import RulesBasedClassifier
@@ -36,7 +37,7 @@ class AppContainer:
     orchestrator: MailOrchestrator
     tool_registry: ToolRegistry
     tool_executor: ToolExecutor
-    planner: ToolPlanner
+    planner: RuleBasedToolPlanner | OptionalLLMToolPlanner
     agent: Agent
 
     @classmethod
@@ -84,7 +85,8 @@ class AppContainer:
         tool_registry.register(NotificationTool(orchestrator=orchestrator))
         tool_registry.register(EmailSummaryTool(repository=repository))
         tool_executor = ToolExecutor(registry=tool_registry, repository=repository)
-        planner = ToolPlanner()
+        rule_planner = RuleBasedToolPlanner()
+        planner = OptionalLLMToolPlanner(fallback=rule_planner, llm=llm, enabled=settings.llm_enabled)
         agent = Agent(planner=planner, executor=tool_executor)
         return cls(
             settings=settings,

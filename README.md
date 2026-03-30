@@ -63,8 +63,9 @@ The current foundation is tool-driven rather than script-driven:
 - Every tool subclasses [`BaseTool`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/tools/base.py) and declares strict Pydantic input/output schemas.
 - [`ToolRegistry`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/tools/registry.py) holds reusable tools by name.
 - [`ToolExecutor`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/tools/executor.py) validates inputs, executes tools, validates outputs, and logs each execution into SQLite.
-- [`ToolPlanner`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/agents/planner.py) does simple rule-based tool selection first.
-- [`Agent`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/agents/agent.py) runs `plan -> execute`.
+- [`RuleBasedToolPlanner`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/agents/planner.py) does simple rule-based tool selection first.
+- [`OptionalLLMToolPlanner`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/agents/llm_planner.py) is the plug-in point for LLM-based planning and falls back to rules on errors.
+- [`Agent`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/agents/agent.py) runs `plan -> execute`, where a plan is a structured list of tool calls.
 
 The implemented v1 tools are:
 
@@ -76,6 +77,7 @@ The implemented v1 tools are:
 - `email_summary`
 
 `email_search` is the primary query tool and supports keyword, sender, category, and time-based filtering directly against SQLite.
+The current search/planner path supports queries like `emails today`, `job emails today`, `events this week`, and `emails from deepmind`.
 
 ## Design Notes
 
@@ -145,6 +147,12 @@ Run the agent planner + executor:
 
 ```bash
 mailmind run-agent "show me job emails today"
+```
+
+Inspect registered tools from the local viewer API:
+
+```bash
+curl "http://127.0.0.1:8000/api/tools"
 ```
 
 Run a single polling cycle against the configured source:
