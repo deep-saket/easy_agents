@@ -6,9 +6,9 @@ from mailmind.classifiers.rules import RulesBasedClassifier
 from mailmind.core.models import EmailMessage
 from mailmind.core.policies import YAMLPolicyProvider
 from mailmind.storage.repository import SQLiteMessageRepository
-from mailmind.tools.base import BaseTool
-from mailmind.tools.executor import ToolExecutor
-from mailmind.tools.registry import ToolRegistry
+from tools.base import BaseTool
+from tools.executor import ToolExecutor
+from tools.registry import ToolRegistry
 
 
 class EchoInput(BaseModel):

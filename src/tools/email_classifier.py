@@ -5,8 +5,8 @@ from dataclasses import dataclass
 from mailmind.core.interfaces import MessageClassifier, MessageRepository
 from mailmind.core.models import MessageBundle
 from mailmind.schemas.tools import EmailClassifierInput, EmailClassifierOutput
-from mailmind.tools.base import BaseTool
-from mailmind.tools.helpers import bundle_to_summary
+from tools.base import BaseTool
+from tools.helpers import bundle_to_summary
 
 
 @dataclass(slots=True)

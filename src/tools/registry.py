@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from mailmind.tools.base import BaseTool
+from tools.base import BaseTool
 
 
 class ToolRegistry:
@@ -17,4 +17,3 @@ class ToolRegistry:
 
     def list_tools(self) -> list[BaseTool]:
         return list(self._tools.values())
-

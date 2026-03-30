@@ -4,8 +4,8 @@ from dataclasses import dataclass
 
 from mailmind.core.interfaces import MessageRepository
 from mailmind.schemas.tools import EmailSearchInput, EmailSearchOutput
-from mailmind.tools.base import BaseTool
-from mailmind.tools.helpers import bundle_to_summary
+from tools.base import BaseTool
+from tools.helpers import bundle_to_summary
 
 
 @dataclass(slots=True)
@@ -27,4 +27,3 @@ class EmailSearchTool(BaseTool[EmailSearchInput, EmailSearchOutput]):
             only_important=input.only_important,
         )
         return EmailSearchOutput(emails=[bundle_to_summary(bundle) for bundle in bundles])
-

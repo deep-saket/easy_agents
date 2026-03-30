@@ -5,8 +5,8 @@ from dataclasses import dataclass
 from mailmind.core.interfaces import EmailSource
 from mailmind.core.orchestrator import MailOrchestrator
 from mailmind.schemas.tools import GmailFetchInput, GmailFetchOutput
-from mailmind.tools.base import BaseTool
-from mailmind.tools.helpers import bundle_to_summary
+from tools.base import BaseTool
+from tools.helpers import bundle_to_summary
 
 
 @dataclass(slots=True)
@@ -26,4 +26,3 @@ class GmailFetchTool(BaseTool[GmailFetchInput, GmailFetchOutput]):
             processed_count=len(bundles),
             emails=[bundle_to_summary(bundle) for bundle in bundles],
         )
-

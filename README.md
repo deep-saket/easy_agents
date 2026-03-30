@@ -22,7 +22,6 @@ mailmind/
     LLM/
     core/
     schemas/
-    tools/
     sources/
     classifiers/
     drafters/
@@ -43,7 +42,7 @@ The code is split by responsibility under [`src/mailmind`](/Users/saketm10/Proje
 - [`core`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/core): domain models, interfaces, policy loading, and the event-driven orchestrator.
 - [`LLM`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/LLM): local Hugging Face LLM clients, including a reusable `HuggingFaceLLM` and a `Qwen/Qwen3-1.7B` subclass.
 - [`schemas`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/schemas): shared Pydantic schemas used across tools and agents.
-- [`tools`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/tools): the base tool interface, tool registry, executor, and concrete tools for fetch/search/classify/draft/notify/summary.
+- [`src/tools`](/Users/saketm10/Projects/openclaw_agents/src/tools): the base tool interface, tool registry, executor, and concrete tools for fetch/search/classify/draft/notify/summary.
 - [`sources`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/sources): Gmail adapters. v0.1 defaults to a fake Gmail source seeded from local JSON.
 - [`classifiers`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/classifiers): rules-based classifier plus an optional local-LLM classifier adapter.
 - [`drafters`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/drafters): reply draft generation.
@@ -92,10 +91,17 @@ The current search/planner path supports queries like `emails today`, `job email
 ## Setup
 
 ```bash
+source ./setup.sh
 python3.11 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 cp .env.example .env
+```
+
+If you want the top-level `src` directory on `PYTHONPATH` for shell sessions and ad hoc scripts, run:
+
+```bash
+source ./setup.sh
 ```
 
 ## Configuration
@@ -204,3 +210,4 @@ The test suite covers policy loading, rules classification, repository round-tri
 - WhatsApp: provider credentials, signed API calls, rate limiting, retry semantics, and delivery receipt handling are still TODOs in [`notifiers/whatsapp.py`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/notifiers/whatsapp.py).
 - Twilio-specific env/config names are `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `MAILMIND_TWILIO_WHATSAPP_FROM`.
 - LLM classification can now run locally through [`HuggingFaceLLM`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/LLM/huggingface.py). [`Qwen3_1_7BLLM`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/LLM/qwen.py) inherits from it for `Qwen/Qwen3-1.7B`. If local inference is unavailable or returns invalid JSON, the adapter falls back to rules.
+  src/tools/

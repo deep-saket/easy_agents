@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from mailmind.agents.base import BasePlanner
 from mailmind.schemas.tools import AgentRunResult, ToolExecutionResult
-from mailmind.tools.executor import ToolExecutor
+from tools.executor import ToolExecutor
 
 
 @dataclass(slots=True)

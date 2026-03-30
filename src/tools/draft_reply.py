@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from mailmind.core.interfaces import DraftGenerator, MessageRepository
 from mailmind.schemas.tools import DraftReplyInput, DraftReplyOutput
-from mailmind.tools.base import BaseTool
+from tools.base import BaseTool
 
 
 @dataclass(slots=True)
@@ -31,4 +31,3 @@ class DraftReplyTool(BaseTool[DraftReplyInput, DraftReplyOutput]):
             subject=draft.subject,
             body_text=draft.body_text,
         )
-

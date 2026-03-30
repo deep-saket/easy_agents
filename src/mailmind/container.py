@@ -17,14 +17,14 @@ from mailmind.logs.jsonl import JSONLAuditLogStore
 from mailmind.notifiers.whatsapp import FakeWhatsAppNotifier, WhatsAppNotifier
 from mailmind.sources.gmail import FakeGmailEmailSource, GmailEmailSource
 from mailmind.storage.repository import SQLiteMessageRepository
-from mailmind.tools.draft_reply import DraftReplyTool
-from mailmind.tools.email_classifier import EmailClassifierTool
-from mailmind.tools.email_search import EmailSearchTool
-from mailmind.tools.email_summary import EmailSummaryTool
-from mailmind.tools.executor import ToolExecutor
-from mailmind.tools.gmail_fetch import GmailFetchTool
-from mailmind.tools.notification import NotificationTool
-from mailmind.tools.registry import ToolRegistry
+from tools.draft_reply import DraftReplyTool
+from tools.email_classifier import EmailClassifierTool
+from tools.email_search import EmailSearchTool
+from tools.email_summary import EmailSummaryTool
+from tools.executor import ToolExecutor
+from tools.gmail_fetch import GmailFetchTool
+from tools.notification import NotificationTool
+from tools.registry import ToolRegistry
 
 
 @dataclass(slots=True)

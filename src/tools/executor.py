@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from mailmind.core.interfaces import MessageRepository
 from mailmind.core.models import ToolExecutionLog
 from mailmind.schemas.tools import ToolCall, ToolExecutionResult
-from mailmind.tools.registry import ToolRegistry
+from tools.registry import ToolRegistry
 
 
 @dataclass(slots=True)
