@@ -45,6 +45,19 @@ def _compact_dict(data: dict[str, Any]) -> dict[str, Any]:
     return compacted
 
 
+def _load_dotenv(dotenv_path: Path) -> None:
+    if not dotenv_path.exists():
+        return
+    for raw_line in dotenv_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip("'").strip('"')
+        os.environ.setdefault(key, value)
+
+
 class PathSettings(BaseModel):
     db_path: Path = Path("data/mailmind.db")
     log_path: Path = Path("data/logs/audit.jsonl")
@@ -88,6 +101,7 @@ class AppSettings(BaseModel):
 
     @classmethod
     def from_env(cls) -> "AppSettings":
+        _load_dotenv(Path(".env"))
         config_path = Path(os.getenv("MAILMIND_CONFIG_PATH", "config/mailmind.yaml"))
         base_data = cls._load_config_file(config_path)
         merged = cls._merge_dicts(base_data, cls._env_overrides())

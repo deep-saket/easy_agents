@@ -79,6 +79,7 @@ Runtime settings now load from [`config/mailmind.yaml`](/Users/saketm10/Projects
 - viewer host and port
 
 Environment variables still override file values when needed. The config path itself can be changed with `MAILMIND_CONFIG_PATH`.
+The application now auto-loads a local `.env` file on startup, so Gmail and Twilio credentials do not need to be exported manually in the shell.
 
 For machine-specific secrets or private destinations, start from [`config/mailmind.local.yaml.example`](/Users/saketm10/Projects/openclaw_agents/config/mailmind.local.yaml.example) and point `MAILMIND_CONFIG_PATH` at your local copy, or keep secrets in environment variables.
 

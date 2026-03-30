@@ -21,11 +21,17 @@ viewer:
         encoding="utf-8",
     )
     monkeypatch.setenv("MAILMIND_CONFIG_PATH", str(config_path))
+    monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("MAILMIND_DB_PATH", raising=False)
     monkeypatch.delenv("MAILMIND_POLL_SECONDS", raising=False)
     monkeypatch.delenv("MAILMIND_NOTIFICATION_DESTINATION", raising=False)
     monkeypatch.delenv("MAILMIND_WHATSAPP_ALLOWLIST", raising=False)
     monkeypatch.delenv("MAILMIND_VIEWER_PORT", raising=False)
+    monkeypatch.delenv("MAILMIND_TWILIO_WHATSAPP_FROM", raising=False)
+    monkeypatch.delenv("TWILIO_ACCOUNT_SID", raising=False)
+    monkeypatch.delenv("TWILIO_AUTH_TOKEN", raising=False)
+    monkeypatch.delenv("MAILMIND_GMAIL_CLIENT_ID", raising=False)
+    monkeypatch.delenv("MAILMIND_GMAIL_CLIENT_SECRET", raising=False)
 
     settings = AppSettings.from_env()
 
@@ -46,6 +52,7 @@ notifications:
         encoding="utf-8",
     )
     monkeypatch.setenv("MAILMIND_CONFIG_PATH", str(config_path))
+    monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("MAILMIND_NOTIFICATION_DESTINATION", "+919999999999")
 
     settings = AppSettings.from_env()
