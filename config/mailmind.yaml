@@ -1,0 +1,28 @@
+paths:
+  db_path: data/mailmind.db
+  log_path: data/logs/audit.jsonl
+  policy_path: policies/default_policy.yaml
+  gmail_seed_path: data/seed/demo_messages.json
+
+runtime:
+  source_mode: fake
+  classifier_mode: rules
+  llm_enabled: false
+  poll_seconds: 300
+
+notifications:
+  whatsapp_mode: fake
+  whatsapp_allowlist:
+    - "+911234567890"
+  notification_destination: "+911234567890"
+
+viewer:
+  host: 127.0.0.1
+  port: 8000
+
+integrations:
+  # TODO: Replace with local secret overrides or env vars for real adapters.
+  gmail_client_id: ""
+  gmail_client_secret: ""
+  whatsapp_api_key: ""
+

@@ -1,0 +1,13 @@
+paths:
+  db_path: data/mailmind-local.db
+
+notifications:
+  notification_destination: "+911234567890"
+  whatsapp_allowlist:
+    - "+911234567890"
+
+integrations:
+  gmail_client_id: "set-me-locally"
+  gmail_client_secret: "set-me-locally"
+  whatsapp_api_key: "set-me-locally"
+
