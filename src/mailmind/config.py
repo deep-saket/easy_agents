@@ -89,7 +89,7 @@ class LLMSettings(BaseModel):
     device_map: str = "auto"
     torch_dtype: str = "auto"
     max_new_tokens: int = 384
-    enable_thinking: bool = False
+    enable_thinking: bool = True
 
 
 class IntegrationSettings(BaseModel):

@@ -16,7 +16,7 @@ llm:
   device_map: auto
   torch_dtype: auto
   max_new_tokens: 384
-  enable_thinking: false
+  enable_thinking: true
 
 notifications:
   whatsapp_mode: fake
