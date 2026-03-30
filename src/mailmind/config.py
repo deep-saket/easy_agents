@@ -83,6 +83,15 @@ class ViewerSettings(BaseModel):
     port: int = 8000
 
 
+class LLMSettings(BaseModel):
+    provider: str = "huggingface"
+    model_name: str = "Qwen/Qwen3-1.7B"
+    device_map: str = "auto"
+    torch_dtype: str = "auto"
+    max_new_tokens: int = 384
+    enable_thinking: bool = False
+
+
 class IntegrationSettings(BaseModel):
     gmail_client_id: str = ""
     gmail_client_secret: str = ""
@@ -97,6 +106,7 @@ class AppSettings(BaseModel):
     runtime: RuntimeSettings = Field(default_factory=RuntimeSettings)
     notifications: NotificationSettings = Field(default_factory=NotificationSettings)
     viewer: ViewerSettings = Field(default_factory=ViewerSettings)
+    llm: LLMSettings = Field(default_factory=LLMSettings)
     integrations: IntegrationSettings = Field(default_factory=IntegrationSettings)
 
     @classmethod
@@ -151,6 +161,16 @@ class AppSettings(BaseModel):
             "viewer": {
                 "host": _env_str("MAILMIND_VIEWER_HOST"),
                 "port": _env_int("MAILMIND_VIEWER_PORT"),
+            },
+            "llm": {
+                "provider": _env_str("MAILMIND_LLM_PROVIDER"),
+                "model_name": _env_str("MAILMIND_LLM_MODEL_NAME"),
+                "device_map": _env_str("MAILMIND_LLM_DEVICE_MAP"),
+                "torch_dtype": _env_str("MAILMIND_LLM_TORCH_DTYPE"),
+                "max_new_tokens": _env_int("MAILMIND_LLM_MAX_NEW_TOKENS"),
+                "enable_thinking": _env_bool("MAILMIND_LLM_THINKING", False)
+                if os.getenv("MAILMIND_LLM_THINKING") is not None
+                else None,
             },
             "integrations": {
                 "gmail_client_id": _env_str("MAILMIND_GMAIL_CLIENT_ID"),

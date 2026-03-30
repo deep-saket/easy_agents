@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from mailmind.LLM.qwen import Qwen3_1_7BLLM
 from mailmind.approvals.queue import LocalApprovalQueue
 from mailmind.classifiers.llm import OptionalLLMClassifierAdapter
 from mailmind.classifiers.rules import RulesBasedClassifier
@@ -30,8 +31,18 @@ class AppContainer:
         policy_provider = YAMLPolicyProvider(settings.policy_path)
         repository = SQLiteMessageRepository(settings.db_path)
         audit_log = JSONLAuditLogStore(settings.log_path)
+        llm = None
+        if settings.llm_enabled and settings.llm.provider == "huggingface":
+            llm = Qwen3_1_7BLLM(
+                model_name=settings.llm.model_name,
+                device_map=settings.llm.device_map,
+                torch_dtype=settings.llm.torch_dtype,
+                max_new_tokens=settings.llm.max_new_tokens,
+                enable_thinking=settings.llm.enable_thinking,
+            )
         classifier = OptionalLLMClassifierAdapter(
             fallback=RulesBasedClassifier(policy_provider=policy_provider),
+            llm=llm,
             enabled=settings.llm_enabled,
         )
         drafter = SimpleReplyDrafter()

@@ -10,6 +10,14 @@ runtime:
   llm_enabled: false
   poll_seconds: 300
 
+llm:
+  provider: huggingface
+  model_name: Qwen/Qwen3-1.7B
+  device_map: auto
+  torch_dtype: auto
+  max_new_tokens: 384
+  enable_thinking: false
+
 notifications:
   whatsapp_mode: fake
   whatsapp_allowlist:

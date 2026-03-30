@@ -36,8 +36,9 @@ mailmind/
 The code is split by responsibility under [`src/mailmind`](/Users/saketm10/Projects/openclaw_agents/src/mailmind):
 
 - [`core`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/core): domain models, interfaces, policy loading, and the event-driven orchestrator.
+- [`LLM`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/LLM): local Hugging Face LLM clients, including a reusable `HuggingFaceLLM` and a `Qwen/Qwen3-1.7B` subclass.
 - [`sources`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/sources): Gmail adapters. v0.1 defaults to a fake Gmail source seeded from local JSON.
-- [`classifiers`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/classifiers): rules-based classifier plus an optional LLM adapter stub.
+- [`classifiers`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/classifiers): rules-based classifier plus an optional local-LLM classifier adapter.
 - [`drafters`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/drafters): reply draft generation.
 - [`notifiers`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/notifiers): WhatsApp adapters. v0.1 ships with a safe fake notifier and a real-integration stub.
 - [`approvals`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/approvals): local approval queue backed by SQLite.
@@ -74,12 +75,14 @@ Runtime settings now load from [`config/mailmind.yaml`](/Users/saketm10/Projects
 - policy file path
 - source mode and seed inbox path
 - classifier mode and optional LLM toggle
+- local LLM provider, model, and inference settings
 - WhatsApp mode, destination, and allowlist
 - Twilio WhatsApp credentials and sender id
 - viewer host and port
 
 Environment variables still override file values when needed. The config path itself can be changed with `MAILMIND_CONFIG_PATH`.
 The application now auto-loads a local `.env` file on startup, so Gmail and Twilio credentials do not need to be exported manually in the shell.
+For local inference, install the optional extra with `pip install -e ".[local-llm]"`.
 
 For machine-specific secrets or private destinations, start from [`config/mailmind.local.yaml.example`](/Users/saketm10/Projects/openclaw_agents/config/mailmind.local.yaml.example) and point `MAILMIND_CONFIG_PATH` at your local copy, or keep secrets in environment variables.
 
@@ -144,4 +147,4 @@ The test suite covers policy loading, rules classification, repository round-tri
 - Gmail: OAuth setup, token persistence, incremental sync state, MIME parsing, and Gmail label/archive actions are still TODOs in [`sources/gmail.py`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/sources/gmail.py).
 - WhatsApp: provider credentials, signed API calls, rate limiting, retry semantics, and delivery receipt handling are still TODOs in [`notifiers/whatsapp.py`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/notifiers/whatsapp.py).
 - Twilio-specific env/config names are `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `MAILMIND_TWILIO_WHATSAPP_FROM`.
-- LLM classification: the optional adapter is a stub that currently falls back to rules and annotates the result.
+- LLM classification can now run locally through [`HuggingFaceLLM`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/LLM/huggingface.py). [`Qwen3_1_7BLLM`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/LLM/qwen.py) inherits from it for `Qwen/Qwen3-1.7B`. If local inference is unavailable or returns invalid JSON, the adapter falls back to rules.
