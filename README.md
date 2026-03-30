@@ -18,7 +18,11 @@ mailmind/
     logs/
     seed/
   src/mailmind/
+    agents/
+    LLM/
     core/
+    schemas/
+    tools/
     sources/
     classifiers/
     drafters/
@@ -35,8 +39,11 @@ mailmind/
 
 The code is split by responsibility under [`src/mailmind`](/Users/saketm10/Projects/openclaw_agents/src/mailmind):
 
+- [`agents`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/agents): an `Agent` plus a rule-based `ToolPlanner` that converts user queries into structured tool calls.
 - [`core`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/core): domain models, interfaces, policy loading, and the event-driven orchestrator.
 - [`LLM`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/LLM): local Hugging Face LLM clients, including a reusable `HuggingFaceLLM` and a `Qwen/Qwen3-1.7B` subclass.
+- [`schemas`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/schemas): shared Pydantic schemas used across tools and agents.
+- [`tools`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/tools): the base tool interface, tool registry, executor, and concrete tools for fetch/search/classify/draft/notify/summary.
 - [`sources`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/sources): Gmail adapters. v0.1 defaults to a fake Gmail source seeded from local JSON.
 - [`classifiers`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/classifiers): rules-based classifier plus an optional local-LLM classifier adapter.
 - [`drafters`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/drafters): reply draft generation.
@@ -49,9 +56,31 @@ The code is split by responsibility under [`src/mailmind`](/Users/saketm10/Proje
 
 The container in [`container.py`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/container.py) wires the interfaces together with simple dependency injection, so future sources, notifiers, or agent channels can be swapped in without changing the orchestrator.
 
+## Tool System
+
+The current foundation is tool-driven rather than script-driven:
+
+- Every tool subclasses [`BaseTool`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/tools/base.py) and declares strict Pydantic input/output schemas.
+- [`ToolRegistry`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/tools/registry.py) holds reusable tools by name.
+- [`ToolExecutor`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/tools/executor.py) validates inputs, executes tools, validates outputs, and logs each execution into SQLite.
+- [`ToolPlanner`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/agents/planner.py) does simple rule-based tool selection first.
+- [`Agent`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/agents/agent.py) runs `plan -> execute`.
+
+The implemented v1 tools are:
+
+- `gmail_fetch`
+- `email_search`
+- `email_classifier`
+- `draft_reply`
+- `notification`
+- `email_summary`
+
+`email_search` is the primary query tool and supports keyword, sender, category, and time-based filtering directly against SQLite.
+
 ## Design Notes
 
 - SQLite is the canonical store to keep the first version robust, inspectable, and easy to extend.
+- SQLite now also stores `tool_logs`, so agent/tool execution is queryable locally.
 - Structured audit logs are written separately to JSONL so side effects and domain events remain easy to inspect outside the database.
 - Policies are YAML-driven through [`policies/default_policy.yaml`](/Users/saketm10/Projects/openclaw_agents/policies/default_policy.yaml), which keeps prioritization easy to tune without editing code.
 - External integrations are stubbed safely. Search for `TODO` markers before wiring real Gmail OAuth or WhatsApp provider credentials.
@@ -100,6 +129,24 @@ Seed demo data and process it through the full loop:
 mailmind seed-demo-data
 ```
 
+Fetch and process emails through the tool system:
+
+```bash
+mailmind fetch-emails
+```
+
+Query stored emails directly through the search tool:
+
+```bash
+mailmind list-emails --category strong_ml_research_job --sender deepmind
+```
+
+Run the agent planner + executor:
+
+```bash
+mailmind run-agent "show me job emails today"
+```
+
 Run a single polling cycle against the configured source:
 
 ```bash
@@ -132,6 +179,7 @@ mailmind reprocess-email <message-id>
 1. Run `mailmind init-db`.
 2. Run `mailmind seed-demo-data`.
 3. Open the viewer and inspect `/`, `/important`, `/approvals`, `/drafts`, `/logs`, and `/settings`.
+   The viewer also exposes `/emails` and `/search`.
 4. Approve a queued notification from the CLI when you want the fake WhatsApp adapter to record a send attempt.
 
 ## Testing
@@ -140,7 +188,7 @@ mailmind reprocess-email <message-id>
 pytest
 ```
 
-The test suite covers policy loading, rules classification, repository round-trips, orchestrator behavior, and an integration-style fake-adapter pipeline.
+The test suite covers policy loading, rules classification, repository round-trips, tool registry/execution, planner behavior, orchestrator behavior, and an integration-style fake-adapter pipeline.
 
 ## Real Integration Gaps
 

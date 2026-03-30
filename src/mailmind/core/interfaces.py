@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from datetime import datetime
 from typing import Protocol
 
 from mailmind.core.models import (
@@ -13,6 +14,7 @@ from mailmind.core.models import (
     NotificationPayload,
     PolicyConfig,
     ReplyDraft,
+    ToolExecutionLog,
 )
 
 
@@ -75,6 +77,19 @@ class MessageRepository(Protocol):
     def list_messages(self, *, search: str | None = None, only_important: bool = False) -> list[MessageBundle]:
         ...
 
+    def search_messages(
+        self,
+        *,
+        query: str | None = None,
+        category: str | None = None,
+        date_from: datetime | None = None,
+        date_to: datetime | None = None,
+        sender: str | None = None,
+        limit: int = 100,
+        only_important: bool = False,
+    ) -> list[MessageBundle]:
+        ...
+
     def save_classification(self, result: ClassificationResult) -> ClassificationResult:
         ...
 
@@ -102,6 +117,12 @@ class MessageRepository(Protocol):
     def save_notification_attempt(self, attempt: NotificationAttempt) -> NotificationAttempt:
         ...
 
+    def save_tool_log(self, log: ToolExecutionLog) -> ToolExecutionLog:
+        ...
+
+    def list_tool_logs(self, *, limit: int = 200, tool_name: str | None = None) -> list[ToolExecutionLog]:
+        ...
+
     def set_processing_state(self, key: str, value: dict[str, str]) -> None:
         ...
 
@@ -126,4 +147,3 @@ class SupportsReprocess(ABC):
     @abstractmethod
     def reprocess(self, message_id: str) -> MessageBundle:
         raise NotImplementedError
-

@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from mailmind.LLM.qwen import Qwen3_1_7BLLM
+from mailmind.agents.agent import Agent
+from mailmind.agents.planner import ToolPlanner
 from mailmind.approvals.queue import LocalApprovalQueue
 from mailmind.classifiers.llm import OptionalLLMClassifierAdapter
 from mailmind.classifiers.rules import RulesBasedClassifier
@@ -14,6 +16,14 @@ from mailmind.logs.jsonl import JSONLAuditLogStore
 from mailmind.notifiers.whatsapp import FakeWhatsAppNotifier, WhatsAppNotifier
 from mailmind.sources.gmail import FakeGmailEmailSource, GmailEmailSource
 from mailmind.storage.repository import SQLiteMessageRepository
+from mailmind.tools.draft_reply import DraftReplyTool
+from mailmind.tools.email_classifier import EmailClassifierTool
+from mailmind.tools.email_search import EmailSearchTool
+from mailmind.tools.email_summary import EmailSummaryTool
+from mailmind.tools.executor import ToolExecutor
+from mailmind.tools.gmail_fetch import GmailFetchTool
+from mailmind.tools.notification import NotificationTool
+from mailmind.tools.registry import ToolRegistry
 
 
 @dataclass(slots=True)
@@ -24,6 +34,10 @@ class AppContainer:
     audit_log: JSONLAuditLogStore
     source: object
     orchestrator: MailOrchestrator
+    tool_registry: ToolRegistry
+    tool_executor: ToolExecutor
+    planner: ToolPlanner
+    agent: Agent
 
     @classmethod
     def from_env(cls) -> "AppContainer":
@@ -62,6 +76,16 @@ class AppContainer:
             audit_log=audit_log,
             notification_destination=settings.notification_destination,
         )
+        tool_registry = ToolRegistry()
+        tool_registry.register(GmailFetchTool(source=source, orchestrator=orchestrator))
+        tool_registry.register(EmailSearchTool(repository=repository))
+        tool_registry.register(EmailClassifierTool(repository=repository, classifier=classifier))
+        tool_registry.register(DraftReplyTool(repository=repository, drafter=drafter))
+        tool_registry.register(NotificationTool(orchestrator=orchestrator))
+        tool_registry.register(EmailSummaryTool(repository=repository))
+        tool_executor = ToolExecutor(registry=tool_registry, repository=repository)
+        planner = ToolPlanner()
+        agent = Agent(planner=planner, executor=tool_executor)
         return cls(
             settings=settings,
             policy_provider=policy_provider,
@@ -69,4 +93,8 @@ class AppContainer:
             audit_log=audit_log,
             source=source,
             orchestrator=orchestrator,
+            tool_registry=tool_registry,
+            tool_executor=tool_executor,
+            planner=planner,
+            agent=agent,
         )

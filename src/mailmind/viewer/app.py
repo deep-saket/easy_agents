@@ -23,6 +23,15 @@ def create_app(container: AppContainer | None = None) -> FastAPI:
             {"request": request, "title": "Inbox", "messages": messages, "search": search or ""},
         )
 
+    @app.get("/emails", response_class=HTMLResponse)
+    def emails(request: Request, search: str | None = Query(default=None)) -> HTMLResponse:
+        messages = active_container.repository.list_messages(search=search)
+        return templates.TemplateResponse(
+            request,
+            "inbox.html",
+            {"request": request, "title": "Emails", "messages": messages, "search": search or ""},
+        )
+
     @app.get("/important", response_class=HTMLResponse)
     def important(request: Request, search: str | None = Query(default=None)) -> HTMLResponse:
         messages = active_container.repository.list_messages(search=search, only_important=True)
@@ -30,6 +39,22 @@ def create_app(container: AppContainer | None = None) -> FastAPI:
             request,
             "important.html",
             {"request": request, "title": "Important", "messages": messages, "search": search or ""},
+        )
+
+    @app.get("/search", response_class=HTMLResponse)
+    def search(request: Request, query: str | None = Query(default=None), category: str | None = Query(default=None), sender: str | None = Query(default=None)) -> HTMLResponse:
+        messages = active_container.repository.search_messages(query=query, category=category, sender=sender, limit=100)
+        return templates.TemplateResponse(
+            request,
+            "search.html",
+            {
+                "request": request,
+                "title": "Search",
+                "messages": messages,
+                "query": query or "",
+                "category": category or "",
+                "sender": sender or "",
+            },
         )
 
     @app.get("/approvals", response_class=HTMLResponse)
@@ -53,10 +78,11 @@ def create_app(container: AppContainer | None = None) -> FastAPI:
     @app.get("/logs", response_class=HTMLResponse)
     def logs(request: Request) -> HTMLResponse:
         entries = active_container.audit_log.read_recent()
+        tool_logs = active_container.repository.list_tool_logs(limit=100)
         return templates.TemplateResponse(
             request,
             "logs.html",
-            {"request": request, "title": "Logs", "logs": entries},
+            {"request": request, "title": "Logs", "logs": entries, "tool_logs": tool_logs},
         )
 
     @app.get("/settings", response_class=HTMLResponse)
@@ -74,4 +100,3 @@ def create_app(container: AppContainer | None = None) -> FastAPI:
         return [bundle.model_dump(mode="json") for bundle in bundles]
 
     return app
-

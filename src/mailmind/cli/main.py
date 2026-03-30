@@ -17,6 +17,20 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     subparsers.add_parser("init-db")
+    fetch = subparsers.add_parser("fetch-emails")
+    fetch.add_argument("--no-process", action="store_true")
+
+    classify = subparsers.add_parser("classify-emails")
+    classify.add_argument("message_ids", nargs="+")
+
+    list_emails = subparsers.add_parser("list-emails")
+    list_emails.add_argument("--query")
+    list_emails.add_argument("--category")
+    list_emails.add_argument("--sender")
+    list_emails.add_argument("--important", action="store_true")
+
+    run_agent = subparsers.add_parser("run-agent")
+    run_agent.add_argument("query")
 
     poller = subparsers.add_parser("run-poller")
     poller.add_argument("--once", action="store_true", help="Process a single polling cycle.")
@@ -47,6 +61,38 @@ def main() -> None:
     if args.command == "init-db":
         container.repository.init_db()
         print(f"Initialized SQLite database at {container.settings.db_path}")
+        return
+
+    if args.command == "fetch-emails":
+        container.repository.init_db()
+        result = container.tool_executor.execute("gmail_fetch", {"process_messages": not args.no_process})
+        print(json.dumps(result, indent=2))
+        return
+
+    if args.command == "classify-emails":
+        container.repository.init_db()
+        result = container.tool_executor.execute("email_classifier", {"message_ids": args.message_ids})
+        print(json.dumps(result, indent=2))
+        return
+
+    if args.command == "list-emails":
+        container.repository.init_db()
+        result = container.tool_executor.execute(
+            "email_search",
+            {
+                "query": args.query,
+                "category": args.category,
+                "sender": args.sender,
+                "only_important": args.important,
+            },
+        )
+        print(json.dumps(result, indent=2))
+        return
+
+    if args.command == "run-agent":
+        container.repository.init_db()
+        result = container.agent.run(args.query)
+        print(json.dumps(result, indent=2))
         return
 
     if args.command == "seed-demo-data":
@@ -82,8 +128,8 @@ def main() -> None:
 
     if args.command == "approve":
         container.repository.init_db()
-        item = container.orchestrator.execute_approval(args.approval_id)
-        print(item.model_dump_json(indent=2))
+        result = container.tool_executor.execute("notification", {"approval_id": args.approval_id})
+        print(json.dumps(result, indent=2))
         return
 
     if args.command == "reject":
@@ -95,4 +141,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

@@ -149,3 +149,12 @@ class MessageBundle(BaseModel):
     classification: ClassificationResult | None = None
     draft: ReplyDraft | None = None
 
+
+class ToolExecutionLog(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid4()))
+    tool_name: str
+    input_payload: dict[str, Any]
+    output_payload: dict[str, Any] | None = None
+    status: str
+    error: str | None = None
+    created_at: datetime = Field(default_factory=utc_now)

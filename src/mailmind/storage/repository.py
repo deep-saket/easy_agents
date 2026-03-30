@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from datetime import datetime
 from pathlib import Path
 
 from mailmind.core.interfaces import MessageRepository
@@ -13,6 +14,7 @@ from mailmind.core.models import (
     MessageBundle,
     NotificationAttempt,
     ReplyDraft,
+    ToolExecutionLog,
 )
 
 
@@ -78,6 +80,15 @@ class SQLiteMessageRepository(MessageRepository):
                     value_json TEXT NOT NULL,
                     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 );
+                CREATE TABLE IF NOT EXISTS tool_logs (
+                    id TEXT PRIMARY KEY,
+                    tool_name TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    input_payload_json TEXT NOT NULL,
+                    output_payload_json TEXT,
+                    error TEXT,
+                    created_at TEXT NOT NULL
+                );
                 """
             )
 
@@ -137,7 +148,20 @@ class SQLiteMessageRepository(MessageRepository):
         return self._row_to_message(row) if row else None
 
     def list_messages(self, *, search: str | None = None, only_important: bool = False) -> list[MessageBundle]:
-        query = """
+        return self.search_messages(query=search, limit=1000, only_important=only_important)
+
+    def search_messages(
+        self,
+        *,
+        query: str | None = None,
+        category: str | None = None,
+        date_from: datetime | None = None,
+        date_to: datetime | None = None,
+        sender: str | None = None,
+        limit: int = 100,
+        only_important: bool = False,
+    ) -> list[MessageBundle]:
+        sql = """
             SELECT m.*, c.payload_json AS classification_json, d.payload_json AS draft_json
             FROM messages m
             LEFT JOIN classifications c ON c.message_id = m.id
@@ -145,17 +169,31 @@ class SQLiteMessageRepository(MessageRepository):
         """
         params: list[object] = []
         clauses: list[str] = []
-        if search:
+        if query:
             clauses.append("(lower(m.subject) LIKE ? OR lower(m.body_text) LIKE ? OR lower(m.from_email) LIKE ?)")
-            pattern = f"%{search.lower()}%"
+            pattern = f"%{query.lower()}%"
             params.extend([pattern, pattern, pattern])
+        if category:
+            clauses.append("json_extract(c.payload_json, '$.category') = ?")
+            params.append(category)
+        if sender:
+            clauses.append("(lower(m.from_email) LIKE ? OR lower(coalesce(m.from_name, '')) LIKE ?)")
+            sender_pattern = f"%{sender.lower()}%"
+            params.extend([sender_pattern, sender_pattern])
+        if date_from:
+            clauses.append("m.received_at >= ?")
+            params.append(date_from.isoformat())
+        if date_to:
+            clauses.append("m.received_at <= ?")
+            params.append(date_to.isoformat())
         if only_important:
             clauses.append("json_extract(c.payload_json, '$.priority_score') >= 0.75")
         if clauses:
-            query += " WHERE " + " AND ".join(clauses)
-        query += " ORDER BY m.received_at DESC"
+            sql += " WHERE " + " AND ".join(clauses)
+        sql += " ORDER BY m.received_at DESC LIMIT ?"
+        params.append(limit)
         with self._connect() as conn:
-            rows = conn.execute(query, params).fetchall()
+            rows = conn.execute(sql, params).fetchall()
         bundles: list[MessageBundle] = []
         for row in rows:
             message = self._row_to_message(row)
@@ -286,6 +324,54 @@ class SQLiteMessageRepository(MessageRepository):
             )
         return attempt
 
+    def save_tool_log(self, log: ToolExecutionLog) -> ToolExecutionLog:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO tool_logs
+                (id, tool_name, status, input_payload_json, output_payload_json, error, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    log.id,
+                    log.tool_name,
+                    log.status,
+                    json.dumps(log.input_payload),
+                    json.dumps(log.output_payload) if log.output_payload is not None else None,
+                    log.error,
+                    log.created_at.isoformat(),
+                ),
+            )
+        return log
+
+    def list_tool_logs(self, *, limit: int = 200, tool_name: str | None = None) -> list[ToolExecutionLog]:
+        sql = """
+            SELECT id, tool_name, status, input_payload_json, output_payload_json, error, created_at
+            FROM tool_logs
+        """
+        params: list[object] = []
+        if tool_name:
+            sql += " WHERE tool_name = ?"
+            params.append(tool_name)
+        sql += " ORDER BY created_at DESC LIMIT ?"
+        params.append(limit)
+        with self._connect() as conn:
+            rows = conn.execute(sql, params).fetchall()
+        return [
+            ToolExecutionLog.model_validate(
+                {
+                    "id": row["id"],
+                    "tool_name": row["tool_name"],
+                    "status": row["status"],
+                    "input_payload": json.loads(row["input_payload_json"]),
+                    "output_payload": json.loads(row["output_payload_json"]) if row["output_payload_json"] else None,
+                    "error": row["error"],
+                    "created_at": row["created_at"],
+                }
+            )
+            for row in rows
+        ]
+
     def set_processing_state(self, key: str, value: dict[str, str]) -> None:
         with self._connect() as conn:
             conn.execute(
@@ -329,4 +415,3 @@ class SQLiteMessageRepository(MessageRepository):
                 "created_at": row["created_at"],
             }
         )
-
