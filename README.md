@@ -1,68 +1,145 @@
-# mailmind
+# Multi-Agent Platform
 
-`mailmind` is a local-first email triage engine for a machine learning researcher/engineer. It fetches messages, classifies them against explicit user policy, generates drafts for relevant items, gates outbound notifications behind approval, stores canonical state in SQLite, writes structured JSONL audit logs, and exposes a local FastAPI viewer.
+This repository is a shared multi-agent platform.
 
-Before writing code, the file tree created for this project was:
+`MailMind` is the first concrete agent built on top of it. It is not the platform itself.
+
+The shared reusable platform code lives under [`src/`](src).
+Concrete agents live under [`agents/`](agents).
+
+## Current Split
+
+Belongs in `src/`:
+
+- LLM abstractions and factories
+- tool abstractions, registry, executor, schemas
+- planner abstractions and reusable ReAct planning
+- memory and session-store logic
+- storage and logging abstractions
+- common schemas, ids, config helpers, interfaces
+- reusable ReAct agent runtime
+
+Belongs in `agents/mailmind/`:
+
+- email policies
+- email-specific prompts
+- MailMind config wrapper
+- MailMind-specific tool wrappers
+- MailMind entrypoints and documentation
+
+`src/mailmind/` still exists as a compatibility layer during the refactor so existing behavior does not break abruptly. New concrete-agent work should go under `agents/mailmind/`.
+
+## Target Structure
 
 ```text
-mailmind/
+project_root/
+  agents/
+    mailmind/
+      agent.py
+      cli.py
+      config.py
+      planner.py
+      prompts/
+      tools/
+      policies/
+      README.md
+    coding_agent/
+    brainstorming_agent/
+    orchestrator/
   pyproject.toml
   README.md
-  .env.example
-  config/
-    mailmind.yaml
-    mailmind.local.yaml.example
-  policies/
-    default_policy.yaml
-  data/
-    logs/
-    seed/
-  src/mailmind/
-    agents/
-    core/
-    schemas/
-    sources/
-    classifiers/
-    drafters/
-    notifiers/
-    approvals/
-    storage/
-    logs/
-    viewer/
-    cli/
-  src/LLM/
+  src/agents/
+  src/interfaces/
+  src/llm/
+  src/memory/
+  src/planner/
+  src/platform_logging/
+  src/schemas/
+  src/storage/
   src/tools/
+  src/utils/
   tests/
 ```
 
-## Architecture
+## Platform Vs Agent
 
-The code is split by responsibility under [`src/mailmind`](src/mailmind):
+Shared platform code:
 
-- [`agent`](src/mailmind/agent): the LangGraph-backed `ReActAgent`.
-- [`agents`](src/mailmind/agents): an `Agent` plus a rule-based `ToolPlanner` that converts user queries into structured tool calls.
-- [`core`](src/mailmind/core): domain models, interfaces, policy loading, and the event-driven orchestrator.
-- [`memory`](src/mailmind/memory): conversation history and session state persisted in SQLite.
-- [`interface`](src/mailmind/interface): channel adapters, including a mock WhatsApp interface.
-- [`src/LLM`](src/LLM): shared local Hugging Face LLM clients, including a reusable `HuggingFaceLLM` and a `Qwen/Qwen3-1.7B` subclass.
-- [`src/LLM`](src/LLM): shared local model clients, including Qwen for classification and Function Gemma for function-style tool selection.
-- [`schemas`](src/mailmind/schemas): shared Pydantic schemas used across tools and agents.
-- [`src/tools`](src/tools): the base tool interface, tool registry, executor, and concrete tools for fetch/search/classify/draft/notify/summary.
-- [`sources`](src/mailmind/sources): Gmail adapters. v0.1 defaults to a fake Gmail source seeded from local JSON.
-- [`classifiers`](src/mailmind/classifiers): rules-based classifier plus an optional local-LLM classifier adapter.
-- [`drafters`](src/mailmind/drafters): reply draft generation.
-- [`notifiers`](src/mailmind/notifiers): WhatsApp adapters. v0.1 ships with a safe fake notifier and a real-integration stub.
-- [`approvals`](src/mailmind/approvals): local approval queue backed by SQLite.
-- [`storage`](src/mailmind/storage): SQLite repository for messages, classifications, drafts, approvals, notifications, and processing state.
-- [`logs`](src/mailmind/logs): structured JSONL audit logging under `data/logs/`.
-- [`viewer`](src/mailmind/viewer): local-only FastAPI/Jinja viewer.
-- [`cli`](src/mailmind/cli): development and operator commands.
+- [`src/llm`](src/llm): generic LLM interfaces and factories
+- [`src/tools`](src/tools): generic tool framework
+- [`src/planner`](src/planner): generic planner interfaces and router
+- [`src/memory`](src/memory): generic session and conversation memory
+- [`src/storage`](src/storage): generic storage abstractions
+- [`src/platform_logging`](src/platform_logging): shared logging adapters
+- [`src/schemas`](src/schemas): common schemas
+- [`src/agents`](src/agents): reusable base agent and ReAct agent
+- [`src/interfaces`](src/interfaces): reusable channel adapters
+- [`src/utils`](src/utils): shared config/time/id helpers
 
-The container in [`container.py`](src/mailmind/container.py) wires the interfaces together with simple dependency injection, so future sources, notifiers, or agent channels can be swapped in without changing the orchestrator.
+MailMind concrete agent:
+
+- [`agents/mailmind`](agents/mailmind): MailMind-specific agent package
+- [`agents/mailmind/policies`](agents/mailmind/policies): MailMind policy files
+- [`agents/mailmind/tools`](agents/mailmind/tools): MailMind-specific tool wrappers
+
+Existing compatibility/runtime modules still used during migration:
+
+- [`src/mailmind`](src/mailmind): compatibility layer and existing runtime wiring
+- [`src/tools`](src/tools): the base tool interface, tool registry, executor, and currently-shared concrete tools for fetch/search/classify/draft/notify/summary.
+
+## Shared Examples
+
+Shared global LLM usage:
+
+```python
+from llm.factory import LLMFactory
+
+default_llm = LLMFactory.build_default_local_llm()
+```
+
+MailMind-specific LLM override:
+
+```python
+from agents.mailmind.agent import MailMindAgentApp
+
+mailmind_app = MailMindAgentApp.from_env()
+mailmind_llm = MailMindAgentApp.default_llm_example()
+```
+
+MailMind tool inheriting from shared `BaseTool`:
+
+```python
+from agents.mailmind.tools.email_search import MailMindEmailSearchTool
+from tools.base import BaseTool
+
+assert issubclass(MailMindEmailSearchTool, BaseTool)
+```
+
+## Adding Agents
+
+To add a new concrete agent:
+
+1. Create a new package under [`agents/`](agents), for example `agents/coding_agent/`.
+2. Put only domain-specific prompts, policies, config, and tool wrappers there.
+3. Reuse shared abstractions from [`src/llm`](src/llm), [`src/tools`](src/tools), [`src/planner`](src/planner), [`src/memory`](src/memory), [`src/storage`](src/storage), and [`src/agents`](src/agents).
+4. If a new helper is reusable beyond one agent, move it into `src/` instead of keeping it in the agent package.
+5. Keep dependency direction one-way: `agents/*` may import from `src/*`, but `src/*` must not import from `agents/*`.
+
+## MailMind
+
+MailMind remains responsible for:
+
+- fetching emails
+- classifying emails
+- searching and summarizing emails
+- drafting replies
+- handling WhatsApp notifications
+
+It consumes the shared platform rather than defining the platform.
 
 ## Tool Catalog
 
-`mailmind` now maintains a JSON tool catalog generated from the registered tools and their Pydantic input schemas. By default it is written to [`data/tool_catalog.json`](data/tool_catalog.json) and passed to Function Gemma for tool selection when planner LLM mode is enabled.
+The platform maintains a JSON tool catalog generated from registered tools and their Pydantic input schemas. By default it is written to [`data/tool_catalog.json`](data/tool_catalog.json) and can be passed to Function Gemma for tool selection.
 
 ## ReAct Graph
 

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from LLM.function_gemma import FunctionGemmaLLM
-from LLM.qwen import Qwen3_1_7BLLM
+from llm.function_gemma import FunctionGemmaLLM
+from llm.qwen import Qwen3_1_7BLLM
 from mailmind.agent.react_agent import ReActAgent
 from mailmind.agents.function_planner import FunctionCallingToolPlanner
 from mailmind.agents.llm_planner import OptionalLLMToolPlanner

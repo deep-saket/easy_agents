@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from LLM.huggingface import HuggingFaceLLM
+from llm.huggingface import HuggingFaceLLM
 
 
 @dataclass(slots=True)

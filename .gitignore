@@ -7,4 +7,5 @@ __pycache__/
 *.egg-info/
 config/*.local.yaml
 data/*.db
+data/tool_catalog.json
 data/logs/*.jsonl

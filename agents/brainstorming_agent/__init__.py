@@ -1,0 +1,2 @@
+"""Placeholder brainstorming agent package."""
+

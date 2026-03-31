@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from LLM.function_gemma import FunctionGemmaLLM
+from llm.function_gemma import FunctionGemmaLLM
 from mailmind.agents.base import BasePlanner
 from mailmind.memory.conversation import ConversationMemory
 from mailmind.schemas.tools import PlannerDecision

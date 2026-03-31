@@ -1,0 +1,2 @@
+"""Common shared platform schemas."""
+

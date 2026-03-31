@@ -1,0 +1,12 @@
+from __future__ import annotations
+
+from tools.base import BaseTool
+from tools.email_classifier import EmailClassifierTool as SharedEmailClassifierTool
+
+
+class MailMindEmailClassifierTool(SharedEmailClassifierTool):
+    """MailMind-specific wrapper over the shared classifier tool."""
+
+
+__all__ = ["BaseTool", "MailMindEmailClassifierTool"]
+

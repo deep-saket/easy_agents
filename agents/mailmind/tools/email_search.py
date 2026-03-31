@@ -1,0 +1,12 @@
+from __future__ import annotations
+
+from tools.base import BaseTool
+from tools.email_search import EmailSearchTool as SharedEmailSearchTool
+
+
+class MailMindEmailSearchTool(SharedEmailSearchTool):
+    """MailMind-specific wrapper over the shared email search tool."""
+
+
+__all__ = ["BaseTool", "MailMindEmailSearchTool"]
+

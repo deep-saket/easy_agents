@@ -7,6 +7,7 @@ from pathlib import Path
 
 import uvicorn
 
+from agents.mailmind.agent import MailMindAgentApp
 from mailmind.container import AppContainer
 from mailmind.core.models import EmailMessage
 from mailmind.viewer.app import create_app
@@ -99,24 +100,26 @@ def main() -> None:
 
     if args.command == "run-agent":
         container.repository.init_db()
-        result = container.agent.run(args.query, args.session_id)
+        result = MailMindAgentApp.from_env().run(args.query, args.session_id)
         print(result)
         return
 
     if args.command == "run-chat":
         container.repository.init_db()
+        app = MailMindAgentApp.from_env()
         print(f"Chat session: {args.session_id}")
         while True:
             user_input = input("You: ").strip()
             if user_input.lower() in {"exit", "quit"}:
                 break
-            response = container.agent.run(user_input, args.session_id)
+            response = app.run(user_input, args.session_id)
             print(f"Agent: {response}")
         return
 
     if args.command == "run-whatsapp-mock":
         container.repository.init_db()
-        response = container.agent.run(args.text, args.session_id)
+        app = MailMindAgentApp.from_env()
+        response = app.run(args.text, args.session_id)
         container.whatsapp_interface.send_message(args.session_id, response)
         print(response)
         return

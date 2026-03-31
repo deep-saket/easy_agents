@@ -61,7 +61,7 @@ def _load_dotenv(dotenv_path: Path) -> None:
 class PathSettings(BaseModel):
     db_path: Path = Path("data/mailmind.db")
     log_path: Path = Path("data/logs/audit.jsonl")
-    policy_path: Path = Path("policies/default_policy.yaml")
+    policy_path: Path = Path("agents/mailmind/policies/default_policy.yaml")
     gmail_seed_path: Path = Path("data/seed/demo_messages.json")
     tool_catalog_path: Path = Path("data/tool_catalog.json")
 

@@ -1,0 +1,2 @@
+"""MailMind concrete agent."""
+

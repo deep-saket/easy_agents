@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -n "${BASH_SOURCE[0]:-}" ]]; then
+  SCRIPT_PATH="${BASH_SOURCE[0]}"
+else
+  SCRIPT_PATH="$0"
+fi
+
+ROOT_DIR="$(cd "$(dirname "${SCRIPT_PATH}")" && pwd)"
 
 case ":${PYTHONPATH:-}:" in
-  *":${ROOT_DIR}/src:"*) ;;
+  *":${ROOT_DIR}:${ROOT_DIR}/src:"*) ;;
   *)
-    export PYTHONPATH="${ROOT_DIR}/src${PYTHONPATH:+:${PYTHONPATH}}"
+    export PYTHONPATH="${ROOT_DIR}:${ROOT_DIR}/src${PYTHONPATH:+:${PYTHONPATH}}"
     ;;
 esac
 

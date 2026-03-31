@@ -1,0 +1,2 @@
+"""Placeholder coding agent package."""
+
