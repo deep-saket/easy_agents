@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from typing import Any
+
 from tools.base import BaseTool
+from tools.catalog import build_tool_catalog_from_tools
 
 
 class ToolRegistry:
@@ -17,3 +20,6 @@ class ToolRegistry:
 
     def list_tools(self) -> list[BaseTool]:
         return list(self._tools.values())
+
+    def build_catalog(self) -> list[dict[str, Any]]:
+        return build_tool_catalog_from_tools(self.list_tools())

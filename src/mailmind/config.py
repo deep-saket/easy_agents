@@ -63,6 +63,7 @@ class PathSettings(BaseModel):
     log_path: Path = Path("data/logs/audit.jsonl")
     policy_path: Path = Path("policies/default_policy.yaml")
     gmail_seed_path: Path = Path("data/seed/demo_messages.json")
+    tool_catalog_path: Path = Path("data/tool_catalog.json")
 
 
 class RuntimeSettings(BaseModel):
@@ -92,6 +93,15 @@ class LLMSettings(BaseModel):
     enable_thinking: bool = True
 
 
+class PlannerSettings(BaseModel):
+    enabled: bool = False
+    provider: str = "function_gemma"
+    model_name: str = "google/functiongemma-270m-it"
+    device_map: str = "auto"
+    torch_dtype: str = "auto"
+    max_new_tokens: int = 128
+
+
 class IntegrationSettings(BaseModel):
     gmail_client_id: str = ""
     gmail_client_secret: str = ""
@@ -107,6 +117,7 @@ class AppSettings(BaseModel):
     notifications: NotificationSettings = Field(default_factory=NotificationSettings)
     viewer: ViewerSettings = Field(default_factory=ViewerSettings)
     llm: LLMSettings = Field(default_factory=LLMSettings)
+    planner: PlannerSettings = Field(default_factory=PlannerSettings)
     integrations: IntegrationSettings = Field(default_factory=IntegrationSettings)
 
     @classmethod
@@ -146,6 +157,7 @@ class AppSettings(BaseModel):
                 "log_path": _env_str("MAILMIND_LOG_PATH"),
                 "policy_path": _env_str("MAILMIND_POLICY_PATH"),
                 "gmail_seed_path": _env_str("MAILMIND_GMAIL_SEED_PATH"),
+                "tool_catalog_path": _env_str("MAILMIND_TOOL_CATALOG_PATH"),
             },
             "runtime": {
                 "source_mode": _env_str("MAILMIND_SOURCE"),
@@ -172,6 +184,16 @@ class AppSettings(BaseModel):
                 if os.getenv("MAILMIND_LLM_THINKING") is not None
                 else None,
             },
+            "planner": {
+                "enabled": _env_bool("MAILMIND_PLANNER_LLM_ENABLED", False)
+                if os.getenv("MAILMIND_PLANNER_LLM_ENABLED") is not None
+                else None,
+                "provider": _env_str("MAILMIND_PLANNER_PROVIDER"),
+                "model_name": _env_str("MAILMIND_PLANNER_MODEL_NAME"),
+                "device_map": _env_str("MAILMIND_PLANNER_DEVICE_MAP"),
+                "torch_dtype": _env_str("MAILMIND_PLANNER_TORCH_DTYPE"),
+                "max_new_tokens": _env_int("MAILMIND_PLANNER_MAX_NEW_TOKENS"),
+            },
             "integrations": {
                 "gmail_client_id": _env_str("MAILMIND_GMAIL_CLIENT_ID"),
                 "gmail_client_secret": _env_str("MAILMIND_GMAIL_CLIENT_SECRET"),
@@ -196,6 +218,10 @@ class AppSettings(BaseModel):
     @property
     def gmail_seed_path(self) -> Path:
         return self.paths.gmail_seed_path
+
+    @property
+    def tool_catalog_path(self) -> Path:
+        return self.paths.tool_catalog_path
 
     @property
     def source_mode(self) -> str:

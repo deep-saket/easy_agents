@@ -45,6 +45,7 @@ The code is split by responsibility under [`src/mailmind`](/Users/saketm10/Proje
 - [`memory`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/memory): conversation history and session state persisted in SQLite.
 - [`interface`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/interface): channel adapters, including a mock WhatsApp interface.
 - [`src/LLM`](/Users/saketm10/Projects/openclaw_agents/src/LLM): shared local Hugging Face LLM clients, including a reusable `HuggingFaceLLM` and a `Qwen/Qwen3-1.7B` subclass.
+- [`src/LLM`](/Users/saketm10/Projects/openclaw_agents/src/LLM): shared local model clients, including Qwen for classification and Function Gemma for function-style tool selection.
 - [`schemas`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/schemas): shared Pydantic schemas used across tools and agents.
 - [`src/tools`](/Users/saketm10/Projects/openclaw_agents/src/tools): the base tool interface, tool registry, executor, and concrete tools for fetch/search/classify/draft/notify/summary.
 - [`sources`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/sources): Gmail adapters. v0.1 defaults to a fake Gmail source seeded from local JSON.
@@ -58,6 +59,10 @@ The code is split by responsibility under [`src/mailmind`](/Users/saketm10/Proje
 - [`cli`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/cli): development and operator commands.
 
 The container in [`container.py`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/container.py) wires the interfaces together with simple dependency injection, so future sources, notifiers, or agent channels can be swapped in without changing the orchestrator.
+
+## Tool Catalog
+
+`mailmind` now maintains a JSON tool catalog generated from the registered tools and their Pydantic input schemas. By default it is written to [`data/tool_catalog.json`](/Users/saketm10/Projects/openclaw_agents/data/tool_catalog.json) and passed to Function Gemma for tool selection when planner LLM mode is enabled.
 
 ## ReAct Graph
 
@@ -108,6 +113,7 @@ The current foundation is tool-driven rather than script-driven:
 - [`ToolRegistry`](/Users/saketm10/Projects/openclaw_agents/src/tools/registry.py) holds reusable tools by name.
 - [`ToolExecutor`](/Users/saketm10/Projects/openclaw_agents/src/tools/executor.py) validates inputs, executes tools, validates outputs, and logs each execution into SQLite.
 - [`RuleBasedToolPlanner`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/agents/planner.py) does simple rule-based tool selection first.
+- [`FunctionCallingToolPlanner`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/agents/function_planner.py) uses Function Gemma for tool selection, with the rule planner as fallback.
 - [`OptionalLLMToolPlanner`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/agents/llm_planner.py) is the plug-in point for LLM-based planning and falls back to rules on errors.
 - [`ReActAgent`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/agent/react_agent.py) runs the conversational loop on top of LangGraph.
 
@@ -159,6 +165,7 @@ Runtime settings now load from [`config/mailmind.yaml`](/Users/saketm10/Projects
 - source mode and seed inbox path
 - classifier mode and optional LLM toggle
 - local LLM provider, model, and inference settings
+- planner LLM provider/model settings for tool selection
 - WhatsApp mode, destination, and allowlist
 - Twilio WhatsApp credentials and sender id
 - viewer host and port
@@ -166,6 +173,7 @@ Runtime settings now load from [`config/mailmind.yaml`](/Users/saketm10/Projects
 Environment variables still override file values when needed. The config path itself can be changed with `MAILMIND_CONFIG_PATH`.
 The application now auto-loads a local `.env` file on startup, so Gmail and Twilio credentials do not need to be exported manually in the shell.
 For local inference, install the optional extra with `pip install -e ".[local-llm]"`.
+Function Gemma tool selection is configured independently from the classifier model. The planner defaults to `google/functiongemma-270m-it`.
 
 For machine-specific secrets or private destinations, start from [`config/mailmind.local.yaml.example`](/Users/saketm10/Projects/openclaw_agents/config/mailmind.local.yaml.example) and point `MAILMIND_CONFIG_PATH` at your local copy, or keep secrets in environment variables.
 
@@ -260,7 +268,7 @@ mailmind reprocess-email <message-id>
 pytest
 ```
 
-The test suite covers policy loading, rules classification, repository round-trips, tool registry/execution, planner behavior, ReAct multi-turn behavior, WhatsApp mock behavior, orchestrator behavior, and an integration-style fake-adapter pipeline.
+The test suite covers policy loading, rules classification, repository round-trips, tool registry/execution, Function Gemma catalog/parsing, planner behavior, ReAct multi-turn behavior, WhatsApp mock behavior, orchestrator behavior, and an integration-style fake-adapter pipeline.
 
 ## Real Integration Gaps
 
@@ -268,3 +276,4 @@ The test suite covers policy loading, rules classification, repository round-tri
 - WhatsApp: provider credentials, signed API calls, rate limiting, retry semantics, and delivery receipt handling are still TODOs in [`notifiers/whatsapp.py`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/notifiers/whatsapp.py).
 - Twilio-specific env/config names are `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `MAILMIND_TWILIO_WHATSAPP_FROM`.
 - LLM classification can now run locally through [`HuggingFaceLLM`](/Users/saketm10/Projects/openclaw_agents/src/LLM/huggingface.py). [`Qwen3_1_7BLLM`](/Users/saketm10/Projects/openclaw_agents/src/LLM/qwen.py) inherits from it for `Qwen/Qwen3-1.7B`. If local inference is unavailable or returns invalid JSON, the adapter falls back to rules.
+- Tool selection can use [`FunctionGemmaLLM`](/Users/saketm10/Projects/openclaw_agents/src/LLM/function_gemma.py), which consumes the generated JSON tool catalog and returns a function-style tool call. If unavailable, planning falls back to rules.

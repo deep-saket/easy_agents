@@ -3,6 +3,7 @@ paths:
   log_path: data/logs/audit.jsonl
   policy_path: policies/default_policy.yaml
   gmail_seed_path: data/seed/demo_messages.json
+  tool_catalog_path: data/tool_catalog.json
 
 runtime:
   source_mode: fake
@@ -17,6 +18,14 @@ llm:
   torch_dtype: auto
   max_new_tokens: 384
   enable_thinking: true
+
+planner:
+  enabled: false
+  provider: function_gemma
+  model_name: google/functiongemma-270m-it
+  device_map: auto
+  torch_dtype: auto
+  max_new_tokens: 128
 
 notifications:
   whatsapp_mode: fake

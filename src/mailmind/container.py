@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from LLM.function_gemma import FunctionGemmaLLM
 from LLM.qwen import Qwen3_1_7BLLM
 from mailmind.agent.react_agent import ReActAgent
+from mailmind.agents.function_planner import FunctionCallingToolPlanner
 from mailmind.agents.llm_planner import OptionalLLMToolPlanner
 from mailmind.agents.planner import RuleBasedToolPlanner
 from mailmind.interface.whatsapp import MockWhatsAppInterface
@@ -26,6 +28,7 @@ from tools.executor import ToolExecutor
 from tools.gmail_fetch import GmailFetchTool
 from tools.notification import NotificationTool
 from tools.registry import ToolRegistry
+from tools.catalog import write_tool_catalog
 
 
 @dataclass(slots=True)
@@ -38,7 +41,7 @@ class AppContainer:
     orchestrator: MailOrchestrator
     tool_registry: ToolRegistry
     tool_executor: ToolExecutor
-    planner: RuleBasedToolPlanner | OptionalLLMToolPlanner
+    planner: RuleBasedToolPlanner | OptionalLLMToolPlanner | FunctionCallingToolPlanner
     agent: ReActAgent
     whatsapp_interface: MockWhatsAppInterface
 
@@ -86,9 +89,27 @@ class AppContainer:
         tool_registry.register(DraftReplyTool(repository=repository, drafter=drafter))
         tool_registry.register(NotificationTool(orchestrator=orchestrator))
         tool_registry.register(EmailSummaryTool(repository=repository))
+        tool_catalog = write_tool_catalog(tool_registry.list_tools(), settings.tool_catalog_path)
         tool_executor = ToolExecutor(registry=tool_registry, repository=repository)
         rule_planner = RuleBasedToolPlanner()
-        planner = OptionalLLMToolPlanner(fallback=rule_planner, llm=llm, enabled=settings.llm_enabled)
+        planner_llm = None
+        if settings.planner.enabled and settings.planner.provider == "function_gemma":
+            planner_llm = FunctionGemmaLLM(
+                model_name=settings.planner.model_name,
+                device_map=settings.planner.device_map,
+                torch_dtype=settings.planner.torch_dtype,
+                max_new_tokens=settings.planner.max_new_tokens,
+            )
+        planner = (
+            FunctionCallingToolPlanner(
+                fallback=rule_planner,
+                llm=planner_llm,
+                tool_catalog=tool_catalog,
+                enabled=settings.planner.enabled,
+            )
+            if settings.planner.provider == "function_gemma"
+            else OptionalLLMToolPlanner(fallback=rule_planner, llm=llm, enabled=settings.llm_enabled)
+        )
         agent = ReActAgent(planner=planner, executor=tool_executor, repository=repository)
         whatsapp_interface = MockWhatsAppInterface()
         return cls(
