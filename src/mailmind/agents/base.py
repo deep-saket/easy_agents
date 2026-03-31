@@ -2,11 +2,17 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from mailmind.schemas.tools import ToolPlan
+from mailmind.memory.conversation import ConversationMemory
+from mailmind.schemas.tools import PlannerDecision
 
 
 class BasePlanner(ABC):
     @abstractmethod
-    def plan(self, user_query: str) -> ToolPlan:
+    def plan(
+        self,
+        *,
+        user_input: str,
+        memory: ConversationMemory,
+        observation: dict | None = None,
+    ) -> PlannerDecision:
         raise NotImplementedError
-

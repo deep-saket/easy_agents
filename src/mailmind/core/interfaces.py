@@ -15,6 +15,7 @@ from mailmind.core.models import (
     PolicyConfig,
     ReplyDraft,
     ToolExecutionLog,
+    ConversationMessage,
 )
 
 
@@ -121,6 +122,18 @@ class MessageRepository(Protocol):
         ...
 
     def list_tool_logs(self, *, limit: int = 200, tool_name: str | None = None) -> list[ToolExecutionLog]:
+        ...
+
+    def get_conversation_state(self, session_id: str) -> dict[str, object] | None:
+        ...
+
+    def save_conversation_state(self, session_id: str, state: dict[str, object]) -> None:
+        ...
+
+    def add_conversation_message(self, message: ConversationMessage) -> ConversationMessage:
+        ...
+
+    def list_conversation_messages(self, session_id: str, limit: int = 50) -> list[ConversationMessage]:
         ...
 
     def set_processing_state(self, key: str, value: dict[str, str]) -> None:

@@ -39,8 +39,11 @@ mailmind/
 
 The code is split by responsibility under [`src/mailmind`](/Users/saketm10/Projects/openclaw_agents/src/mailmind):
 
+- [`agent`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/agent): the LangGraph-backed `ReActAgent`.
 - [`agents`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/agents): an `Agent` plus a rule-based `ToolPlanner` that converts user queries into structured tool calls.
 - [`core`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/core): domain models, interfaces, policy loading, and the event-driven orchestrator.
+- [`memory`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/memory): conversation history and session state persisted in SQLite.
+- [`interface`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/interface): channel adapters, including a mock WhatsApp interface.
 - [`src/LLM`](/Users/saketm10/Projects/openclaw_agents/src/LLM): shared local Hugging Face LLM clients, including a reusable `HuggingFaceLLM` and a `Qwen/Qwen3-1.7B` subclass.
 - [`schemas`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/schemas): shared Pydantic schemas used across tools and agents.
 - [`src/tools`](/Users/saketm10/Projects/openclaw_agents/src/tools): the base tool interface, tool registry, executor, and concrete tools for fetch/search/classify/draft/notify/summary.
@@ -56,6 +59,47 @@ The code is split by responsibility under [`src/mailmind`](/Users/saketm10/Proje
 
 The container in [`container.py`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/container.py) wires the interfaces together with simple dependency injection, so future sources, notifiers, or agent channels can be swapped in without changing the orchestrator.
 
+## ReAct Graph
+
+The conversational agent now runs as a LangGraph state machine:
+
+```text
+User / WhatsApp / CLI
+        |
+        v
+  ConversationMemory.load(session_id)
+        |
+        v
+      START
+        |
+        v
+    [reason]
+      planner.plan(user_input, memory, observation)
+        |
+        +--> respond_directly / done ----> [respond] ----> END
+        |
+        +--> tool_call ------------------> [act]
+                                           |
+                                           v
+                                 ToolExecutor.execute(...)
+                                           |
+                                           v
+                                       observation
+                                           |
+                                           v
+                                        [reason]
+```
+
+This is used for multi-turn flows such as:
+
+1. `what emails today?`
+2. `email_search`
+3. `email_summary`
+4. agent asks for clarification
+5. `job ones`
+6. `email_search(category=strong_ml_research_job)`
+7. agent responds with the narrowed result
+
 ## Tool System
 
 The current foundation is tool-driven rather than script-driven:
@@ -65,7 +109,7 @@ The current foundation is tool-driven rather than script-driven:
 - [`ToolExecutor`](/Users/saketm10/Projects/openclaw_agents/src/tools/executor.py) validates inputs, executes tools, validates outputs, and logs each execution into SQLite.
 - [`RuleBasedToolPlanner`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/agents/planner.py) does simple rule-based tool selection first.
 - [`OptionalLLMToolPlanner`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/agents/llm_planner.py) is the plug-in point for LLM-based planning and falls back to rules on errors.
-- [`Agent`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/agents/agent.py) runs `plan -> execute`, where a plan is a structured list of tool calls.
+- [`ReActAgent`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/agent/react_agent.py) runs the conversational loop on top of LangGraph.
 
 The implemented v1 tools are:
 
@@ -78,6 +122,7 @@ The implemented v1 tools are:
 
 `email_search` is the primary query tool and supports keyword, sender, category, and time-based filtering directly against SQLite.
 The current search/planner path supports queries like `emails today`, `job emails today`, `events this week`, and `emails from deepmind`.
+`email_summary` now returns structured totals and category counts for follow-up prompts.
 
 ## Design Notes
 
@@ -156,6 +201,18 @@ Run the agent planner + executor:
 mailmind run-agent "show me job emails today"
 ```
 
+Run a local multi-turn chat simulation:
+
+```bash
+mailmind run-chat --session-id demo
+```
+
+Run the mock WhatsApp entrypoint:
+
+```bash
+mailmind run-whatsapp-mock "what emails today?" --session-id wa-demo
+```
+
 Inspect registered tools from the local viewer API:
 
 ```bash
@@ -203,7 +260,7 @@ mailmind reprocess-email <message-id>
 pytest
 ```
 
-The test suite covers policy loading, rules classification, repository round-trips, tool registry/execution, planner behavior, orchestrator behavior, and an integration-style fake-adapter pipeline.
+The test suite covers policy loading, rules classification, repository round-trips, tool registry/execution, planner behavior, ReAct multi-turn behavior, WhatsApp mock behavior, orchestrator behavior, and an integration-style fake-adapter pipeline.
 
 ## Real Integration Gaps
 

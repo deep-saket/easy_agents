@@ -3,9 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from LLM.qwen import Qwen3_1_7BLLM
-from mailmind.agents.agent import Agent
+from mailmind.agent.react_agent import ReActAgent
 from mailmind.agents.llm_planner import OptionalLLMToolPlanner
 from mailmind.agents.planner import RuleBasedToolPlanner
+from mailmind.interface.whatsapp import MockWhatsAppInterface
 from mailmind.approvals.queue import LocalApprovalQueue
 from mailmind.classifiers.llm import OptionalLLMClassifierAdapter
 from mailmind.classifiers.rules import RulesBasedClassifier
@@ -38,7 +39,8 @@ class AppContainer:
     tool_registry: ToolRegistry
     tool_executor: ToolExecutor
     planner: RuleBasedToolPlanner | OptionalLLMToolPlanner
-    agent: Agent
+    agent: ReActAgent
+    whatsapp_interface: MockWhatsAppInterface
 
     @classmethod
     def from_env(cls) -> "AppContainer":
@@ -87,7 +89,8 @@ class AppContainer:
         tool_executor = ToolExecutor(registry=tool_registry, repository=repository)
         rule_planner = RuleBasedToolPlanner()
         planner = OptionalLLMToolPlanner(fallback=rule_planner, llm=llm, enabled=settings.llm_enabled)
-        agent = Agent(planner=planner, executor=tool_executor)
+        agent = ReActAgent(planner=planner, executor=tool_executor, repository=repository)
+        whatsapp_interface = MockWhatsAppInterface()
         return cls(
             settings=settings,
             policy_provider=policy_provider,
@@ -99,4 +102,5 @@ class AppContainer:
             tool_executor=tool_executor,
             planner=planner,
             agent=agent,
+            whatsapp_interface=whatsapp_interface,
         )

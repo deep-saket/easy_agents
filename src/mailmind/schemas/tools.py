@@ -28,6 +28,14 @@ class AgentRunResult(BaseModel):
     results: list[ToolExecutionResult] = Field(default_factory=list)
 
 
+class PlannerDecision(BaseModel):
+    thought: str
+    tool_call: ToolCall | None = None
+    respond_directly: bool = False
+    response_text: str | None = None
+    done: bool = False
+
+
 class GmailFetchInput(BaseModel):
     process_messages: bool = True
 
@@ -58,6 +66,8 @@ class EmailSearchInput(BaseModel):
 
 
 class EmailSearchOutput(BaseModel):
+    total: int = 0
+    categories: dict[str, int] = Field(default_factory=dict)
     emails: list[EmailSummary] = Field(default_factory=list)
 
 
@@ -90,5 +100,7 @@ class EmailSummaryInput(BaseModel):
 
 
 class EmailSummaryOutput(BaseModel):
+    total: int
+    categories: dict[str, int] = Field(default_factory=dict)
     summaries: list[EmailDetail] = Field(default_factory=list)
     combined_summary: str

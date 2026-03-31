@@ -26,7 +26,16 @@ class EmailSummaryTool(BaseTool[EmailSummaryInput, EmailSummaryOutput]):
             classification = self.repository.get_latest_classification(message_id)
             bundles.append(MessageBundle(message=message, classification=classification, draft=None))
         details = [bundle_to_detail(bundle) for bundle in bundles]
+        categories: dict[str, int] = {}
+        for detail in details:
+            label = detail.summary.category or "unclassified"
+            categories[label] = categories.get(label, 0) + 1
         combined_summary = " | ".join(
             detail.summary.summary or f"{detail.summary.subject} from {detail.summary.from_email}" for detail in details
         )
-        return EmailSummaryOutput(summaries=details, combined_summary=combined_summary)
+        return EmailSummaryOutput(
+            total=len(details),
+            categories=categories,
+            summaries=details,
+            combined_summary=combined_summary,
+        )

@@ -15,6 +15,7 @@ from mailmind.core.models import (
     NotificationAttempt,
     ReplyDraft,
     ToolExecutionLog,
+    ConversationMessage,
 )
 
 
@@ -87,6 +88,18 @@ class SQLiteMessageRepository(MessageRepository):
                     input_payload_json TEXT NOT NULL,
                     output_payload_json TEXT,
                     error TEXT,
+                    created_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS conversation_state (
+                    session_id TEXT PRIMARY KEY,
+                    state_json TEXT NOT NULL,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE TABLE IF NOT EXISTS conversation_messages (
+                    id TEXT PRIMARY KEY,
+                    session_id TEXT NOT NULL,
+                    role TEXT NOT NULL,
+                    content TEXT NOT NULL,
                     created_at TEXT NOT NULL
                 );
                 """
@@ -370,6 +383,69 @@ class SQLiteMessageRepository(MessageRepository):
                 }
             )
             for row in rows
+        ]
+
+    def get_conversation_state(self, session_id: str) -> dict[str, object] | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT state_json FROM conversation_state WHERE session_id = ?",
+                (session_id,),
+            ).fetchone()
+        return json.loads(row["state_json"]) if row else None
+
+    def save_conversation_state(self, session_id: str, state: dict[str, object]) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO conversation_state (session_id, state_json, updated_at)
+                VALUES (?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(session_id) DO UPDATE SET
+                    state_json = excluded.state_json,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (session_id, json.dumps(state)),
+            )
+
+    def add_conversation_message(self, message: ConversationMessage) -> ConversationMessage:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO conversation_messages (id, session_id, role, content, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    message.id,
+                    message.session_id,
+                    message.role,
+                    message.content,
+                    message.created_at.isoformat(),
+                ),
+            )
+        return message
+
+    def list_conversation_messages(self, session_id: str, limit: int = 50) -> list[ConversationMessage]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT id, session_id, role, content, created_at
+                FROM conversation_messages
+                WHERE session_id = ?
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (session_id, limit),
+            ).fetchall()
+        return [
+            ConversationMessage.model_validate(
+                {
+                    "id": row["id"],
+                    "session_id": row["session_id"],
+                    "role": row["role"],
+                    "content": row["content"],
+                    "created_at": row["created_at"],
+                }
+            )
+            for row in reversed(rows)
         ]
 
     def set_processing_state(self, key: str, value: dict[str, str]) -> None:

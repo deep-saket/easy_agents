@@ -26,4 +26,9 @@ class EmailSearchTool(BaseTool[EmailSearchInput, EmailSearchOutput]):
             limit=input.limit,
             only_important=input.only_important,
         )
-        return EmailSearchOutput(emails=[bundle_to_summary(bundle) for bundle in bundles])
+        summaries = [bundle_to_summary(bundle) for bundle in bundles]
+        categories: dict[str, int] = {}
+        for summary in summaries:
+            label = summary.category or "unclassified"
+            categories[label] = categories.get(label, 0) + 1
+        return EmailSearchOutput(total=len(summaries), categories=categories, emails=summaries)
