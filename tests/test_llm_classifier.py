@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from mailmind.LLM.huggingface import HuggingFaceLLM
+from LLM.huggingface import HuggingFaceLLM
 from mailmind.classifiers.llm import OptionalLLMClassifierAdapter
 from mailmind.classifiers.rules import RulesBasedClassifier
 from mailmind.core.models import Category, EmailMessage, SuggestedAction

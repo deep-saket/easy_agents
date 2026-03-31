@@ -19,7 +19,6 @@ mailmind/
     seed/
   src/mailmind/
     agents/
-    LLM/
     core/
     schemas/
     sources/
@@ -31,6 +30,8 @@ mailmind/
     logs/
     viewer/
     cli/
+  src/LLM/
+  src/tools/
   tests/
 ```
 
@@ -40,7 +41,7 @@ The code is split by responsibility under [`src/mailmind`](/Users/saketm10/Proje
 
 - [`agents`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/agents): an `Agent` plus a rule-based `ToolPlanner` that converts user queries into structured tool calls.
 - [`core`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/core): domain models, interfaces, policy loading, and the event-driven orchestrator.
-- [`LLM`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/LLM): local Hugging Face LLM clients, including a reusable `HuggingFaceLLM` and a `Qwen/Qwen3-1.7B` subclass.
+- [`src/LLM`](/Users/saketm10/Projects/openclaw_agents/src/LLM): shared local Hugging Face LLM clients, including a reusable `HuggingFaceLLM` and a `Qwen/Qwen3-1.7B` subclass.
 - [`schemas`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/schemas): shared Pydantic schemas used across tools and agents.
 - [`src/tools`](/Users/saketm10/Projects/openclaw_agents/src/tools): the base tool interface, tool registry, executor, and concrete tools for fetch/search/classify/draft/notify/summary.
 - [`sources`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/sources): Gmail adapters. v0.1 defaults to a fake Gmail source seeded from local JSON.
@@ -59,9 +60,9 @@ The container in [`container.py`](/Users/saketm10/Projects/openclaw_agents/src/m
 
 The current foundation is tool-driven rather than script-driven:
 
-- Every tool subclasses [`BaseTool`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/tools/base.py) and declares strict Pydantic input/output schemas.
-- [`ToolRegistry`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/tools/registry.py) holds reusable tools by name.
-- [`ToolExecutor`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/tools/executor.py) validates inputs, executes tools, validates outputs, and logs each execution into SQLite.
+- Every tool subclasses [`BaseTool`](/Users/saketm10/Projects/openclaw_agents/src/tools/base.py) and declares strict Pydantic input/output schemas.
+- [`ToolRegistry`](/Users/saketm10/Projects/openclaw_agents/src/tools/registry.py) holds reusable tools by name.
+- [`ToolExecutor`](/Users/saketm10/Projects/openclaw_agents/src/tools/executor.py) validates inputs, executes tools, validates outputs, and logs each execution into SQLite.
 - [`RuleBasedToolPlanner`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/agents/planner.py) does simple rule-based tool selection first.
 - [`OptionalLLMToolPlanner`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/agents/llm_planner.py) is the plug-in point for LLM-based planning and falls back to rules on errors.
 - [`Agent`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/agents/agent.py) runs `plan -> execute`, where a plan is a structured list of tool calls.
@@ -209,5 +210,4 @@ The test suite covers policy loading, rules classification, repository round-tri
 - Gmail: OAuth setup, token persistence, incremental sync state, MIME parsing, and Gmail label/archive actions are still TODOs in [`sources/gmail.py`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/sources/gmail.py).
 - WhatsApp: provider credentials, signed API calls, rate limiting, retry semantics, and delivery receipt handling are still TODOs in [`notifiers/whatsapp.py`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/notifiers/whatsapp.py).
 - Twilio-specific env/config names are `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `MAILMIND_TWILIO_WHATSAPP_FROM`.
-- LLM classification can now run locally through [`HuggingFaceLLM`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/LLM/huggingface.py). [`Qwen3_1_7BLLM`](/Users/saketm10/Projects/openclaw_agents/src/mailmind/LLM/qwen.py) inherits from it for `Qwen/Qwen3-1.7B`. If local inference is unavailable or returns invalid JSON, the adapter falls back to rules.
-  src/tools/
+- LLM classification can now run locally through [`HuggingFaceLLM`](/Users/saketm10/Projects/openclaw_agents/src/LLM/huggingface.py). [`Qwen3_1_7BLLM`](/Users/saketm10/Projects/openclaw_agents/src/LLM/qwen.py) inherits from it for `Qwen/Qwen3-1.7B`. If local inference is unavailable or returns invalid JSON, the adapter falls back to rules.

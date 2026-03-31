@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from mailmind.LLM.qwen import Qwen3_1_7BLLM
+from LLM.qwen import Qwen3_1_7BLLM
 from mailmind.agents.agent import Agent
 from mailmind.agents.llm_planner import OptionalLLMToolPlanner
 from mailmind.agents.planner import RuleBasedToolPlanner

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from mailmind.LLM.huggingface import HuggingFaceLLM
+from LLM.huggingface import HuggingFaceLLM
 from mailmind.agents.llm_planner import OptionalLLMToolPlanner
 from mailmind.agents.planner import RuleBasedToolPlanner
 
