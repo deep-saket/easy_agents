@@ -1,3 +1,8 @@
+"""Created: 2026-03-30
+
+Purpose: Tests the agent planner behavior.
+"""
+
 from datetime import datetime, timezone
 from mailmind.agents.planner import RuleBasedToolPlanner
 from mailmind.memory.conversation import ConversationMemory

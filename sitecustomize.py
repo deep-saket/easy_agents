@@ -1,4 +1,8 @@
-"""Compatibility aliases loaded automatically on interpreter startup."""
+"""Created: 2026-03-31
+
+Purpose: Compatibility aliases loaded automatically on interpreter startup.
+"""
+
 
 from __future__ import annotations
 

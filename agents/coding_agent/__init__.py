@@ -1,2 +1,6 @@
-"""Placeholder coding agent package."""
+"""Created: 2026-03-31
+
+Purpose: Placeholder coding agent package.
+"""
+
 

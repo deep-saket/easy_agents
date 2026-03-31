@@ -4,6 +4,8 @@ paths:
   policy_path: agents/mailmind/policies/default_policy.yaml
   gmail_seed_path: data/seed/demo_messages.json
   tool_catalog_path: data/tool_catalog.json
+  memory_cold_path: data/memory/cold_memories.jsonl
+  sleeping_tasks_path: data/memory/sleeping_tasks.jsonl
 
 runtime:
   source_mode: fake
@@ -26,6 +28,10 @@ planner:
   device_map: auto
   torch_dtype: auto
   max_new_tokens: 128
+
+memory:
+  hot_cache_size: 256
+  archive_after_days: 30
 
 notifications:
   whatsapp_mode: fake

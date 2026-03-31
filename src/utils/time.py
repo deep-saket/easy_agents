@@ -1,3 +1,8 @@
+"""Created: 2026-03-31
+
+Purpose: Implements the time module for the shared utils platform layer.
+"""
+
 from __future__ import annotations
 
 from mailmind.core.models import utc_now

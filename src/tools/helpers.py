@@ -1,3 +1,8 @@
+"""Created: 2026-03-30
+
+Purpose: Implements the helpers module for the shared tools platform layer.
+"""
+
 from __future__ import annotations
 
 from mailmind.core.models import MessageBundle

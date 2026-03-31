@@ -1,3 +1,8 @@
+"""Created: 2026-03-31
+
+Purpose: Implements the factory module for the shared llm platform layer.
+"""
+
 from __future__ import annotations
 
 from llm.function_gemma import FunctionGemmaLLM

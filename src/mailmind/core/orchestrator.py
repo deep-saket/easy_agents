@@ -1,7 +1,14 @@
+"""Created: 2026-03-30
+
+Purpose: Implements the orchestrator module for the shared mailmind platform layer.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 
+from memory.policies import MemoryPolicy
+from memory.store import MemoryStore
 from mailmind.core.interfaces import (
     ApprovalQueue,
     AuditLogStore,
@@ -32,6 +39,8 @@ class MailOrchestrator:
     approval_queue: ApprovalQueue
     audit_log: AuditLogStore
     notification_destination: str
+    memory_store: MemoryStore | None = None
+    memory_policy: MemoryPolicy | None = None
 
     def process_messages(self, messages: list[EmailMessage]) -> list[MessageBundle]:
         bundles: list[MessageBundle] = []
@@ -54,6 +63,21 @@ class MailOrchestrator:
                 entity_id=stored.id,
                 payload=classification.model_dump(mode="json"),
             )
+        )
+        self._write_memory(
+            {
+                "event_type": "classification",
+                "agent": "mailmind",
+                "content": classification.model_dump(mode="json"),
+                "metadata": {
+                    "agent": "mailmind",
+                    "message_id": stored.id,
+                    "category": classification.category.value,
+                    "tags": [classification.category.value, "classification"],
+                    "source": "system",
+                    "priority": "medium",
+                },
+            }
         )
 
         draft = None
@@ -152,3 +176,9 @@ class MailOrchestrator:
             ),
         )
 
+    def _write_memory(self, event: dict) -> None:
+        if self.memory_store is None or self.memory_policy is None:
+            return
+        if not self.memory_policy.should_store(event):
+            return
+        self.memory_store.add(self.memory_policy.build_item(event))

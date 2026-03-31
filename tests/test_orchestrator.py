@@ -1,3 +1,8 @@
+"""Created: 2026-03-30
+
+Purpose: Tests the orchestrator behavior.
+"""
+
 from pathlib import Path
 
 from mailmind.approvals.queue import LocalApprovalQueue

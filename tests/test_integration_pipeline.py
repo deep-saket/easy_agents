@@ -1,3 +1,8 @@
+"""Created: 2026-03-30
+
+Purpose: Tests the integration pipeline behavior.
+"""
+
 from pathlib import Path
 
 from mailmind.container import AppContainer

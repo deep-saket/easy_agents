@@ -1,3 +1,8 @@
+"""Created: 2026-03-31
+
+Purpose: Implements the remote llm module for the shared llm platform layer.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

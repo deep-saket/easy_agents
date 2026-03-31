@@ -1,3 +1,8 @@
+"""Created: 2026-03-30
+
+Purpose: Tests the policy provider behavior.
+"""
+
 from pathlib import Path
 
 from mailmind.core.policies import YAMLPolicyProvider

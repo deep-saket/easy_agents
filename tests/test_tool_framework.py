@@ -1,3 +1,8 @@
+"""Created: 2026-03-30
+
+Purpose: Tests the tool framework behavior.
+"""
+
 from pathlib import Path
 
 from pydantic import BaseModel

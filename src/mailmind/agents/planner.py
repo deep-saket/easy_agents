@@ -1,3 +1,8 @@
+"""Created: 2026-03-30
+
+Purpose: Implements the planner module for the shared mailmind platform layer.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -16,7 +21,9 @@ class RuleBasedToolPlanner(BasePlanner):
         user_input: str,
         memory: ConversationMemory,
         observation: dict | None = None,
+        memory_context: dict[str, object] | None = None,
     ) -> PlannerDecision:
+        del memory_context
         if observation is not None:
             return self._plan_from_observation(memory, observation)
 

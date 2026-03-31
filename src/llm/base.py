@@ -1,3 +1,8 @@
+"""Created: 2026-03-31
+
+Purpose: Implements the base module for the shared llm platform layer.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod

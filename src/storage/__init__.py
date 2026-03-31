@@ -1,4 +1,8 @@
-"""Reusable storage abstractions."""
+"""Created: 2026-03-31
+
+Purpose: Reusable storage abstractions.
+"""
+
 
 from storage.base import BaseStore
 from storage.json_store import JsonStore

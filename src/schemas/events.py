@@ -1,3 +1,8 @@
+"""Created: 2026-03-31
+
+Purpose: Implements the events module for the shared schemas platform layer.
+"""
+
 from __future__ import annotations
 
 from mailmind.core.models import DomainEvent, ToolExecutionLog

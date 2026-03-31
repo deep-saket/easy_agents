@@ -1,3 +1,8 @@
+"""Created: 2026-03-31
+
+Purpose: Implements the function gemma module for the shared llm platform layer.
+"""
+
 from __future__ import annotations
 
 import re

@@ -1,9 +1,15 @@
+"""Created: 2026-03-30
+
+Purpose: Implements the interfaces module for the shared mailmind platform layer.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Protocol
 
+from memory.conversation import ConversationRepository
 from mailmind.core.models import (
     ApprovalItem,
     ClassificationResult,
@@ -59,7 +65,23 @@ class ApprovalQueue(Protocol):
         ...
 
 
-class MessageRepository(Protocol):
+class MessageRepository(ConversationRepository, Protocol):
+    """Defines the full MailMind persistence contract.
+
+    `MessageRepository` is the larger MailMind-specific repository interface.
+    It extends the shared `ConversationRepository` protocol so that one storage
+    implementation can back both:
+
+    - working memory for active conversations
+    - MailMind domain storage for emails, classifications, drafts, approvals,
+      notifications, and tool logs
+
+    This explicit inheritance exists to avoid the appearance of two separate
+    conversation repository abstractions. The conversation-related methods live
+    in the shared base protocol, while MailMind adds its domain-specific
+    persistence operations here.
+    """
+
     def init_db(self) -> None:
         ...
 
@@ -122,18 +144,6 @@ class MessageRepository(Protocol):
         ...
 
     def list_tool_logs(self, *, limit: int = 200, tool_name: str | None = None) -> list[ToolExecutionLog]:
-        ...
-
-    def get_conversation_state(self, session_id: str) -> dict[str, object] | None:
-        ...
-
-    def save_conversation_state(self, session_id: str, state: dict[str, object]) -> None:
-        ...
-
-    def add_conversation_message(self, message: ConversationMessage) -> ConversationMessage:
-        ...
-
-    def list_conversation_messages(self, session_id: str, limit: int = 50) -> list[ConversationMessage]:
         ...
 
     def set_processing_state(self, key: str, value: dict[str, str]) -> None:

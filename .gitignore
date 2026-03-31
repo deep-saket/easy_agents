@@ -8,4 +8,5 @@ __pycache__/
 config/*.local.yaml
 data/*.db
 data/tool_catalog.json
+data/memory/*.jsonl
 data/logs/*.jsonl

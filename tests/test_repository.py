@@ -1,3 +1,8 @@
+"""Created: 2026-03-30
+
+Purpose: Tests the repository behavior.
+"""
+
 from pathlib import Path
 
 from mailmind.core.models import ClassificationResult, EmailMessage, SuggestedAction, Category

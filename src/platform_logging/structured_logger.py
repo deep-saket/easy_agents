@@ -1,3 +1,8 @@
+"""Created: 2026-03-31
+
+Purpose: Implements the structured logger module for the shared platform logging platform layer.
+"""
+
 from __future__ import annotations
 
 import logging as std_logging

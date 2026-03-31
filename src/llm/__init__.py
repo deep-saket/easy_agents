@@ -1,4 +1,8 @@
-"""Compatibility wrapper for the shared lowercase `llm` package."""
+"""Created: 2026-03-31
+
+Purpose: Compatibility wrapper for the shared lowercase `llm` package.
+"""
+
 
 from llm.base import BaseLLM
 from llm.factory import LLMFactory

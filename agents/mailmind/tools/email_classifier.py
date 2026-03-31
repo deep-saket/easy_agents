@@ -1,3 +1,8 @@
+"""Created: 2026-03-31
+
+Purpose: Implements the email classifier module for the mailmind agent.
+"""
+
 from __future__ import annotations
 
 from tools.base import BaseTool

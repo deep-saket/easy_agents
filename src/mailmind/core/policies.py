@@ -1,3 +1,8 @@
+"""Created: 2026-03-30
+
+Purpose: Implements the policies module for the shared mailmind platform layer.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path

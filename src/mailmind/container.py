@@ -1,7 +1,22 @@
+"""Created: 2026-03-30
+
+Purpose: Implements the container module for the shared mailmind platform layer.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 
+from memory import (
+    ColdMemoryLayer,
+    HotMemoryLayer,
+    MemoryIndexer,
+    MemoryPolicy,
+    MemoryRetriever,
+    MemoryStore,
+    SleepingMemoryQueue,
+    WarmMemoryLayer,
+)
 from llm.function_gemma import FunctionGemmaLLM
 from llm.qwen import Qwen3_1_7BLLM
 from mailmind.agent.react_agent import ReActAgent
@@ -26,6 +41,8 @@ from tools.email_search import EmailSearchTool
 from tools.email_summary import EmailSummaryTool
 from tools.executor import ToolExecutor
 from tools.gmail_fetch import GmailFetchTool
+from tools.memory_search import MemorySearchTool
+from tools.memory_write import MemoryWriteTool
 from tools.notification import NotificationTool
 from tools.registry import ToolRegistry
 from tools.catalog import write_tool_catalog
@@ -39,6 +56,9 @@ class AppContainer:
     audit_log: JSONLAuditLogStore
     source: object
     orchestrator: MailOrchestrator
+    memory_store: MemoryStore
+    memory_retriever: MemoryRetriever
+    sleeping_queue: SleepingMemoryQueue
     tool_registry: ToolRegistry
     tool_executor: ToolExecutor
     planner: RuleBasedToolPlanner | OptionalLLMToolPlanner | FunctionCallingToolPlanner
@@ -51,6 +71,19 @@ class AppContainer:
         policy_provider = YAMLPolicyProvider(settings.policy_path)
         repository = SQLiteMessageRepository(settings.db_path)
         audit_log = JSONLAuditLogStore(settings.log_path)
+        hot_layer = HotMemoryLayer(max_items=settings.memory.hot_cache_size)
+        warm_layer = WarmMemoryLayer(settings.db_path)
+        cold_layer = ColdMemoryLayer(settings.memory_cold_path)
+        memory_store = MemoryStore(
+            hot_layer=hot_layer,
+            warm_layer=warm_layer,
+            cold_layer=cold_layer,
+            indexer=MemoryIndexer(warm_layer=warm_layer),
+            archive_after_days=settings.memory.archive_after_days,
+        )
+        memory_retriever = MemoryRetriever(store=memory_store)
+        memory_policy = MemoryPolicy()
+        sleeping_queue = SleepingMemoryQueue(settings.sleeping_tasks_path)
         llm = None
         if settings.llm_enabled and settings.llm.provider == "huggingface":
             llm = Qwen3_1_7BLLM(
@@ -81,6 +114,8 @@ class AppContainer:
             approval_queue=approval_queue,
             audit_log=audit_log,
             notification_destination=settings.notification_destination,
+            memory_store=memory_store,
+            memory_policy=memory_policy,
         )
         tool_registry = ToolRegistry()
         tool_registry.register(GmailFetchTool(source=source, orchestrator=orchestrator))
@@ -89,8 +124,15 @@ class AppContainer:
         tool_registry.register(DraftReplyTool(repository=repository, drafter=drafter))
         tool_registry.register(NotificationTool(orchestrator=orchestrator))
         tool_registry.register(EmailSummaryTool(repository=repository))
+        tool_registry.register(MemorySearchTool(retriever=memory_retriever))
+        tool_registry.register(MemoryWriteTool(store=memory_store))
         tool_catalog = write_tool_catalog(tool_registry.list_tools(), settings.tool_catalog_path)
-        tool_executor = ToolExecutor(registry=tool_registry, repository=repository)
+        tool_executor = ToolExecutor(
+            registry=tool_registry,
+            repository=repository,
+            memory_store=memory_store,
+            memory_policy=memory_policy,
+        )
         rule_planner = RuleBasedToolPlanner()
         planner_llm = None
         if settings.planner.enabled and settings.planner.provider == "function_gemma":
@@ -110,7 +152,12 @@ class AppContainer:
             if settings.planner.provider == "function_gemma"
             else OptionalLLMToolPlanner(fallback=rule_planner, llm=llm, enabled=settings.llm_enabled)
         )
-        agent = ReActAgent(planner=planner, executor=tool_executor, repository=repository)
+        agent = ReActAgent(
+            planner=planner,
+            executor=tool_executor,
+            repository=repository,
+            memory_retriever=memory_retriever,
+        )
         whatsapp_interface = MockWhatsAppInterface()
         return cls(
             settings=settings,
@@ -119,6 +166,9 @@ class AppContainer:
             audit_log=audit_log,
             source=source,
             orchestrator=orchestrator,
+            memory_store=memory_store,
+            memory_retriever=memory_retriever,
+            sleeping_queue=sleeping_queue,
             tool_registry=tool_registry,
             tool_executor=tool_executor,
             planner=planner,

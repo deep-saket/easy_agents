@@ -1,3 +1,8 @@
+"""Created: 2026-03-31
+
+Purpose: Implements the function planner module for the shared mailmind platform layer.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -21,7 +26,9 @@ class FunctionCallingToolPlanner(BasePlanner):
         user_input: str,
         memory: ConversationMemory,
         observation: dict | None = None,
+        memory_context: dict[str, object] | None = None,
     ) -> PlannerDecision:
+        del memory_context
         if observation is not None or memory.state.get("pending_choice"):
             return self.fallback.plan(user_input=user_input, memory=memory, observation=observation)
         if not self.enabled or self.llm is None or not self.tool_catalog:

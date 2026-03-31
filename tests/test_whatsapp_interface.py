@@ -1,3 +1,8 @@
+"""Created: 2026-03-31
+
+Purpose: Tests the whatsapp interface behavior.
+"""
+
 from mailmind.interface.whatsapp import MockWhatsAppInterface
 
 

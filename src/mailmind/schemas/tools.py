@@ -1,3 +1,8 @@
+"""Created: 2026-03-30
+
+Purpose: Implements the tools module for the shared mailmind platform layer.
+"""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -5,6 +10,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from memory.models import MemoryItem
 from mailmind.schemas.emails import EmailDetail, EmailSummary
 
 
@@ -104,3 +110,22 @@ class EmailSummaryOutput(BaseModel):
     categories: dict[str, int] = Field(default_factory=dict)
     summaries: list[EmailDetail] = Field(default_factory=list)
     combined_summary: str
+
+
+class MemorySearchInput(BaseModel):
+    query: str = ""
+    filters: dict[str, Any] = Field(default_factory=dict)
+    limit: int = 20
+
+
+class MemorySearchOutput(BaseModel):
+    total: int = 0
+    memories: list[MemoryItem] = Field(default_factory=list)
+
+
+class MemoryWriteInput(BaseModel):
+    item: MemoryItem
+
+
+class MemoryWriteOutput(BaseModel):
+    item: MemoryItem

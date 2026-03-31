@@ -1,3 +1,8 @@
+"""Created: 2026-03-30
+
+Purpose: Implements the registry module for the shared tools platform layer.
+"""
+
 from __future__ import annotations
 
 from typing import Any

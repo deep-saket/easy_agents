@@ -1,3 +1,8 @@
+"""Created: 2026-03-31
+
+Purpose: Implements the agent module for the mailmind agent.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

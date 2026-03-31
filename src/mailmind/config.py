@@ -1,3 +1,8 @@
+"""Created: 2026-03-30
+
+Purpose: Implements the config module for the shared mailmind platform layer.
+"""
+
 from __future__ import annotations
 
 import os
@@ -64,6 +69,8 @@ class PathSettings(BaseModel):
     policy_path: Path = Path("agents/mailmind/policies/default_policy.yaml")
     gmail_seed_path: Path = Path("data/seed/demo_messages.json")
     tool_catalog_path: Path = Path("data/tool_catalog.json")
+    memory_cold_path: Path = Path("data/memory/cold_memories.jsonl")
+    sleeping_tasks_path: Path = Path("data/memory/sleeping_tasks.jsonl")
 
 
 class RuntimeSettings(BaseModel):
@@ -102,6 +109,11 @@ class PlannerSettings(BaseModel):
     max_new_tokens: int = 128
 
 
+class MemorySettings(BaseModel):
+    hot_cache_size: int = 256
+    archive_after_days: int = 30
+
+
 class IntegrationSettings(BaseModel):
     gmail_client_id: str = ""
     gmail_client_secret: str = ""
@@ -118,6 +130,7 @@ class AppSettings(BaseModel):
     viewer: ViewerSettings = Field(default_factory=ViewerSettings)
     llm: LLMSettings = Field(default_factory=LLMSettings)
     planner: PlannerSettings = Field(default_factory=PlannerSettings)
+    memory: MemorySettings = Field(default_factory=MemorySettings)
     integrations: IntegrationSettings = Field(default_factory=IntegrationSettings)
 
     @classmethod
@@ -158,6 +171,8 @@ class AppSettings(BaseModel):
                 "policy_path": _env_str("MAILMIND_POLICY_PATH"),
                 "gmail_seed_path": _env_str("MAILMIND_GMAIL_SEED_PATH"),
                 "tool_catalog_path": _env_str("MAILMIND_TOOL_CATALOG_PATH"),
+                "memory_cold_path": _env_str("MAILMIND_MEMORY_COLD_PATH"),
+                "sleeping_tasks_path": _env_str("MAILMIND_SLEEPING_TASKS_PATH"),
             },
             "runtime": {
                 "source_mode": _env_str("MAILMIND_SOURCE"),
@@ -194,6 +209,10 @@ class AppSettings(BaseModel):
                 "torch_dtype": _env_str("MAILMIND_PLANNER_TORCH_DTYPE"),
                 "max_new_tokens": _env_int("MAILMIND_PLANNER_MAX_NEW_TOKENS"),
             },
+            "memory": {
+                "hot_cache_size": _env_int("MAILMIND_MEMORY_HOT_CACHE_SIZE"),
+                "archive_after_days": _env_int("MAILMIND_MEMORY_ARCHIVE_AFTER_DAYS"),
+            },
             "integrations": {
                 "gmail_client_id": _env_str("MAILMIND_GMAIL_CLIENT_ID"),
                 "gmail_client_secret": _env_str("MAILMIND_GMAIL_CLIENT_SECRET"),
@@ -222,6 +241,14 @@ class AppSettings(BaseModel):
     @property
     def tool_catalog_path(self) -> Path:
         return self.paths.tool_catalog_path
+
+    @property
+    def memory_cold_path(self) -> Path:
+        return self.paths.memory_cold_path
+
+    @property
+    def sleeping_tasks_path(self) -> Path:
+        return self.paths.sleeping_tasks_path
 
     @property
     def source_mode(self) -> str:

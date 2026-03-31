@@ -69,6 +69,7 @@ Shared platform code:
 - [`src/tools`](src/tools): generic tool framework
 - [`src/planner`](src/planner): generic planner interfaces and router
 - [`src/memory`](src/memory): generic session and conversation memory
+- [`src/memory`](src/memory): layered long-term memory, retrieval, policies, and session memory
 - [`src/storage`](src/storage): generic storage abstractions
 - [`src/platform_logging`](src/platform_logging): shared logging adapters
 - [`src/schemas`](src/schemas): common schemas
@@ -207,6 +208,65 @@ The implemented v1 tools are:
 The current search/planner path supports queries like `emails today`, `job emails today`, `events this week`, and `emails from deepmind`.
 `email_summary` now returns structured totals and category counts for follow-up prompts.
 
+## Memory System
+
+The shared memory system is JSON-first and database-backed:
+
+- [`src/memory/models.py`](src/memory/models.py): strict `MemoryItem` and `SleepingTask` schemas
+- [`src/memory/layers.py`](src/memory/layers.py): hot in-memory cache, warm SQLite + FTS storage, cold JSON archive
+- [`src/memory/store.py`](src/memory/store.py): write routing, promotion, and archival
+- [`src/memory/retriever.py`](src/memory/retriever.py): layered retrieval and ranking
+- [`src/memory/policies.py`](src/memory/policies.py): write policy for tool execution, classification, reflection, and errors
+- [`src/memory/sleeping.py`](src/memory/sleeping.py): deferred background task queue
+
+Memory types are:
+
+- `semantic`
+- `episodic`
+- `error`
+- `reflection`
+- `task`
+
+Storage layers are:
+
+- `hot`: recent in-memory cache
+- `warm`: primary SQLite store with FTS
+- `cold`: archived JSONL storage
+
+MailMind now wires this shared memory system into:
+
+- the shared ReAct agent, which retrieves memory context before planning
+- the tool executor, which records tool execution and tool failures
+- the MailMind orchestrator, which records classification memories
+
+Example:
+
+```python
+from pathlib import Path
+
+from memory import ColdMemoryLayer, HotMemoryLayer, MemoryIndexer, MemoryItem, MemoryRetriever, MemoryStore, WarmMemoryLayer
+
+warm = WarmMemoryLayer(Path("data/mailmind.db"))
+store = MemoryStore(
+    hot_layer=HotMemoryLayer(),
+    warm_layer=warm,
+    cold_layer=ColdMemoryLayer(Path("data/memory/cold_memories.jsonl")),
+    indexer=MemoryIndexer(warm_layer=warm),
+)
+retriever = MemoryRetriever(store=store)
+
+store.add(
+    MemoryItem(
+        type="semantic",
+        layer="warm",
+        content={"fact": "User prefers research-heavy roles"},
+        metadata={"agent": "mailmind"},
+    )
+)
+
+memories = retriever.retrieve("research-heavy roles", filters={"type": "semantic"})
+```
+
 ## Design Notes
 
 - SQLite is the canonical store to keep the first version robust, inspectable, and easy to extend.
@@ -243,6 +303,7 @@ Runtime settings now load from [`config/mailmind.yaml`](config/mailmind.yaml) by
 - classifier mode and optional LLM toggle
 - local LLM provider, model, and inference settings
 - planner LLM provider/model settings for tool selection
+- memory hot-cache size, archival threshold, and cold-storage paths
 - WhatsApp mode, destination, and allowlist
 - Twilio WhatsApp credentials and sender id
 - viewer host and port

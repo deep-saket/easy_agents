@@ -1,4 +1,8 @@
-"""MailMind-specific tool exports."""
+"""Created: 2026-03-31
+
+Purpose: MailMind-specific tool exports.
+"""
+
 
 from tools.base import BaseTool
 from tools.draft_reply import DraftReplyTool
