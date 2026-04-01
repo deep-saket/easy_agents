@@ -7,9 +7,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from mailmind.core.interfaces import DraftGenerator, MessageRepository
-from mailmind.schemas.tools import DraftReplyInput, DraftReplyOutput
-from tools.base import BaseTool
+from src.mailmind.core.interfaces import DraftGenerator, MessageRepository
+from src.mailmind.schemas.tools import DraftReplyInput, DraftReplyOutput
+from src.tools.base import BaseTool
 
 
 @dataclass(slots=True)

@@ -5,7 +5,7 @@ Purpose: Implements the config module for the mailmind agent.
 
 from __future__ import annotations
 
-from utils.config import AppSettings
+from src.utils.config import AppSettings
 
 
 class MailMindSettings(AppSettings):

@@ -5,12 +5,12 @@ Purpose: Tests the repository behavior.
 
 from pathlib import Path
 
-from mailmind.core.models import ClassificationResult, EmailMessage, SuggestedAction, Category
-from mailmind.storage.repository import SQLiteMessageRepository
+from src.mailmind.core.models import ClassificationResult, EmailMessage, SuggestedAction, Category
+from src.mailmind.storage.repository import DuckDBMessageRepository
 
 
 def test_repository_round_trip(tmp_path: Path) -> None:
-    repo = SQLiteMessageRepository(tmp_path / "mailmind.db")
+    repo = DuckDBMessageRepository(tmp_path / "mailmind.db")
     repo.init_db()
     message = EmailMessage(
         source_id="abc",

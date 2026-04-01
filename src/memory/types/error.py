@@ -1,6 +1,12 @@
 """Created: 2026-03-31
 
 Purpose: Implements the error module for the shared memory platform layer.
+
+Error memory
+
+failures, bad outputs, wrong classifications, user corrections, tool failures
+warm first-class storage
+should influence future routing and tool choice
 """
 
 from __future__ import annotations
@@ -9,7 +15,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from memory.models import MemoryItem
+from src.memory.models import MemoryItem
 
 
 class ErrorMemoryContent(BaseModel):

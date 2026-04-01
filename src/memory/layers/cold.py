@@ -1,71 +1,32 @@
-"""Created: 2026-03-31
+"""Created: 2026-04-01
 
-Purpose: Implements the cold module for the shared memory platform layer.
+Purpose: Implements the cold memory layer using an archive backend.
 """
 
 from __future__ import annotations
 
-import json
+from dataclasses import dataclass
 from pathlib import Path
 
-from memory.base import BaseMemoryLayer
-from memory.layers.shared import content_to_text, filters_match
-from memory.models import MemoryItem
-from memory.types import parse_memory_item
+from src.memory.backends.archive_backend import ArchiveMemoryBackend
+from src.memory.base import BaseMemoryLayer
+from src.memory.models import MemoryRecord
 
 
+@dataclass(slots=True)
 class ColdMemoryLayer(BaseMemoryLayer):
-    """Archives long-term memories as JSONL on disk.
+    """Exposes the cold archive backend through the layer interface."""
 
-    Cold memory is the cheapest, slowest layer. It is intended for older data
-    that should remain accessible but does not need to stay in SQLite.
-    """
+    file_path: Path
 
-    def __init__(self, file_path: Path) -> None:
-        """Initializes the cold archive file.
+    def __post_init__(self) -> None:
+        self._backend = ArchiveMemoryBackend(self.file_path)
 
-        Args:
-            file_path: JSONL path used for archived memories.
-        """
-        self.file_path = file_path
-        self.file_path.parent.mkdir(parents=True, exist_ok=True)
-        self.file_path.touch(exist_ok=True)
+    def add(self, item: MemoryRecord) -> MemoryRecord:
+        return self._backend.add_record(item)
 
-    def add(self, item: MemoryItem) -> MemoryItem:
-        """Appends a memory item to the cold JSONL archive."""
-        stored = item.model_copy(update={"layer": "cold"})
-        with self.file_path.open("a", encoding="utf-8") as handle:
-            handle.write(stored.model_dump_json() + "\n")
-        return stored
+    def get(self, memory_id: str) -> MemoryRecord | None:
+        return self._backend.get_record(memory_id)
 
-    def get(self, memory_id: str) -> MemoryItem | None:
-        """Fetches an archived memory by identifier."""
-        for item in reversed(self._read_all()):
-            if item.id == memory_id:
-                return item
-        return None
-
-    def search(self, query: str, filters: dict[str, object] | None = None, limit: int = 20) -> list[MemoryItem]:
-        """Searches archived memories using linear scan and metadata filters."""
-        lowered = query.lower().strip()
-        results: list[MemoryItem] = []
-        for item in reversed(self._read_all()):
-            if not filters_match(item, filters):
-                continue
-            haystack = f"{content_to_text(item.content)} {json.dumps(item.metadata, sort_keys=True)}".lower()
-            if lowered and lowered not in haystack:
-                continue
-            results.append(item)
-            if len(results) >= limit:
-                break
-        return results
-
-    def _read_all(self) -> list[MemoryItem]:
-        """Reads the entire cold archive into typed memory objects."""
-        items: list[MemoryItem] = []
-        for line in self.file_path.read_text(encoding="utf-8").splitlines():
-            stripped = line.strip()
-            if not stripped:
-                continue
-            items.append(parse_memory_item(stripped))
-        return items
+    def search(self, query: str, filters: dict[str, object] | None = None, limit: int = 20) -> list[MemoryRecord]:
+        return self._backend.query_records(query=query, filters=filters, limit=limit)

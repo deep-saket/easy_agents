@@ -1,6 +1,6 @@
-"""Created: 2026-03-31
+"""Created: 2026-04-01
 
-Purpose: Implements the store module for the shared memory platform layer.
+Purpose: Implements the scope-aware layered memory store.
 """
 
 from __future__ import annotations
@@ -8,111 +8,88 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import timedelta
 
-from memory.base import BaseMemoryStore
-from memory.indexer import MemoryIndexer
-from memory.layers import ColdMemoryLayer, HotMemoryLayer, WarmMemoryLayer
-from memory.models import MemoryItem, utc_now
+from src.memory.base import BaseMemoryStore
+from src.memory.indexer import MemoryIndexer
+from src.memory.layers import ColdMemoryLayer, HotMemoryLayer, WarmMemoryLayer
+from src.memory.models import MemoryRecord, utc_now
 
 
 @dataclass(slots=True)
 class MemoryStore(BaseMemoryStore):
-    """Coordinates hot, warm, and cold memory layers.
-
-    The store is the main write entrypoint for long-term memory. It decides
-    where new memories should live, rehydrates archived memories when accessed,
-    and periodically archives stale warm memories into cold storage.
-    """
+    """Coordinates hot, warm, and cold storage for one memory scope."""
 
     hot_layer: HotMemoryLayer
     warm_layer: WarmMemoryLayer
     cold_layer: ColdMemoryLayer
     indexer: MemoryIndexer
     archive_after_days: int = 30
+    default_scope: str = "agent_local"
+    agent_id: str | None = None
 
-    def add(self, item: MemoryItem) -> MemoryItem:
-        """Stores a memory item in the appropriate layer.
+    def _normalize_record(self, item: MemoryRecord) -> MemoryRecord:
+        metadata = item.normalized_metadata()
+        agent_id = item.agent_id or self.agent_id or metadata.get("agent_id") or metadata.get("agent")
+        return item.model_copy(
+            update={
+                "agent_id": agent_id,
+                "scope": item.scope or self.default_scope,
+                "metadata": metadata,
+            }
+        )
 
-        Cold memories are appended directly to the archive. All other memories
-        are normalized into warm storage, and hot memories are additionally
-        cached in the hot layer.
-
-        Args:
-            item: The memory item to store.
-
-        Returns:
-            The stored memory item.
-        """
-        if item.layer == "cold":
-            return self.cold_layer.add(item)
-        stored = self.indexer.index(item.model_copy(update={"layer": "warm"}))
+    def add(self, item: MemoryRecord) -> MemoryRecord:
+        record = self._normalize_record(item)
+        if record.layer == "cold":
+            return self.cold_layer.add(record)
+        stored = self.indexer.index(record.model_copy(update={"layer": "warm"}))
         if item.layer == "hot":
             self.hot_layer.add(stored)
         return stored
 
-    def bulk_add(self, items: list[MemoryItem]) -> list[MemoryItem]:
-        """Stores multiple memory items.
-
-        Args:
-            items: Memory items to store.
-
-        Returns:
-            The stored memory items.
-        """
+    def bulk_add(self, items: list[MemoryRecord]) -> list[MemoryRecord]:
         return [self.add(item) for item in items]
 
-    def get(self, memory_id: str) -> MemoryItem | None:
-        """Retrieves a memory item and promotes it when necessary.
-
-        Lookup order is hot, warm, then cold. A cold hit is rehydrated into
-        warm storage and cached in hot storage.
-
-        Args:
-            memory_id: The unique memory identifier.
-
-        Returns:
-            The matching memory item when found, otherwise `None`.
-        """
-        hot_item = self.hot_layer.get(memory_id)
-        if hot_item is not None:
-            return hot_item
-        warm_item = self.warm_layer.get(memory_id)
-        if warm_item is not None:
-            self.hot_layer.add(warm_item)
-            return warm_item
-        cold_item = self.cold_layer.get(memory_id)
-        if cold_item is not None:
-            promoted = self.indexer.index(cold_item.model_copy(update={"layer": "warm"}))
+    def get(self, memory_id: str) -> MemoryRecord | None:
+        hot_record = self.hot_layer.get(memory_id)
+        if hot_record is not None:
+            return hot_record
+        warm_record = self.warm_layer.get(memory_id)
+        if warm_record is not None and self._matches_scope(warm_record):
+            self.hot_layer.add(warm_record)
+            return warm_record
+        cold_record = self.cold_layer.get(memory_id)
+        if cold_record is not None and self._matches_scope(cold_record):
+            promoted = self.indexer.index(cold_record.model_copy(update={"layer": "warm"}))
             self.hot_layer.add(promoted)
             return promoted
         return None
 
-    def search(self, query: str, filters: dict[str, object] | None = None, limit: int = 20) -> list[MemoryItem]:
-        """Searches the primary warm memory layer.
-
-        Retrieval orchestration across layers lives in `MemoryRetriever`. The
-        store keeps this method as the canonical direct search API.
-
-        Args:
-            query: Free-text search input.
-            filters: Optional structured filters.
-            limit: Maximum number of results to return.
-
-        Returns:
-            Matching memory items from warm storage.
-        """
-        return self.warm_layer.search(query=query, filters=filters, limit=limit)
+    def search(self, query: str, filters: dict[str, object] | None = None, limit: int = 20) -> list[MemoryRecord]:
+        scoped_filters = self._scoped_filters(filters)
+        return self.warm_layer.search(query=query, filters=scoped_filters, limit=limit)
 
     def archive_old(self) -> int:
-        """Moves stale warm memories into cold storage.
-
-        Returns:
-            The number of archived memories.
-        """
         cutoff = utc_now() - timedelta(days=self.archive_after_days)
-        candidates = self.warm_layer.list_older_than(cutoff.isoformat())
+        candidates = self.warm_layer.list_older_than(cutoff.isoformat(), scope=self.default_scope, limit=500)
         archived = 0
-        for item in candidates:
-            self.cold_layer.add(item.model_copy(update={"layer": "cold"}))
-            self.warm_layer.delete(item.id)
+        for record in candidates:
+            if not self._matches_scope(record):
+                continue
+            self.cold_layer.add(record.model_copy(update={"layer": "cold", "archived_at": utc_now()}))
+            self.warm_layer.delete(record.id)
             archived += 1
         return archived
+
+    def _scoped_filters(self, filters: dict[str, object] | None) -> dict[str, object]:
+        scoped_filters = dict(filters or {})
+        scoped_filters.setdefault("scope", self.default_scope)
+        if self.agent_id is not None and self.default_scope == "agent_local":
+            scoped_filters.setdefault("agent_id", self.agent_id)
+        return scoped_filters
+
+    def _matches_scope(self, record: MemoryRecord) -> bool:
+        if record.scope != self.default_scope:
+            return False
+        if self.default_scope == "agent_local" and self.agent_id is not None:
+            return record.agent_id == self.agent_id
+        return True

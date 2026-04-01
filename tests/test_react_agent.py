@@ -14,7 +14,7 @@ from src.mailmind.agents.planner import RuleBasedToolPlanner
 from src.mailmind.classifiers.rules import RulesBasedClassifier
 from src.mailmind.core.models import EmailMessage
 from src.mailmind.core.policies import YAMLPolicyProvider
-from src.mailmind.storage.repository import SQLiteMessageRepository
+from src.mailmind.storage.repository import DuckDBMessageRepository
 from src.mailmind.schemas.tools import PlannerDecision
 from src.tools.gmail.email_search import EmailSearchTool
 from src.tools.gmail.email_summary import EmailSummaryTool
@@ -23,7 +23,7 @@ from src.tools.registry import ToolRegistry
 
 
 def test_react_agent_handles_clarification_flow(tmp_path: Path) -> None:
-    repo = SQLiteMessageRepository(tmp_path / "mailmind.db")
+    repo = DuckDBMessageRepository(tmp_path / "mailmind.db")
     repo.init_db()
     classifier = RulesBasedClassifier(YAMLPolicyProvider(Path("policies/default_policy.yaml")))
 
@@ -84,7 +84,7 @@ class CapturePlanner:
 
 
 def test_react_agent_provides_four_memory_types_to_planner(tmp_path: Path) -> None:
-    repo = SQLiteMessageRepository(tmp_path / "mailmind.db")
+    repo = DuckDBMessageRepository(tmp_path / "mailmind.db")
     repo.init_db()
     warm_layer = WarmMemoryLayer(tmp_path / "memory.db")
     memory_store = MemoryStore(
@@ -118,7 +118,7 @@ def test_react_agent_provides_four_memory_types_to_planner(tmp_path: Path) -> No
 
 
 def test_react_agent_writes_reflection_memory_after_tool_execution(tmp_path: Path) -> None:
-    repo = SQLiteMessageRepository(tmp_path / "mailmind.db")
+    repo = DuckDBMessageRepository(tmp_path / "mailmind.db")
     repo.init_db()
     classifier = RulesBasedClassifier(YAMLPolicyProvider(Path("policies/default_policy.yaml")))
     message = EmailMessage(

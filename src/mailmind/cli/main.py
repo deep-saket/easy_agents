@@ -13,9 +13,9 @@ from pathlib import Path
 import uvicorn
 
 from agents.mailmind.agent import MailMindAgentApp
-from mailmind.container import AppContainer
-from mailmind.core.models import EmailMessage
-from mailmind.viewer.app import create_app
+from src.mailmind.container import AppContainer
+from src.mailmind.core.models import EmailMessage
+from src.mailmind.viewer.app import create_app
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -74,7 +74,7 @@ def main() -> None:
 
     if args.command == "init-db":
         container.repository.init_db()
-        print(f"Initialized SQLite database at {container.settings.db_path}")
+        print(f"Initialized DuckDB database at {container.settings.db_path}")
         return
 
     if args.command == "fetch-emails":

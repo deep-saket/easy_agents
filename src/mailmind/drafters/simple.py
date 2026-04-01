@@ -7,8 +7,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from mailmind.core.interfaces import DraftGenerator
-from mailmind.core.models import Category, ClassificationResult, EmailMessage, ReplyDraft
+from src.mailmind.core.interfaces import DraftGenerator
+from src.mailmind.core.models import Category, ClassificationResult, EmailMessage, ReplyDraft
 
 
 @dataclass(slots=True)

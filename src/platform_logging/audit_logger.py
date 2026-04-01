@@ -5,6 +5,6 @@ Purpose: Implements the audit logger module for the shared platform logging plat
 
 from __future__ import annotations
 
-from mailmind.logs.jsonl import JSONLAuditLogStore as AuditLogger
+from src.mailmind.logs.jsonl import JSONLAuditLogStore as AuditLogger
 
 __all__ = ["AuditLogger"]

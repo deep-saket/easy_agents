@@ -9,8 +9,8 @@ from pathlib import Path
 
 import yaml
 
-from mailmind.core.interfaces import PolicyProvider
-from mailmind.core.models import PolicyConfig
+from src.mailmind.core.interfaces import PolicyProvider
+from src.mailmind.core.models import PolicyConfig
 
 
 class YAMLPolicyProvider(PolicyProvider):

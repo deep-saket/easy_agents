@@ -5,7 +5,7 @@ Purpose: Tests the dotenv loading behavior.
 
 from pathlib import Path
 
-from mailmind.config import AppSettings
+from src.mailmind.config import AppSettings
 
 
 def test_dotenv_file_is_loaded(tmp_path: Path, monkeypatch) -> None:

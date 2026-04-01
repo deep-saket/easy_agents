@@ -1,0 +1,52 @@
+retention:
+  hot_max_items: 256
+  archive_after_days:
+    agent_local: 30
+    global: 180
+
+archival:
+  cold_format: jsonl
+  allow_rehydrate_to_warm: true
+
+promotion:
+  episodic_to_reflection: true
+  reflection_to_semantic: true
+  global_distillation_types:
+    - semantic
+    - reflection
+    - error
+
+write_rules:
+  tool_execution:
+    memory_type: episodic
+    scope: agent_local
+    layer: warm
+  tool_failure:
+    memory_type: error
+    scope: agent_local
+    layer: warm
+  classification:
+    memory_type: semantic
+    scope: agent_local
+    layer: warm
+  summarization:
+    memory_type: reflection
+    scope: agent_local
+    layer: warm
+  user_feedback:
+    memory_type: error
+    scope: agent_local
+    layer: warm
+  reflection:
+    memory_type: reflection
+    scope: agent_local
+    layer: warm
+  sleeping_task:
+    memory_type: task
+    scope: agent_local
+    layer: warm
+
+retrieval:
+  escalation_step_count: 3
+  confidence_threshold: 0.5
+  local_first: true

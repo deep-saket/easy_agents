@@ -7,13 +7,13 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from mailmind.classifiers.rules import RulesBasedClassifier
-from mailmind.core.models import EmailMessage
-from mailmind.core.policies import YAMLPolicyProvider
-from mailmind.storage.repository import SQLiteMessageRepository
-from tools.base import BaseTool
-from tools.executor import ToolExecutor
-from tools.registry import ToolRegistry
+from src.mailmind.classifiers.rules import RulesBasedClassifier
+from src.mailmind.core.models import EmailMessage
+from src.mailmind.core.policies import YAMLPolicyProvider
+from src.mailmind.storage.repository import DuckDBMessageRepository
+from src.tools.base import BaseTool
+from src.tools.executor import ToolExecutor
+from src.tools.registry import ToolRegistry
 
 
 class EchoInput(BaseModel):
@@ -35,7 +35,7 @@ class EchoTool(BaseTool[EchoInput, EchoOutput]):
 
 
 def test_tool_registry_and_executor_round_trip(tmp_path: Path) -> None:
-    repo = SQLiteMessageRepository(tmp_path / "mailmind.db")
+    repo = DuckDBMessageRepository(tmp_path / "mailmind.db")
     repo.init_db()
     registry = ToolRegistry()
     registry.register(EchoTool())
@@ -48,7 +48,7 @@ def test_tool_registry_and_executor_round_trip(tmp_path: Path) -> None:
 
 
 def test_email_search_filters_by_category_and_sender(tmp_path: Path) -> None:
-    repo = SQLiteMessageRepository(tmp_path / "mailmind.db")
+    repo = DuckDBMessageRepository(tmp_path / "mailmind.db")
     repo.init_db()
     classifier = RulesBasedClassifier(YAMLPolicyProvider(Path("policies/default_policy.yaml")))
     message = EmailMessage(

@@ -1,0 +1,77 @@
+memory_tables:
+  memory_records:
+    purpose: Primary structured memory record store.
+    scope: mixed
+    columns:
+      id: VARCHAR PRIMARY KEY
+      agent_id: VARCHAR
+      scope: VARCHAR NOT NULL
+      memory_type: VARCHAR NOT NULL
+      layer: VARCHAR NOT NULL
+      content_text: VARCHAR
+      content_json: JSON
+      source_type: VARCHAR
+      source_id: VARCHAR
+      tags_json: JSON
+      metadata_json: JSON
+      importance: DOUBLE
+      confidence: DOUBLE
+      created_at: TIMESTAMP NOT NULL
+      updated_at: TIMESTAMP
+      archived_at: TIMESTAMP
+      last_accessed_at: TIMESTAMP
+    indexes:
+      - "CREATE INDEX IF NOT EXISTS idx_memory_records_scope ON memory_records(scope)"
+      - "CREATE INDEX IF NOT EXISTS idx_memory_records_agent ON memory_records(agent_id)"
+      - "CREATE INDEX IF NOT EXISTS idx_memory_records_type ON memory_records(memory_type)"
+      - "CREATE INDEX IF NOT EXISTS idx_memory_records_layer ON memory_records(layer)"
+      - "CREATE INDEX IF NOT EXISTS idx_memory_records_created_at ON memory_records(created_at)"
+    retention:
+      agent_local:
+        warm_days: 30
+      global:
+        warm_days: 180
+    archive:
+      cold_format: jsonl
+  memory_links:
+    purpose: Links related memories and source records.
+    scope: mixed
+    columns:
+      id: VARCHAR PRIMARY KEY
+      from_memory_id: VARCHAR NOT NULL
+      to_memory_id: VARCHAR NOT NULL
+      link_type: VARCHAR NOT NULL
+      created_at: TIMESTAMP NOT NULL
+  memory_feedback:
+    purpose: Stores structured user and agent feedback over memory-backed decisions.
+    scope: mixed
+    columns:
+      id: VARCHAR PRIMARY KEY
+      memory_id: VARCHAR
+      agent_id: VARCHAR
+      feedback_type: VARCHAR NOT NULL
+      payload_json: JSON NOT NULL
+      created_at: TIMESTAMP NOT NULL
+  memory_reflections:
+    purpose: Stores distilled reflections and promotion candidates.
+    scope: mixed
+    columns:
+      id: VARCHAR PRIMARY KEY
+      source_memory_id: VARCHAR
+      agent_id: VARCHAR
+      scope: VARCHAR NOT NULL
+      summary_text: VARCHAR
+      payload_json: JSON
+      created_at: TIMESTAMP NOT NULL
+  memory_tasks:
+    purpose: Stores deferred background memory jobs.
+    scope: mixed
+    columns:
+      id: VARCHAR PRIMARY KEY
+      agent_id: VARCHAR
+      task_type: VARCHAR NOT NULL
+      status: VARCHAR NOT NULL
+      priority: INTEGER NOT NULL
+      payload_json: JSON NOT NULL
+      created_at: TIMESTAMP NOT NULL
+      updated_at: TIMESTAMP

@@ -7,8 +7,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from mailmind.memory.conversation import ConversationMemory
-from mailmind.schemas.tools import PlannerDecision
+from src.mailmind.memory.conversation import ConversationMemory
+from src.mailmind.schemas.tools import PlannerDecision
 
 
 class BasePlanner(ABC):

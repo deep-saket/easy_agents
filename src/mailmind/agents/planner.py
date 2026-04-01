@@ -8,9 +8,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, time, timedelta, timezone
 
-from mailmind.agents.base import BasePlanner
-from mailmind.memory.conversation import ConversationMemory
-from mailmind.schemas.tools import PlannerDecision, ToolCall
+from src.mailmind.agents.base import BasePlanner
+from src.mailmind.memory.conversation import ConversationMemory
+from src.mailmind.schemas.tools import PlannerDecision, ToolCall
 
 
 @dataclass(slots=True)

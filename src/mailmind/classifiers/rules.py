@@ -7,8 +7,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from mailmind.core.interfaces import MessageClassifier, PolicyProvider
-from mailmind.core.models import Category, ClassificationResult, EmailMessage, SuggestedAction
+from src.mailmind.core.interfaces import MessageClassifier, PolicyProvider
+from src.mailmind.core.models import Category, ClassificationResult, EmailMessage, SuggestedAction
 
 
 @dataclass(slots=True)

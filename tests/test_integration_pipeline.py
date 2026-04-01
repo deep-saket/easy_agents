@@ -5,7 +5,7 @@ Purpose: Tests the integration pipeline behavior.
 
 from pathlib import Path
 
-from mailmind.container import AppContainer
+from src.mailmind.container import AppContainer
 
 
 def test_integration_pipeline_with_fake_adapters(tmp_path: Path, monkeypatch) -> None:

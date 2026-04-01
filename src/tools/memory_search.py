@@ -6,17 +6,17 @@ Purpose: Implements the memory search module for the shared tools platform layer
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
-from memory.retriever import MemoryRetriever
-from mailmind.schemas.tools import MemorySearchInput, MemorySearchOutput
-from tools.base import BaseTool
+from src.mailmind.schemas.tools import MemorySearchInput, MemorySearchOutput
+from src.tools.base import BaseTool
 
 
 @dataclass(slots=True)
 class MemorySearchTool(BaseTool[MemorySearchInput, MemorySearchOutput]):
     """Exposes long-term memory retrieval through the shared tool interface."""
 
-    retriever: MemoryRetriever
+    retriever: Any
     name: str = "memory_search"
     description: str = "Search layered long-term memory across hot, warm, and cold storage."
     input_schema = MemorySearchInput

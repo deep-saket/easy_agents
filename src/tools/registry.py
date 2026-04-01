@@ -7,8 +7,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from tools.base import BaseTool
-from tools.catalog import build_tool_catalog_from_tools
+from src.tools.base import BaseTool
+from src.tools.catalog import build_tool_catalog_from_tools
 
 
 class ToolRegistry:

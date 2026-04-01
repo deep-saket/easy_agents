@@ -7,10 +7,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from LLM.huggingface import HuggingFaceLLM
-from mailmind.classifiers.llm import OptionalLLMClassifierAdapter
-from mailmind.classifiers.rules import RulesBasedClassifier
-from mailmind.core.models import Category, EmailMessage, SuggestedAction
-from mailmind.core.policies import YAMLPolicyProvider
+from src.mailmind.classifiers.llm import OptionalLLMClassifierAdapter
+from src.mailmind.classifiers.rules import RulesBasedClassifier
+from src.mailmind.core.models import Category, EmailMessage, SuggestedAction
+from src.mailmind.core.policies import YAMLPolicyProvider
 
 
 @dataclass(slots=True)

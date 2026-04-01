@@ -1,19 +1,20 @@
-"""Created: 2026-03-31
+"""Created: 2026-04-01
 
-Purpose: Reusable layered memory system and conversation session helpers.
+Purpose: Exposes the shared memory platform API.
 """
 
-
-from memory.conversation import ConversationMemory
-from memory.indexer import MemoryIndexer
-from memory.layers import ColdMemoryLayer, HotMemoryLayer, WarmMemoryLayer
-from memory.models import MemoryItem, MemoryQuery, MemorySearchResult, SleepingTask
-from memory.policies import MemoryPolicy
-from memory.retriever import MemoryRetriever
-from memory.session_store import SessionStore
-from memory.sleeping import SleepingMemoryQueue
-from memory.store import MemoryStore
-from memory.types import (
+from src.memory.conversation import ConversationMemory
+from src.memory.indexer import MemoryIndexer
+from src.memory.layers import ColdMemoryLayer, HotMemoryLayer, WarmMemoryLayer
+from src.memory.models import MemoryItem, MemoryQuery, MemoryRecord, MemorySearchResult, RetrievalContext, SleepingTask
+from src.memory.policies import MemoryPolicy
+from src.memory.retriever import MemoryRetriever
+from src.memory.router import MemoryRouter
+from src.memory.service import MemoryService
+from src.memory.session_store import SessionStore
+from src.memory.sleeping import SleepingMemoryQueue
+from src.memory.store import MemoryStore
+from src.memory.types import (
     EpisodicMemory,
     ErrorMemory,
     ErrorMemoryContent,
@@ -31,10 +32,13 @@ __all__ = [
     "HotMemoryLayer",
     "MemoryIndexer",
     "MemoryItem",
+    "MemoryRecord",
     "MemoryPolicy",
     "MemoryQuery",
     "MemoryRetriever",
+    "MemoryRouter",
     "MemorySearchResult",
+    "MemoryService",
     "MemoryStore",
     "ProceduralMemory",
     "ReflectionMemory",
@@ -43,6 +47,7 @@ __all__ = [
     "SessionStore",
     "SleepingMemoryQueue",
     "SleepingTask",
+    "RetrievalContext",
     "TaskMemory",
     "WarmMemoryLayer",
     "WorkingMemory",

@@ -7,8 +7,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from mailmind.core.interfaces import MessageRepository
-from mailmind.core.models import ConversationMessage
+from src.mailmind.core.interfaces import MessageRepository
+from src.mailmind.core.models import ConversationMessage
 
 
 @dataclass(slots=True)

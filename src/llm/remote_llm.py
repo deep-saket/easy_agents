@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from llm.base import BaseLLM
+from src.llm.base import BaseLLM
 
 
 @dataclass(slots=True)

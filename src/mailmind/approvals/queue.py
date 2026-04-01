@@ -8,8 +8,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from mailmind.core.interfaces import ApprovalQueue, MessageRepository
-from mailmind.core.models import ApprovalItem, ApprovalStatus
+from src.mailmind.core.interfaces import ApprovalQueue, MessageRepository
+from src.mailmind.core.models import ApprovalItem, ApprovalStatus
 
 
 @dataclass(slots=True)

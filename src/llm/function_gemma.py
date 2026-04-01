@@ -9,7 +9,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from mailmind.schemas.tools import ToolCall
+from src.mailmind.schemas.tools import ToolCall
 
 
 @dataclass(slots=True)

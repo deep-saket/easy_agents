@@ -1,6 +1,14 @@
 """Created: 2026-03-31
 
 Purpose: Implements the working module for the shared memory platform layer.
+
+Working memory
+
+short-lived
+current chat state, pending clarification, selected email, last tool results
+usually hot only
+optionally checkpointed to warm for recovery
+
 """
 
 from __future__ import annotations

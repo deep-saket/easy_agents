@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Protocol
 
-from schemas.messages import ConversationMessage
+from src.schemas.messages import ConversationMessage
 
 
 class ConversationRepository(Protocol):
@@ -25,7 +25,7 @@ class ConversationRepository(Protocol):
     - temporary per-session planner state
 
     Any repository that implements these methods can back `ConversationMemory`,
-    whether the implementation uses SQLite, Redis, files, or an in-memory test
+    whether the implementation uses DuckDB, Redis, files, or an in-memory test
     double.
     """
 

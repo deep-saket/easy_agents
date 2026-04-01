@@ -5,9 +5,9 @@ Purpose: Tests the classifier behavior.
 
 from pathlib import Path
 
-from mailmind.classifiers.rules import RulesBasedClassifier
-from mailmind.core.models import Category, EmailMessage, SuggestedAction
-from mailmind.core.policies import YAMLPolicyProvider
+from src.mailmind.classifiers.rules import RulesBasedClassifier
+from src.mailmind.core.models import Category, EmailMessage, SuggestedAction
+from src.mailmind.core.policies import YAMLPolicyProvider
 
 
 def test_rules_classifier_marks_research_role_high_priority() -> None:

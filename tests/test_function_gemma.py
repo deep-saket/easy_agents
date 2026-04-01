@@ -7,13 +7,13 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from LLM.function_gemma import FunctionGemmaLLM
-from mailmind.agents.function_planner import FunctionCallingToolPlanner
-from mailmind.agents.planner import RuleBasedToolPlanner
-from mailmind.memory.conversation import ConversationMemory
-from mailmind.storage.repository import SQLiteMessageRepository
-from tools.base import BaseTool
-from tools.catalog import build_tool_catalog_from_tools
-from tools.registry import ToolRegistry
+from src.mailmind.agents.function_planner import FunctionCallingToolPlanner
+from src.mailmind.agents.planner import RuleBasedToolPlanner
+from src.mailmind.memory.conversation import ConversationMemory
+from src.mailmind.storage.repository import DuckDBMessageRepository
+from src.tools.base import BaseTool
+from src.tools.catalog import build_tool_catalog_from_tools
+from src.tools.registry import ToolRegistry
 from pydantic import BaseModel
 
 
@@ -62,7 +62,7 @@ def test_tool_catalog_builds_function_schema() -> None:
 
 
 def test_function_planner_uses_function_gemma_for_tool_selection(tmp_path: Path) -> None:
-    repo = SQLiteMessageRepository(tmp_path / "planner.db")
+    repo = DuckDBMessageRepository(tmp_path / "planner.db")
     repo.init_db()
     memory = ConversationMemory.load("function-gemma", repo)
     registry = ToolRegistry()

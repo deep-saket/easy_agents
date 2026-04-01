@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from memory.conversation import ConversationMemory
+from src.memory.conversation import ConversationMemory
 
 
 @dataclass(slots=True)

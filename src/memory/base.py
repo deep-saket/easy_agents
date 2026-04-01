@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from memory.models import MemoryItem
+from src.memory.models import MemoryItem
 
 
 class BaseMemoryLayer(ABC):
@@ -18,7 +18,7 @@ class BaseMemoryLayer(ABC):
     pattern:
 
     - `HotMemoryLayer` keeps a bounded in-process cache for very recent items.
-    - `WarmMemoryLayer` keeps the primary searchable store in SQLite.
+    - `WarmMemoryLayer` keeps the primary searchable store in DuckDB.
     - `ColdMemoryLayer` keeps archived memories in JSONL for cheap retention.
 
     The important point is that a layer does not decide *which* memories should

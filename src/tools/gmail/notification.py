@@ -7,9 +7,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from mailmind.core.orchestrator import MailOrchestrator
-from mailmind.schemas.tools import NotificationInput, NotificationOutput
-from tools.base import BaseTool
+from src.mailmind.core.orchestrator import MailOrchestrator
+from src.mailmind.schemas.tools import NotificationInput, NotificationOutput
+from src.tools.base import BaseTool
 
 
 @dataclass(slots=True)

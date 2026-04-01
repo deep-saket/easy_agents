@@ -4,14 +4,14 @@ Purpose: Tests the agent planner behavior.
 """
 
 from datetime import datetime, timezone
-from mailmind.agents.planner import RuleBasedToolPlanner
-from mailmind.memory.conversation import ConversationMemory
-from mailmind.storage.repository import SQLiteMessageRepository
+from src.mailmind.agents.planner import RuleBasedToolPlanner
+from src.mailmind.memory.conversation import ConversationMemory
+from src.mailmind.storage.repository import DuckDBMessageRepository
 
 
 def test_planner_maps_job_emails_today_to_search_tool(tmp_path) -> None:
     planner = RuleBasedToolPlanner()
-    repo = SQLiteMessageRepository(tmp_path / "planner.db")
+    repo = DuckDBMessageRepository(tmp_path / "planner.db")
     repo.init_db()
     memory = ConversationMemory.load("planner-1", repo)
     decision = planner.plan(user_input="show me job emails today", memory=memory)
@@ -23,7 +23,7 @@ def test_planner_maps_job_emails_today_to_search_tool(tmp_path) -> None:
 
 def test_planner_maps_sender_queries(tmp_path) -> None:
     planner = RuleBasedToolPlanner()
-    repo = SQLiteMessageRepository(tmp_path / "planner.db")
+    repo = DuckDBMessageRepository(tmp_path / "planner.db")
     repo.init_db()
     memory = ConversationMemory.load("planner-2", repo)
     decision = planner.plan(user_input="emails from deepmind", memory=memory)

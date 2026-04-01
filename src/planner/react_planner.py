@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from planner.base import BasePlanner
+from src.planner.base import BasePlanner
 
 
 @dataclass(slots=True)

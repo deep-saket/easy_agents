@@ -7,9 +7,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from memory.policies import MemoryPolicy
-from memory.store import MemoryStore
-from mailmind.core.interfaces import (
+from src.memory.policies import MemoryPolicy
+from src.memory.store import MemoryStore
+from src.mailmind.core.interfaces import (
     ApprovalQueue,
     AuditLogStore,
     DraftGenerator,
@@ -17,7 +17,7 @@ from mailmind.core.interfaces import (
     MessageRepository,
     Notifier,
 )
-from mailmind.core.models import (
+from src.mailmind.core.models import (
     ApprovalItem,
     ApprovalKind,
     ClassificationResult,

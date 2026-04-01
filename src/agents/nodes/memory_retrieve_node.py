@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from src.agents.nodes.types import ReActState
+from src.memory.models import RetrievalContext
 from src.memory.types import ProceduralMemory, WorkingMemory
 from src.tools.registry import ToolRegistry
 
@@ -47,8 +48,25 @@ class MemoryRetrieveNode:
         semantic_memories: list[Any] = []
         episodic_memories: list[Any] = []
         if self.memory_retriever is not None:
-            semantic_memories = self.memory_retriever.retrieve(user_input, filters={"type": "semantic"}, limit=5)
-            episodic_memories = self.memory_retriever.retrieve(user_input, filters={"type": "episodic"}, limit=5)
+            memory_state = dict(getattr(memory, "state", {}))
+            context = RetrievalContext(
+                agent_id=str(memory_state.get("agent_id", "mailmind")),
+                step_count=state.get("steps", 0),
+                confidence=float(state.get("confidence", 1.0) or 1.0),
+                last_error=bool(memory_state.get("last_error", False)),
+            )
+            semantic_memories = self._retrieve(
+                user_input,
+                filters={"type": "semantic", "agent_id": context.agent_id},
+                limit=5,
+                context=context,
+            )
+            episodic_memories = self._retrieve(
+                user_input,
+                filters={"type": "episodic", "agent_id": context.agent_id},
+                limit=5,
+                context=context,
+            )
         working_memory = WorkingMemory(
             session_id=session_id,
             current_goal=user_input,
@@ -71,3 +89,17 @@ class MemoryRetrieveNode:
                 "procedural": procedural_memory,
             }
         }
+
+    def _retrieve(
+        self,
+        query: str,
+        *,
+        filters: dict[str, object],
+        limit: int,
+        context: RetrievalContext,
+    ) -> list[Any]:
+        """Calls either a context-aware router or a legacy local retriever."""
+        try:
+            return self.memory_retriever.retrieve(query, filters=filters, limit=limit, context=context)
+        except TypeError:
+            return self.memory_retriever.retrieve(query, filters=filters, limit=limit)

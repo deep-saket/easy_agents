@@ -9,8 +9,8 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Protocol
 
-from memory.conversation import ConversationRepository
-from mailmind.core.models import (
+from src.memory.conversation import ConversationRepository
+from src.mailmind.core.models import (
     ApprovalItem,
     ClassificationResult,
     DomainEvent,

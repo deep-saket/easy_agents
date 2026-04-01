@@ -5,7 +5,7 @@ Purpose: Tests the config behavior.
 
 from pathlib import Path
 
-from mailmind.config import AppSettings
+from src.mailmind.config import AppSettings
 
 
 def test_app_settings_load_from_config_file(tmp_path: Path, monkeypatch) -> None:

@@ -10,7 +10,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from memory.models import MemoryItem
+from src.memory.models import MemoryItem
 
 
 def content_to_jsonable(content: Any) -> Any:
@@ -34,8 +34,18 @@ def filters_match(item: MemoryItem, filters: dict[str, object] | None) -> bool:
             continue
         if key == "type" and item.type != value:
             return False
+        if key == "memory_type" and item.type != value:
+            return False
         if key == "layer" and item.layer != value:
             return False
+        if key == "scope" and item.scope != value:
+            return False
+        if key in {"agent", "agent_id"} and item.agent_id != value:
+            return False
+        if key == "tags":
+            expected_tags = value if isinstance(value, list) else [value]
+            if not all(tag in item.tags for tag in expected_tags):
+                return False
         if key == "metadata":
             expected = value if isinstance(value, dict) else {}
             for metadata_key, metadata_value in expected.items():
@@ -47,6 +57,6 @@ def filters_match(item: MemoryItem, filters: dict[str, object] | None) -> bool:
                     continue
                 if item.normalized_metadata().get(metadata_key) != metadata_value:
                     return False
-        if key in {"agent", "source", "priority"} and item.normalized_metadata().get(key) != value:
+        if key in {"source", "priority", "source_type", "source_id"} and item.normalized_metadata().get(key) != value:
             return False
     return True

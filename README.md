@@ -189,7 +189,7 @@ The current foundation is tool-driven rather than script-driven:
 
 - Every tool subclasses [`BaseTool`](src/tools/base.py) and declares strict Pydantic input/output schemas.
 - [`ToolRegistry`](src/tools/registry.py) holds reusable tools by name.
-- [`ToolExecutor`](src/tools/executor.py) validates inputs, executes tools, validates outputs, and logs each execution into SQLite.
+- [`ToolExecutor`](src/tools/executor.py) validates inputs, executes tools, validates outputs, and logs each execution into DuckDB plus JSONL audit logs.
 - [`RuleBasedToolPlanner`](src/mailmind/agents/planner.py) does simple rule-based tool selection first.
 - [`FunctionCallingToolPlanner`](src/mailmind/agents/function_planner.py) uses Function Gemma for tool selection, with the rule planner as fallback.
 - [`OptionalLLMToolPlanner`](src/mailmind/agents/llm_planner.py) is the plug-in point for LLM-based planning and falls back to rules on errors.
@@ -204,7 +204,7 @@ The implemented v1 tools are:
 - `notification`
 - `email_summary`
 
-`email_search` is the primary query tool and supports keyword, sender, category, and time-based filtering directly against SQLite.
+`email_search` is the primary query tool and supports keyword, sender, category, and time-based filtering directly against DuckDB.
 The current search/planner path supports queries like `emails today`, `job emails today`, `events this week`, and `emails from deepmind`.
 `email_summary` now returns structured totals and category counts for follow-up prompts.
 
@@ -213,7 +213,7 @@ The current search/planner path supports queries like `emails today`, `job email
 The shared memory system is JSON-first and database-backed:
 
 - [`src/memory/models.py`](src/memory/models.py): strict `MemoryItem` and `SleepingTask` schemas
-- [`src/memory/layers.py`](src/memory/layers.py): hot in-memory cache, warm SQLite + FTS storage, cold JSON archive
+- [`src/memory/layers`](src/memory/layers): hot in-memory cache, warm DuckDB storage, cold JSON archive
 - [`src/memory/store.py`](src/memory/store.py): write routing, promotion, and archival
 - [`src/memory/retriever.py`](src/memory/retriever.py): layered retrieval and ranking
 - [`src/memory/policies.py`](src/memory/policies.py): write policy for tool execution, classification, reflection, and errors
@@ -230,7 +230,7 @@ Memory types are:
 Storage layers are:
 
 - `hot`: recent in-memory cache
-- `warm`: primary SQLite store with FTS
+- `warm`: primary DuckDB store for structured search and retrieval
 - `cold`: archived JSONL storage
 
 MailMind now wires this shared memory system into:
@@ -269,8 +269,8 @@ memories = retriever.retrieve("research-heavy roles", filters={"type": "semantic
 
 ## Design Notes
 
-- SQLite is the canonical store to keep the first version robust, inspectable, and easy to extend.
-- SQLite now also stores `tool_logs`, so agent/tool execution is queryable locally.
+- DuckDB is the canonical local store for operational data and warm memory.
+- DuckDB also stores `tool_logs`, so agent/tool execution is queryable locally.
 - Structured audit logs are written separately to JSONL so side effects and domain events remain easy to inspect outside the database.
 - Policies are YAML-driven through [`policies/default_policy.yaml`](policies/default_policy.yaml), which keeps prioritization easy to tune without editing code.
 - External integrations are stubbed safely. Search for `TODO` markers before wiring real Gmail OAuth or WhatsApp provider credentials.
@@ -297,7 +297,7 @@ source ./setup.sh
 
 Runtime settings now load from [`config/mailmind.yaml`](config/mailmind.yaml) by default. This is the main place to configure:
 
-- SQLite path and JSONL log path
+- DuckDB path and JSONL log path
 - policy file path
 - source mode and seed inbox path
 - classifier mode and optional LLM toggle

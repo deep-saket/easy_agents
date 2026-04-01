@@ -7,7 +7,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from memory import (
+from src.memory import (
     ColdMemoryLayer,
     EpisodicMemory,
     ErrorMemory,
@@ -20,11 +20,11 @@ from memory import (
     MemoryStore,
     WarmMemoryLayer,
 )
-from mailmind.storage.repository import SQLiteMessageRepository
-from tools.base import BaseTool
-from tools.executor import ToolExecutor
-from tools.memory_write import MemoryWriteTool
-from tools.registry import ToolRegistry
+from src.mailmind.storage.repository import DuckDBMessageRepository
+from src.tools.base import BaseTool
+from src.tools.executor import ToolExecutor
+from src.tools.memory_write import MemoryWriteTool
+from src.tools.registry import ToolRegistry
 
 
 class FailingInput(BaseModel):
@@ -84,7 +84,7 @@ def test_memory_store_and_retriever_promote_cold_items(tmp_path: Path) -> None:
 
 def test_memory_write_tool_and_executor_policy_capture(tmp_path: Path) -> None:
     store = build_store(tmp_path)
-    repo = SQLiteMessageRepository(tmp_path / "mailmind.db")
+    repo = DuckDBMessageRepository(tmp_path / "mailmind.db")
     repo.init_db()
     registry = ToolRegistry()
     registry.register(MemoryWriteTool(store=store))
@@ -107,7 +107,7 @@ def test_memory_write_tool_and_executor_policy_capture(tmp_path: Path) -> None:
 
 def test_tool_failures_are_recorded_as_error_memory(tmp_path: Path) -> None:
     store = build_store(tmp_path)
-    repo = SQLiteMessageRepository(tmp_path / "mailmind.db")
+    repo = DuckDBMessageRepository(tmp_path / "mailmind.db")
     repo.init_db()
     registry = ToolRegistry()
     registry.register(FailingTool())

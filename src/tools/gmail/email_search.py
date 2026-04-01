@@ -7,10 +7,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from mailmind.core.interfaces import MessageRepository
-from mailmind.schemas.tools import EmailSearchInput, EmailSearchOutput
-from tools.base import BaseTool
-from tools.helpers import bundle_to_summary
+from src.mailmind.core.interfaces import MessageRepository
+from src.mailmind.schemas.tools import EmailSearchInput, EmailSearchOutput
+from src.tools.base import BaseTool
+from src.tools.gmail.helpers import bundle_to_summary
 
 
 @dataclass(slots=True)

@@ -10,8 +10,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from memory.models import MemoryItem
-from mailmind.schemas.emails import EmailDetail, EmailSummary
+from src.memory.models import MemoryItem
+from src.mailmind.schemas.emails import EmailDetail, EmailSummary
 
 
 class ToolCall(BaseModel):

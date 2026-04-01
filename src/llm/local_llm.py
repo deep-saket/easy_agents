@@ -8,9 +8,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from llm.function_gemma import FunctionGemmaLLM
-from llm.huggingface import HuggingFaceLLM
-from llm.base import BaseLLM
+from src.llm.function_gemma import FunctionGemmaLLM
+from src.llm.huggingface import HuggingFaceLLM
+from src.llm.base import BaseLLM
 
 
 @dataclass(slots=True)

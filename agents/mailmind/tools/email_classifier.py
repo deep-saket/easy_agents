@@ -5,8 +5,8 @@ Purpose: Implements the email classifier module for the mailmind agent.
 
 from __future__ import annotations
 
-from tools.base import BaseTool
-from tools.email_classifier import EmailClassifierTool as SharedEmailClassifierTool
+from src.tools.base import BaseTool
+from src.tools.gmail.email_classifier import EmailClassifierTool as SharedEmailClassifierTool
 
 
 class MailMindEmailClassifierTool(SharedEmailClassifierTool):
@@ -14,4 +14,3 @@ class MailMindEmailClassifierTool(SharedEmailClassifierTool):
 
 
 __all__ = ["BaseTool", "MailMindEmailClassifierTool"]
-

@@ -3,7 +3,7 @@
 Purpose: Tests the whatsapp interface behavior.
 """
 
-from mailmind.interface.whatsapp import MockWhatsAppInterface
+from src.mailmind.interface.whatsapp import MockWhatsAppInterface
 
 
 def test_mock_whatsapp_interface_captures_outbound_messages() -> None:

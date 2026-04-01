@@ -7,9 +7,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from memory.store import MemoryStore
-from mailmind.schemas.tools import MemoryWriteInput, MemoryWriteOutput
-from tools.base import BaseTool
+from src.memory.store import MemoryStore
+from src.mailmind.schemas.tools import MemoryWriteInput, MemoryWriteOutput
+from src.tools.base import BaseTool
 
 
 @dataclass(slots=True)

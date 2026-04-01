@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from mailmind.core.models import EmailMessage
+from src.mailmind.core.models import EmailMessage
 
 
 class FakeGmailEmailSource:

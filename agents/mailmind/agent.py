@@ -7,8 +7,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from llm.factory import LLMFactory
-from mailmind.container import AppContainer
+from src.llm.factory import LLMFactory
+from src.mailmind.container import AppContainer
 
 
 @dataclass(slots=True)

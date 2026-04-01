@@ -5,19 +5,19 @@ Purpose: Tests the orchestrator behavior.
 
 from pathlib import Path
 
-from mailmind.approvals.queue import LocalApprovalQueue
-from mailmind.classifiers.rules import RulesBasedClassifier
-from mailmind.core.orchestrator import MailOrchestrator
-from mailmind.core.policies import YAMLPolicyProvider
-from mailmind.drafters.simple import SimpleReplyDrafter
-from mailmind.logs.jsonl import JSONLAuditLogStore
-from mailmind.notifiers.whatsapp import FakeWhatsAppNotifier
-from mailmind.storage.repository import SQLiteMessageRepository
-from mailmind.sources.gmail import FakeGmailEmailSource
+from src.mailmind.approvals.queue import LocalApprovalQueue
+from src.mailmind.classifiers.rules import RulesBasedClassifier
+from src.mailmind.core.orchestrator import MailOrchestrator
+from src.mailmind.core.policies import YAMLPolicyProvider
+from src.mailmind.drafters.simple import SimpleReplyDrafter
+from src.mailmind.logs.jsonl import JSONLAuditLogStore
+from src.mailmind.notifiers.whatsapp import FakeWhatsAppNotifier
+from src.mailmind.storage.repository import DuckDBMessageRepository
+from src.mailmind.sources.gmail import FakeGmailEmailSource
 
 
 def test_orchestrator_processes_high_priority_message(tmp_path: Path) -> None:
-    repo = SQLiteMessageRepository(tmp_path / "mailmind.db")
+    repo = DuckDBMessageRepository(tmp_path / "mailmind.db")
     repo.init_db()
     audit = JSONLAuditLogStore(tmp_path / "audit.jsonl")
     policy_provider = YAMLPolicyProvider(Path("policies/default_policy.yaml"))

@@ -5,7 +5,7 @@ Purpose: Tests the policy provider behavior.
 
 from pathlib import Path
 
-from mailmind.core.policies import YAMLPolicyProvider
+from src.mailmind.core.policies import YAMLPolicyProvider
 
 
 def test_policy_provider_loads_default_policy() -> None:

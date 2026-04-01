@@ -7,8 +7,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from mailmind.core.interfaces import Notifier
-from mailmind.core.models import NotificationAttempt, NotificationPayload, NotificationStatus
+from src.mailmind.core.interfaces import Notifier
+from src.mailmind.core.models import NotificationAttempt, NotificationPayload, NotificationStatus
 
 
 @dataclass(slots=True)

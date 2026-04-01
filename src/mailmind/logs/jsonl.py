@@ -8,8 +8,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from mailmind.core.interfaces import AuditLogStore
-from mailmind.core.models import DomainEvent
+from src.mailmind.core.interfaces import AuditLogStore
+from src.mailmind.core.models import DomainEvent
 
 
 class JSONLAuditLogStore(AuditLogStore):

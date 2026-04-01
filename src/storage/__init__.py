@@ -4,9 +4,9 @@ Purpose: Reusable storage abstractions.
 """
 
 
-from storage.base import BaseStore
-from storage.json_store import JsonStore
-from storage.sqlite_store import SQLiteStore
+from src.storage.base import BaseStore
+from src.storage.json_store import JsonStore
+from src.storage.duckdb_store import DuckDBStore
 
-__all__ = ["BaseStore", "JsonStore", "SQLiteStore"]
+__all__ = ["BaseStore", "JsonStore", "DuckDBStore"]
 

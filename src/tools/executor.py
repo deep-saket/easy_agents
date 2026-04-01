@@ -7,12 +7,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from memory.policies import MemoryPolicy
-from memory.store import MemoryStore
-from mailmind.core.interfaces import MessageRepository
-from mailmind.core.models import ToolExecutionLog
-from mailmind.schemas.tools import ToolCall, ToolExecutionResult
-from tools.registry import ToolRegistry
+from src.memory.policies import MemoryPolicy
+from src.memory.store import MemoryStore
+from src.mailmind.core.interfaces import MessageRepository
+from src.mailmind.core.models import ToolExecutionLog
+from src.mailmind.schemas.tools import ToolCall, ToolExecutionResult
+from src.tools.registry import ToolRegistry
 
 
 @dataclass(slots=True)

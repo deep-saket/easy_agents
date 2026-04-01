@@ -64,13 +64,15 @@ def _load_dotenv(dotenv_path: Path) -> None:
 
 
 class PathSettings(BaseModel):
-    db_path: Path = Path("data/mailmind.db")
+    db_path: Path = Path("data/mailmind.duckdb")
     log_path: Path = Path("data/logs/audit.jsonl")
     policy_path: Path = Path("agents/mailmind/policies/default_policy.yaml")
     gmail_seed_path: Path = Path("data/seed/demo_messages.json")
     tool_catalog_path: Path = Path("data/tool_catalog.json")
     memory_cold_path: Path = Path("data/memory/cold_memories.jsonl")
     sleeping_tasks_path: Path = Path("data/memory/sleeping_tasks.jsonl")
+    memory_tables_path: Path = Path("config/memory_tables.yaml")
+    memory_policies_path: Path = Path("config/memory_policies.yaml")
 
 
 class RuntimeSettings(BaseModel):
@@ -112,6 +114,8 @@ class PlannerSettings(BaseModel):
 class MemorySettings(BaseModel):
     hot_cache_size: int = 256
     archive_after_days: int = 30
+    escalation_step_count: int = 3
+    confidence_threshold: float = 0.5
 
 
 class IntegrationSettings(BaseModel):
@@ -173,6 +177,8 @@ class AppSettings(BaseModel):
                 "tool_catalog_path": _env_str("MAILMIND_TOOL_CATALOG_PATH"),
                 "memory_cold_path": _env_str("MAILMIND_MEMORY_COLD_PATH"),
                 "sleeping_tasks_path": _env_str("MAILMIND_SLEEPING_TASKS_PATH"),
+                "memory_tables_path": _env_str("MAILMIND_MEMORY_TABLES_PATH"),
+                "memory_policies_path": _env_str("MAILMIND_MEMORY_POLICIES_PATH"),
             },
             "runtime": {
                 "source_mode": _env_str("MAILMIND_SOURCE"),
@@ -212,6 +218,10 @@ class AppSettings(BaseModel):
             "memory": {
                 "hot_cache_size": _env_int("MAILMIND_MEMORY_HOT_CACHE_SIZE"),
                 "archive_after_days": _env_int("MAILMIND_MEMORY_ARCHIVE_AFTER_DAYS"),
+                "escalation_step_count": _env_int("MAILMIND_MEMORY_ESCALATION_STEP_COUNT"),
+                "confidence_threshold": float(os.getenv("MAILMIND_MEMORY_CONFIDENCE_THRESHOLD"))
+                if os.getenv("MAILMIND_MEMORY_CONFIDENCE_THRESHOLD") is not None
+                else None,
             },
             "integrations": {
                 "gmail_client_id": _env_str("MAILMIND_GMAIL_CLIENT_ID"),
@@ -249,6 +259,14 @@ class AppSettings(BaseModel):
     @property
     def sleeping_tasks_path(self) -> Path:
         return self.paths.sleeping_tasks_path
+
+    @property
+    def memory_tables_path(self) -> Path:
+        return self.paths.memory_tables_path
+
+    @property
+    def memory_policies_path(self) -> Path:
+        return self.paths.memory_policies_path
 
     @property
     def source_mode(self) -> str:

@@ -1,15 +1,18 @@
-"""Created: 2026-03-31
+"""Created: 2026-04-01
 
-Purpose: Implements the policies module for the shared memory platform layer.
+Purpose: Implements config-driven write policies for the memory system.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
-from memory.models import MemoryItem
-from memory.types import (
+import yaml
+
+from src.memory.models import MemoryRecord
+from src.memory.types import (
     EpisodicMemory,
     ErrorMemory,
     ErrorMemoryContent,
@@ -22,103 +25,85 @@ from memory.types import (
 
 @dataclass(slots=True)
 class MemoryPolicy:
-    """Classifies runtime events into concrete memory types and layers.
+    """Maps runtime events into typed memory records using policy config."""
 
-    This policy is the write-side decision point for long-term memory. It tells
-    the rest of the system which events should become memories and which
-    specific memory subtype should be created.
-    """
+    policy_path: Path = Path("config/memory_policies.yaml")
+    _config: dict[str, Any] = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        self._config = yaml.safe_load(self.policy_path.read_text(encoding="utf-8")) or {}
 
     def should_store(self, event: dict[str, Any]) -> bool:
-        """Determines whether an event should be persisted as memory.
-
-        Args:
-            event: A normalized event emitted by a tool, agent, or workflow.
-
-        Returns:
-            `True` when the event should be stored, otherwise `False`.
-        """
-        event_type = event.get("event_type")
-        return event_type in {
-            "tool_execution",
-            "tool_failure",
-            "classification",
-            "summarization",
-            "user_feedback",
-            "reflection",
-            "sleeping_task",
-        }
+        return event.get("event_type") in self._config.get("write_rules", {})
 
     def classify_type(self, event: dict[str, Any]) -> str:
-        """Maps an event to a memory taxonomy type."""
-        event_type = event.get("event_type")
-        if event_type == "tool_failure":
-            return "error"
-        if event_type == "reflection" or event_type == "summarization":
-            return "reflection"
-        if event_type == "classification":
-            return "semantic"
-        if event_type == "sleeping_task":
-            return "task"
-        return "episodic"
+        return self._rule_for(event).get("memory_type", "episodic")
 
     def classify_layer(self, event: dict[str, Any]) -> str:
-        """Maps an event to its initial storage layer."""
-        memory_type = self.classify_type(event)
-        if memory_type == "task":
-            return "warm"
-        if memory_type == "error":
-            return "hot"
-        return "warm"
+        return self._rule_for(event).get("layer", "warm")
 
-    def build_item(self, event: dict[str, Any]) -> MemoryItem:
-        """Builds a typed memory object from a normalized event.
+    def classify_scope(self, event: dict[str, Any]) -> str:
+        return self._rule_for(event).get("scope", "agent_local")
 
-        Args:
-            event: A normalized event emitted by runtime code.
-
-        Returns:
-            A concrete typed memory instance such as `SemanticMemory` or
-            `ErrorMemory`.
-        """
+    def build_item(self, event: dict[str, Any]) -> MemoryRecord:
         event_type = event.get("event_type")
         content = event.get("content", event)
         metadata = dict(event.get("metadata", {}))
         metadata.setdefault("event_type", event_type)
         metadata.setdefault("agent", event.get("agent", "unknown"))
+        metadata.setdefault("agent_id", event.get("agent_id", metadata["agent"]))
         metadata.setdefault("tags", [])
         metadata.setdefault("source", self._infer_source(event_type))
+        metadata.setdefault("source_type", metadata["source"])
+        metadata.setdefault("source_id", event.get("source_id"))
         metadata.setdefault("priority", self._infer_priority(event_type))
-        if event_type == "tool_failure":
-            content = ErrorMemoryContent(
-                input=event.get("input", {}),
-                output=event.get("output"),
-                error_type=event.get("error_type", "tool_failure"),
-                correction=event.get("correction"),
-                root_cause=event.get("root_cause", event.get("error")),
-                agent=metadata["agent"],
+        metadata.setdefault("confidence", event.get("confidence"))
+        metadata.setdefault("importance", event.get("importance"))
+        common = {
+            "agent_id": event.get("agent_id", metadata["agent_id"]),
+            "scope": self.classify_scope(event),
+            "layer": self.classify_layer(event),
+            "source_type": metadata.get("source_type"),
+            "source_id": metadata.get("source_id"),
+            "tags": list(metadata.get("tags", [])),
+            "metadata": metadata,
+            "importance": event.get("importance"),
+            "confidence": event.get("confidence"),
+        }
+        if self.classify_type(event) == "error":
+            return ErrorMemory(
+                **common,
+                content=ErrorMemoryContent(
+                    input=event.get("input", {}),
+                    output=event.get("output"),
+                    error_type=event.get("error_type", "tool_failure"),
+                    correction=event.get("correction"),
+                    root_cause=event.get("root_cause", event.get("error")),
+                    agent=common["agent_id"] or "unknown",
+                ),
             )
-            return ErrorMemory(layer=self.classify_layer(event), content=content, metadata=metadata)
-        if event_type in {"reflection", "summarization"}:
-            if isinstance(content, dict):
-                reflection_content = ReflectionMemoryContent(
-                    reasoning=content.get("reasoning"),
-                    improvement_suggestions=content.get("improvement_suggestions", []),
-                    failure_analysis=content.get("failure_analysis"),
-                    summary=content.get("summary"),
-                )
-            else:
-                reflection_content = ReflectionMemoryContent(summary=str(content))
-            return ReflectionMemory(layer=self.classify_layer(event), content=reflection_content, metadata=metadata)
-        if event_type == "classification":
-            return SemanticMemory(layer=self.classify_layer(event), content=content, metadata=metadata)
-        if event_type == "sleeping_task":
-            return TaskMemory(layer=self.classify_layer(event), content=content, metadata=metadata)
-        return EpisodicMemory(layer=self.classify_layer(event), content=content, metadata=metadata)
+        if self.classify_type(event) == "reflection":
+            reflection_payload = content if isinstance(content, dict) else {"summary": str(content)}
+            return ReflectionMemory(
+                **common,
+                content=ReflectionMemoryContent(
+                    reasoning=reflection_payload.get("reasoning"),
+                    improvement_suggestions=reflection_payload.get("improvement_suggestions", []),
+                    failure_analysis=reflection_payload.get("failure_analysis"),
+                    summary=reflection_payload.get("summary"),
+                ),
+            )
+        if self.classify_type(event) == "semantic":
+            return SemanticMemory(**common, content=content)
+        if self.classify_type(event) == "task":
+            return TaskMemory(**common, content=content)
+        return EpisodicMemory(**common, content=content)
+
+    def archive_after_days(self, scope: str) -> int:
+        return int(self._config.get("retention", {}).get("archive_after_days", {}).get(scope, 30))
 
     @staticmethod
     def _infer_source(event_type: str | None) -> str:
-        """Infers the logical event source for memory metadata."""
         if event_type in {"tool_execution", "tool_failure"}:
             return "tool"
         if event_type == "user_feedback":
@@ -127,9 +112,12 @@ class MemoryPolicy:
 
     @staticmethod
     def _infer_priority(event_type: str | None) -> str:
-        """Infers a default memory priority from the event type."""
         if event_type == "tool_failure":
             return "high"
         if event_type in {"reflection", "classification"}:
             return "medium"
         return "low"
+
+    def _rule_for(self, event: dict[str, Any]) -> dict[str, Any]:
+        event_type = event.get("event_type", "")
+        return dict(self._config.get("write_rules", {}).get(event_type, {}))

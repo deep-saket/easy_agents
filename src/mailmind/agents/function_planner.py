@@ -7,10 +7,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from llm.function_gemma import FunctionGemmaLLM
-from mailmind.agents.base import BasePlanner
-from mailmind.memory.conversation import ConversationMemory
-from mailmind.schemas.tools import PlannerDecision
+from src.llm.function_gemma import FunctionGemmaLLM
+from src.mailmind.agents.base import BasePlanner
+from src.mailmind.memory.conversation import ConversationMemory
+from src.mailmind.schemas.tools import PlannerDecision
 
 
 @dataclass(slots=True)

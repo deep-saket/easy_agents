@@ -1,11 +1,13 @@
 paths:
-  db_path: data/mailmind.db
+  db_path: data/mailmind.duckdb
   log_path: data/logs/audit.jsonl
   policy_path: agents/mailmind/policies/default_policy.yaml
   gmail_seed_path: data/seed/demo_messages.json
   tool_catalog_path: data/tool_catalog.json
   memory_cold_path: data/memory/cold_memories.jsonl
   sleeping_tasks_path: data/memory/sleeping_tasks.jsonl
+  memory_tables_path: config/memory_tables.yaml
+  memory_policies_path: config/memory_policies.yaml
 
 runtime:
   source_mode: fake
@@ -32,6 +34,8 @@ planner:
 memory:
   hot_cache_size: 256
   archive_after_days: 30
+  escalation_step_count: 3
+  confidence_threshold: 0.5
 
 notifications:
   whatsapp_mode: fake

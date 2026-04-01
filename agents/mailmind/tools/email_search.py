@@ -5,8 +5,8 @@ Purpose: Implements the email search module for the mailmind agent.
 
 from __future__ import annotations
 
-from tools.base import BaseTool
-from tools.email_search import EmailSearchTool as SharedEmailSearchTool
+from src.tools.base import BaseTool
+from src.tools.gmail.email_search import EmailSearchTool as SharedEmailSearchTool
 
 
 class MailMindEmailSearchTool(SharedEmailSearchTool):
@@ -14,4 +14,3 @@ class MailMindEmailSearchTool(SharedEmailSearchTool):
 
 
 __all__ = ["BaseTool", "MailMindEmailSearchTool"]
-

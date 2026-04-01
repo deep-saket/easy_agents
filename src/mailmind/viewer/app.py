@@ -11,7 +11,7 @@ from fastapi import FastAPI, Query, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from mailmind.container import AppContainer
+from src.mailmind.container import AppContainer
 
 
 def create_app(container: AppContainer | None = None) -> FastAPI:

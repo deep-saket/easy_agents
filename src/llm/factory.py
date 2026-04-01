@@ -5,9 +5,9 @@ Purpose: Implements the factory module for the shared llm platform layer.
 
 from __future__ import annotations
 
-from llm.function_gemma import FunctionGemmaLLM
-from llm.qwen import Qwen3_1_7BLLM
-from llm.local_llm import FunctionCallingLocalLLM, LocalLLM
+from src.llm.function_gemma import FunctionGemmaLLM
+from src.llm.qwen import Qwen3_1_7BLLM
+from src.llm.local_llm import FunctionCallingLocalLLM, LocalLLM
 
 
 class LLMFactory:
