@@ -13,6 +13,7 @@ from src.mailmind.core.models import ConversationMessage
 
 @dataclass(slots=True)
 class ConversationMemory:
+    """Represents conversation memory."""
     session_id: str
     repository: MessageRepository
     history: list[ConversationMessage] = field(default_factory=list)

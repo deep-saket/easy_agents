@@ -10,7 +10,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from src.memory.models import MemoryItem
+from src.memory.models import MemoryRecord
 
 
 def content_to_jsonable(content: Any) -> Any:
@@ -26,7 +26,7 @@ def content_to_text(content: Any) -> str:
     return json.dumps(content, sort_keys=True, ensure_ascii=True)
 
 
-def filters_match(item: MemoryItem, filters: dict[str, object] | None) -> bool:
+def filters_match(item: MemoryRecord, filters: dict[str, object] | None) -> bool:
     if not filters:
         return True
     for key, value in filters.items():

@@ -9,5 +9,6 @@ from pydantic import BaseModel
 
 
 class SessionRef(BaseModel):
+    """Represents the session ref component."""
     session_id: str
 

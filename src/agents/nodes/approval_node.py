@@ -8,7 +8,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from src.agents.nodes.types import ReActState
+from src.agents.nodes.base import BaseGraphNode
+from src.agents.nodes.types import AgentState, NodeUpdate
 
 
 class ApprovalQueueProtocol(Protocol):
@@ -20,7 +21,7 @@ class ApprovalQueueProtocol(Protocol):
 
 
 @dataclass(slots=True)
-class ApprovalNode:
+class ApprovalNode(BaseGraphNode):
     """Places outbound side effects behind an approval queue when required.
 
     The node is generic and intentionally light on policy. Agent-specific
@@ -29,8 +30,9 @@ class ApprovalNode:
     """
 
     approval_queue: ApprovalQueueProtocol | None = None
+    llm: Any | None = None
 
-    def execute(self, state: ReActState) -> ReActState:
+    def execute(self, state: AgentState) -> NodeUpdate:
         """Queues a pending approval item when one is present in the state.
 
         Args:
@@ -40,6 +42,7 @@ class ApprovalNode:
             A partial state update describing the queued approval when
             applicable, otherwise an empty update.
         """
+        self._record_llm_usage(state, node_name="approval")
         if self.approval_queue is None:
             return {}
         approval_item = state.get("approval_item")

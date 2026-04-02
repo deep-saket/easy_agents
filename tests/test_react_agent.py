@@ -8,8 +8,11 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from src.memory import ColdMemoryLayer, HotMemoryLayer, MemoryIndexer, MemoryRetriever, MemoryStore, SemanticMemory, WarmMemoryLayer
-from src.mailmind.agent.react_agent import ReActAgent
+from src.memory.layers import ColdMemoryLayer, HotMemoryLayer, WarmMemoryLayer
+from src.memory.retrieval.retriever import LayeredMemoryRetriever as MemoryRetriever
+from src.memory.store import MemoryStore
+from src.memory.types import SemanticMemory
+from src.mailmind.agent.graph_agent import MailMindGraphAgent
 from src.mailmind.agents.planner import RuleBasedToolPlanner
 from src.mailmind.classifiers.rules import RulesBasedClassifier
 from src.mailmind.core.models import EmailMessage
@@ -51,7 +54,7 @@ def test_react_agent_handles_clarification_flow(tmp_path: Path) -> None:
     registry.register(EmailSearchTool(repository=repo))
     registry.register(EmailSummaryTool(repository=repo))
     executor = ToolExecutor(registry=registry, repository=repo)
-    agent = ReActAgent(planner=RuleBasedToolPlanner(), executor=executor, repository=repo)
+    agent = MailMindGraphAgent(planner=RuleBasedToolPlanner(), executor=executor, repository=repo)
 
     first_response = agent.run("what emails today?", "react-session")
     second_response = agent.run("job ones", "react-session")
@@ -61,14 +64,17 @@ def test_react_agent_handles_clarification_flow(tmp_path: Path) -> None:
 
 
 class NoopInput(BaseModel):
+    """Represents input for noop operations."""
     value: str
 
 
 class NoopOutput(BaseModel):
+    """Represents output for noop operations."""
     value: str
 
 
 class CapturePlanner:
+    """Represents the capture planner component."""
     def __init__(self) -> None:
         self.last_memory_context = None
 
@@ -91,7 +97,6 @@ def test_react_agent_provides_four_memory_types_to_planner(tmp_path: Path) -> No
         hot_layer=HotMemoryLayer(max_items=8),
         warm_layer=warm_layer,
         cold_layer=ColdMemoryLayer(tmp_path / "cold.jsonl"),
-        indexer=MemoryIndexer(warm_layer=warm_layer),
     )
     memory_store.add(
         SemanticMemory(
@@ -103,7 +108,7 @@ def test_react_agent_provides_four_memory_types_to_planner(tmp_path: Path) -> No
     registry = ToolRegistry()
     executor = ToolExecutor(registry=registry, repository=repo)
     planner = CapturePlanner()
-    agent = ReActAgent(
+    agent = MailMindGraphAgent(
         planner=planner,
         executor=executor,
         repository=repo,
@@ -136,12 +141,11 @@ def test_react_agent_writes_reflection_memory_after_tool_execution(tmp_path: Pat
         hot_layer=HotMemoryLayer(max_items=8),
         warm_layer=warm_layer,
         cold_layer=ColdMemoryLayer(tmp_path / "cold.jsonl"),
-        indexer=MemoryIndexer(warm_layer=warm_layer),
     )
     registry = ToolRegistry()
     registry.register(EmailSearchTool(repository=repo))
     executor = ToolExecutor(registry=registry, repository=repo)
-    agent = ReActAgent(
+    agent = MailMindGraphAgent(
         planner=RuleBasedToolPlanner(),
         executor=executor,
         repository=repo,

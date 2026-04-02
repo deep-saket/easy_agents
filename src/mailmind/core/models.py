@@ -18,6 +18,7 @@ def utc_now() -> datetime:
 
 
 class Category(str, Enum):
+    """Represents the category component."""
     STRONG_ML_RESEARCH_JOB = "strong_ml_research_job"
     DEEP_TECH_OPPORTUNITY = "deep_tech_opportunity"
     NETWORK_EVENT = "network_event"
@@ -31,6 +32,7 @@ class Category(str, Enum):
 
 
 class SuggestedAction(str, Enum):
+    """Represents the suggested action component."""
     NOTIFY_AND_DRAFT = "notify_and_draft"
     DRAFT_ONLY = "draft_only"
     MANUAL_REVIEW = "manual_review"
@@ -39,10 +41,12 @@ class SuggestedAction(str, Enum):
 
 
 class ApprovalKind(str, Enum):
+    """Represents the approval kind component."""
     WHATSAPP_NOTIFICATION = "whatsapp_notification"
 
 
 class ApprovalStatus(str, Enum):
+    """Represents the approval status component."""
     PENDING = "pending"
     APPROVED = "approved"
     REJECTED = "rejected"
@@ -51,12 +55,14 @@ class ApprovalStatus(str, Enum):
 
 
 class NotificationStatus(str, Enum):
+    """Represents the notification status component."""
     PENDING = "pending"
     SENT = "sent"
     FAILED = "failed"
 
 
 class ProcessStatus(str, Enum):
+    """Represents the process status component."""
     NEW = "new"
     PROCESSED = "processed"
     DEPRIORITIZED = "deprioritized"
@@ -64,6 +70,7 @@ class ProcessStatus(str, Enum):
 
 
 class EmailMessage(BaseModel):
+    """Represents the email message component."""
     id: str = Field(default_factory=lambda: str(uuid4()))
     source_id: str
     thread_id: str | None = None
@@ -81,6 +88,7 @@ class EmailMessage(BaseModel):
 
 
 class ClassificationResult(BaseModel):
+    """Represents the result for classification operations."""
     message_id: str
     priority_score: float
     category: Category
@@ -92,6 +100,7 @@ class ClassificationResult(BaseModel):
 
 
 class ReplyDraft(BaseModel):
+    """Represents the reply draft component."""
     id: str = Field(default_factory=lambda: str(uuid4()))
     message_id: str
     subject: str
@@ -101,6 +110,7 @@ class ReplyDraft(BaseModel):
 
 
 class NotificationPayload(BaseModel):
+    """Represents the notification payload component."""
     message_id: str
     destination: str
     channel: str = "whatsapp"
@@ -109,6 +119,7 @@ class NotificationPayload(BaseModel):
 
 
 class ApprovalItem(BaseModel):
+    """Represents the approval item component."""
     id: str = Field(default_factory=lambda: str(uuid4()))
     kind: ApprovalKind
     target_id: str
@@ -120,6 +131,7 @@ class ApprovalItem(BaseModel):
 
 
 class NotificationAttempt(BaseModel):
+    """Represents the notification attempt component."""
     id: str = Field(default_factory=lambda: str(uuid4()))
     message_id: str
     channel: str
@@ -131,6 +143,7 @@ class NotificationAttempt(BaseModel):
 
 
 class DomainEvent(BaseModel):
+    """Represents the domain event component."""
     event_type: str
     entity_id: str
     payload: dict[str, Any]
@@ -138,6 +151,7 @@ class DomainEvent(BaseModel):
 
 
 class PolicyConfig(BaseModel):
+    """Represents the policy config component."""
     profile: dict[str, Any]
     high_priority_senders: list[str] = Field(default_factory=list)
     positive_keywords: dict[str, list[str]] = Field(default_factory=dict)
@@ -150,12 +164,14 @@ class PolicyConfig(BaseModel):
 
 
 class MessageBundle(BaseModel):
+    """Represents the message bundle component."""
     message: EmailMessage
     classification: ClassificationResult | None = None
     draft: ReplyDraft | None = None
 
 
 class ToolExecutionLog(BaseModel):
+    """Represents the tool execution log component."""
     id: str = Field(default_factory=lambda: str(uuid4()))
     tool_name: str
     input_payload: dict[str, Any]
@@ -166,6 +182,7 @@ class ToolExecutionLog(BaseModel):
 
 
 class ConversationMessage(BaseModel):
+    """Represents the conversation message component."""
     id: str = Field(default_factory=lambda: str(uuid4()))
     session_id: str
     role: str

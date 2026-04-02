@@ -8,13 +8,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from src.agents.nodes.types import ReActState
+from src.agents.nodes.base import BaseGraphNode
+from src.agents.nodes.types import AgentState, NodeUpdate
 from src.memory.base import BaseMemoryStore
 from src.memory.types import ReflectionMemory, ReflectionMemoryContent
 
 
 @dataclass(slots=True)
-class ReflectNode:
+class ReflectNode(BaseGraphNode):
     """Writes lightweight reflection memory after a tool observation.
 
     The shared graph uses this node to capture a compact post-action trace that
@@ -25,8 +26,9 @@ class ReflectNode:
 
     memory_store: BaseMemoryStore | None = None
     agent_name: str = "platform"
+    llm: Any | None = None
 
-    def execute(self, state: ReActState) -> ReActState:
+    def execute(self, state: AgentState) -> NodeUpdate:
         """Stores a reflection item derived from the latest tool observation.
 
         Args:
@@ -35,6 +37,7 @@ class ReflectNode:
         Returns:
             An empty state update. Reflection is a side effect only.
         """
+        self._record_llm_usage(state, node_name="reflect")
         if self.memory_store is None:
             return {}
         observation = state.get("observation")
@@ -59,6 +62,7 @@ class ReflectNode:
                     "source": "reflect_node",
                     "priority": "low",
                     "tool_name": tool_name,
+                    "llm_name": self._llm_name(),
                     "observation_preview": self._preview_output(output),
                 },
             )

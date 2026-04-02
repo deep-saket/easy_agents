@@ -16,6 +16,7 @@ from src.tools.gmail.helpers import bundle_to_summary
 
 @dataclass(slots=True)
 class GmailFetchTool(BaseTool[GmailFetchInput, GmailFetchOutput]):
+    """Implements the gmail fetch tool."""
     source: EmailSource
     orchestrator: MailOrchestrator
     name: str = "gmail_fetch"

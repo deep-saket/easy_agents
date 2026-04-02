@@ -13,8 +13,13 @@ from __future__ import annotations
 
 from typing import Literal
 
-from src.memory.models import MemoryItem
+from src.memory.types.base import TypedMemoryRecord
 
 
-class EpisodicMemory(MemoryItem):
+class EpisodicMemory(TypedMemoryRecord):
+    """Represents episodic memory."""
     type: Literal["episodic"] = "episodic"
+    layer: Literal["hot", "warm", "cold"] = "hot"
+    scope: Literal["agent_local"] = "agent_local"
+    default_layer = "hot"
+    default_scope = "agent_local"

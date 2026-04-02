@@ -6,12 +6,14 @@ Purpose: Implements the huggingface module for the shared llm platform layer.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
 
 @dataclass(slots=True)
 class LLMGeneration:
+    """Represents the l l m generation component."""
     content: str
     thinking_content: str | None = None
     raw_text: str = ""
@@ -19,6 +21,7 @@ class LLMGeneration:
 
 @dataclass(slots=True)
 class HuggingFaceLLM:
+    """Represents the hugging face l l m component."""
     model_name: str
     device_map: str = "auto"
     torch_dtype: str = "auto"
@@ -81,10 +84,46 @@ class HuggingFaceLLM:
 
         if self.reasoning_end_marker and content.startswith(self.reasoning_end_marker):
             content = content[len(self.reasoning_end_marker) :].strip()
+        content = self._strip_residual_reasoning_markup(content)
         if thinking_content == "":
             thinking_content = None
 
         return LLMGeneration(content=content, thinking_content=thinking_content, raw_text=raw_text)
+
+    @staticmethod
+    def _strip_residual_reasoning_markup(content: str) -> str:
+        """Removes leaked reasoning tags from a model response.
+
+        Some local reasoning models may still emit `<think>` blocks into the
+        final content when the end marker is missing or malformed. That is safe
+        for plain chat, but it breaks downstream tool calls that expect clean
+        structured text such as SQL, JSON, or arithmetic expressions.
+
+        Args:
+            content: The decoded content portion after the primary reasoning
+                split logic has run.
+
+        Returns:
+            Content with leading think-tag markup removed as defensively as
+            possible while preserving the actual answer text.
+        """
+        original = content.strip()
+        cleaned = re.sub(r"(?is)^<think>\s*", "", original).strip()
+        cleaned = re.sub(r"(?is)</?think>\s*", "", cleaned).strip()
+        if original.startswith("<think>") and "</think>" not in original:
+            lines = [line.strip() for line in cleaned.splitlines() if line.strip()]
+            return lines[-1] if lines else cleaned
+        if "<think>" not in cleaned and "</think>" not in cleaned:
+            return cleaned
+        parts = re.split(r"(?is)</think>", content, maxsplit=1)
+        if len(parts) == 2:
+            return parts[1].strip()
+        lines = [
+            line.strip()
+            for line in cleaned.splitlines()
+            if line.strip() and not line.strip().startswith("<think>")
+        ]
+        return lines[-1] if lines else cleaned
 
     def _find_reasoning_split_index(self, output_ids: list[int]) -> int:
         if self.reasoning_end_token_id is None:

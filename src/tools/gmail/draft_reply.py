@@ -14,6 +14,7 @@ from src.tools.base import BaseTool
 
 @dataclass(slots=True)
 class DraftReplyTool(BaseTool[DraftReplyInput, DraftReplyOutput]):
+    """Implements the draft reply tool."""
     repository: MessageRepository
     drafter: DraftGenerator
     name: str = "draft_reply"

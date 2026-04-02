@@ -7,19 +7,12 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from src.memory import (
-    ColdMemoryLayer,
-    EpisodicMemory,
-    ErrorMemory,
-    HotMemoryLayer,
-    MemoryIndexer,
-    MemoryItem,
-    MemoryPolicy,
-    MemoryRetriever,
-    SemanticMemory,
-    MemoryStore,
-    WarmMemoryLayer,
-)
+from src.memory.layers import ColdMemoryLayer, HotMemoryLayer, WarmMemoryLayer
+from src.memory.models import MemoryRecord
+from src.memory.policies import MemoryPolicy
+from src.memory.retrieval.retriever import LayeredMemoryRetriever as MemoryRetriever
+from src.memory.store import MemoryStore
+from src.memory.types import EpisodicMemory, ErrorMemory, SemanticMemory
 from src.mailmind.storage.repository import DuckDBMessageRepository
 from src.tools.base import BaseTool
 from src.tools.executor import ToolExecutor
@@ -28,14 +21,17 @@ from src.tools.registry import ToolRegistry
 
 
 class FailingInput(BaseModel):
+    """Represents input for failing operations."""
     value: str
 
 
 class FailingOutput(BaseModel):
+    """Represents output for failing operations."""
     value: str
 
 
 class FailingTool(BaseTool[FailingInput, FailingOutput]):
+    """Implements the failing tool."""
     name = "failing_tool"
     description = "Always fails."
     input_schema = FailingInput
@@ -51,7 +47,6 @@ def build_store(tmp_path: Path) -> MemoryStore:
         hot_layer=HotMemoryLayer(max_items=8),
         warm_layer=warm_layer,
         cold_layer=ColdMemoryLayer(tmp_path / "cold.jsonl"),
-        indexer=MemoryIndexer(warm_layer=warm_layer),
         archive_after_days=1,
     )
 
@@ -90,7 +85,7 @@ def test_memory_write_tool_and_executor_policy_capture(tmp_path: Path) -> None:
     registry.register(MemoryWriteTool(store=store))
     executor = ToolExecutor(registry=registry, repository=repo, memory_store=store, memory_policy=MemoryPolicy())
 
-    memory_item = MemoryItem(
+    memory_item = MemoryRecord(
         type="semantic",
         layer="warm",
         content={"fact": "User values selective research labs"},

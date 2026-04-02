@@ -43,6 +43,38 @@ class ConversationRepository(Protocol):
 
 
 @dataclass(slots=True)
+class InMemoryConversationRepository(ConversationRepository):
+    """Provides a minimal in-memory implementation of `ConversationRepository`.
+
+    This implementation is useful for notebooks, tests, and tiny local agents
+    that only need working memory for the lifetime of the current process. It
+    intentionally does not persist data across restarts.
+    """
+
+    messages: dict[str, list[ConversationMessage]] = field(default_factory=dict)
+    states: dict[str, dict[str, object]] = field(default_factory=dict)
+
+    def list_conversation_messages(self, session_id: str) -> list[ConversationMessage]:
+        """Returns the stored conversation messages for one session."""
+        return list(self.messages.get(session_id, []))
+
+    def get_conversation_state(self, session_id: str) -> dict[str, object] | None:
+        """Returns the stored working-memory state for one session."""
+        state = self.states.get(session_id)
+        if state is None:
+            return None
+        return dict(state)
+
+    def add_conversation_message(self, message: ConversationMessage) -> None:
+        """Appends a message to the in-memory conversation history."""
+        self.messages.setdefault(message.session_id, []).append(message)
+
+    def save_conversation_state(self, session_id: str, state: dict[str, object]) -> None:
+        """Stores the latest working-memory state for one session."""
+        self.states[session_id] = dict(state)
+
+
+@dataclass(slots=True)
 class ConversationMemory:
     """Represents working memory for one active conversation session.
 
@@ -128,4 +160,4 @@ class ConversationMemory:
         self.repository.save_conversation_state(self.session_id, self.state)
 
 
-__all__ = ["ConversationMemory"]
+__all__ = ["ConversationMemory", "ConversationRepository", "InMemoryConversationRepository"]

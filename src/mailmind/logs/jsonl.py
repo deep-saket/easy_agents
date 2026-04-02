@@ -13,6 +13,7 @@ from src.mailmind.core.models import DomainEvent
 
 
 class JSONLAuditLogStore(AuditLogStore):
+    """Represents the j s o n l audit log store component."""
     def __init__(self, path: Path) -> None:
         self._path = path
         self._path.parent.mkdir(parents=True, exist_ok=True)

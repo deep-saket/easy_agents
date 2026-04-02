@@ -15,6 +15,7 @@ from src.tools.gmail.helpers import bundle_to_summary
 
 @dataclass(slots=True)
 class EmailSearchTool(BaseTool[EmailSearchInput, EmailSearchOutput]):
+    """Implements the email search tool."""
     repository: MessageRepository
     name: str = "email_search"
     description: str = "Search stored emails by keyword, category, sender, and time range."

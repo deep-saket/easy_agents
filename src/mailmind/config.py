@@ -64,6 +64,7 @@ def _load_dotenv(dotenv_path: Path) -> None:
 
 
 class PathSettings(BaseModel):
+    """Defines configuration settings for path behavior."""
     db_path: Path = Path("data/mailmind.duckdb")
     log_path: Path = Path("data/logs/audit.jsonl")
     policy_path: Path = Path("agents/mailmind/policies/default_policy.yaml")
@@ -76,6 +77,7 @@ class PathSettings(BaseModel):
 
 
 class RuntimeSettings(BaseModel):
+    """Defines configuration settings for runtime behavior."""
     source_mode: str = "fake"
     classifier_mode: str = "rules"
     llm_enabled: bool = False
@@ -83,17 +85,20 @@ class RuntimeSettings(BaseModel):
 
 
 class NotificationSettings(BaseModel):
+    """Defines configuration settings for notification behavior."""
     whatsapp_mode: str = "fake"
     whatsapp_allowlist: tuple[str, ...] = Field(default_factory=tuple)
     notification_destination: str = ""
 
 
 class ViewerSettings(BaseModel):
+    """Defines configuration settings for viewer behavior."""
     host: str = "127.0.0.1"
     port: int = 8000
 
 
 class LLMSettings(BaseModel):
+    """Defines configuration settings for l l m behavior."""
     provider: str = "huggingface"
     model_name: str = "Qwen/Qwen3-1.7B"
     device_map: str = "auto"
@@ -103,6 +108,7 @@ class LLMSettings(BaseModel):
 
 
 class PlannerSettings(BaseModel):
+    """Defines configuration settings for planner behavior."""
     enabled: bool = False
     provider: str = "function_gemma"
     model_name: str = "google/functiongemma-270m-it"
@@ -112,6 +118,7 @@ class PlannerSettings(BaseModel):
 
 
 class MemorySettings(BaseModel):
+    """Defines configuration settings for memory behavior."""
     hot_cache_size: int = 256
     archive_after_days: int = 30
     escalation_step_count: int = 3
@@ -119,6 +126,7 @@ class MemorySettings(BaseModel):
 
 
 class IntegrationSettings(BaseModel):
+    """Defines configuration settings for integration behavior."""
     gmail_client_id: str = ""
     gmail_client_secret: str = ""
     twilio_account_sid: str = ""
@@ -127,6 +135,7 @@ class IntegrationSettings(BaseModel):
 
 
 class AppSettings(BaseModel):
+    """Defines configuration settings for app behavior."""
     config_path: Path = Path("config/mailmind.yaml")
     paths: PathSettings = Field(default_factory=PathSettings)
     runtime: RuntimeSettings = Field(default_factory=RuntimeSettings)

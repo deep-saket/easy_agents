@@ -14,6 +14,7 @@ from src.mailmind.core.models import PolicyConfig
 
 
 class YAMLPolicyProvider(PolicyProvider):
+    """Represents the y a m l policy provider component."""
     def __init__(self, path: Path) -> None:
         self._path = path
 

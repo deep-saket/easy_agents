@@ -16,6 +16,7 @@ def utc_now() -> datetime:
 
 
 class ConversationMessage(BaseModel):
+    """Represents the conversation message component."""
     id: str = Field(default_factory=lambda: str(uuid4()))
     session_id: str
     role: str

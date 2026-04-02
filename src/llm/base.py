@@ -10,6 +10,7 @@ from typing import Any
 
 
 class BaseLLM(ABC):
+    """Represents the base l l m component."""
     @abstractmethod
     def generate(self, prompt: str, **kwargs: Any) -> str:
         raise NotImplementedError

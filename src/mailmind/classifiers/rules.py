@@ -13,6 +13,7 @@ from src.mailmind.core.models import Category, ClassificationResult, EmailMessag
 
 @dataclass(slots=True)
 class RulesBasedClassifier(MessageClassifier):
+    """Represents the rules based classifier component."""
     policy_provider: PolicyProvider
 
     def classify(self, message: EmailMessage) -> ClassificationResult:

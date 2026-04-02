@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from src.memory.models import MemoryItem
+from src.memory.models import MemoryRecord
 
 
 class BaseMemoryLayer(ABC):
@@ -29,7 +29,7 @@ class BaseMemoryLayer(ABC):
     """
 
     @abstractmethod
-    def add(self, item: MemoryItem) -> MemoryItem:
+    def add(self, item: MemoryRecord) -> MemoryRecord:
         """Stores a memory item inside this layer only.
 
         Args:
@@ -42,7 +42,7 @@ class BaseMemoryLayer(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get(self, memory_id: str) -> MemoryItem | None:
+    def get(self, memory_id: str) -> MemoryRecord | None:
         """Fetches a memory item by identifier from this layer only.
 
         Args:
@@ -54,7 +54,7 @@ class BaseMemoryLayer(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def search(self, query: str, filters: dict[str, object] | None = None, limit: int = 20) -> list[MemoryItem]:
+    def search(self, query: str, filters: dict[str, object] | None = None, limit: int = 20) -> list[MemoryRecord]:
         """Searches this layer for memory items matching the query and filters.
 
         Args:
@@ -88,7 +88,7 @@ class BaseMemoryStore(ABC):
     """
 
     @abstractmethod
-    def add(self, item: MemoryItem) -> MemoryItem:
+    def add(self, item: MemoryRecord) -> MemoryRecord:
         """Writes a single memory item into the managed long-term memory system.
 
         Args:
@@ -101,7 +101,7 @@ class BaseMemoryStore(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def bulk_add(self, items: list[MemoryItem]) -> list[MemoryItem]:
+    def bulk_add(self, items: list[MemoryRecord]) -> list[MemoryRecord]:
         """Writes multiple memory items in one operation.
 
         Args:
@@ -113,7 +113,7 @@ class BaseMemoryStore(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get(self, memory_id: str) -> MemoryItem | None:
+    def get(self, memory_id: str) -> MemoryRecord | None:
         """Fetches a memory item from the managed memory system.
 
         Args:
@@ -126,7 +126,7 @@ class BaseMemoryStore(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def search(self, query: str, filters: dict[str, object] | None = None, limit: int = 20) -> list[MemoryItem]:
+    def search(self, query: str, filters: dict[str, object] | None = None, limit: int = 20) -> list[MemoryRecord]:
         """Searches the managed memory system for relevant items.
 
         Args:

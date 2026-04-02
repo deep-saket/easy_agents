@@ -13,6 +13,7 @@ from src.mailmind.core.models import NotificationAttempt, NotificationPayload, N
 
 @dataclass(slots=True)
 class FakeWhatsAppNotifier(Notifier):
+    """Represents the fake whats app notifier component."""
     allowlist: tuple[str, ...]
 
     def send(self, payload: NotificationPayload) -> NotificationAttempt:
@@ -28,6 +29,7 @@ class FakeWhatsAppNotifier(Notifier):
 
 
 class WhatsAppNotifier(Notifier):
+    """Represents the whats app notifier component."""
     def __init__(self, allowlist: tuple[str, ...]) -> None:
         self._allowlist = allowlist
 

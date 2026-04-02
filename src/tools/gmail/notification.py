@@ -14,6 +14,7 @@ from src.tools.base import BaseTool
 
 @dataclass(slots=True)
 class NotificationTool(BaseTool[NotificationInput, NotificationOutput]):
+    """Implements the notification tool."""
     orchestrator: MailOrchestrator
     name: str = "notification"
     description: str = "Execute or inspect approved WhatsApp notification actions."

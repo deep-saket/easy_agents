@@ -14,6 +14,7 @@ from src.mailmind.core.models import ApprovalItem, ApprovalStatus
 
 @dataclass(slots=True)
 class LocalApprovalQueue(ApprovalQueue):
+    """Manages the local approval queue."""
     repository: MessageRepository
 
     def enqueue(self, item: ApprovalItem) -> ApprovalItem:

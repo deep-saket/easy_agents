@@ -15,6 +15,7 @@ from src.llm.base import BaseLLM
 
 @dataclass(slots=True)
 class LocalLLM(BaseLLM):
+    """Represents the local l l m component."""
     client: HuggingFaceLLM
 
     def generate(self, prompt: str, **kwargs: Any) -> str:
@@ -29,6 +30,7 @@ class LocalLLM(BaseLLM):
 
 @dataclass(slots=True)
 class FunctionCallingLocalLLM(BaseLLM):
+    """Represents the function calling local l l m component."""
     client: FunctionGemmaLLM
 
     def generate(self, prompt: str, **kwargs: Any) -> str:

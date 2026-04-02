@@ -26,26 +26,31 @@ from src.mailmind.core.models import (
 
 
 class EmailSource(Protocol):
+    """Represents the email source component."""
     def fetch_new_messages(self) -> list[EmailMessage]:
         ...
 
 
 class MessageClassifier(Protocol):
+    """Represents the message classifier component."""
     def classify(self, message: EmailMessage) -> ClassificationResult:
         ...
 
 
 class DraftGenerator(Protocol):
+    """Represents the draft generator component."""
     def generate(self, message: EmailMessage, classification: ClassificationResult) -> ReplyDraft:
         ...
 
 
 class Notifier(Protocol):
+    """Represents the notifier component."""
     def send(self, payload: NotificationPayload) -> NotificationAttempt:
         ...
 
 
 class ApprovalQueue(Protocol):
+    """Manages the approval queue."""
     def enqueue(self, item: ApprovalItem) -> ApprovalItem:
         ...
 
@@ -154,6 +159,7 @@ class MessageRepository(ConversationRepository, Protocol):
 
 
 class AuditLogStore(Protocol):
+    """Represents the audit log store component."""
     def append(self, event: DomainEvent) -> None:
         ...
 
@@ -162,11 +168,13 @@ class AuditLogStore(Protocol):
 
 
 class PolicyProvider(Protocol):
+    """Represents the policy provider component."""
     def load(self) -> PolicyConfig:
         ...
 
 
 class SupportsReprocess(ABC):
+    """Represents the supports reprocess component."""
     @abstractmethod
     def reprocess(self, message_id: str) -> MessageBundle:
         raise NotImplementedError

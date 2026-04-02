@@ -13,6 +13,7 @@ from src.mailmind.container import AppContainer
 
 @dataclass(slots=True)
 class MailMindAgentApp:
+    """Represents the mail mind agent app component."""
     container: AppContainer
 
     @classmethod

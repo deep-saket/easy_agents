@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 
 class EmailSummary(BaseModel):
+    """Represents the email summary component."""
     id: str
     source_id: str
     from_email: str
@@ -23,6 +24,7 @@ class EmailSummary(BaseModel):
 
 
 class EmailDetail(BaseModel):
+    """Represents the email detail component."""
     summary: EmailSummary
     body_text: str
     labels: list[str] = Field(default_factory=list)

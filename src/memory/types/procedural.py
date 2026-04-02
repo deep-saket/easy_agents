@@ -17,6 +17,8 @@ from pydantic import BaseModel, Field
 
 
 class ProceduralMemory(BaseModel):
+    """Represents procedural memory."""
     tool_names: list[str] = Field(default_factory=list)
     planner_names: list[str] = Field(default_factory=list)
+    llm_names: list[str] = Field(default_factory=list)
     prompt_names: list[str] = Field(default_factory=list)

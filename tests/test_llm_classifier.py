@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from LLM.huggingface import HuggingFaceLLM
+from src.llm.qwen import Qwen3_1_7BLLM
 from src.mailmind.classifiers.llm import OptionalLLMClassifierAdapter
 from src.mailmind.classifiers.rules import RulesBasedClassifier
 from src.mailmind.core.models import Category, EmailMessage, SuggestedAction
@@ -15,6 +16,7 @@ from src.mailmind.core.policies import YAMLPolicyProvider
 
 @dataclass(slots=True)
 class FakeLocalLLM(HuggingFaceLLM):
+    """Represents the fake local l l m component."""
     model_name: str = "fake/model"
 
     def generate_json(self, system_prompt: str, user_prompt: str) -> dict[str, object]:
@@ -51,6 +53,7 @@ def test_reasoning_split_is_generic_when_marker_exists() -> None:
     llm = HuggingFaceLLM(model_name="fake/model", reasoning_end_marker="</think>")
 
     class Tokenizer:
+        """Represents the tokenizer component."""
         @staticmethod
         def decode(tokens: list[int], skip_special_tokens: bool = True) -> str:
             mapping = {
@@ -64,3 +67,38 @@ def test_reasoning_split_is_generic_when_marker_exists() -> None:
     parsed = llm._parse_generation(Tokenizer(), [1, 2, 3, 4])
     assert parsed.thinking_content == "thinking line 1 thinking line 2"
     assert parsed.content == '{"priority_score":0.5}'
+
+
+def test_reasoning_markup_is_stripped_when_think_block_leaks_into_content() -> None:
+    llm = HuggingFaceLLM(model_name="fake/model", reasoning_end_marker="</think>")
+
+    class Tokenizer:
+        """Represents the tokenizer component."""
+
+        @staticmethod
+        def decode(tokens: list[int], skip_special_tokens: bool = True) -> str:
+            del tokens, skip_special_tokens
+            return "<think>\nNeed to compute carefully\n12 * (3 + 4)"
+
+    parsed = llm._parse_generation(Tokenizer(), [1, 2, 3])
+    assert parsed.content == "12 * (3 + 4)"
+
+
+def test_qwen_parses_thinking_and_content_explicitly() -> None:
+    llm = Qwen3_1_7BLLM(model_name="fake/qwen")
+
+    class Tokenizer:
+        """Represents the tokenizer component."""
+
+        @staticmethod
+        def decode(tokens: list[int], skip_special_tokens: bool = True) -> str:
+            mapping = {
+                1: "Need to compute carefully\n",
+                151668: "</think>",
+                2: "12 * (3 + 4)",
+            }
+            return "".join(mapping[token] for token in tokens)
+
+    parsed = llm._parse_generation(Tokenizer(), [1, 151668, 2])
+    assert parsed.thinking_content == "Need to compute carefully"
+    assert parsed.content == "12 * (3 + 4)"

@@ -16,6 +16,7 @@ from src.tools.gmail.helpers import bundle_to_summary
 
 @dataclass(slots=True)
 class EmailClassifierTool(BaseTool[EmailClassifierInput, EmailClassifierOutput]):
+    """Implements the email classifier tool."""
     repository: MessageRepository
     classifier: MessageClassifier
     name: str = "email_classifier"

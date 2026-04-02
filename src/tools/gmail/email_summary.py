@@ -16,6 +16,7 @@ from src.tools.gmail.helpers import bundle_to_detail
 
 @dataclass(slots=True)
 class EmailSummaryTool(BaseTool[EmailSummaryInput, EmailSummaryOutput]):
+    """Implements the email summary tool."""
     repository: MessageRepository
     name: str = "email_summary"
     description: str = "Summarize selected stored emails."

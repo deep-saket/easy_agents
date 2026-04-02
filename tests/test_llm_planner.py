@@ -13,6 +13,7 @@ from src.mailmind.storage.repository import DuckDBMessageRepository
 
 @dataclass(slots=True)
 class FakePlannerLLM(HuggingFaceLLM):
+    """Represents the fake planner l l m component."""
     model_name: str = "fake/model"
 
     def generate_json(self, system_prompt: str, user_prompt: str) -> dict[str, object]:

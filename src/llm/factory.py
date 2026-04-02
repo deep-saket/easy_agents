@@ -11,6 +11,7 @@ from src.llm.local_llm import FunctionCallingLocalLLM, LocalLLM
 
 
 class LLMFactory:
+    """Represents the l l m factory component."""
     @staticmethod
     def build_default_local_llm(model_name: str = "Qwen/Qwen3-1.7B") -> LocalLLM:
         return LocalLLM(client=Qwen3_1_7BLLM(model_name=model_name))

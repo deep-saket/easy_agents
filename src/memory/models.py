@@ -116,10 +116,6 @@ class MemoryRecord(BaseModel):
         return metadata
 
 
-class MemoryItem(MemoryRecord):
-    """Backward-compatible alias model for existing imports."""
-
-
 class MemoryQuery(BaseModel):
     """Defines a structured memory search request."""
 

@@ -15,6 +15,7 @@ from src.mailmind.schemas.tools import PlannerDecision
 
 @dataclass(slots=True)
 class FunctionCallingToolPlanner(BasePlanner):
+    """Represents the function calling tool planner component."""
     fallback: BasePlanner
     llm: FunctionGemmaLLM | None = None
     tool_catalog: list[dict] | None = None

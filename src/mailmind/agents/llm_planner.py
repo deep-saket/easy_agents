@@ -15,6 +15,7 @@ from src.mailmind.schemas.tools import PlannerDecision, ToolCall
 
 @dataclass(slots=True)
 class OptionalLLMToolPlanner(BasePlanner):
+    """Represents the optional l l m tool planner component."""
     fallback: BasePlanner
     llm: HuggingFaceLLM | None = None
     enabled: bool = False

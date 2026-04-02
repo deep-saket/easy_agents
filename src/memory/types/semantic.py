@@ -13,8 +13,13 @@ from __future__ import annotations
 
 from typing import Literal
 
-from src.memory.models import MemoryItem
+from src.memory.types.base import TypedMemoryRecord
 
 
-class SemanticMemory(MemoryItem):
+class SemanticMemory(TypedMemoryRecord):
+    """Represents semantic memory."""
     type: Literal["semantic"] = "semantic"
+    layer: Literal["hot", "warm", "cold"] = "warm"
+    scope: Literal["agent_local", "global"] = "agent_local"
+    default_layer = "warm"
+    default_scope = "agent_local"

@@ -7,13 +7,16 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from time import perf_counter
 from typing import Any
 
 from src.mailmind.schemas.tools import ToolCall
+from src.platform_logging.tracing import record_llm_call
 
 
 @dataclass(slots=True)
 class FunctionGemmaLLM:
+    """Represents the function gemma l l m component."""
     model_name: str = "google/functiongemma-270m-it"
     device_map: str = "auto"
     torch_dtype: str = "auto"
@@ -28,6 +31,7 @@ class FunctionGemmaLLM:
         tool_catalog: list[dict[str, Any]],
         memory_state: dict[str, object] | None = None,
     ) -> ToolCall:
+        started = perf_counter()
         processor = self._get_processor()
         model = self._get_model()
         message = [
@@ -52,7 +56,19 @@ class FunctionGemmaLLM:
             pad_token_id=processor.eos_token_id,
             max_new_tokens=self.max_new_tokens,
         )
-        content = processor.decode(outputs[0][len(inputs["input_ids"][0]) :], skip_special_tokens=True)
+        output_ids = outputs[0][len(inputs["input_ids"][0]) :]
+        content = processor.decode(output_ids, skip_special_tokens=True)
+        prompt_tokens = int(inputs["input_ids"].shape[-1])
+        completion_tokens = int(output_ids.shape[-1])
+        total_tokens = prompt_tokens + completion_tokens
+        record_llm_call(
+            model_name=self.model_name,
+            call_kind="tool_selection",
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=total_tokens,
+            duration_ms=round((perf_counter() - started) * 1000, 3),
+        )
         return self._parse_function_call(content)
 
     @staticmethod

@@ -8,21 +8,6 @@ from __future__ import annotations
 from typing import Any, Protocol, TypedDict
 
 
-class PlannerProtocol(Protocol):
-    """Describes the planner interface consumed by shared graph nodes."""
-
-    def plan(
-        self,
-        *,
-        user_input: str,
-        memory: Any,
-        observation: dict[str, Any] | None = None,
-        memory_context: dict[str, Any] | None = None,
-    ) -> Any:
-        """Plans the next agent step for the current turn."""
-        ...
-
-
 class MemoryProtocol(Protocol):
     """Describes the working-memory contract needed by shared graph nodes."""
 
@@ -47,16 +32,57 @@ class SessionStoreProtocol(Protocol):
         ...
 
 
-class ReActState(TypedDict, total=False):
-    """Represents the shared graph state passed between agent nodes."""
+class AgentState(TypedDict, total=False):
+    """Represents the neutral shared state passed between graph nodes.
+
+    The state is intentionally generic so the platform can compose different
+    agent graphs from the same node vocabulary. Although some current nodes are
+    inspired by a ReAct-style loop, the state itself should not be named after
+    a single reasoning pattern.
+    """
 
     user_input: str
-    memory: MemoryProtocol
+    memory: MemoryProtocol | None
     memory_context: dict[str, Any]
+    intent: dict[str, Any]
     decision: Any
+    memory_updates: list[dict[str, Any]]
+    stored_memories: list[Any]
     observation: dict[str, Any] | None
+    available_tools: list[Any] | None
     response: str
     steps: int
     route: str
     approval_item: Any
     approval_result: Any
+    confidence: float
+
+
+class NodeUpdate(TypedDict, total=False):
+    """Represents a partial state update emitted by one graph node.
+
+    LangGraph merges these updates into the shared state after each node
+    finishes. Keeping this as a dedicated alias makes the node contract easier
+    to read and document than reusing the full state type everywhere.
+    """
+
+    user_input: str
+    memory: MemoryProtocol | None
+    memory_context: dict[str, Any]
+    intent: dict[str, Any]
+    decision: Any
+    memory_updates: list[dict[str, Any]]
+    stored_memories: list[Any]
+    observation: dict[str, Any] | None
+    available_tools: list[Any] | None
+    response: str
+    steps: int
+    route: str
+    approval_item: Any
+    approval_result: Any
+    confidence: float
+
+
+# Backward compatibility alias during the transition away from a ReAct-specific
+# state name.
+ReActState = AgentState

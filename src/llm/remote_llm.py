@@ -13,6 +13,7 @@ from src.llm.base import BaseLLM
 
 @dataclass(slots=True)
 class RemoteLLM(BaseLLM):
+    """Represents the remote l l m component."""
     provider: str = "unconfigured"
 
     def generate(self, prompt: str, **kwargs: Any) -> str:

@@ -12,6 +12,7 @@ from src.planner.base import BasePlanner
 
 @dataclass(slots=True)
 class ReActPlanner(BasePlanner):
+    """Represents the re act planner component."""
     delegate: object
 
     def plan(self, user_input: str, memory, available_tools, observation=None):

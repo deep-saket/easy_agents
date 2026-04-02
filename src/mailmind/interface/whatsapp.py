@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 
 class IncomingMessage(BaseModel):
+    """Represents the incoming message component."""
     session_id: str
     text: str
     sender: str
@@ -18,6 +19,7 @@ class IncomingMessage(BaseModel):
 
 @dataclass(slots=True)
 class WhatsAppInterface:
+    """Defines the interface for whats app interactions."""
     def receive_message(self) -> IncomingMessage:
         raise NotImplementedError
 
@@ -27,6 +29,7 @@ class WhatsAppInterface:
 
 @dataclass(slots=True)
 class MockWhatsAppInterface(WhatsAppInterface):
+    """Defines the interface for mock whats app interactions."""
     outbound_messages: list[tuple[str, str]] = field(default_factory=list)
 
     def receive_message(self) -> IncomingMessage:

@@ -13,6 +13,7 @@ from src.mailmind.core.models import Category, ClassificationResult, EmailMessag
 
 @dataclass(slots=True)
 class SimpleReplyDrafter(DraftGenerator):
+    """Represents the simple reply drafter component."""
     def generate(self, message: EmailMessage, classification: ClassificationResult) -> ReplyDraft:
         opener = self._opener_for(classification.category)
         body = (

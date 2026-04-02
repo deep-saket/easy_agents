@@ -18,14 +18,17 @@ from pydantic import BaseModel
 
 
 class SearchInput(BaseModel):
+    """Represents input for search operations."""
     sender: str | None = None
 
 
 class SearchOutput(BaseModel):
+    """Represents output for search operations."""
     ok: bool = True
 
 
 class SearchTool(BaseTool[SearchInput, SearchOutput]):
+    """Implements the search tool."""
     name = "email_search"
     description = "Search emails."
     input_schema = SearchInput
@@ -37,6 +40,7 @@ class SearchTool(BaseTool[SearchInput, SearchOutput]):
 
 @dataclass(slots=True)
 class FakeFunctionGemma(FunctionGemmaLLM):
+    """Represents the fake function gemma component."""
     def select_tool_call(self, *, user_input: str, tool_catalog: list[dict], memory_state: dict | None = None):
         del user_input, tool_catalog, memory_state
         return self._parse_function_call(

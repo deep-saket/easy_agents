@@ -14,6 +14,7 @@ from src.mailmind.core.models import Category, ClassificationResult, EmailMessag
 
 @dataclass(slots=True)
 class OptionalLLMClassifierAdapter(MessageClassifier):
+    """Represents the optional l l m classifier adapter component."""
     fallback: MessageClassifier
     llm: HuggingFaceLLM | None = None
     enabled: bool = False

@@ -32,6 +32,7 @@ from src.mailmind.core.models import (
 
 @dataclass(slots=True)
 class MailOrchestrator:
+    """Represents the mail orchestrator component."""
     repository: MessageRepository
     classifier: MessageClassifier
     drafter: DraftGenerator

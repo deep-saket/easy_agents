@@ -15,15 +15,21 @@ from src.mailmind.schemas.tools import PlannerDecision, ToolCall
 
 @dataclass(slots=True)
 class RuleBasedToolPlanner(BasePlanner):
+    """Represents the rule based tool planner component."""
     def plan(
         self,
         *,
         user_input: str,
-        memory: ConversationMemory,
+        memory: ConversationMemory | None = None,
         observation: dict | None = None,
         memory_context: dict[str, object] | None = None,
+        system_prompt: str | None = None,
+        user_prompt: str | None = None,
+        available_tools: list[object] | None = None,
     ) -> PlannerDecision:
-        del memory_context
+        del memory_context, system_prompt, user_prompt, available_tools
+        if memory is None:
+            raise ValueError("RuleBasedToolPlanner requires working memory for multi-turn state.")
         if observation is not None:
             return self._plan_from_observation(memory, observation)
 

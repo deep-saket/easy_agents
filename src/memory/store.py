@@ -9,9 +9,9 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 from src.memory.base import BaseMemoryStore
-from src.memory.indexer import MemoryIndexer
 from src.memory.layers import ColdMemoryLayer, HotMemoryLayer, WarmMemoryLayer
 from src.memory.models import MemoryRecord, utc_now
+from src.memory.types import parse_memory_item, TypedMemoryRecord
 
 
 @dataclass(slots=True)
@@ -21,18 +21,20 @@ class MemoryStore(BaseMemoryStore):
     hot_layer: HotMemoryLayer
     warm_layer: WarmMemoryLayer
     cold_layer: ColdMemoryLayer
-    indexer: MemoryIndexer
     archive_after_days: int = 30
     default_scope: str = "agent_local"
     agent_id: str | None = None
 
     def _normalize_record(self, item: MemoryRecord) -> MemoryRecord:
-        metadata = item.normalized_metadata()
-        agent_id = item.agent_id or self.agent_id or metadata.get("agent_id") or metadata.get("agent")
-        return item.model_copy(
+        record = parse_memory_item(item.model_dump(mode="json"))
+        if isinstance(record, TypedMemoryRecord):
+            return record.prepare_for_store(default_scope=self.default_scope, agent_id=self.agent_id)
+        metadata = record.normalized_metadata()
+        agent_id = record.agent_id or self.agent_id or metadata.get("agent_id") or metadata.get("agent")
+        return record.model_copy(
             update={
                 "agent_id": agent_id,
-                "scope": item.scope or self.default_scope,
+                "scope": record.scope or self.default_scope,
                 "metadata": metadata,
             }
         )
@@ -41,7 +43,7 @@ class MemoryStore(BaseMemoryStore):
         record = self._normalize_record(item)
         if record.layer == "cold":
             return self.cold_layer.add(record)
-        stored = self.indexer.index(record.model_copy(update={"layer": "warm"}))
+        stored = self.warm_layer.add(record.model_copy(update={"layer": "warm"}))
         if item.layer == "hot":
             self.hot_layer.add(stored)
         return stored
@@ -59,7 +61,7 @@ class MemoryStore(BaseMemoryStore):
             return warm_record
         cold_record = self.cold_layer.get(memory_id)
         if cold_record is not None and self._matches_scope(cold_record):
-            promoted = self.indexer.index(cold_record.model_copy(update={"layer": "warm"}))
+            promoted = self.warm_layer.add(cold_record.model_copy(update={"layer": "warm"}))
             self.hot_layer.add(promoted)
             return promoted
         return None

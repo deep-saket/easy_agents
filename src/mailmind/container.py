@@ -7,21 +7,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.memory import (
-    ColdMemoryLayer,
-    HotMemoryLayer,
-    MemoryIndexer,
-    MemoryPolicy,
-    MemoryRetriever,
-    MemoryRouter,
-    MemoryService,
-    MemoryStore,
-    SleepingMemoryQueue,
-    WarmMemoryLayer,
-)
+from src.memory.layers import ColdMemoryLayer, HotMemoryLayer, WarmMemoryLayer
+from src.memory.policies import MemoryPolicy
+from src.memory.retrieval.retriever import LayeredMemoryRetriever as MemoryRetriever
+from src.memory.router import MemoryRouter
+from src.memory.service import MemoryService
+from src.memory.store import MemoryStore
+from src.memory.tasks.sleeping_queue import SleepingTaskQueue as SleepingMemoryQueue
 from src.llm.function_gemma import FunctionGemmaLLM
 from src.llm.qwen import Qwen3_1_7BLLM
-from src.mailmind.agent.react_agent import ReActAgent
+from src.mailmind.agent.graph_agent import MailMindGraphAgent
 from src.mailmind.agents.function_planner import FunctionCallingToolPlanner
 from src.mailmind.agents.llm_planner import OptionalLLMToolPlanner
 from src.mailmind.agents.planner import RuleBasedToolPlanner
@@ -52,6 +47,7 @@ from src.tools.catalog import write_tool_catalog
 
 @dataclass(slots=True)
 class AppContainer:
+    """Represents the app container component."""
     settings: AppSettings
     policy_provider: YAMLPolicyProvider
     repository: DuckDBMessageRepository
@@ -65,7 +61,7 @@ class AppContainer:
     tool_registry: ToolRegistry
     tool_executor: ToolExecutor
     planner: RuleBasedToolPlanner | OptionalLLMToolPlanner | FunctionCallingToolPlanner
-    agent: ReActAgent
+    agent: MailMindGraphAgent
     whatsapp_interface: MockWhatsAppInterface
 
     @classmethod
@@ -82,7 +78,6 @@ class AppContainer:
             hot_layer=hot_layer,
             warm_layer=warm_layer,
             cold_layer=cold_layer,
-            indexer=MemoryIndexer(warm_layer=warm_layer),
             archive_after_days=memory_policy.archive_after_days("agent_local"),
             default_scope="agent_local",
             agent_id="mailmind",
@@ -91,7 +86,6 @@ class AppContainer:
             hot_layer=HotMemoryLayer(max_items=max(32, settings.memory.hot_cache_size // 2)),
             warm_layer=warm_layer,
             cold_layer=cold_layer,
-            indexer=MemoryIndexer(warm_layer=warm_layer),
             archive_after_days=memory_policy.archive_after_days("global"),
             default_scope="global",
             agent_id=None,
@@ -178,7 +172,7 @@ class AppContainer:
             if settings.planner.provider == "function_gemma"
             else OptionalLLMToolPlanner(fallback=rule_planner, llm=llm, enabled=settings.llm_enabled)
         )
-        agent = ReActAgent(
+        agent = MailMindGraphAgent(
             planner=planner,
             executor=tool_executor,
             repository=repository,
