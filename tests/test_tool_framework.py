@@ -17,14 +17,17 @@ from src.tools.registry import ToolRegistry
 
 
 class EchoInput(BaseModel):
+    """Represents input for echo operations."""
     value: str
 
 
 class EchoOutput(BaseModel):
+    """Represents output for echo operations."""
     echoed: str
 
 
 class EchoTool(BaseTool[EchoInput, EchoOutput]):
+    """Implements the echo tool."""
     name = "echo"
     description = "Echo test tool."
     input_schema = EchoInput
@@ -45,6 +48,16 @@ def test_tool_registry_and_executor_round_trip(tmp_path: Path) -> None:
     assert result["status"] == "completed"
     assert result["output"]["echoed"] == "hello"
     assert logs[0].tool_name == "echo"
+
+
+def test_tool_registry_can_serialize_catalog_as_json() -> None:
+    registry = ToolRegistry()
+    registry.register(EchoTool())
+
+    catalog_json = registry.build_catalog_json()
+
+    assert '"name": "echo"' in catalog_json
+    assert '"description": "Echo test tool."' in catalog_json
 
 
 def test_email_search_filters_by_category_and_sender(tmp_path: Path) -> None:

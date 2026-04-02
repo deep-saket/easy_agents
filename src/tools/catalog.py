@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+
 def build_tool_catalog_from_tools(tools: list[Any]) -> list[dict[str, Any]]:
     catalog: list[dict[str, Any]] = []
     for tool in tools:
@@ -24,6 +25,23 @@ def build_tool_catalog_from_tools(tools: list[Any]) -> list[dict[str, Any]]:
             }
         )
     return catalog
+
+
+def catalog_to_json(catalog: list[dict[str, Any]], *, indent: int = 2) -> str:
+    """Serializes a structured tool catalog into JSON text."""
+    return json.dumps(catalog, indent=indent, ensure_ascii=True)
+
+
+def catalog_to_yaml(catalog: list[dict[str, Any]]) -> str:
+    """Serializes a structured tool catalog into YAML text.
+
+    Falls back to JSON-compatible key ordering through PyYAML when available.
+    """
+    try:
+        import yaml
+    except ImportError as exc:
+        raise RuntimeError("PyYAML is required for YAML tool catalog output.") from exc
+    return yaml.safe_dump(catalog, sort_keys=False, allow_unicode=False)
 
 
 def write_tool_catalog(tools: list[Any], path: Path) -> list[dict[str, Any]]:
