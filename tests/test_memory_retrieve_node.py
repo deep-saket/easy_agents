@@ -78,3 +78,29 @@ def test_memory_retrieve_node_can_select_targets_via_llm(tmp_path) -> None:
 
     assert set(result["memory_context"].keys()) == {"semantic", "working"}
     assert result["memory_context"]["semantic"]
+
+
+def test_memory_retrieve_node_respects_state_memory_targets(tmp_path) -> None:
+    store = build_store(tmp_path)
+    SemanticMemory(content={"fact": "prefers research roles"}, agent_id="mailmind").store_warm(store)
+    retriever = LayeredMemoryRetriever(store=store)
+    working = WorkingMemory(session_id="s3")
+    working.set_state(agent_id="mailmind")
+    node = MemoryRetrieveNode(
+        tool_registry=ToolRegistry(),
+        memory_retriever=retriever,
+        memories=[],
+    )
+
+    result = node.execute(
+        {
+            "user_input": "research",
+            "memory": working,
+            "steps": 0,
+            "confidence": 1.0,
+            "memory_targets": [{"type": "semantic", "limit": 2, "enabled": True}],
+        }
+    )
+
+    assert set(result["memory_context"].keys()) == {"semantic"}
+    assert result["memory_context"]["semantic"]

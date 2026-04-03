@@ -15,6 +15,7 @@ from src.agents.nodes.response_node import RespondNode, ResponseNode
 from src.agents.nodes.router_node import RouterNode
 from src.agents.nodes.tool_execution_node import ToolExecutionNode, ToolNode
 from src.agents.nodes.types import AgentState, MemoryProtocol, NodeUpdate, ReActState, SessionStoreProtocol
+from src.agents.nodes.whatsapp_node import WhatsAppNode
 
 __all__ = [
     "ApprovalNode",
@@ -35,4 +36,5 @@ __all__ = [
     "SessionStoreProtocol",
     "ToolExecutionNode",
     "ToolNode",
+    "WhatsAppNode",
 ]

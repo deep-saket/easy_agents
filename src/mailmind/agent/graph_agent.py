@@ -12,7 +12,7 @@ from src.memory.session_store import SessionStore
 class MailMindGraphAgent(SharedGraphAgent):
     """Specializes the shared graph agent with MailMind session storage."""
 
-    def __init__(self, planner, executor, repository, memory_retriever=None, memory_store=None) -> None:
+    def __init__(self, planner, executor, repository, memory_retriever=None, memory_store=None, trace_sink=None) -> None:
         SharedGraphAgent.__init__(
             self,
             llm=None,
@@ -26,4 +26,5 @@ class MailMindGraphAgent(SharedGraphAgent):
             memory_store=memory_store,
             memory_retriever=memory_retriever,
             agent_name="mailmind",
+            trace_sink=trace_sink,
         )

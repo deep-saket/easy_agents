@@ -10,14 +10,63 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+import json
+from pathlib import Path
 from time import perf_counter
-from typing import Any, Iterator
+from typing import Any, Iterator, Protocol
 from uuid import uuid4
 
 
 def _utc_now() -> datetime:
     """Returns the current timezone-aware UTC timestamp."""
     return datetime.now(UTC)
+
+
+def _json_safe(value: Any) -> Any:
+    """Normalizes values into JSON-serializable shapes."""
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, dict):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_json_safe(item) for item in value]
+    if hasattr(value, "model_dump"):
+        return _json_safe(value.model_dump(mode="json"))
+    if hasattr(value, "_asdict"):
+        return _json_safe(value._asdict())
+    if hasattr(value, "__dict__"):
+        return {key: _json_safe(item) for key, item in vars(value).items() if not key.startswith("_")}
+    return repr(value)
+
+
+class TraceSink(Protocol):
+    """Defines a real-time sink for structured execution trace events."""
+
+    def emit(self, event: dict[str, Any]) -> None:
+        """Emits one JSON-serializable trace event."""
+        ...
+
+
+@dataclass(slots=True)
+class StdoutJSONTraceSink:
+    """Writes one JSON event per line to stdout."""
+
+    def emit(self, event: dict[str, Any]) -> None:
+        print(json.dumps(_json_safe(event), ensure_ascii=True), flush=True)
+
+
+@dataclass(slots=True)
+class JSONLTraceSink:
+    """Appends one JSON event per line to a JSONL file."""
+
+    file_path: Path
+
+    def __post_init__(self) -> None:
+        self.file_path.parent.mkdir(parents=True, exist_ok=True)
+
+    def emit(self, event: dict[str, Any]) -> None:
+        with self.file_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(_json_safe(event), ensure_ascii=True) + "\n")
 
 
 @dataclass(slots=True)
@@ -240,31 +289,91 @@ class ExecutionTrace:
 
 _active_trace: ContextVar[ExecutionTrace | None] = ContextVar("active_execution_trace", default=None)
 _active_node_name: ContextVar[str | None] = ContextVar("active_node_name", default=None)
+_active_trace_sink: ContextVar[TraceSink | None] = ContextVar("active_trace_sink", default=None)
+
+
+def emit_trace_event(event: dict[str, Any]) -> None:
+    """Emits one real-time trace event when a sink is active."""
+    sink = _active_trace_sink.get()
+    if sink is None:
+        return
+    sink.emit(event)
 
 
 @contextmanager
-def trace_turn(trace: ExecutionTrace) -> Iterator[ExecutionTrace]:
+def trace_turn(trace: ExecutionTrace, *, sink: TraceSink | None = None) -> Iterator[ExecutionTrace]:
     """Sets the active agent-turn trace for nested node/tool/llm events."""
-    token = _active_trace.set(trace)
+    trace_token = _active_trace.set(trace)
+    sink_token = _active_trace_sink.set(sink)
+    emit_trace_event(
+        {
+            "event": "turn_started",
+            "trace_id": trace.trace_id,
+            "agent_name": trace.agent_name,
+            "session_id": trace.session_id,
+            "user_input": trace.user_input,
+            "started_at": trace.started_at.isoformat(),
+        }
+    )
     try:
         yield trace
     finally:
-        _active_trace.reset(token)
+        emit_trace_event(
+            {
+                "event": "turn_finished",
+                "trace_id": trace.trace_id,
+                "agent_name": trace.agent_name,
+                "session_id": trace.session_id,
+                "status": trace.status,
+                "summary": trace.summary(),
+                "finished_at": trace.finished_at.isoformat() if trace.finished_at else None,
+                "error": trace.error,
+            }
+        )
+        _active_trace.reset(trace_token)
+        _active_trace_sink.reset(sink_token)
 
 
 @contextmanager
-def trace_node(node_name: str) -> Iterator[NodeTrace | None]:
+def trace_node(node_name: str, *, state: dict[str, Any] | None = None) -> Iterator[NodeTrace | None]:
     """Sets the active node name and records one node execution span."""
     trace = current_trace()
     node_trace = trace.start_node(node_name) if trace is not None else None
     token = _active_node_name.set(node_name)
+    emit_trace_event(
+        {
+            "event": "node_started",
+            "trace_id": trace.trace_id if trace is not None else None,
+            "node_name": node_name,
+            "step": None if state is None else state.get("steps", 0),
+            "state": _json_safe(state or {}),
+        }
+    )
     try:
         yield node_trace
         if node_trace is not None:
             node_trace.finish(status="completed")
+            emit_trace_event(
+                {
+                    "event": "node_finished",
+                    "trace_id": trace.trace_id if trace is not None else None,
+                    "node_name": node_name,
+                    "status": "completed",
+                    "duration_ms": node_trace.duration_ms,
+                }
+            )
     except Exception as exc:
         if node_trace is not None:
             node_trace.finish(status="failed", error=str(exc))
+        emit_trace_event(
+            {
+                "event": "node_finished",
+                "trace_id": trace.trace_id if trace is not None else None,
+                "node_name": node_name,
+                "status": "failed",
+                "error": str(exc),
+            }
+        )
         raise
     finally:
         _active_node_name.reset(token)
@@ -302,6 +411,19 @@ def record_llm_call(
         duration_ms=duration_ms,
         node_name=current_node_name(),
     )
+    emit_trace_event(
+        {
+            "event": "llm_call",
+            "trace_id": trace.trace_id,
+            "node_name": current_node_name(),
+            "model_name": model_name,
+            "call_kind": call_kind,
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_tokens": total_tokens,
+            "duration_ms": duration_ms,
+        }
+    )
 
 
 def record_tool_call(
@@ -321,6 +443,17 @@ def record_tool_call(
         duration_ms=duration_ms,
         error=error,
         node_name=current_node_name(),
+    )
+    emit_trace_event(
+        {
+            "event": "tool_call",
+            "trace_id": trace.trace_id,
+            "node_name": current_node_name(),
+            "tool_name": tool_name,
+            "status": status,
+            "duration_ms": duration_ms,
+            "error": error,
+        }
     )
 
 

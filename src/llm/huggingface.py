@@ -8,8 +8,10 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
+from time import perf_counter
 from typing import Any
 
+from src.platform_logging.tracing import record_llm_call
 
 @dataclass(slots=True)
 class LLMGeneration:
@@ -36,6 +38,7 @@ class HuggingFaceLLM:
         return self.generate_result(system_prompt, user_prompt).content
 
     def generate_result(self, system_prompt: str, user_prompt: str) -> LLMGeneration:
+        started = perf_counter()
         tokenizer = self._get_tokenizer()
         model = self._get_model()
         messages = [
@@ -58,6 +61,17 @@ class HuggingFaceLLM:
         model_inputs = tokenizer([prompt_text], return_tensors="pt").to(model.device)
         generated_ids = model.generate(**model_inputs, max_new_tokens=self.max_new_tokens)
         output_ids = generated_ids[0][len(model_inputs.input_ids[0]) :].tolist()
+        prompt_tokens = int(model_inputs.input_ids.shape[-1])
+        completion_tokens = len(output_ids)
+        total_tokens = prompt_tokens + completion_tokens
+        record_llm_call(
+            model_name=self.model_name,
+            call_kind="generate",
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=total_tokens,
+            duration_ms=round((perf_counter() - started) * 1000, 3),
+        )
         return self._parse_generation(tokenizer, output_ids)
 
     def generate_json(self, system_prompt: str, user_prompt: str) -> dict[str, Any]:

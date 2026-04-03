@@ -20,7 +20,7 @@ from src.mailmind.agent.graph_agent import MailMindGraphAgent
 from src.mailmind.agents.function_planner import FunctionCallingToolPlanner
 from src.mailmind.agents.llm_planner import OptionalLLMToolPlanner
 from src.mailmind.agents.planner import RuleBasedToolPlanner
-from src.mailmind.interface.whatsapp import MockWhatsAppInterface
+from src.mailmind.interface.whatsapp import MockWhatsAppInterface, TwilioWhatsAppInterface, WhatsAppInterface
 from src.mailmind.approvals.queue import LocalApprovalQueue
 from src.mailmind.classifiers.llm import OptionalLLMClassifierAdapter
 from src.mailmind.classifiers.rules import RulesBasedClassifier
@@ -62,7 +62,7 @@ class AppContainer:
     tool_executor: ToolExecutor
     planner: RuleBasedToolPlanner | OptionalLLMToolPlanner | FunctionCallingToolPlanner
     agent: MailMindGraphAgent
-    whatsapp_interface: MockWhatsAppInterface
+    whatsapp_interface: WhatsAppInterface
 
     @classmethod
     def from_env(cls) -> "AppContainer":
@@ -122,7 +122,12 @@ class AppContainer:
         notifier = (
             FakeWhatsAppNotifier(settings.whatsapp_allowlist)
             if settings.whatsapp_mode == "fake"
-            else WhatsAppNotifier(settings.whatsapp_allowlist)
+            else WhatsAppNotifier(
+                settings.whatsapp_allowlist,
+                account_sid=settings.integrations.twilio_account_sid,
+                auth_token=settings.integrations.twilio_auth_token,
+                whatsapp_from=settings.integrations.twilio_whatsapp_from,
+            )
         )
         approval_queue = LocalApprovalQueue(repository=repository)
         source = FakeGmailEmailSource(settings.gmail_seed_path) if settings.source_mode == "fake" else GmailEmailSource()
@@ -179,7 +184,15 @@ class AppContainer:
             memory_retriever=memory_router,
             memory_store=local_memory_store,
         )
-        whatsapp_interface = MockWhatsAppInterface()
+        whatsapp_interface = (
+            MockWhatsAppInterface()
+            if settings.whatsapp_mode == "fake"
+            else TwilioWhatsAppInterface(
+                account_sid=settings.integrations.twilio_account_sid,
+                auth_token=settings.integrations.twilio_auth_token,
+                whatsapp_from=settings.integrations.twilio_whatsapp_from,
+            )
+        )
         return cls(
             settings=settings,
             policy_provider=policy_provider,

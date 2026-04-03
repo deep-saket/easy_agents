@@ -111,3 +111,20 @@ def test_memory_node_can_choose_memory_updates_via_llm(tmp_path) -> None:
 
     assert state["memory"].recent_items[0]["content"] == "remember this"
     assert any(isinstance(item, SemanticMemory) for item in state["stored_memories"])
+
+
+def test_memory_node_respects_state_memory_targets(tmp_path) -> None:
+    store = build_store(tmp_path)
+    node = MemoryNode(memory_store=store, memories=[])
+
+    state = node.execute(
+        {
+            "user_input": "hello",
+            "response": "hi",
+            "memory_targets": [{"type": "episodic", "layer": "cold", "enabled": True}],
+        }
+    )
+
+    stored = state["stored_memories"][0]
+    assert stored.type == "episodic"
+    assert stored.layer == "cold"

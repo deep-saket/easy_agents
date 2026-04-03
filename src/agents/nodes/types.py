@@ -11,6 +11,10 @@ from typing import Any, Protocol, TypedDict
 class MemoryProtocol(Protocol):
     """Describes the working-memory contract needed by shared graph nodes."""
 
+    session_id: str
+    state: dict[str, Any]
+    recent_items: list[dict[str, Any]]
+
     def add_user_message(self, content: str) -> None:
         """Persists one user message in session working memory."""
         ...
@@ -32,6 +36,22 @@ class SessionStoreProtocol(Protocol):
         ...
 
 
+class MemoryTargetSpec(TypedDict, total=False):
+    """Describes one memory target that a node may retrieve or update.
+
+    This is the state-level configuration shape for memory-aware nodes. It lets
+    callers add or change memory targets without changing the node class
+    constructor or hardcoding per-agent logic into the node itself.
+    """
+
+    type: str
+    layer: str
+    scope: str
+    limit: int
+    enabled: bool
+    metadata: dict[str, Any]
+
+
 class AgentState(TypedDict, total=False):
     """Represents the neutral shared state passed between graph nodes.
 
@@ -41,21 +61,30 @@ class AgentState(TypedDict, total=False):
     a single reasoning pattern.
     """
 
+    session_id: str
+    turn_id: str
     user_input: str
     memory: MemoryProtocol | None
+    memory_targets: list[MemoryTargetSpec]
     memory_context: dict[str, Any]
+    memory_retrievals: list[dict[str, Any]]
     intent: dict[str, Any]
     decision: Any
     memory_updates: list[dict[str, Any]]
     stored_memories: list[Any]
     observation: dict[str, Any] | None
+    error: dict[str, Any] | None
     available_tools: list[Any] | None
     response: str
     steps: int
     route: str
+    final: bool
+    waiting: bool
+    trace: dict[str, Any]
     approval_item: Any
     approval_result: Any
     confidence: float
+    channel_result: dict[str, Any]
 
 
 class NodeUpdate(TypedDict, total=False):
@@ -66,23 +95,30 @@ class NodeUpdate(TypedDict, total=False):
     to read and document than reusing the full state type everywhere.
     """
 
+    session_id: str
+    turn_id: str
     user_input: str
     memory: MemoryProtocol | None
+    memory_targets: list[MemoryTargetSpec]
     memory_context: dict[str, Any]
+    memory_retrievals: list[dict[str, Any]]
     intent: dict[str, Any]
     decision: Any
     memory_updates: list[dict[str, Any]]
     stored_memories: list[Any]
     observation: dict[str, Any] | None
+    error: dict[str, Any] | None
     available_tools: list[Any] | None
     response: str
     steps: int
     route: str
+    final: bool
+    waiting: bool
+    trace: dict[str, Any]
     approval_item: Any
     approval_result: Any
     confidence: float
+    channel_result: dict[str, Any]
 
 
-# Backward compatibility alias during the transition away from a ReAct-specific
-# state name.
 ReActState = AgentState

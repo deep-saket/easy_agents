@@ -6,6 +6,7 @@ Purpose: Implements the neutral graph-based shared agent runtime.
 from __future__ import annotations
 
 from typing import Any
+from uuid import uuid4
 
 from langgraph.graph import END, START, StateGraph
 
@@ -13,6 +14,7 @@ from src.agents.base_agent import BaseAgent
 from src.agents.nodes import AgentState, MemoryRetrieveNode, ReflectNode, ResponseNode, SessionStoreProtocol, ToolExecutionNode
 from src.agents.nodes.react_node import ReactNode
 from src.memory.base import BaseMemoryStore
+from src.platform_logging.tracing import ExecutionTrace, emit_trace_event, trace_node, trace_turn
 from src.tools.executor import ToolExecutor
 
 
@@ -53,6 +55,7 @@ class GraphAgent(BaseAgent):
         memory_store: BaseMemoryStore | None = None,
         memory_retriever: Any | None = None,
         agent_name: str = "platform",
+        trace_sink: Any | None = None,
     ) -> None:
         """Initializes the graph agent and compiles its shared node graph.
 
@@ -69,11 +72,16 @@ class GraphAgent(BaseAgent):
             memory_store: Optional long-term memory write path.
             memory_retriever: Optional long-term memory read path.
             agent_name: Stable agent identifier used in reflection memory.
+            trace_sink: Optional real-time JSON trace sink.
         """
         self.session_store = session_store
         self.tool_executor = tool_executor
         self.memory_store = memory_store
         self.memory_retriever = memory_retriever
+        self.planner = planner
+        self.tool_registry = tool_registry
+        self.storage = storage
+        self.memory = memory
         self.agent_name = agent_name
         self._graph: Any | None = None
         self._memory_retrieve_node: MemoryRetrieveNode | None = None
@@ -83,13 +91,9 @@ class GraphAgent(BaseAgent):
         self._response_node: ResponseNode | None = None
         super().__init__(
             llm=llm,
-            planner=planner,
-            tool_registry=tool_registry,
-            memory=memory,
-            storage=storage,
+            agent_name=agent_name,
             logger=logger,
-            memory_store=memory_store,
-            memory_retriever=memory_retriever,
+            trace_sink=trace_sink,
         )
         self._memory_retrieve_node = MemoryRetrieveNode(
             tool_registry=self.tool_registry,
@@ -122,15 +126,23 @@ class GraphAgent(BaseAgent):
         memory = self.session_store.load(session_key)
         memory.add_user_message(user_input)
         try:
-            state = self._graph.invoke(
-                {
-                    "user_input": user_input,
-                    "memory": memory,
-                    "observation": None,
-                    "steps": 0,
-                }
-            )
+            trace = ExecutionTrace(agent_name=self.agent_name, session_id=session_key, user_input=user_input)
+            with trace_turn(trace, sink=self.trace_sink):
+                state = self._graph.invoke(
+                    {
+                        "session_id": session_key,
+                        "turn_id": str(uuid4()),
+                        "user_input": user_input,
+                        "memory": memory,
+                        "observation": None,
+                        "steps": 0,
+                        "trace": {"trace_id": trace.trace_id},
+                    }
+                )
+                trace.finish(status="completed")
         except Exception:
+            if 'trace' in locals():
+                trace.finish(status="failed", error="graph_invoke_failed")
             self.log_exception(
                 "Graph agent turn failed",
                 agent_name=self.agent_name,
@@ -152,10 +164,10 @@ class GraphAgent(BaseAgent):
     def _build_graph(self) -> Any:
         """Builds the default shared node graph for an agent turn."""
         graph = StateGraph(AgentState)
-        graph.add_node("retrieve_memory", self._memory_retrieve_node.execute)
-        graph.add_node("plan", self._planner_node.execute)
+        graph.add_node("retrieve_memory", self._wrap_node("retrieve_memory", self._memory_retrieve_node.execute))
+        graph.add_node("plan", self._wrap_node("plan", self._planner_node.execute))
         graph.add_node("act", self._act_node)
-        graph.add_node("reflect", self._reflect_node.execute)
+        graph.add_node("reflect", self._wrap_node("reflect", self._reflect_node.execute))
         graph.add_node("respond", self._respond_step)
         graph.add_edge(START, "retrieve_memory")
         graph.add_edge("retrieve_memory", "plan")
@@ -169,13 +181,61 @@ class GraphAgent(BaseAgent):
         graph.add_edge("respond", END)
         return graph.compile()
 
+    def _wrap_node(self, node_name: str, fn: Any) -> Any:
+        """Wraps a node function with real-time trace emission."""
+
+        def _wrapped(state: AgentState) -> AgentState:
+            with trace_node(node_name, state=state):
+                result = fn(state)
+            emit_trace_event(
+                {
+                    "event": "node_state",
+                    "node_name": node_name,
+                    "step": state.get("steps", 0),
+                    "decision": repr(result.get("decision") if isinstance(result, dict) else None),
+                    "state": {
+                        "response": result.get("response") if isinstance(result, dict) else None,
+                        "route": result.get("route") if isinstance(result, dict) else None,
+                        "memory_context_keys": sorted((result.get("memory_context") or {}).keys())
+                        if isinstance(result, dict) and isinstance(result.get("memory_context"), dict)
+                        else [],
+                    },
+                }
+            )
+            return result
+
+        return _wrapped
+
     def _act_node(self, state: AgentState) -> AgentState:
         """Delegates tool execution to the shared tool node."""
-        return self._tool_execution_node.execute(state)
+        with trace_node("act", state=state):
+            result = self._tool_execution_node.execute(state)
+        emit_trace_event(
+            {
+                "event": "node_state",
+                "node_name": "act",
+                "step": state.get("steps", 0),
+                "decision": repr(state.get("decision")),
+                "observation": result.get("observation"),
+                "response": result.get("response"),
+            }
+        )
+        return result
 
     def _respond_step(self, state: AgentState) -> AgentState:
         """Delegates final response generation to the shared response node."""
-        return self._response_node.execute(state)
+        with trace_node("respond", state=state):
+            result = self._response_node.execute(state)
+        emit_trace_event(
+            {
+                "event": "node_state",
+                "node_name": "respond",
+                "step": state.get("steps", 0),
+                "decision": repr(state.get("decision")),
+                "response": result.get("response"),
+            }
+        )
+        return result
 
 
 __all__ = ["GraphAgent"]

@@ -45,6 +45,7 @@ class MemoryRetrieveNode(BaseGraphNode):
         user_input: str,
         memory: Any | None = None,
         memory_context: dict[str, Any] | None = None,
+        memory_targets: list[dict[str, Any]] | None = None,
         system_prompt: str | None = None,
         user_prompt: str | None = None,
     ) -> list[dict[str, Any]]:
@@ -54,7 +55,7 @@ class MemoryRetrieveNode(BaseGraphNode):
         targets to retrieve and with what limits. Otherwise the node retrieves
         all configured memory targets using conservative defaults.
         """
-        default_plan = self._default_plan(memory=memory)
+        default_plan = self._default_plan(memory=memory, memory_targets=memory_targets)
         if self.llm is None:
             return default_plan
         rendered_user_prompt = self._render_user_prompt(
@@ -62,7 +63,7 @@ class MemoryRetrieveNode(BaseGraphNode):
             user_input=user_input,
             memory=memory,
             memory_context=memory_context,
-            memory_targets=self._memory_targets(),
+            memory_targets=self._memory_targets(memory_targets),
         )
         raw = self.llm.generate(system_prompt or self.system_prompt or "", rendered_user_prompt).strip()
         planned = self._parse_plan(raw)
@@ -91,6 +92,7 @@ class MemoryRetrieveNode(BaseGraphNode):
             user_input=user_input,
             memory=memory,
             memory_context=state.get("memory_context"),
+            memory_targets=state.get("memory_targets"),
             system_prompt=self.system_prompt,
             user_prompt=self.user_prompt,
         )
@@ -115,31 +117,48 @@ class MemoryRetrieveNode(BaseGraphNode):
             )
         return {"memory_context": assembled_context}
 
-    def _default_plan(self, *, memory: Any | None) -> list[dict[str, Any]]:
+    def _default_plan(self, *, memory: Any | None, memory_targets: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
         """Builds the default retrieval plan for configured memory targets."""
         del memory
         return [
-            {"target": target, "limit": 5}
-            for target in self._memory_targets()
+            {"target": target.get("type", ""), "limit": int(target.get("limit", 5))}
+            for target in self._memory_targets(memory_targets)
         ]
 
-    def _memory_targets(self) -> list[str]:
+    def _memory_targets(self, state_targets: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
         """Normalizes constructor-provided memory targets into target names."""
-        configured = self.memories or [SemanticMemory, EpisodicMemory, WorkingMemory, ProceduralMemory]
-        targets: list[str] = []
+        configured = self.memories if self.memories is not None else [SemanticMemory, EpisodicMemory, WorkingMemory, ProceduralMemory]
+        targets: list[dict[str, Any]] = []
         for memory in configured:
             if memory is WorkingMemory or getattr(memory, "__name__", None) == "WorkingMemory":
-                targets.append("working")
+                targets.append({"type": "working", "limit": 5, "layer": "hot"})
                 continue
             if memory is ProceduralMemory or getattr(memory, "__name__", None) == "ProceduralMemory":
-                targets.append("procedural")
+                targets.append({"type": "procedural", "limit": 5, "layer": "warm"})
                 continue
             memory_type = getattr(getattr(memory, "model_fields", {}), "get", lambda *_: None)("type")
             if memory_type is not None:
-                targets.append(str(memory_type.default))
+                targets.append({"type": str(memory_type.default), "limit": 5, "layer": getattr(memory, "default_layer", "warm")})
                 continue
             if hasattr(memory, "type"):
-                targets.append(str(getattr(memory, "type")))
+                targets.append({"type": str(getattr(memory, "type")), "limit": 5, "layer": "warm"})
+        for target in state_targets or []:
+            if not isinstance(target, dict):
+                continue
+            if not target.get("enabled", True):
+                continue
+            target_type = str(target.get("type", "")).strip().lower()
+            if not target_type:
+                continue
+            targets.append(
+                {
+                    "type": target_type,
+                    "limit": int(target.get("limit", 5)),
+                    "layer": str(target.get("layer", "warm")),
+                    "scope": target.get("scope"),
+                    "metadata": dict(target.get("metadata", {})) if isinstance(target.get("metadata"), dict) else {},
+                }
+            )
         return targets
 
     @staticmethod

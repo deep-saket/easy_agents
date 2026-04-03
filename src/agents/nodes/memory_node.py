@@ -46,6 +46,7 @@ class MemoryNode(BaseGraphNode):
         observation: dict[str, Any] | None = None,
         decision: Any | None = None,
         memory: Any | None = None,
+        memory_targets: list[dict[str, Any]] | None = None,
         system_prompt: str | None = None,
         user_prompt: str | None = None,
     ) -> list[dict[str, Any]]:
@@ -65,7 +66,7 @@ class MemoryNode(BaseGraphNode):
             response=response,
             observation=observation,
             decision=decision,
-            memory_targets=self._memory_targets(),
+            memory_targets=self._memory_targets(memory_targets),
         )
         raw = self.llm.generate(system_prompt or self.system_prompt or "", rendered_user_prompt).strip()
         planned_updates = self._parse_updates(raw)
@@ -89,6 +90,7 @@ class MemoryNode(BaseGraphNode):
                 observation=state.get("observation"),
                 decision=state.get("decision"),
                 memory=memory,
+                memory_targets=state.get("memory_targets"),
                 system_prompt=self.system_prompt,
                 user_prompt=self.user_prompt,
             )
@@ -98,12 +100,14 @@ class MemoryNode(BaseGraphNode):
                 response=state.get("response"),
                 observation=state.get("observation"),
                 memory=memory,
+                memory_targets=state.get("memory_targets"),
             ),
             planned=explicit_updates,
         )
         for update in updates:
             target = str(update.get("target", "working"))
-            if self._managed_types() and target not in self._managed_types():
+            managed_types = self._managed_types(state.get("memory_targets"))
+            if managed_types and target not in managed_types:
                 continue
             if target == "working":
                 self._apply_working_update(memory, update)
@@ -139,10 +143,11 @@ class MemoryNode(BaseGraphNode):
         response: str | None,
         observation: dict[str, Any] | None,
         memory: Any | None,
+        memory_targets: list[dict[str, Any]] | None = None,
     ) -> list[dict[str, Any]]:
         """Builds a blind/default memory update plan for all configured targets."""
         updates = [dict(update) for update in self.default_memory_plan]
-        for target in self._memory_targets():
+        for target in self._memory_targets(memory_targets):
             target_type = str(target["type"])
             if target_type == "working":
                 if user_input:
@@ -185,7 +190,7 @@ class MemoryNode(BaseGraphNode):
             )
         return updates
 
-    def _memory_targets(self) -> list[dict[str, Any]]:
+    def _memory_targets(self, state_targets: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
         """Normalizes constructor-provided memory targets into descriptors."""
         targets: list[dict[str, Any]] = []
         for memory in self.memories:
@@ -202,11 +207,28 @@ class MemoryNode(BaseGraphNode):
                         "default_layer": getattr(memory, "default_layer", "warm"),
                     }
                 )
+        for target in state_targets or []:
+            if not isinstance(target, dict):
+                continue
+            if not target.get("enabled", True):
+                continue
+            target_type = str(target.get("type", "")).strip().lower()
+            if not target_type:
+                continue
+            targets.append(
+                {
+                    "type": target_type,
+                    "default_layer": str(target.get("layer", "warm")),
+                    "scope": target.get("scope"),
+                    "limit": target.get("limit"),
+                    "metadata": dict(target.get("metadata", {})) if isinstance(target.get("metadata"), dict) else {},
+                }
+            )
         return targets
 
-    def _managed_types(self) -> set[str]:
+    def _managed_types(self, state_targets: list[dict[str, Any]] | None = None) -> set[str]:
         """Returns the set of memory types configured on this node."""
-        return {str(target["type"]) for target in self._memory_targets()}
+        return {str(target["type"]) for target in self._memory_targets(state_targets)}
 
     def _working_memory(self) -> Any | None:
         """Returns the configured working-memory target, if any."""

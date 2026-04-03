@@ -8,70 +8,46 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 
 from src.platform_logging.structured_logger import StructuredLogger
+from src.platform_logging.tracing import TraceSink
 
 
 class BaseAgent(ABC):
-    """Defines the shared dependency shape for all concrete agents.
+    """Defines only the concerns shared by all agent runtimes.
 
-    This class exists to make the platform composition model explicit. A
-    concrete agent is not expected to implement all logic itself. Instead, it
-    coordinates a set of collaborating subsystems:
+    `BaseAgent` should stay small. It exists for the pieces that are truly
+    runtime-agnostic across different agent implementations:
 
-    - `llm`: the language-model adapter used for reasoning or generation
-    - `planner`: the component that decides what the agent should do next
-    - `tool_registry`: the catalog of tools the agent is allowed to call
-    - `memory`: session-scoped working memory for the current interaction
-    - `storage`: the agent's durable operational store
-    - `logger`: structured logging for observability and audit
-    - `memory_store`: long-term layered memory writes
-    - `memory_retriever`: long-term layered memory reads
+    - optional LLM access
+    - stable agent identity
+    - structured logging helpers
+    - real-time trace sink integration
 
-    The goal of this base class is clarity of composition, not behavior. The
-    actual control loop belongs in concrete runtimes such as `GraphAgent` or
-    future agent-specific runners.
-
-    One subtle but important point is that an agent does not require an LLM in
-    order to function. The platform allows two broad planning styles:
-
-    - LLM-backed planning, where the planner asks a model to reason about the
-      next step
-    - deterministic planning, where the planner is rule-based or otherwise
-      procedural
-
-    In other words, `llm` is an optional dependency of the agent runtime, not a
-    mandatory requirement for every agent turn.
+    It should not own graph wiring, planner contracts, tool registries, or
+    storage topology. Those belong to the concrete runtime such as
+    `GraphAgent`.
     """
 
-    def __init__(self, llm, planner, tool_registry, memory, storage, logger, memory_store=None, memory_retriever=None) -> None:
-        """Stores the shared runtime dependencies for an agent instance.
+    def __init__(
+        self,
+        *,
+        llm=None,
+        agent_name: str | None = None,
+        logger=None,
+        trace_sink: TraceSink | None = None,
+    ) -> None:
+        """Stores the minimal shared runtime dependencies for an agent.
 
         Args:
-            llm: The language-model adapter used by the agent. This may be a
-                local or remote model and can be `None` for purely rule-based
-                agents.
-            planner: The decision-making component that interprets user input
-                and decides whether to respond directly, call a tool, or route
-                elsewhere.
-            tool_registry: The registry containing all tools available to this
-                agent. The planner typically reasons over this tool set.
-            memory: Working memory for the active interaction or session. This
-                is short-lived state such as conversation history.
-            storage: Durable agent-specific storage, such as the MailMind
-                repository for emails, drafts, and approvals.
+            llm: Optional language-model adapter for the runtime.
+            agent_name: Stable runtime name used in logs and traces.
             logger: Structured logging backend used for observability.
-            memory_store: Optional long-term memory write path for semantic,
-                episodic, reflection, error, and task memory.
-            memory_retriever: Optional long-term memory read path used when the
-                agent needs historical context beyond the current session.
+            trace_sink: Optional real-time structured trace sink that receives
+                one JSON event at a time during the forward pass.
         """
         self.llm = llm
-        self.planner = planner
-        self.tool_registry = tool_registry
-        self.memory = memory
-        self.storage = storage
+        self.agent_name = agent_name or type(self).__name__.lower()
         self.logger = logger or StructuredLogger(type(self).__name__)
-        self.memory_store = memory_store
-        self.memory_retriever = memory_retriever
+        self.trace_sink = trace_sink
 
     def log_info(self, message: str, **context: object) -> None:
         """Writes one info-level structured log line for the agent.

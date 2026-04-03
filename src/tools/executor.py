@@ -6,12 +6,14 @@ Purpose: Implements the executor module for the shared tools platform layer.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from time import perf_counter
 
 from src.memory.policies import MemoryPolicy
 from src.memory.store import MemoryStore
 from src.mailmind.core.interfaces import MessageRepository
 from src.mailmind.core.models import ToolExecutionLog
 from src.mailmind.schemas.tools import ToolCall, ToolExecutionResult
+from src.platform_logging.tracing import record_tool_call
 from src.tools.registry import ToolRegistry
 
 
@@ -79,6 +81,7 @@ class ToolExecutor:
         tool = self.registry.get(tool_name)
         repository = self.repository or NullToolLogRepository()
         log = ToolExecutionLog(tool_name=tool_name, input_payload=input, status="started")
+        started = perf_counter()
         try:
             validated_input = tool.input_schema.model_validate(input)
             output = tool.execute(validated_input)
@@ -105,6 +108,11 @@ class ToolExecutor:
                     },
                 }
             )
+            record_tool_call(
+                tool_name=tool_name,
+                status="completed",
+                duration_ms=round((perf_counter() - started) * 1000, 3),
+            )
             return ToolExecutionResult(
                 tool_name=tool_name,
                 status="completed",
@@ -130,6 +138,12 @@ class ToolExecutor:
                         "priority": "high",
                     },
                 }
+            )
+            record_tool_call(
+                tool_name=tool_name,
+                status="failed",
+                duration_ms=round((perf_counter() - started) * 1000, 3),
+                error=str(exc),
             )
             raise
 

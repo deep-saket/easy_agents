@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from src.interfaces.whatsapp import TwilioWhatsAppInterface
 from src.mailmind.core.interfaces import Notifier
 from src.mailmind.core.models import NotificationAttempt, NotificationPayload, NotificationStatus
 
@@ -30,12 +31,23 @@ class FakeWhatsAppNotifier(Notifier):
 
 class WhatsAppNotifier(Notifier):
     """Represents the whats app notifier component."""
-    def __init__(self, allowlist: tuple[str, ...]) -> None:
+    def __init__(
+        self,
+        allowlist: tuple[str, ...],
+        *,
+        account_sid: str,
+        auth_token: str,
+        whatsapp_from: str,
+        interface: TwilioWhatsAppInterface | None = None,
+    ) -> None:
         self._allowlist = allowlist
+        self._interface = interface or TwilioWhatsAppInterface(
+            account_sid=account_sid,
+            auth_token=auth_token,
+            whatsapp_from=whatsapp_from,
+        )
 
     def send(self, payload: NotificationPayload) -> NotificationAttempt:
-        # TODO: Implement Twilio WhatsApp sending with TWILIO_ACCOUNT_SID,
-        # TWILIO_AUTH_TOKEN, and a configured WhatsApp-enabled sender.
         if self._allowlist and payload.destination not in self._allowlist:
             return NotificationAttempt(
                 message_id=payload.message_id,
@@ -45,4 +57,22 @@ class WhatsAppNotifier(Notifier):
                 status=NotificationStatus.FAILED,
                 error="Destination is not in the WhatsApp allowlist.",
             )
-        raise NotImplementedError("Real Twilio WhatsApp integration is not configured in v0.1.")
+        try:
+            self._interface.send_message(payload.destination, payload.body)
+        except Exception as exc:
+            return NotificationAttempt(
+                message_id=payload.message_id,
+                channel=payload.channel,
+                destination=payload.destination,
+                payload=payload.model_dump(mode="json"),
+                status=NotificationStatus.FAILED,
+                error=str(exc),
+            )
+        return NotificationAttempt(
+            message_id=payload.message_id,
+            channel=payload.channel,
+            destination=payload.destination,
+            payload=payload.model_dump(mode="json"),
+            status=NotificationStatus.SENT,
+            error=None,
+        )
