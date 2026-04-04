@@ -25,13 +25,25 @@ from src.memory.types import (
 
 @dataclass(slots=True)
 class MemoryPolicy:
-    """Maps runtime events into typed memory records using policy config."""
+    """Maps runtime events into typed memory records.
 
-    policy_path: Path = Path("config/memory_policies.yaml")
+    Policy rules can be provided either as an injected dictionary or loaded from
+    an explicit YAML file path. The framework itself does not assume repository-
+    local config files exist.
+    """
+
+    config: dict[str, Any] | None = None
+    policy_path: Path | None = None
     _config: dict[str, Any] = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
-        self._config = yaml.safe_load(self.policy_path.read_text(encoding="utf-8")) or {}
+        if self.config is not None:
+            self._config = dict(self.config)
+            return
+        if self.policy_path is not None:
+            self._config = yaml.safe_load(self.policy_path.read_text(encoding="utf-8")) or {}
+            return
+        self._config = {"write_rules": {}, "retention": {}}
 
     def should_store(self, event: dict[str, Any]) -> bool:
         return event.get("event_type") in self._config.get("write_rules", {})

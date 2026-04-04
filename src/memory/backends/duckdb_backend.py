@@ -41,10 +41,18 @@ def _row_dict(description: list[tuple[Any, ...]], row: tuple[Any, ...]) -> dict[
 
 @dataclass(slots=True)
 class DuckDBMemoryBackend(MemoryBackend):
-    """Stores memory records in DuckDB using config-defined tables."""
+    """Stores memory records in DuckDB.
+
+    The backend can initialize its schema from either:
+
+    - an injected YAML schema file
+    - a built-in default schema
+
+    This keeps the framework independent from repository-local config files.
+    """
 
     db_path: Path
-    schema_config_path: Path
+    schema_config_path: Path | None = None
     _conn: duckdb.DuckDBPyConnection = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
@@ -53,7 +61,7 @@ class DuckDBMemoryBackend(MemoryBackend):
         self._init_schema()
 
     def _init_schema(self) -> None:
-        config = yaml.safe_load(self.schema_config_path.read_text(encoding="utf-8")) or {}
+        config = self._load_schema_config()
         tables = config.get("memory_tables", {})
         for table_name, table_config in tables.items():
             columns = table_config.get("columns", {})
@@ -61,6 +69,41 @@ class DuckDBMemoryBackend(MemoryBackend):
             self._conn.execute(f"CREATE TABLE IF NOT EXISTS {table_name} ({column_sql})")
             for statement in table_config.get("indexes", []):
                 self._conn.execute(statement)
+
+    def _load_schema_config(self) -> dict[str, Any]:
+        if self.schema_config_path is None:
+            return {
+                "memory_tables": {
+                    "memory_records": {
+                        "columns": {
+                            "id": "VARCHAR PRIMARY KEY",
+                            "agent_id": "VARCHAR",
+                            "scope": "VARCHAR NOT NULL",
+                            "memory_type": "VARCHAR NOT NULL",
+                            "layer": "VARCHAR NOT NULL",
+                            "content_text": "VARCHAR",
+                            "content_json": "JSON",
+                            "source_type": "VARCHAR",
+                            "source_id": "VARCHAR",
+                            "tags_json": "JSON",
+                            "metadata_json": "JSON",
+                            "importance": "DOUBLE",
+                            "confidence": "DOUBLE",
+                            "created_at": "TIMESTAMP NOT NULL",
+                            "updated_at": "TIMESTAMP",
+                            "archived_at": "TIMESTAMP",
+                            "last_accessed_at": "TIMESTAMP",
+                        },
+                        "indexes": [
+                            "CREATE INDEX IF NOT EXISTS idx_memory_records_created_at ON memory_records(created_at)",
+                            "CREATE INDEX IF NOT EXISTS idx_memory_records_agent_scope ON memory_records(agent_id, scope)",
+                            "CREATE INDEX IF NOT EXISTS idx_memory_records_type ON memory_records(memory_type)",
+                            "CREATE INDEX IF NOT EXISTS idx_memory_records_layer ON memory_records(layer)",
+                        ],
+                    }
+                }
+            }
+        return yaml.safe_load(self.schema_config_path.read_text(encoding="utf-8")) or {}
 
     def add_record(self, record: MemoryRecord) -> MemoryRecord:
         metadata = record.normalized_metadata()

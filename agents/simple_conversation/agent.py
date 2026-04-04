@@ -15,10 +15,10 @@ from src.agents.nodes import MemoryNode, MemoryRetrieveNode, PlannerNode, Respon
 from src.agents.nodes.types import AgentState
 from src.interfaces.whatsapp import MockWhatsAppInterface, TwilioWhatsAppInterface, WhatsAppInterface
 from src.llm.qwen import Qwen3_1_7BLLM
-from src.mailmind.config import AppSettings
 from src.memory import WorkingMemory
 from src.platform_logging.tracing import ExecutionTrace, JSONLTraceSink, trace_turn
 from src.tools.registry import ToolRegistry
+from src.utils.config import AppSettings
 
 
 class ConversationNode(PlannerNode):

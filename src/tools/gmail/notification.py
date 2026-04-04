@@ -6,16 +6,16 @@ Purpose: Implements the notification module for the shared tools platform layer.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
-from src.mailmind.core.orchestrator import MailOrchestrator
-from src.mailmind.schemas.tools import NotificationInput, NotificationOutput
+from src.schemas.tool_io import NotificationInput, NotificationOutput
 from src.tools.base import BaseTool
 
 
 @dataclass(slots=True)
 class NotificationTool(BaseTool[NotificationInput, NotificationOutput]):
     """Implements the notification tool."""
-    orchestrator: MailOrchestrator
+    orchestrator: Any
     name: str = "notification"
     description: str = "Execute or inspect approved WhatsApp notification actions."
     input_schema = NotificationInput

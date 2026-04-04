@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from src.mailmind.schemas.tools import MemorySearchInput, MemorySearchOutput
+from src.schemas.tool_io import MemorySearchInput, MemorySearchOutput
 from src.tools.base import BaseTool
 
 

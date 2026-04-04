@@ -18,7 +18,7 @@ class WarmMemoryLayer(BaseMemoryLayer):
     """Stores primary long-term memory records in DuckDB."""
 
     db_path: Path
-    schema_config_path: Path = Path("config/memory_tables.yaml")
+    schema_config_path: Path | None = None
 
     def __post_init__(self) -> None:
         self._backend = DuckDBMemoryBackend(self.db_path, self.schema_config_path)

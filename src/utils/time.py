@@ -5,7 +5,6 @@ Purpose: Implements the time module for the shared utils platform layer.
 
 from __future__ import annotations
 
-from src.mailmind.core.models import utc_now
+from src.schemas.domain import utc_now
 
 __all__ = ["utc_now"]
-

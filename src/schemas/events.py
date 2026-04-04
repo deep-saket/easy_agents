@@ -5,7 +5,6 @@ Purpose: Implements the events module for the shared schemas platform layer.
 
 from __future__ import annotations
 
-from src.mailmind.core.models import DomainEvent, ToolExecutionLog
+from src.schemas.domain import DomainEvent, ToolExecutionLog
 
 __all__ = ["DomainEvent", "ToolExecutionLog"]
-

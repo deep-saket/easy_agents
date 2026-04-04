@@ -5,8 +5,8 @@ Purpose: Implements the helpers module for the shared tools platform layer.
 
 from __future__ import annotations
 
-from src.mailmind.core.models import MessageBundle
-from src.mailmind.schemas.emails import EmailDetail, EmailSummary
+from src.schemas.domain import MessageBundle
+from src.schemas.emails import EmailDetail, EmailSummary
 
 
 def bundle_to_summary(bundle: MessageBundle) -> EmailSummary:
@@ -29,4 +29,3 @@ def bundle_to_detail(bundle: MessageBundle) -> EmailDetail:
         body_text=bundle.message.body_text,
         labels=bundle.message.labels,
     )
-

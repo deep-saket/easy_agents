@@ -6,10 +6,10 @@ Purpose: Implements the gmail fetch module for the shared tools platform layer.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
-from src.mailmind.core.interfaces import EmailSource
-from src.mailmind.core.orchestrator import MailOrchestrator
-from src.mailmind.schemas.tools import GmailFetchInput, GmailFetchOutput
+from src.interfaces.email import EmailSource
+from src.schemas.tool_io import GmailFetchInput, GmailFetchOutput
 from src.tools.base import BaseTool
 from src.tools.gmail.helpers import bundle_to_summary
 
@@ -18,7 +18,7 @@ from src.tools.gmail.helpers import bundle_to_summary
 class GmailFetchTool(BaseTool[GmailFetchInput, GmailFetchOutput]):
     """Implements the gmail fetch tool."""
     source: EmailSource
-    orchestrator: MailOrchestrator
+    orchestrator: Any
     name: str = "gmail_fetch"
     description: str = "Fetch and optionally process new Gmail messages."
     input_schema = GmailFetchInput

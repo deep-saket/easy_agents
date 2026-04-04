@@ -8,12 +8,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from time import perf_counter
 
+from src.interfaces.email import MessageRepository
 from src.memory.policies import MemoryPolicy
 from src.memory.store import MemoryStore
-from src.mailmind.core.interfaces import MessageRepository
-from src.mailmind.core.models import ToolExecutionLog
-from src.mailmind.schemas.tools import ToolCall, ToolExecutionResult
 from src.platform_logging.tracing import record_tool_call
+from src.schemas.domain import ToolExecutionLog
+from src.schemas.tool_io import ToolCall, ToolExecutionResult
 from src.tools.registry import ToolRegistry
 
 

@@ -10,8 +10,8 @@ from dataclasses import dataclass, field
 from time import perf_counter
 from typing import Any
 
-from src.mailmind.schemas.tools import ToolCall
 from src.platform_logging.tracing import record_llm_call
+from src.schemas.tool_io import ToolCall
 
 
 @dataclass(slots=True)

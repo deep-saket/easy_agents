@@ -7,9 +7,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.mailmind.core.interfaces import MessageRepository
-from src.mailmind.core.models import MessageBundle
-from src.mailmind.schemas.tools import EmailSummaryInput, EmailSummaryOutput
+from src.interfaces.email import MessageRepository
+from src.schemas.domain import MessageBundle
+from src.schemas.tool_io import EmailSummaryInput, EmailSummaryOutput
 from src.tools.base import BaseTool
 from src.tools.gmail.helpers import bundle_to_detail
 

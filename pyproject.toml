@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mailmind"
+name = "easy_agent"
 version = "0.1.0"
 description = "Local-first email triage and response engine."
 readme = "README.md"
@@ -27,9 +27,6 @@ dev = [
 local-llm = [
   "transformers>=4.51.0,<5.0",
 ]
-
-[project.scripts]
-mailmind = "mailmind.cli.main:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
