@@ -3,7 +3,7 @@
 Purpose: Tests the shared WhatsApp graph node behavior.
 """
 
-from src.agents.nodes.whatsapp_node import WhatsAppNode
+from src.nodes.whatsapp_node import WhatsAppNode
 from src.interfaces.whatsapp import MockWhatsAppInterface
 from src.memory import WorkingMemory
 

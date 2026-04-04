@@ -5,7 +5,7 @@ Purpose: Tests the generic memory update node for graph workflows.
 
 from types import SimpleNamespace
 
-from src.agents.nodes import MemoryNode
+from src.nodes import MemoryNode
 from src.memory.layers import ColdMemoryLayer, HotMemoryLayer, WarmMemoryLayer
 from src.memory.store import MemoryStore
 from src.memory.types import EpisodicMemory, SemanticMemory, WorkingMemory

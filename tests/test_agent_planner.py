@@ -6,7 +6,7 @@ Purpose: Tests the agent planner behavior.
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
-from src.agents.nodes import PlannerNode, ReactNode
+from src.nodes import PlannerNode, ReactNode
 from src.mailmind.agents.planner import RuleBasedToolPlanner
 from src.mailmind.memory.conversation import ConversationMemory
 from src.mailmind.storage.repository import DuckDBMessageRepository

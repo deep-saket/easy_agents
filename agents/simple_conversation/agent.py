@@ -11,8 +11,8 @@ from types import SimpleNamespace
 from langgraph.graph import END, START, StateGraph
 
 from src.agents.base_agent import BaseAgent
-from src.agents.nodes import MemoryNode, MemoryRetrieveNode, PlannerNode, ResponseNode, WhatsAppNode
-from src.agents.nodes.types import AgentState
+from src.nodes import MemoryNode, MemoryRetrieveNode, PlannerNode, ResponseNode, WhatsAppNode
+from src.nodes.types import AgentState
 from src.interfaces.whatsapp import MockWhatsAppInterface, TwilioWhatsAppInterface, WhatsAppInterface
 from src.llm.qwen import Qwen3_1_7BLLM
 from src.memory import WorkingMemory

@@ -5,7 +5,7 @@ Purpose: Tests the constructor-driven memory retrieval node behavior.
 
 from types import SimpleNamespace
 
-from src.agents.nodes import MemoryRetrieveNode
+from src.nodes import MemoryRetrieveNode
 from src.memory.layers import ColdMemoryLayer, HotMemoryLayer, WarmMemoryLayer
 from src.memory.retrieval.retriever import LayeredMemoryRetriever
 from src.memory.store import MemoryStore

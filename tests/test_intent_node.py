@@ -3,7 +3,7 @@
 Purpose: Tests the reusable intent node behavior.
 """
 
-from src.agents.nodes import IntentNode
+from src.nodes import IntentNode
 
 
 def test_intent_node_parses_json_intent_payload() -> None:
