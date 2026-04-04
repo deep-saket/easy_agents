@@ -5,22 +5,28 @@ Purpose: Implements the helpers module for the shared tools platform layer.
 
 from __future__ import annotations
 
-from src.schemas.domain import MessageBundle
+from src.schemas.domain import ClassificationResult, EmailMessage, MessageBundle
 from src.schemas.emails import EmailDetail, EmailSummary
 
 
-def bundle_to_summary(bundle: MessageBundle) -> EmailSummary:
+def message_to_summary(message: EmailMessage, classification: ClassificationResult | None = None) -> EmailSummary:
+    """Builds an email summary from a stored message and optional classification."""
+
     return EmailSummary(
-        id=bundle.message.id,
-        source_id=bundle.message.source_id,
-        from_email=bundle.message.from_email,
-        from_name=bundle.message.from_name,
-        subject=bundle.message.subject,
-        received_at=bundle.message.received_at,
-        category=bundle.classification.category.value if bundle.classification else None,
-        priority_score=bundle.classification.priority_score if bundle.classification else None,
-        summary=bundle.classification.summary if bundle.classification else None,
+        id=message.id,
+        source_id=message.source_id,
+        from_email=message.from_email,
+        from_name=message.from_name,
+        subject=message.subject,
+        received_at=message.received_at,
+        category=classification.category.value if classification else None,
+        priority_score=classification.priority_score if classification else None,
+        summary=classification.summary if classification else None,
     )
+
+
+def bundle_to_summary(bundle: MessageBundle) -> EmailSummary:
+    return message_to_summary(bundle.message, bundle.classification)
 
 
 def bundle_to_detail(bundle: MessageBundle) -> EmailDetail:

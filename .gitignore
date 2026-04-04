@@ -7,6 +7,9 @@ __pycache__/
 *.egg-info/
 config/*.local.yaml
 data/*.db
+data/*.duckdb
+data/*.json
 data/tool_catalog.json
 data/memory/*.jsonl
 data/logs/*.jsonl
+tests/*.executed.ipynb
