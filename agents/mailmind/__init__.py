@@ -1,6 +1,11 @@
-"""Created: 2026-03-31
+"""Created: 2026-04-05
 
-Purpose: MailMind concrete agent.
+Purpose: Exports MailMind agent-specific building blocks.
 """
 
+from agents.mailmind.helpers import MailMindEmailClassificationPayload, MailMindEmailClassifier
 
+__all__ = [
+    "MailMindEmailClassificationPayload",
+    "MailMindEmailClassifier",
+]
