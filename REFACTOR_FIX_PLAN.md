@@ -44,7 +44,7 @@ Status: completed
 
 Current issue:
 
-- [pyproject.toml](/Users/saketm10/Projects/openclaw_agents/pyproject.toml) still declares:
+- [pyproject.toml](/Users/saketm10/Projects/easy_agents/pyproject.toml) still declares:
   - project name `mailmind`
   - script entrypoint `mailmind = "mailmind.cli.main:main"`
 - The package layout now centers on `src/` plus `agents/`, not an installed `mailmind` package.
@@ -57,7 +57,7 @@ Required changes:
 
 Completed changes:
 
-- Project name in [pyproject.toml](/Users/saketm10/Projects/openclaw_agents/pyproject.toml) was changed from `mailmind` to `easy_agent`.
+- Project name in [pyproject.toml](/Users/saketm10/Projects/easy_agents/pyproject.toml) was changed from `mailmind` to `easy_agent`.
 - The stale `[project.scripts]` entry pointing at `mailmind.cli.main:main` was removed.
 
 Remaining notes:
@@ -75,17 +75,17 @@ Core shared modules still depend on the deleted package, so importing platform c
 
 Affected files currently include:
 
-- [src/tools/executor.py](/Users/saketm10/Projects/openclaw_agents/src/tools/executor.py)
-- [src/tools/memory_search.py](/Users/saketm10/Projects/openclaw_agents/src/tools/memory_search.py)
-- [src/tools/memory_write.py](/Users/saketm10/Projects/openclaw_agents/src/tools/memory_write.py)
-- [src/llm/function_gemma.py](/Users/saketm10/Projects/openclaw_agents/src/llm/function_gemma.py)
-- [src/utils/time.py](/Users/saketm10/Projects/openclaw_agents/src/utils/time.py)
-- [src/utils/config.py](/Users/saketm10/Projects/openclaw_agents/src/utils/config.py)
-- [src/schemas/tool_io.py](/Users/saketm10/Projects/openclaw_agents/src/schemas/tool_io.py)
-- [src/schemas/events.py](/Users/saketm10/Projects/openclaw_agents/src/schemas/events.py)
-- [src/storage/duckdb_store.py](/Users/saketm10/Projects/openclaw_agents/src/storage/duckdb_store.py)
-- [src/storage/json_store.py](/Users/saketm10/Projects/openclaw_agents/src/storage/json_store.py)
-- [src/platform_logging/audit_logger.py](/Users/saketm10/Projects/openclaw_agents/src/platform_logging/audit_logger.py)
+- [src/tools/executor.py](/Users/saketm10/Projects/easy_agents/src/tools/executor.py)
+- [src/tools/memory_search.py](/Users/saketm10/Projects/easy_agents/src/tools/memory_search.py)
+- [src/tools/memory_write.py](/Users/saketm10/Projects/easy_agents/src/tools/memory_write.py)
+- [src/llm/function_gemma.py](/Users/saketm10/Projects/easy_agents/src/llm/function_gemma.py)
+- [src/utils/time.py](/Users/saketm10/Projects/easy_agents/src/utils/time.py)
+- [src/utils/config.py](/Users/saketm10/Projects/easy_agents/src/utils/config.py)
+- [src/schemas/tool_io.py](/Users/saketm10/Projects/easy_agents/src/schemas/tool_io.py)
+- [src/schemas/events.py](/Users/saketm10/Projects/easy_agents/src/schemas/events.py)
+- [src/storage/duckdb_store.py](/Users/saketm10/Projects/easy_agents/src/storage/duckdb_store.py)
+- [src/storage/json_store.py](/Users/saketm10/Projects/easy_agents/src/storage/json_store.py)
+- [src/platform_logging/audit_logger.py](/Users/saketm10/Projects/easy_agents/src/platform_logging/audit_logger.py)
 
 Required changes:
 
@@ -95,12 +95,12 @@ Required changes:
 
 Completed changes:
 
-- Added shared framework records in [src/schemas/domain.py](/Users/saketm10/Projects/openclaw_agents/src/schemas/domain.py).
-- Added shared email view schemas in [src/schemas/emails.py](/Users/saketm10/Projects/openclaw_agents/src/schemas/emails.py).
-- Added shared email/repository protocols in [src/interfaces/email.py](/Users/saketm10/Projects/openclaw_agents/src/interfaces/email.py).
-- Rebuilt shared config in [src/utils/config.py](/Users/saketm10/Projects/openclaw_agents/src/utils/config.py).
-- Rebuilt JSONL audit storage in [src/storage/json_store.py](/Users/saketm10/Projects/openclaw_agents/src/storage/json_store.py).
-- Rebuilt the DuckDB repository in [src/storage/duckdb_store.py](/Users/saketm10/Projects/openclaw_agents/src/storage/duckdb_store.py).
+- Added shared framework records in [src/schemas/domain.py](/Users/saketm10/Projects/easy_agents/src/schemas/domain.py).
+- Added shared email view schemas in [src/schemas/emails.py](/Users/saketm10/Projects/easy_agents/src/schemas/emails.py).
+- Added shared email/repository protocols in [src/interfaces/email.py](/Users/saketm10/Projects/easy_agents/src/interfaces/email.py).
+- Rebuilt shared config in [src/utils/config.py](/Users/saketm10/Projects/easy_agents/src/utils/config.py).
+- Rebuilt JSONL audit storage in [src/storage/json_store.py](/Users/saketm10/Projects/easy_agents/src/storage/json_store.py).
+- Rebuilt the DuckDB repository in [src/storage/duckdb_store.py](/Users/saketm10/Projects/easy_agents/src/storage/duckdb_store.py).
 - Rewired shared imports in tools, schemas, logging, storage, LLM helpers, and the simple conversation agent.
 
 Verification completed:
@@ -123,8 +123,8 @@ Status: completed for source/runtime code
 
 Current issue:
 
-- Generic tool infrastructure is in place under [src/tools](/Users/saketm10/Projects/openclaw_agents/src/tools).
-- MailMind Gmail tools under [src/tools/gmail](/Users/saketm10/Projects/openclaw_agents/src/tools/gmail) still depend heavily on deleted `src.mailmind.*` modules.
+- Generic tool infrastructure is in place under [src/tools](/Users/saketm10/Projects/easy_agents/src/tools).
+- MailMind Gmail tools under [src/tools/gmail](/Users/saketm10/Projects/easy_agents/src/tools/gmail) still depend heavily on deleted `src.mailmind.*` modules.
 
 Required changes:
 
@@ -147,17 +147,17 @@ Status: pending decision cleanup
 
 Current issue:
 
-[agents/simple_conversation/agent.py](/Users/saketm10/Projects/openclaw_agents/agents/simple_conversation/agent.py) imports `src.mailmind.config.AppSettings`, so the one visible concrete agent does not import successfully.
+[agents/simple_conversation/agent.py](/Users/saketm10/Projects/easy_agents/agents/simple_conversation/agent.py) imports `src.mailmind.config.AppSettings`, so the one visible concrete agent does not import successfully.
 
 Required changes:
 
 - Move the required config model into a shared config module, or define a simple agent-local config path.
 - Remove the MailMind dependency from the simple conversation agent.
-- Verify [endpoints/whatsapp.py](/Users/saketm10/Projects/openclaw_agents/endpoints/whatsapp.py) can construct the agent successfully.
+- Verify [endpoints/whatsapp.py](/Users/saketm10/Projects/easy_agents/endpoints/whatsapp.py) can construct the agent successfully.
 
 Completed changes:
 
-- [agents/simple_conversation/agent.py](/Users/saketm10/Projects/openclaw_agents/agents/simple_conversation/agent.py) now imports [src/utils/config.py](/Users/saketm10/Projects/openclaw_agents/src/utils/config.py) instead of `src.mailmind.config`.
+- [agents/simple_conversation/agent.py](/Users/saketm10/Projects/easy_agents/agents/simple_conversation/agent.py) now imports [src/utils/config.py](/Users/saketm10/Projects/easy_agents/src/utils/config.py) instead of `src.mailmind.config`.
 - The simple conversation agent imports cleanly in the repo virtualenv.
 
 Remaining note:
@@ -180,7 +180,7 @@ Required changes:
 
 Completed changes:
 
-- Shared config ownership moved into [src/utils/config.py](/Users/saketm10/Projects/openclaw_agents/src/utils/config.py).
+- Shared config ownership moved into [src/utils/config.py](/Users/saketm10/Projects/easy_agents/src/utils/config.py).
 - Non-MailMind framework code now depends on shared config instead of `src.mailmind.config`.
 
 Remaining cleanup:
@@ -218,11 +218,11 @@ Many tests still target the deleted MailMind package.
 
 Examples include:
 
-- [tests/test_react_agent.py](/Users/saketm10/Projects/openclaw_agents/tests/test_react_agent.py)
-- [tests/test_orchestrator.py](/Users/saketm10/Projects/openclaw_agents/tests/test_orchestrator.py)
-- [tests/test_repository.py](/Users/saketm10/Projects/openclaw_agents/tests/test_repository.py)
-- [tests/test_classifier.py](/Users/saketm10/Projects/openclaw_agents/tests/test_classifier.py)
-- [tests/test_llm_planner.py](/Users/saketm10/Projects/openclaw_agents/tests/test_llm_planner.py)
+- [tests/test_react_agent.py](/Users/saketm10/Projects/easy_agents/tests/test_react_agent.py)
+- [tests/test_orchestrator.py](/Users/saketm10/Projects/easy_agents/tests/test_orchestrator.py)
+- [tests/test_repository.py](/Users/saketm10/Projects/easy_agents/tests/test_repository.py)
+- [tests/test_classifier.py](/Users/saketm10/Projects/easy_agents/tests/test_classifier.py)
+- [tests/test_llm_planner.py](/Users/saketm10/Projects/easy_agents/tests/test_llm_planner.py)
 
 Required changes:
 
@@ -259,7 +259,7 @@ Status: pending
 
 Required changes:
 
-- Update [README.md](/Users/saketm10/Projects/openclaw_agents/README.md) to match the actual runnable structure.
+- Update [README.md](/Users/saketm10/Projects/easy_agents/README.md) to match the actual runnable structure.
 - Document which agents are real versus placeholders.
 - Document current entrypoints and test commands.
 

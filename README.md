@@ -1,6 +1,8 @@
-# easy_agent
+# easy_agents
 
-`easy_agent` is a framework-first repository for building local multi-agent systems.
+`easy_agents` is a framework-first repository for building local multi-agent systems.
+
+The Python package/distribution name remains `easy_agent`.
 
 The shared framework lives under [`src/`](src). Concrete agents, examples, or experiments may live outside it, but `src/` is intended to be usable as a standalone foundation.
 
@@ -54,7 +56,7 @@ project_root/
 
 ## Runtime Model
 
-The shared runtime centers on the graph agent in [src/agents/graph_agent.py](/Users/saketm10/Projects/openclaw_agents/src/agents/graph_agent.py).
+The shared runtime centers on the graph agent in [src/agents/graph_agent.py](/Users/saketm10/Projects/easy_agents/src/agents/graph_agent.py).
 
 At a high level, a turn flows like this:
 
@@ -71,17 +73,17 @@ This is implemented with reusable nodes under [`src/agents/nodes`](src/agents/no
 
 The framework now contains the shared pieces that previously only existed under the deleted MailMind package:
 
-- domain records in [src/schemas/domain.py](/Users/saketm10/Projects/openclaw_agents/src/schemas/domain.py)
-- email view schemas in [src/schemas/emails.py](/Users/saketm10/Projects/openclaw_agents/src/schemas/emails.py)
-- tool I/O schemas in [src/schemas/tool_io.py](/Users/saketm10/Projects/openclaw_agents/src/schemas/tool_io.py)
-- repository and email protocols in [src/interfaces/email.py](/Users/saketm10/Projects/openclaw_agents/src/interfaces/email.py)
-- shared config in [src/utils/config.py](/Users/saketm10/Projects/openclaw_agents/src/utils/config.py)
-- JSONL audit storage in [src/storage/json_store.py](/Users/saketm10/Projects/openclaw_agents/src/storage/json_store.py)
-- DuckDB repository in [src/storage/duckdb_store.py](/Users/saketm10/Projects/openclaw_agents/src/storage/duckdb_store.py)
+- domain records in [src/schemas/domain.py](/Users/saketm10/Projects/easy_agents/src/schemas/domain.py)
+- email view schemas in [src/schemas/emails.py](/Users/saketm10/Projects/easy_agents/src/schemas/emails.py)
+- tool I/O schemas in [src/schemas/tool_io.py](/Users/saketm10/Projects/easy_agents/src/schemas/tool_io.py)
+- repository and email protocols in [src/interfaces/email.py](/Users/saketm10/Projects/easy_agents/src/interfaces/email.py)
+- shared config in [src/utils/config.py](/Users/saketm10/Projects/easy_agents/src/utils/config.py)
+- JSONL audit storage in [src/storage/json_store.py](/Users/saketm10/Projects/easy_agents/src/storage/json_store.py)
+- DuckDB repository in [src/storage/duckdb_store.py](/Users/saketm10/Projects/easy_agents/src/storage/duckdb_store.py)
 
 ## Available Example Agent
 
-The simple conversation agent in [agents/simple_conversation/agent.py](/Users/saketm10/Projects/openclaw_agents/agents/simple_conversation/agent.py) is the current example concrete agent.
+The simple conversation agent in [agents/simple_conversation/agent.py](/Users/saketm10/Projects/easy_agents/agents/simple_conversation/agent.py) is the current example concrete agent.
 
 It demonstrates:
 
@@ -90,7 +92,7 @@ It demonstrates:
 - WhatsApp interface integration
 - local trace logging
 
-The FastAPI webhook entrypoint is [endpoints/whatsapp.py](/Users/saketm10/Projects/openclaw_agents/endpoints/whatsapp.py).
+The FastAPI webhook entrypoint is [endpoints/whatsapp.py](/Users/saketm10/Projects/easy_agents/endpoints/whatsapp.py).
 
 ## Tools
 
@@ -109,7 +111,7 @@ The email-oriented tools remain in `src/` for now because the framework extracti
 
 ## Configuration
 
-Shared settings are defined in [src/utils/config.py](/Users/saketm10/Projects/openclaw_agents/src/utils/config.py).
+Shared settings are defined in [src/utils/config.py](/Users/saketm10/Projects/easy_agents/src/utils/config.py).
 
 Current behavior:
 
@@ -148,4 +150,4 @@ Note: the test suite is still being migrated. Some tests still reference deleted
 - package metadata has been renamed to `easy_agent`
 - the source tree is ahead of the tests and documentation cleanup
 
-The tracked migration plan is in [REFACTOR_FIX_PLAN.md](/Users/saketm10/Projects/openclaw_agents/REFACTOR_FIX_PLAN.md).
+The tracked migration plan is in [REFACTOR_FIX_PLAN.md](/Users/saketm10/Projects/easy_agents/REFACTOR_FIX_PLAN.md).

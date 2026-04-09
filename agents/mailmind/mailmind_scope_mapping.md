@@ -1,6 +1,6 @@
 # MailMind Scope Mapping
 
-This document maps the target MailMind scope from [mailmindscope.md](/Users/saketm10/Projects/openclaw_agents/agents/mailmind/mailmindscope.md) to what currently exists in the shared `src/` framework and what is still missing.
+This document maps the target MailMind scope from [mailmindscope.md](/Users/saketm10/Projects/easy_agents/agents/mailmind/mailmindscope.md) to what currently exists in the shared `src/` framework and what is still missing.
 
 ## Summary
 
@@ -32,11 +32,11 @@ Scope requirement:
 
 Present in `src/`:
 
-- email message model in [src/schemas/domain.py](/Users/saketm10/Projects/openclaw_agents/src/schemas/domain.py)
-- email source protocol in [src/interfaces/email.py](/Users/saketm10/Projects/openclaw_agents/src/interfaces/email.py)
-- fetch tool shape in [src/tools/gmail/gmail_fetch.py](/Users/saketm10/Projects/openclaw_agents/src/tools/gmail/gmail_fetch.py)
-- persistence layer in [src/storage/duckdb_store.py](/Users/saketm10/Projects/openclaw_agents/src/storage/duckdb_store.py)
-- memory infrastructure in [src/memory](/Users/saketm10/Projects/openclaw_agents/src/memory)
+- email message model in [src/schemas/domain.py](/Users/saketm10/Projects/easy_agents/src/schemas/domain.py)
+- email source protocol in [src/interfaces/email.py](/Users/saketm10/Projects/easy_agents/src/interfaces/email.py)
+- fetch tool shape in [src/tools/gmail/gmail_fetch.py](/Users/saketm10/Projects/easy_agents/src/tools/gmail/gmail_fetch.py)
+- persistence layer in [src/storage/duckdb_store.py](/Users/saketm10/Projects/easy_agents/src/storage/duckdb_store.py)
+- memory infrastructure in [src/memory](/Users/saketm10/Projects/easy_agents/src/memory)
 
 Missing:
 
@@ -61,9 +61,9 @@ Scope requirement:
 
 Present in `src/`:
 
-- classification result model in [src/schemas/domain.py](/Users/saketm10/Projects/openclaw_agents/src/schemas/domain.py)
-- classifier protocol in [src/interfaces/email.py](/Users/saketm10/Projects/openclaw_agents/src/interfaces/email.py)
-- classifier tool in [src/tools/gmail/email_classifier.py](/Users/saketm10/Projects/openclaw_agents/src/tools/gmail/email_classifier.py)
+- classification result model in [src/schemas/domain.py](/Users/saketm10/Projects/easy_agents/src/schemas/domain.py)
+- classifier protocol in [src/interfaces/email.py](/Users/saketm10/Projects/easy_agents/src/interfaces/email.py)
+- classifier tool in [src/tools/gmail/email_classifier.py](/Users/saketm10/Projects/easy_agents/src/tools/gmail/email_classifier.py)
 
 Current schema fields:
 
@@ -103,10 +103,10 @@ Scope requirement:
 
 Present in `src/`:
 
-- search tool in [src/tools/gmail/email_search.py](/Users/saketm10/Projects/openclaw_agents/src/tools/gmail/email_search.py)
-- search input/output schemas in [src/schemas/tool_io.py](/Users/saketm10/Projects/openclaw_agents/src/schemas/tool_io.py)
-- DuckDB query support in [src/storage/duckdb_store.py](/Users/saketm10/Projects/openclaw_agents/src/storage/duckdb_store.py)
-- graph/planner runtime in [src/agents](/Users/saketm10/Projects/openclaw_agents/src/agents)
+- search tool in [src/tools/gmail/email_search.py](/Users/saketm10/Projects/easy_agents/src/tools/gmail/email_search.py)
+- search input/output schemas in [src/schemas/tool_io.py](/Users/saketm10/Projects/easy_agents/src/schemas/tool_io.py)
+- DuckDB query support in [src/storage/duckdb_store.py](/Users/saketm10/Projects/easy_agents/src/storage/duckdb_store.py)
+- graph/planner runtime in [src/agents](/Users/saketm10/Projects/easy_agents/src/agents)
 
 Missing:
 
@@ -128,9 +128,9 @@ Scope requirement:
 
 Present in `src/`:
 
-- summary tool schema in [src/schemas/tool_io.py](/Users/saketm10/Projects/openclaw_agents/src/schemas/tool_io.py)
-- summary implementation in [src/tools/gmail/email_summary.py](/Users/saketm10/Projects/openclaw_agents/src/tools/gmail/email_summary.py)
-- email detail/summary view models in [src/schemas/emails.py](/Users/saketm10/Projects/openclaw_agents/src/schemas/emails.py)
+- summary tool schema in [src/schemas/tool_io.py](/Users/saketm10/Projects/easy_agents/src/schemas/tool_io.py)
+- summary implementation in [src/tools/gmail/email_summary.py](/Users/saketm10/Projects/easy_agents/src/tools/gmail/email_summary.py)
+- email detail/summary view models in [src/schemas/emails.py](/Users/saketm10/Projects/easy_agents/src/schemas/emails.py)
 
 Missing:
 
@@ -152,9 +152,9 @@ Scope requirement:
 
 Present in `src/`:
 
-- draft model in [src/schemas/domain.py](/Users/saketm10/Projects/openclaw_agents/src/schemas/domain.py)
-- draft generator protocol in [src/interfaces/email.py](/Users/saketm10/Projects/openclaw_agents/src/interfaces/email.py)
-- draft tool in [src/tools/gmail/draft_reply.py](/Users/saketm10/Projects/openclaw_agents/src/tools/gmail/draft_reply.py)
+- draft model in [src/schemas/domain.py](/Users/saketm10/Projects/easy_agents/src/schemas/domain.py)
+- draft generator protocol in [src/interfaces/email.py](/Users/saketm10/Projects/easy_agents/src/interfaces/email.py)
+- draft tool in [src/tools/gmail/draft_reply.py](/Users/saketm10/Projects/easy_agents/src/tools/gmail/draft_reply.py)
 
 Missing:
 
@@ -180,9 +180,9 @@ Scope requirement:
 
 Present in `src/`:
 
-- approval models in [src/schemas/domain.py](/Users/saketm10/Projects/openclaw_agents/src/schemas/domain.py)
-- generic approval node in [src/agents/nodes/approval_node.py](/Users/saketm10/Projects/openclaw_agents/src/agents/nodes/approval_node.py)
-- notification tool shell in [src/tools/gmail/notification.py](/Users/saketm10/Projects/openclaw_agents/src/tools/gmail/notification.py)
+- approval models in [src/schemas/domain.py](/Users/saketm10/Projects/easy_agents/src/schemas/domain.py)
+- generic approval node in [src/agents/nodes/approval_node.py](/Users/saketm10/Projects/easy_agents/src/agents/nodes/approval_node.py)
+- notification tool shell in [src/tools/gmail/notification.py](/Users/saketm10/Projects/easy_agents/src/tools/gmail/notification.py)
 
 Missing:
 
@@ -203,9 +203,9 @@ Scope requirement:
 
 Present in `src/`:
 
-- WhatsApp transport abstractions in [src/interfaces/whatsapp.py](/Users/saketm10/Projects/openclaw_agents/src/interfaces/whatsapp.py)
-- WhatsApp graph node in [src/agents/nodes/whatsapp_node.py](/Users/saketm10/Projects/openclaw_agents/src/agents/nodes/whatsapp_node.py)
-- webhook entrypoint in [endpoints/whatsapp.py](/Users/saketm10/Projects/openclaw_agents/endpoints/whatsapp.py)
+- WhatsApp transport abstractions in [src/interfaces/whatsapp.py](/Users/saketm10/Projects/easy_agents/src/interfaces/whatsapp.py)
+- WhatsApp graph node in [src/agents/nodes/whatsapp_node.py](/Users/saketm10/Projects/easy_agents/src/agents/nodes/whatsapp_node.py)
+- webhook entrypoint in [endpoints/whatsapp.py](/Users/saketm10/Projects/easy_agents/endpoints/whatsapp.py)
 
 Missing:
 
@@ -227,10 +227,10 @@ Scope requirement:
 
 Present in `src/`:
 
-- layered memory system in [src/memory](/Users/saketm10/Projects/openclaw_agents/src/memory)
-- memory retrieval node in [src/agents/nodes/memory_retrieve_node.py](/Users/saketm10/Projects/openclaw_agents/src/agents/nodes/memory_retrieve_node.py)
-- memory write tool in [src/tools/memory_write.py](/Users/saketm10/Projects/openclaw_agents/src/tools/memory_write.py)
-- memory search tool in [src/tools/memory_search.py](/Users/saketm10/Projects/openclaw_agents/src/tools/memory_search.py)
+- layered memory system in [src/memory](/Users/saketm10/Projects/easy_agents/src/memory)
+- memory retrieval node in [src/agents/nodes/memory_retrieve_node.py](/Users/saketm10/Projects/easy_agents/src/agents/nodes/memory_retrieve_node.py)
+- memory write tool in [src/tools/memory_write.py](/Users/saketm10/Projects/easy_agents/src/tools/memory_write.py)
+- memory search tool in [src/tools/memory_search.py](/Users/saketm10/Projects/easy_agents/src/tools/memory_search.py)
 
 Missing:
 
@@ -246,31 +246,31 @@ Status:
 From the scope doc:
 
 - `EmailFetchTool`
-  - partial equivalent exists as [src/tools/gmail/gmail_fetch.py](/Users/saketm10/Projects/openclaw_agents/src/tools/gmail/gmail_fetch.py)
+  - partial equivalent exists as [src/tools/gmail/gmail_fetch.py](/Users/saketm10/Projects/easy_agents/src/tools/gmail/gmail_fetch.py)
 - `EmailNormalizeTool`
   - missing
 - `EmailClassifierTool`
-  - present as [src/tools/gmail/email_classifier.py](/Users/saketm10/Projects/openclaw_agents/src/tools/gmail/email_classifier.py)
+  - present as [src/tools/gmail/email_classifier.py](/Users/saketm10/Projects/easy_agents/src/tools/gmail/email_classifier.py)
 - `EmailSearchTool`
-  - present as [src/tools/gmail/email_search.py](/Users/saketm10/Projects/openclaw_agents/src/tools/gmail/email_search.py)
+  - present as [src/tools/gmail/email_search.py](/Users/saketm10/Projects/easy_agents/src/tools/gmail/email_search.py)
 - `EmailSummaryTool`
-  - present as [src/tools/gmail/email_summary.py](/Users/saketm10/Projects/openclaw_agents/src/tools/gmail/email_summary.py)
+  - present as [src/tools/gmail/email_summary.py](/Users/saketm10/Projects/easy_agents/src/tools/gmail/email_summary.py)
 - `DraftReplyTool`
-  - present as [src/tools/gmail/draft_reply.py](/Users/saketm10/Projects/openclaw_agents/src/tools/gmail/draft_reply.py)
+  - present as [src/tools/gmail/draft_reply.py](/Users/saketm10/Projects/easy_agents/src/tools/gmail/draft_reply.py)
 - `EmailSendTool`
   - missing
 - `WhatsAppNotifyTool`
-  - partially covered by [src/interfaces/whatsapp.py](/Users/saketm10/Projects/openclaw_agents/src/interfaces/whatsapp.py), [src/agents/nodes/whatsapp_node.py](/Users/saketm10/Projects/openclaw_agents/src/agents/nodes/whatsapp_node.py), and [src/tools/gmail/notification.py](/Users/saketm10/Projects/openclaw_agents/src/tools/gmail/notification.py)
+  - partially covered by [src/interfaces/whatsapp.py](/Users/saketm10/Projects/easy_agents/src/interfaces/whatsapp.py), [src/agents/nodes/whatsapp_node.py](/Users/saketm10/Projects/easy_agents/src/agents/nodes/whatsapp_node.py), and [src/tools/gmail/notification.py](/Users/saketm10/Projects/easy_agents/src/tools/gmail/notification.py)
 - `MemoryWriteTool`
-  - present as [src/tools/memory_write.py](/Users/saketm10/Projects/openclaw_agents/src/tools/memory_write.py)
+  - present as [src/tools/memory_write.py](/Users/saketm10/Projects/easy_agents/src/tools/memory_write.py)
 - `MemorySearchTool`
-  - present as [src/tools/memory_search.py](/Users/saketm10/Projects/openclaw_agents/src/tools/memory_search.py)
+  - present as [src/tools/memory_search.py](/Users/saketm10/Projects/easy_agents/src/tools/memory_search.py)
 
 ## Behavioral Mapping
 
 Multi-turn support:
 
-- present through [src/agents/graph_agent.py](/Users/saketm10/Projects/openclaw_agents/src/agents/graph_agent.py) and [src/memory/conversation.py](/Users/saketm10/Projects/openclaw_agents/src/memory/conversation.py)
+- present through [src/agents/graph_agent.py](/Users/saketm10/Projects/easy_agents/src/agents/graph_agent.py) and [src/memory/conversation.py](/Users/saketm10/Projects/easy_agents/src/memory/conversation.py)
 
 Context awareness:
 
@@ -286,7 +286,7 @@ Tool-only execution:
 
 Logging mandatory:
 
-- infrastructure exists in [src/platform_logging](/Users/saketm10/Projects/openclaw_agents/src/platform_logging) and tool execution logging exists
+- infrastructure exists in [src/platform_logging](/Users/saketm10/Projects/easy_agents/src/platform_logging) and tool execution logging exists
 
 Memory mandatory:
 
