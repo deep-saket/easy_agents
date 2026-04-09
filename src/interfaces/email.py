@@ -20,6 +20,7 @@ from src.schemas.domain import (
     NotificationPayload,
     PolicyConfig,
     ReplyDraft,
+    SentEmail,
     ToolExecutionLog,
 )
 
@@ -42,6 +43,21 @@ class DraftGenerator(Protocol):
     """Describes a component that generates reply drafts."""
 
     def generate(self, message: EmailMessage, classification: ClassificationResult) -> ReplyDraft:
+        ...
+
+
+class EmailSender(Protocol):
+    """Describes a transport that can send an outbound email."""
+
+    def send(
+        self,
+        *,
+        message: EmailMessage,
+        draft: ReplyDraft,
+        recipients: list[str] | None = None,
+        subject: str | None = None,
+        body_text: str | None = None,
+    ) -> SentEmail:
         ...
 
 
@@ -117,6 +133,9 @@ class MessageRepository(ConversationRepository, Protocol):
     def save_draft(self, draft: ReplyDraft) -> ReplyDraft:
         ...
 
+    def get_draft(self, message_id: str) -> ReplyDraft | None:
+        ...
+
     def list_drafts(self) -> list[ReplyDraft]:
         ...
 
@@ -177,6 +196,7 @@ __all__ = [
     "ApprovalQueue",
     "AuditLogStore",
     "DraftGenerator",
+    "EmailSender",
     "EmailSource",
     "MessageClassifier",
     "MessageRepository",

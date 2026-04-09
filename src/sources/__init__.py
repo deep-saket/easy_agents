@@ -4,5 +4,6 @@ Purpose: Exposes reusable data-source adapters for the framework.
 """
 
 from src.sources.gmail import GmailEmailSource
+from src.sources.gmail_sender import GmailEmailSender
 
-__all__ = ["GmailEmailSource"]
+__all__ = ["GmailEmailSource", "GmailEmailSender"]

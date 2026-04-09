@@ -44,6 +44,15 @@ class SuggestedAction(str, Enum):
     IGNORE = "ignore"
 
 
+class ActionType(str, Enum):
+    """Represents the type of user action implied by a message."""
+
+    REPLY = "reply"
+    SCHEDULE = "schedule"
+    REVIEW = "review"
+    NONE = "none"
+
+
 class ApprovalKind(str, Enum):
     """Represents the type of approval request."""
 
@@ -101,9 +110,13 @@ class ClassificationResult(BaseModel):
 
     message_id: str
     priority_score: float
+    impact_score: float = 0.0
     category: Category
+    requires_action: bool = False
+    action_type: ActionType = ActionType.NONE
     confidence: float
     reason_codes: list[str]
+    reasoning: str = ""
     suggested_action: SuggestedAction
     summary: str
     created_at: datetime = Field(default_factory=utc_now)
@@ -118,6 +131,19 @@ class ReplyDraft(BaseModel):
     body_text: str
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
+
+
+class SentEmail(BaseModel):
+    """Represents one outbound email send result."""
+
+    message_id: str
+    draft_id: str | None = None
+    provider_message_id: str | None = None
+    thread_id: str | None = None
+    recipients: list[str] = Field(default_factory=list)
+    subject: str
+    status: str = "sent"
+    created_at: datetime = Field(default_factory=utc_now)
 
 
 class NotificationPayload(BaseModel):
@@ -200,6 +226,7 @@ class ToolExecutionLog(BaseModel):
 
 
 __all__ = [
+    "ActionType",
     "ApprovalItem",
     "ApprovalKind",
     "ApprovalStatus",
@@ -214,6 +241,7 @@ __all__ = [
     "PolicyConfig",
     "ProcessStatus",
     "ReplyDraft",
+    "SentEmail",
     "SuggestedAction",
     "ToolExecutionLog",
     "utc_now",

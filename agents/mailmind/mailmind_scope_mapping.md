@@ -1,24 +1,38 @@
 # MailMind Scope Mapping
 
-This document maps the target MailMind scope from [mailmindscope.md](/Users/saketm10/Projects/easy_agents/agents/mailmind/mailmindscope.md) to what currently exists in the shared `src/` framework and what is still missing.
+This document maps the target MailMind scope from [mailmindscope.md](/Users/saketm10/Projects/openclaw_agents/agents/mailmind/mailmindscope.md) to what currently exists in this repository.
 
 ## Summary
 
-MailMind's intended flow is:
+MailMind's target flow remains:
 
 `Read -> Decide -> Draft -> Approve -> Execute`
 
-The current `src/` framework already contains many of the primitives MailMind will need:
+What exists today is split across two places:
 
-- graph runtime
-- tool registry and executor
-- shared email and tool schemas
-- repository and storage layers
-- WhatsApp interface
-- layered memory
-- approval primitive
+- `agents/mailmind/`
+  - MailMind-specific prompt and classification logic
+- `src/`
+  - shared framework infrastructure, Gmail integrations, tools, memory, nodes, storage, and LLM adapters
 
-But MailMind itself is not rebuilt yet as a concrete agent. Most of the missing pieces are domain behavior, orchestration, and concrete integrations.
+The repository is no longer in the old "MailMind agent package under `src.mailmind`" shape. That package has been removed. MailMind now exists as a thin domain layer on top of the shared framework.
+
+## Current MailMind Surface
+
+MailMind-specific code currently present:
+
+- classifier payload and classifier implementation in [email_classifier.py](/Users/saketm10/Projects/openclaw_agents/agents/mailmind/helpers/email_classifier.py)
+- classifier prompts in [email_classifier.py](/Users/saketm10/Projects/openclaw_agents/agents/mailmind/prompts/email_classifier.py)
+- class metadata in [email_classifier_classes.json](/Users/saketm10/Projects/openclaw_agents/agents/mailmind/prompts/email_classifier_classes.json)
+- grouped summary tool in [email_summary.py](/Users/saketm10/Projects/openclaw_agents/agents/mailmind/tools/email_summary.py)
+- package exports in [__init__.py](/Users/saketm10/Projects/openclaw_agents/agents/mailmind/__init__.py)
+
+MailMind-specific code not currently present:
+
+- concrete MailMind graph agent
+- MailMind planner
+- MailMind CLI/runtime entrypoint
+- MailMind-specific approval orchestration
 
 ## Capability Mapping
 
@@ -26,97 +40,98 @@ But MailMind itself is not rebuilt yet as a concrete agent. Most of the missing 
 
 Scope requirement:
 
-- fetch emails (Gmail)
-- normalize into structured format
-- store as episodic memory
+- fetch emails from Gmail
+- normalize into structured email records
+- store messages for downstream classification/search
+- optionally write memory about ingestion events
 
-Present in `src/`:
+Currently present:
 
-- email message model in [src/schemas/domain.py](/Users/saketm10/Projects/easy_agents/src/schemas/domain.py)
-- email source protocol in [src/interfaces/email.py](/Users/saketm10/Projects/easy_agents/src/interfaces/email.py)
-- fetch tool shape in [src/tools/gmail/gmail_fetch.py](/Users/saketm10/Projects/easy_agents/src/tools/gmail/gmail_fetch.py)
-- persistence layer in [src/storage/duckdb_store.py](/Users/saketm10/Projects/easy_agents/src/storage/duckdb_store.py)
-- memory infrastructure in [src/memory](/Users/saketm10/Projects/easy_agents/src/memory)
+- Gmail-backed source in [gmail.py](/Users/saketm10/Projects/openclaw_agents/src/sources/gmail.py)
+- email source protocol in [email.py](/Users/saketm10/Projects/openclaw_agents/src/interfaces/email.py)
+- normalized email model in [domain.py](/Users/saketm10/Projects/openclaw_agents/src/schemas/domain.py)
+- fetch tool in [gmail_fetch.py](/Users/saketm10/Projects/openclaw_agents/src/tools/gmail/gmail_fetch.py)
+- repository/storage layer in [duckdb_store.py](/Users/saketm10/Projects/openclaw_agents/src/storage/duckdb_store.py)
 
-Missing:
+Missing or not yet MailMind-specific:
 
-- concrete Gmail source implementation in current `src/`
-- explicit email normalization tool
-- MailMind-specific ingestion pipeline that writes episodic memory for incoming mail
+- explicit ingestion-to-memory write policy
+- MailMind-specific ingestion orchestration around fetch/classify/notify
 
 Status:
 
-- partially present
+- strongly present at the framework/tool level
+- MailMind-specific orchestration missing
 
 ### 2. Email Understanding / Classification
 
 Scope requirement:
 
-- category
-- requires_action
-- action_type
-- impact_score
-- priority_score
-- short explanation
+- classify emails by category
+- determine `requires_action`
+- determine `action_type`
+- compute `impact_score`
+- compute `priority_score`
+- provide short reasoning
 
-Present in `src/`:
+Currently present:
 
-- classification result model in [src/schemas/domain.py](/Users/saketm10/Projects/easy_agents/src/schemas/domain.py)
-- classifier protocol in [src/interfaces/email.py](/Users/saketm10/Projects/easy_agents/src/interfaces/email.py)
-- classifier tool in [src/tools/gmail/email_classifier.py](/Users/saketm10/Projects/easy_agents/src/tools/gmail/email_classifier.py)
+- MailMind-specific structured payload in [email_classifier.py](/Users/saketm10/Projects/openclaw_agents/agents/mailmind/helpers/email_classifier.py)
+- MailMind classifier implementation in [email_classifier.py](/Users/saketm10/Projects/openclaw_agents/agents/mailmind/helpers/email_classifier.py)
+- shared classifier protocol in [email.py](/Users/saketm10/Projects/openclaw_agents/src/interfaces/email.py)
+- classifier execution tool in [email_classifier.py](/Users/saketm10/Projects/openclaw_agents/src/tools/gmail/email_classifier.py)
+- shared classification result model in [domain.py](/Users/saketm10/Projects/openclaw_agents/src/schemas/domain.py)
+- reusable prompt-based classifier template in [llm_classifier_template.py](/Users/saketm10/Projects/openclaw_agents/src/helpers/llm_classifier_template.py)
 
-Current schema fields:
+Current MailMind classification payload fields:
 
 - `category`
+- `requires_action`
+- `action_type`
+- `impact_score`
 - `priority_score`
 - `confidence`
+- `reason`
 - `reason_codes`
 - `suggested_action`
 - `summary`
 
-Missing vs target scope:
+Gap versus scope:
 
-- `requires_action`
-- `action_type`
-- `impact_score`
-- explicit short reasoning field matching the new scope
-- actual classifier implementation in current `src/`
+- the core classification schema now matches the scope well
+- remaining gap is reliability/tuning of the LLM behavior, not schema shape
 
 Status:
 
-- partially present, schema not fully aligned
+- strongly present
 
 ### 3. Email Querying
 
 Scope requirement:
 
-- conversational retrieval
-- queries like:
-  - "what emails today?"
-  - "show job emails"
-  - "important emails"
-  - "emails from X"
-- grouped output:
-  - Action Required
-  - High Impact
-  - Informational
+- support conversational retrieval
+- answer queries like "what emails today?" and "show job emails"
+- support sender/category/time filtering
+- surface "important" mail
+- ideally support grouped output views
 
-Present in `src/`:
+Currently present:
 
-- search tool in [src/tools/gmail/email_search.py](/Users/saketm10/Projects/easy_agents/src/tools/gmail/email_search.py)
-- search input/output schemas in [src/schemas/tool_io.py](/Users/saketm10/Projects/easy_agents/src/schemas/tool_io.py)
-- DuckDB query support in [src/storage/duckdb_store.py](/Users/saketm10/Projects/easy_agents/src/storage/duckdb_store.py)
-- graph/planner runtime in [src/agents](/Users/saketm10/Projects/easy_agents/src/agents)
+- email search tool in [email_search.py](/Users/saketm10/Projects/openclaw_agents/src/tools/gmail/email_search.py)
+- repository search methods in [duckdb_store.py](/Users/saketm10/Projects/openclaw_agents/src/storage/duckdb_store.py)
+- tool I/O schemas in [tool_io.py](/Users/saketm10/Projects/openclaw_agents/src/schemas/tool_io.py)
+- graph runtime in [graph_agent.py](/Users/saketm10/Projects/openclaw_agents/src/agents/graph_agent.py)
 
-Missing:
+Missing or partial:
 
-- MailMind-specific query planner behavior
-- grouped output by `Action Required / High Impact / Informational`
-- domain interpretation of "important"
+- MailMind-specific grouped conversational presentation
+- richer semantic interpretation of "important"
+- a concrete MailMind query-facing agent that routes these tools
 
 Status:
 
-- partially to strongly present at the infrastructure level
+- strong infrastructure present
+- MailMind query behavior still missing
 
 ### 4. Email Summarization
 
@@ -126,41 +141,43 @@ Scope requirement:
 - grouped summary
 - individual email summary
 
-Present in `src/`:
+Currently present:
 
-- summary tool schema in [src/schemas/tool_io.py](/Users/saketm10/Projects/easy_agents/src/schemas/tool_io.py)
-- summary implementation in [src/tools/gmail/email_summary.py](/Users/saketm10/Projects/easy_agents/src/tools/gmail/email_summary.py)
-- email detail/summary view models in [src/schemas/emails.py](/Users/saketm10/Projects/easy_agents/src/schemas/emails.py)
+- email summary tool in [email_summary.py](/Users/saketm10/Projects/openclaw_agents/src/tools/gmail/email_summary.py)
+- MailMind-specific grouped summary tool in [email_summary.py](/Users/saketm10/Projects/openclaw_agents/agents/mailmind/tools/email_summary.py)
+- summary/detail output schemas in [emails.py](/Users/saketm10/Projects/openclaw_agents/src/schemas/emails.py)
+- summary tool I/O in [tool_io.py](/Users/saketm10/Projects/openclaw_agents/src/schemas/tool_io.py)
 
-Missing:
+Missing or partial:
 
-- daily summary behavior
-- grouped summary behavior for MailMind categories
-- MailMind-specific summarization policy
+- daily scheduled summary workflow
+- summary policy tuned for MailMind decision-making
 
 Status:
 
-- partially present
+- strongly present for grouped and per-email summaries
+- daily workflow still missing
 
 ### 5. Response Drafting
 
 Scope requirement:
 
-- generate draft replies
+- generate reply drafts
 - adapt tone
-- include context
+- include context from the email/classification
 
-Present in `src/`:
+Currently present:
 
-- draft model in [src/schemas/domain.py](/Users/saketm10/Projects/easy_agents/src/schemas/domain.py)
-- draft generator protocol in [src/interfaces/email.py](/Users/saketm10/Projects/easy_agents/src/interfaces/email.py)
-- draft tool in [src/tools/gmail/draft_reply.py](/Users/saketm10/Projects/easy_agents/src/tools/gmail/draft_reply.py)
+- draft tool in [draft_reply.py](/Users/saketm10/Projects/openclaw_agents/src/tools/gmail/draft_reply.py)
+- draft model in [domain.py](/Users/saketm10/Projects/openclaw_agents/src/schemas/domain.py)
+- draft generator protocol in [email.py](/Users/saketm10/Projects/openclaw_agents/src/interfaces/email.py)
+- simple built-in draft generator in [draft_reply.py](/Users/saketm10/Projects/openclaw_agents/src/tools/gmail/draft_reply.py)
 
-Missing:
+Missing or partial:
 
-- concrete draft generator implementation
-- tone adaptation behavior
-- context-aware drafting policy for MailMind
+- high-quality MailMind-specific draft generation policy
+- tone control
+- user/persona preference injection
 
 Status:
 
@@ -171,46 +188,48 @@ Status:
 Scope requirement:
 
 - no auto-send
-- always require explicit approval
-- flow:
-  1. draft generated
-  2. shown via WhatsApp
-  3. user approves
-  4. send tool executes
+- explicit approval before execution
+- approval-aware draft/send flow
 
-Present in `src/`:
+Currently present:
 
-- approval models in [src/schemas/domain.py](/Users/saketm10/Projects/easy_agents/src/schemas/domain.py)
-- generic approval node in [src/agents/nodes/approval_node.py](/Users/saketm10/Projects/easy_agents/src/agents/nodes/approval_node.py)
-- notification tool shell in [src/tools/gmail/notification.py](/Users/saketm10/Projects/easy_agents/src/tools/gmail/notification.py)
+- approval models in [domain.py](/Users/saketm10/Projects/openclaw_agents/src/schemas/domain.py)
+- approval queue protocol in [email.py](/Users/saketm10/Projects/openclaw_agents/src/interfaces/email.py)
+- email sender protocol in [email.py](/Users/saketm10/Projects/openclaw_agents/src/interfaces/email.py)
+- send result model in [domain.py](/Users/saketm10/Projects/openclaw_agents/src/schemas/domain.py)
+- send tool in [email_send.py](/Users/saketm10/Projects/openclaw_agents/src/tools/gmail/email_send.py)
+- Gmail sender adapter in [gmail_sender.py](/Users/saketm10/Projects/openclaw_agents/src/sources/gmail_sender.py)
+- notification tool with approval lookup in [notification.py](/Users/saketm10/Projects/openclaw_agents/src/tools/gmail/notification.py)
+- approval node primitive in [approval_node.py](/Users/saketm10/Projects/openclaw_agents/src/nodes/approval_node.py)
 
 Missing:
 
-- approval queue implementation in current `src/`
-- concrete orchestrator/service for the approval flow
-- email send tool
-- actual MailMind approval-gated send workflow
+- concrete approval queue implementation wired for MailMind
+- end-to-end MailMind approval gated execution flow
 
 Status:
 
-- primitives present, workflow missing
+- shared send primitives present, MailMind workflow missing
 
 ### 7. Notification (WhatsApp)
 
 Scope requirement:
 
-- trigger on `requires_action == true` or high impact
+- notify on `requires_action == true`
+- notify on high-impact messages
+- use WhatsApp as the user-facing approval/attention channel
 
-Present in `src/`:
+Currently present:
 
-- WhatsApp transport abstractions in [src/interfaces/whatsapp.py](/Users/saketm10/Projects/easy_agents/src/interfaces/whatsapp.py)
-- WhatsApp graph node in [src/agents/nodes/whatsapp_node.py](/Users/saketm10/Projects/easy_agents/src/agents/nodes/whatsapp_node.py)
-- webhook entrypoint in [endpoints/whatsapp.py](/Users/saketm10/Projects/easy_agents/endpoints/whatsapp.py)
+- WhatsApp interfaces in [whatsapp.py](/Users/saketm10/Projects/openclaw_agents/src/interfaces/whatsapp.py)
+- WhatsApp node in [whatsapp_node.py](/Users/saketm10/Projects/openclaw_agents/src/nodes/whatsapp_node.py)
+- notification tool in [notification.py](/Users/saketm10/Projects/openclaw_agents/src/tools/gmail/notification.py)
+- webhook entrypoint in [whatsapp.py](/Users/saketm10/Projects/openclaw_agents/endpoints/whatsapp.py)
 
-Missing:
+Missing or partial:
 
 - MailMind-specific notification trigger policy
-- notification orchestration over classified email events
+- orchestration that converts classified email events into approval/notification items
 
 Status:
 
@@ -220,103 +239,89 @@ Status:
 
 Scope requirement:
 
-- write episodic memory
-- write error memory
-- write user decisions
-- read preferences and past interactions
+- write episodic/error/user-decision memory
+- read user preferences and prior interactions
 
-Present in `src/`:
+Currently present:
 
-- layered memory system in [src/memory](/Users/saketm10/Projects/easy_agents/src/memory)
-- memory retrieval node in [src/agents/nodes/memory_retrieve_node.py](/Users/saketm10/Projects/easy_agents/src/agents/nodes/memory_retrieve_node.py)
-- memory write tool in [src/tools/memory_write.py](/Users/saketm10/Projects/easy_agents/src/tools/memory_write.py)
-- memory search tool in [src/tools/memory_search.py](/Users/saketm10/Projects/easy_agents/src/tools/memory_search.py)
+- shared layered memory system under [memory/](/Users/saketm10/Projects/openclaw_agents/src/memory)
+- memory search tool in [memory_search.py](/Users/saketm10/Projects/openclaw_agents/src/tools/memory_search.py)
+- memory write tool in [memory_write.py](/Users/saketm10/Projects/openclaw_agents/src/tools/memory_write.py)
+- memory retrieval node in [memory_retrieve_node.py](/Users/saketm10/Projects/openclaw_agents/src/nodes/memory_retrieve_node.py)
 
-Missing:
+Missing or partial:
 
-- MailMind-specific memory policy for writing user decisions and email-specific events
-- explicit preference extraction and retrieval behavior tailored to MailMind
+- MailMind-specific memory policy for email decisions and user preferences
+- explicit write points integrated into MailMind email workflows
 
 Status:
 
-- strongly present as framework infrastructure
+- strong infrastructure present
+- MailMind-specific memory policy missing
 
 ## Tool Mapping
 
-From the scope doc:
+From the scope document:
 
 - `EmailFetchTool`
-  - partial equivalent exists as [src/tools/gmail/gmail_fetch.py](/Users/saketm10/Projects/easy_agents/src/tools/gmail/gmail_fetch.py)
+  - present as [gmail_fetch.py](/Users/saketm10/Projects/openclaw_agents/src/tools/gmail/gmail_fetch.py)
 - `EmailNormalizeTool`
-  - missing
+  - effectively absorbed into [gmail.py](/Users/saketm10/Projects/openclaw_agents/src/sources/gmail.py), which already normalizes Gmail payloads into `EmailMessage`
 - `EmailClassifierTool`
-  - present as [src/tools/gmail/email_classifier.py](/Users/saketm10/Projects/easy_agents/src/tools/gmail/email_classifier.py)
+  - present as [email_classifier.py](/Users/saketm10/Projects/openclaw_agents/src/tools/gmail/email_classifier.py)
 - `EmailSearchTool`
-  - present as [src/tools/gmail/email_search.py](/Users/saketm10/Projects/easy_agents/src/tools/gmail/email_search.py)
+  - present as [email_search.py](/Users/saketm10/Projects/openclaw_agents/src/tools/gmail/email_search.py)
 - `EmailSummaryTool`
-  - present as [src/tools/gmail/email_summary.py](/Users/saketm10/Projects/easy_agents/src/tools/gmail/email_summary.py)
+  - present as [email_summary.py](/Users/saketm10/Projects/openclaw_agents/src/tools/gmail/email_summary.py)
+- `MailMindGroupedSummaryTool`
+  - present as [email_summary.py](/Users/saketm10/Projects/openclaw_agents/agents/mailmind/tools/email_summary.py)
 - `DraftReplyTool`
-  - present as [src/tools/gmail/draft_reply.py](/Users/saketm10/Projects/easy_agents/src/tools/gmail/draft_reply.py)
+  - present as [draft_reply.py](/Users/saketm10/Projects/openclaw_agents/src/tools/gmail/draft_reply.py)
 - `EmailSendTool`
-  - missing
+  - present as [email_send.py](/Users/saketm10/Projects/openclaw_agents/src/tools/gmail/email_send.py)
 - `WhatsAppNotifyTool`
-  - partially covered by [src/interfaces/whatsapp.py](/Users/saketm10/Projects/easy_agents/src/interfaces/whatsapp.py), [src/agents/nodes/whatsapp_node.py](/Users/saketm10/Projects/easy_agents/src/agents/nodes/whatsapp_node.py), and [src/tools/gmail/notification.py](/Users/saketm10/Projects/easy_agents/src/tools/gmail/notification.py)
+  - partially covered by [notification.py](/Users/saketm10/Projects/openclaw_agents/src/tools/gmail/notification.py)
 - `MemoryWriteTool`
-  - present as [src/tools/memory_write.py](/Users/saketm10/Projects/easy_agents/src/tools/memory_write.py)
+  - present as [memory_write.py](/Users/saketm10/Projects/openclaw_agents/src/tools/memory_write.py)
 - `MemorySearchTool`
-  - present as [src/tools/memory_search.py](/Users/saketm10/Projects/easy_agents/src/tools/memory_search.py)
+  - present as [memory_search.py](/Users/saketm10/Projects/openclaw_agents/src/tools/memory_search.py)
 
-## Behavioral Mapping
+## LLM Mapping
 
-Multi-turn support:
+LLM support currently present in the shared framework:
 
-- present through [src/agents/graph_agent.py](/Users/saketm10/Projects/easy_agents/src/agents/graph_agent.py) and [src/memory/conversation.py](/Users/saketm10/Projects/easy_agents/src/memory/conversation.py)
+- local Hugging Face inference in [huggingface.py](/Users/saketm10/Projects/openclaw_agents/src/llm/huggingface.py)
+- Qwen-specific local adapter in [qwen.py](/Users/saketm10/Projects/openclaw_agents/src/llm/qwen.py)
+- function-calling local adapter in [function_gemma.py](/Users/saketm10/Projects/openclaw_agents/src/llm/function_gemma.py)
+- hosted/custom endpoint adapters in [remote_llm.py](/Users/saketm10/Projects/openclaw_agents/src/llm/remote_llm.py)
+- OpenAI and Groq-compatible hosted adapters in [remote_llm.py](/Users/saketm10/Projects/openclaw_agents/src/llm/remote_llm.py)
 
-Context awareness:
+MailMind currently uses these through the classifier helper, not through a dedicated MailMind runtime.
 
-- present through working memory plus long-term retrieval
+## What Is Actually Missing For MailMind
 
-Clarification prompts:
+The main missing pieces are no longer basic framework primitives. They are domain assembly and workflow policy:
 
-- possible with the current graph/planner design, but not implemented specifically for MailMind
-
-Tool-only execution:
-
-- strongly supported by the framework design
-
-Logging mandatory:
-
-- infrastructure exists in [src/platform_logging](/Users/saketm10/Projects/easy_agents/src/platform_logging) and tool execution logging exists
-
-Memory mandatory:
-
-- infrastructure exists, but not yet enforced by a MailMind-specific runtime
-
-No autonomous send:
-
-- conceptually compatible with the current design, but not yet implemented as a complete MailMind send workflow
+- a concrete MailMind graph agent
+- MailMind-specific planner/routing behavior
+- MailMind-specific grouped query and summary views
+- MailMind-specific memory write/read policy
+- MailMind-specific notification trigger policy
+- approval-gated send workflow
 
 ## Bottom Line
 
-What already exists in `src/` for MailMind:
+Current reality:
 
-- graph runtime
-- tool system
-- email and message schemas
-- repository protocols and DuckDB storage
-- search, summarize, classify, and draft tool shells
-- WhatsApp transport and graph node
-- layered memory system
-- approval primitive
+- the shared framework already provides most of the reusable infrastructure MailMind needs
+- MailMind-specific classification is implemented
+- MailMind-specific grouped summary behavior is implemented
+- Gmail ingestion/search/summary/draft/send/notification primitives are implemented
+- the missing layer is the fully assembled MailMind workflow agent
 
-What is still missing for the new MailMind:
+So the repository is no longer "MailMind missing almost everything". It is now closer to:
 
-- a rebuilt MailMind concrete agent
-- Gmail ingestion adapter
-- normalization tool
-- classifier implementation aligned with the new scope
-- MailMind-specific query planner and grouped output behavior
-- draft generator implementation
-- approval queue and orchestration flow
-- email send tool
-- MailMind-specific memory and notification policies
+- framework: mostly ready
+- MailMind classifier/prompt layer: ready
+- MailMind summary layer: partially ready
+- MailMind end-to-end workflow runtime: still missing

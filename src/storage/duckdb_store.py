@@ -275,6 +275,10 @@ class DuckDBMessageRepository(MessageRepository):
         )
         return draft
 
+    def get_draft(self, message_id: str) -> ReplyDraft | None:
+        row = self._fetchone("SELECT payload_json FROM drafts WHERE message_id = ?", [message_id])
+        return ReplyDraft.model_validate_json(row["payload_json"]) if row else None
+
     def list_drafts(self) -> list[ReplyDraft]:
         rows = self._fetchall("SELECT payload_json FROM drafts ORDER BY updated_at DESC")
         return [ReplyDraft.model_validate_json(row["payload_json"]) for row in rows]

@@ -114,6 +114,27 @@ class DraftReplyOutput(BaseModel):
     body_text: str
 
 
+class EmailSendInput(BaseModel):
+    """Represents input for sending a stored email draft or explicit reply."""
+
+    message_id: str
+    recipients: list[str] = Field(default_factory=list)
+    subject: str | None = None
+    body_text: str | None = None
+
+
+class EmailSendOutput(BaseModel):
+    """Represents output for email send operations."""
+
+    status: str
+    message_id: str
+    draft_id: str | None = None
+    provider_message_id: str | None = None
+    thread_id: str | None = None
+    recipients: list[str] = Field(default_factory=list)
+    subject: str
+
+
 class NotificationInput(BaseModel):
     """Represents input for notification execution."""
 
@@ -179,6 +200,8 @@ __all__ = [
     "DraftReplyOutput",
     "EmailClassifierInput",
     "EmailClassifierOutput",
+    "EmailSendInput",
+    "EmailSendOutput",
     "EmailSearchInput",
     "EmailSearchOutput",
     "EmailSummaryInput",
