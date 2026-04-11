@@ -3,6 +3,7 @@
 Purpose: Exposes only the public memory type models.
 """
 
+from src.memory.index import MemoryIndexer, VectorMemoryIndexBackend
 from src.memory.types import (
     EpisodicMemory,
     ErrorMemory,
@@ -25,4 +26,6 @@ __all__ = [
     "EpisodicMemory",
     "ErrorMemory",
     "ErrorMemoryContent",
+    "MemoryIndexer",
+    "VectorMemoryIndexBackend",
 ]

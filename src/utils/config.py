@@ -106,7 +106,7 @@ class LLMSettings(BaseModel):
     model_name: str = "Qwen/Qwen3-1.7B"
     device_map: str = "auto"
     torch_dtype: str = "auto"
-    max_new_tokens: int = 384
+    max_new_tokens: int | None = None
     enable_thinking: bool = True
 
 
@@ -118,7 +118,7 @@ class PlannerSettings(BaseModel):
     model_name: str = "google/functiongemma-270m-it"
     device_map: str = "auto"
     torch_dtype: str = "auto"
-    max_new_tokens: int = 128
+    max_new_tokens: int | None = None
 
 
 class MemorySettings(BaseModel):
@@ -128,6 +128,12 @@ class MemorySettings(BaseModel):
     archive_after_days: int = 30
     escalation_step_count: int = 3
     confidence_threshold: float = 0.5
+    similarity_enabled: bool = False
+    similarity_backend: str = "none"
+    embedding_provider: str = "sentence_transformer"
+    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+    hybrid_search_enabled: bool = False
+    vector_top_k: int = 20
 
 
 class IntegrationSettings(BaseModel):
@@ -243,6 +249,16 @@ class AppSettings(BaseModel):
                     "confidence_threshold": float(os.getenv("EASY_AGENT_MEMORY_CONFIDENCE_THRESHOLD"))
                     if os.getenv("EASY_AGENT_MEMORY_CONFIDENCE_THRESHOLD") is not None
                     else None,
+                    "similarity_enabled": _env_bool("EASY_AGENT_MEMORY_SIMILARITY_ENABLED", False)
+                    if os.getenv("EASY_AGENT_MEMORY_SIMILARITY_ENABLED") is not None
+                    else None,
+                    "similarity_backend": _env_str("EASY_AGENT_MEMORY_SIMILARITY_BACKEND"),
+                    "embedding_provider": _env_str("EASY_AGENT_MEMORY_EMBEDDING_PROVIDER"),
+                    "embedding_model": _env_str("EASY_AGENT_MEMORY_EMBEDDING_MODEL"),
+                    "hybrid_search_enabled": _env_bool("EASY_AGENT_MEMORY_HYBRID_SEARCH_ENABLED", False)
+                    if os.getenv("EASY_AGENT_MEMORY_HYBRID_SEARCH_ENABLED") is not None
+                    else None,
+                    "vector_top_k": _env_int("EASY_AGENT_MEMORY_VECTOR_TOP_K"),
                 },
                 "integrations": {
                     "gmail_client_id": _env_str("EASY_AGENT_GMAIL_CLIENT_ID"),

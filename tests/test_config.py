@@ -63,3 +63,21 @@ notifications:
     settings = AppSettings.from_env()
 
     assert settings.notifications.notification_destination == "+919999999999"
+
+
+def test_memory_vector_settings_load_from_env(monkeypatch) -> None:
+    monkeypatch.setenv("EASY_AGENT_MEMORY_SIMILARITY_ENABLED", "true")
+    monkeypatch.setenv("EASY_AGENT_MEMORY_SIMILARITY_BACKEND", "faiss")
+    monkeypatch.setenv("EASY_AGENT_MEMORY_EMBEDDING_PROVIDER", "sentence_transformer")
+    monkeypatch.setenv("EASY_AGENT_MEMORY_EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+    monkeypatch.setenv("EASY_AGENT_MEMORY_HYBRID_SEARCH_ENABLED", "true")
+    monkeypatch.setenv("EASY_AGENT_MEMORY_VECTOR_TOP_K", "12")
+
+    settings = AppSettings.from_env()
+
+    assert settings.memory.similarity_enabled is True
+    assert settings.memory.similarity_backend == "faiss"
+    assert settings.memory.embedding_provider == "sentence_transformer"
+    assert settings.memory.embedding_model == "sentence-transformers/all-MiniLM-L6-v2"
+    assert settings.memory.hybrid_search_enabled is True
+    assert settings.memory.vector_top_k == 12

@@ -232,3 +232,7 @@ This architecture combines:
 
 Result:
 A scalable, indexable, production-grade memory system.
+
+Related implementation plan:
+
+- [MEMORY_VECTOR_INDEX_PLAN.md](/Users/saketm10/Projects/openclaw_agents/MEMORY_VECTOR_INDEX_PLAN.md) for FAISS-first hybrid similarity retrieval with a swappable index backend design

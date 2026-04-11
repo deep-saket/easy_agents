@@ -27,17 +27,48 @@ class MemoryStore(BaseMemoryStore):
 
     def _normalize_record(self, item: MemoryRecord) -> MemoryRecord:
         record = parse_memory_item(item.model_dump(mode="json"))
+        agent_id = (
+            record.agent_id
+            or self.agent_id
+            or record.metadata.get("agent_id")
+            or record.metadata.get("agent")
+        )
+        resolved_scope = record.scope or self.default_scope
         if isinstance(record, TypedMemoryRecord):
-            return record.prepare_for_store(default_scope=self.default_scope, agent_id=self.agent_id)
-        metadata = record.normalized_metadata()
-        agent_id = record.agent_id or self.agent_id or metadata.get("agent_id") or metadata.get("agent")
+            prepared = record.prepare_for_store(default_scope=self.default_scope, agent_id=self.agent_id)
+            return prepared.model_copy(
+                update={"metadata": self._normalized_metadata(prepared, prepared.agent_id, prepared.scope)}
+            )
+        metadata = self._normalized_metadata(record, agent_id, resolved_scope)
         return record.model_copy(
             update={
                 "agent_id": agent_id,
-                "scope": record.scope or self.default_scope,
+                "scope": resolved_scope,
                 "metadata": metadata,
             }
         )
+
+    def _normalized_metadata(
+        self,
+        record: MemoryRecord,
+        agent_id: str | None,
+        scope: str,
+    ) -> dict[str, object]:
+        metadata = dict(record.metadata)
+        metadata["agent"] = agent_id or metadata.get("agent") or "unknown"
+        metadata["agent_id"] = agent_id or metadata.get("agent_id") or metadata["agent"]
+        metadata["tags"] = list(record.tags or metadata.get("tags", []))
+        metadata["source"] = record.source_type or metadata.get("source") or "system"
+        metadata["source_type"] = record.source_type or metadata.get("source_type") or metadata["source"]
+        metadata["source_id"] = record.source_id or metadata.get("source_id")
+        priority = metadata.get("priority", "medium")
+        if priority not in {"low", "medium", "high"}:
+            priority = "medium"
+        metadata["priority"] = priority
+        metadata["importance"] = record.importance if record.importance is not None else metadata.get("importance")
+        metadata["confidence"] = record.confidence if record.confidence is not None else metadata.get("confidence")
+        metadata["scope"] = scope
+        return metadata
 
     def add(self, item: MemoryRecord) -> MemoryRecord:
         record = self._normalize_record(item)

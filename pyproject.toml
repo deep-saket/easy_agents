@@ -32,6 +32,14 @@ gmail = [
 local-llm = [
   "transformers>=4.51.0,<5.0",
 ]
+memory-vector = [
+  "faiss-cpu>=1.8,<2.0",
+  "numpy>=1.26,<3.0",
+]
+memory-vector-local = [
+  "sentence-transformers>=3.0,<4.0",
+  "torch>=2.2,<3.0",
+]
 
 [tool.setuptools]
 package-dir = {"" = "src"}
