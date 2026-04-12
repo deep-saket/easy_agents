@@ -1,0 +1,76 @@
+tools:
+  - name: gmail_fetch
+    description: Fetch and optionally process new Gmail messages into the repository.
+    when_to_use: Use when the user asks to refresh inbox state or when a poll flow needs fresh messages.
+    required_inputs:
+      - process_messages
+
+  - name: email_classifier
+    description: Classify stored emails and persist the latest classification.
+    when_to_use: Use after fetching or when stored emails do not yet have MailMind classifications.
+    required_inputs:
+      - message_ids
+
+  - name: email_search
+    description: Search stored emails by keyword, category, sender, and time range.
+    when_to_use: Use for inbox search, filtering, and finding specific emails.
+    required_inputs:
+      - query
+      - category
+      - sender
+      - date_from
+      - date_to
+      - only_important
+      - limit
+
+  - name: email_summary
+    description: Summarize selected stored emails.
+    when_to_use: Use when the user wants a compact summary of one or more concrete emails.
+    required_inputs:
+      - message_ids
+      - max_items
+
+  - name: mailmind_email_summary
+    description: Build MailMind grouped summaries for action required, high impact, and informational emails.
+    when_to_use: Use for inbox overview and grouped MailMind digest responses.
+    required_inputs:
+      - message_ids
+      - max_items
+      - high_impact_threshold
+
+  - name: draft_reply
+    description: Generate a reply draft for a stored email.
+    when_to_use: Use when the user asks for a draft or when a classified email needs a reply draft.
+    required_inputs:
+      - message_id
+
+  - name: email_send
+    description: Send a saved reply draft or explicit reply for a stored email.
+    when_to_use: Use only after the user has approved sending.
+    required_inputs:
+      - message_id
+      - recipients
+      - subject
+      - body_text
+
+  - name: notification
+    description: Execute or inspect approved WhatsApp notification actions.
+    when_to_use: Use for notification delivery workflows tied to approval items.
+    required_inputs:
+      - approval_id
+      - message_id
+      - enqueue_only
+
+  - name: memory_search
+    description: Search long-term memory across the configured memory layers.
+    when_to_use: Use when past user preferences, prior episodes, or stored lessons may help answer.
+    required_inputs:
+      - query
+      - filters
+      - limit
+
+  - name: memory_write
+    description: Persist a structured long-term memory item.
+    when_to_use: Use only when the turn should explicitly store a durable memory record.
+    required_inputs:
+      - item

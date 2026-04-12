@@ -63,6 +63,7 @@ class AgentState(TypedDict, total=False):
 
     session_id: str
     turn_id: str
+    trigger_type: str
     user_input: str
     memory: MemoryProtocol | None
     memory_targets: list[MemoryTargetSpec]
@@ -73,6 +74,8 @@ class AgentState(TypedDict, total=False):
     memory_updates: list[dict[str, Any]]
     stored_memories: list[Any]
     observation: dict[str, Any] | None
+    reflection_feedback: dict[str, Any] | None
+    reflection_complete: bool
     error: dict[str, Any] | None
     available_tools: list[Any] | None
     response: str
@@ -97,6 +100,7 @@ class NodeUpdate(TypedDict, total=False):
 
     session_id: str
     turn_id: str
+    trigger_type: str
     user_input: str
     memory: MemoryProtocol | None
     memory_targets: list[MemoryTargetSpec]
@@ -107,6 +111,8 @@ class NodeUpdate(TypedDict, total=False):
     memory_updates: list[dict[str, Any]]
     stored_memories: list[Any]
     observation: dict[str, Any] | None
+    reflection_feedback: dict[str, Any] | None
+    reflection_complete: bool
     error: dict[str, Any] | None
     available_tools: list[Any] | None
     response: str

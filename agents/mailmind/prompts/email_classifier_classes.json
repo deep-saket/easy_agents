@@ -1,0 +1,157 @@
+{
+  "strong_ml_research_job": {
+    "mailmind_group": "job",
+    "description": "A strong research or engineering role in machine learning, frontier AI, or adjacent deep-tech work.",
+    "signals": [
+      "research scientist or engineer role",
+      "machine learning or AI role",
+      "high-impact technical work",
+      "selective hiring language",
+      "credible company or lab",
+      "interview process initiated",
+      "requires reply",
+      "career opportunity"
+    ],
+    "default_action_type": "reply",
+    "default_suggested_action": "notify_and_draft"
+  },
+
+  "deep_tech_opportunity": {
+    "mailmind_group": "job",
+    "description": "A high-impact deep-tech startup, founding, or strategic opportunity.",
+    "signals": [
+      "founding engineer or researcher role",
+      "startup or early-stage company",
+      "technical leadership opportunity",
+      "high ownership or equity upside",
+      "long-term impact potential",
+      "requires reply",
+      "opportunity signal"
+    ],
+    "default_action_type": "reply",
+    "default_suggested_action": "notify_and_draft"
+  },
+
+  "network_event": {
+    "mailmind_group": "event",
+    "description": "An event, meetup, or conference that may be valuable for networking or learning.",
+    "signals": [
+      "invite",
+      "meetup",
+      "conference",
+      "alumni gathering",
+      "founder or research event",
+      "date or schedule present",
+      "requires scheduling"
+    ],
+    "default_action_type": "schedule",
+    "default_suggested_action": "manual_review"
+  },
+
+  "time_sensitive_professional": {
+    "mailmind_group": "networking",
+    "description": "A professional email requiring timely attention or response.",
+    "signals": [
+      "deadline mentioned",
+      "urgent request",
+      "follow-up needed",
+      "interview step",
+      "response requested",
+      "time-sensitive language",
+      "requires reply",
+      "time_sensitive"
+    ],
+    "default_action_type": "review",
+    "default_suggested_action": "manual_review"
+  },
+
+  "alumni_reconnect": {
+    "mailmind_group": "networking",
+    "description": "Reconnect from alumni, colleague, or known contact.",
+    "signals": [
+      "alumni reference",
+      "former colleague",
+      "warm intro",
+      "reconnect message",
+      "casual or relationship-based tone",
+      "requires reply"
+    ],
+    "default_action_type": "reply",
+    "default_suggested_action": "draft_only"
+  },
+
+  "personal_exceptional": {
+    "mailmind_group": "personal-important",
+    "description": "A personally important message outside routine traffic.",
+    "signals": [
+      "family or close contact",
+      "important personal update",
+      "non-routine personal request",
+      "emotionally significant content",
+      "requires reply",
+      "high importance"
+    ],
+    "default_action_type": "reply",
+    "default_suggested_action": "manual_review"
+  },
+
+  "promotion": {
+    "mailmind_group": "low-priority",
+    "description": "Marketing, promotional, or transactional upsell content.",
+    "signals": [
+      "discount",
+      "offer",
+      "sale",
+      "marketing language",
+      "product promotion",
+      "no action required",
+      "low relevance"
+    ],
+    "default_action_type": "none",
+    "default_suggested_action": "archive"
+  },
+
+  "newsletter": {
+    "mailmind_group": "low-priority",
+    "description": "Recurring informational content or digest.",
+    "signals": [
+      "weekly update",
+      "newsletter",
+      "digest",
+      "roundup",
+      "subscription content",
+      "informational only",
+      "no immediate action"
+    ],
+    "default_action_type": "none",
+    "default_suggested_action": "archive"
+  },
+
+  "weak_recruiter": {
+    "mailmind_group": "low-priority",
+    "description": "Low-quality recruiting outreach with poor personalization or relevance.",
+    "signals": [
+      "generic recruiter message",
+      "mass outreach",
+      "poor role relevance",
+      "template language",
+      "no personalization",
+      "low opportunity signal"
+    ],
+    "default_action_type": "none",
+    "default_suggested_action": "ignore"
+  },
+
+  "other": {
+    "mailmind_group": "low-priority",
+    "description": "Emails that do not clearly fit into high-signal categories.",
+    "signals": [
+      "ambiguous content",
+      "unclear intent",
+      "routine traffic",
+      "insufficient context"
+    ],
+    "default_action_type": "none",
+    "default_suggested_action": "manual_review"
+  }
+}
