@@ -56,6 +56,12 @@ def build_arg_parser(defaults: dict[str, object]) -> argparse.ArgumentParser:
         help="Conversation session id.",
     )
     parser.add_argument(
+        "--entry-mode",
+        default=str(defaults.get("entry_mode", "cli")),
+        choices=["cli", "webhook"],
+        help="Run MailMind as a CLI session or WhatsApp webhook server.",
+    )
+    parser.add_argument(
         "--trigger-type",
         default=str(defaults.get("trigger_type", "query")),
         choices=["query", "approval", "poll", "maintenance"],
@@ -66,6 +72,17 @@ def build_arg_parser(defaults: dict[str, object]) -> argparse.ArgumentParser:
         action="store_true",
         default=bool(defaults.get("interactive", False)),
         help="Start a simple interactive loop instead of running a single message.",
+    )
+    parser.add_argument(
+        "--webhook-host",
+        default=str(defaults.get("webhook_host", "127.0.0.1")),
+        help="Host for the WhatsApp webhook server.",
+    )
+    parser.add_argument(
+        "--webhook-port",
+        type=int,
+        default=int(defaults.get("webhook_port", 8000)),
+        help="Port for the WhatsApp webhook server.",
     )
     return parser
 
@@ -232,6 +249,24 @@ def run_interactive(agent: MailMindAgent, *, session_id: str, trigger_type: str,
         )
 
 
+def run_webhook_server(agent: MailMindAgent, *, host: str, port: int) -> None:
+    """Runs the FastAPI WhatsApp webhook app backed by the MailMind agent."""
+    try:
+        import uvicorn
+    except ImportError as exc:
+        raise RuntimeError("uvicorn is required to run MailMind in webhook mode.") from exc
+
+    try:
+        from endpoints.whatsapp import create_app
+    except ImportError as exc:
+        raise RuntimeError(
+            "Webhook mode requires FastAPI endpoint dependencies. Install the web stack to use endpoints.whatsapp."
+        ) from exc
+
+    app = create_app(agent=agent)
+    uvicorn.run(app, host=host, port=port)
+
+
 def main() -> int:
     """CLI entrypoint for running MailMind."""
     bootstrap = argparse.ArgumentParser(add_help=False)
@@ -246,6 +281,10 @@ def main() -> int:
     settings = load_settings(args.config)
     agent, whatsapp = build_agent(settings)
     session_id = args.session_id or settings.notifications.notification_destination or "mailmind-cli"
+
+    if args.entry_mode == "webhook":
+        run_webhook_server(agent, host=args.webhook_host, port=args.webhook_port)
+        return 0
 
     if args.interactive or not args.message:
         run_interactive(agent, session_id=session_id, trigger_type=args.trigger_type, whatsapp=whatsapp)

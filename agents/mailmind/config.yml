@@ -2,6 +2,9 @@ session_id: mailmind-cli
 trigger_type: query
 interactive: true
 message:
+entry_mode: cli
+webhook_host: 127.0.0.1
+webhook_port: 8000
 
 paths:
   db_path: data/mailmind.duckdb
