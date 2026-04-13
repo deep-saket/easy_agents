@@ -1,3 +1,8 @@
+session_id: mailmind-cli
+trigger_type: query
+interactive: true
+message:
+
 paths:
   db_path: data/mailmind.duckdb
   log_path: data/logs/audit.jsonl
@@ -20,7 +25,7 @@ llm:
   model_name: Qwen/Qwen3-1.7B
   device_map: auto
   torch_dtype: auto
-  max_new_tokens: 384
+  max_new_tokens:
   enable_thinking: true
 
 planner:
@@ -29,7 +34,7 @@ planner:
   model_name: google/functiongemma-270m-it
   device_map: auto
   torch_dtype: auto
-  max_new_tokens: 128
+  max_new_tokens:
 
 memory:
   hot_cache_size: 256
@@ -48,7 +53,6 @@ viewer:
   port: 8000
 
 integrations:
-  # TODO: Replace with local secret overrides or env vars for real adapters.
   gmail_client_id: ""
   gmail_client_secret: ""
   twilio_account_sid: ""
