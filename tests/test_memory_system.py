@@ -1,6 +1,6 @@
 """Created: 2026-04-09
 
-Purpose: Exercises the layered memory system against the architecture in memory.md.
+Purpose: Exercises the layered memory system against the architecture in docs/architecture/memory-architecture.md.
 """
 
 from __future__ import annotations
