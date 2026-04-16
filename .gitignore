@@ -13,3 +13,6 @@ data/tool_catalog.json
 data/memory/*.jsonl
 data/logs/*.jsonl
 tests/*.executed.ipynb
+tests/voice_transcript.json
+tests/youtube_audio.wav
+tests/youtube_downloaded_audio.m4a

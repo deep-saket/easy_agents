@@ -40,6 +40,19 @@ memory-vector-local = [
   "sentence-transformers>=3.0,<4.0",
   "torch>=2.2,<3.0",
 ]
+voice-processing = [
+  "numpy>=1.26,<3.0",
+  "openai-whisper>=20240930",
+  "silero-vad>=5.1.2,<6.0",
+  "soundfile>=0.12,<1.0",
+  "speechbrain>=1.0,<2.0",
+  "torch>=2.2,<3.0",
+  "torchaudio>=2.2,<3.0",
+  "yt-dlp>=2025.1.15",
+]
+
+[project.scripts]
+voice-processing = "voice_processing.cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
