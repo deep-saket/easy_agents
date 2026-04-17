@@ -152,7 +152,13 @@ class SimpleConversationAgent(BaseAgent):
         """Builds the notebook-style agent from env/config."""
 
         settings = AppSettings.from_env()
-        qwen_llm = Qwen3_1_7BLLM(model_name="Qwen/Qwen3-1.7B", max_new_tokens=128, enable_thinking=False)
+        qwen_llm = Qwen3_1_7BLLM(
+            model_name=settings.llm.model_name,
+            device_map=settings.llm.device_map,
+            torch_dtype=settings.llm.torch_dtype,
+            max_new_tokens=settings.llm.max_new_tokens,
+            enable_thinking=False,
+        )
         memory = WorkingMemory(session_id=settings.notification_destination or "whatsapp:+919999999999")
         trace_sink = JSONLTraceSink(settings.log_path.with_name("conversation_agent_trace.jsonl"))
         whatsapp = cls.build_whatsapp_interface(settings)

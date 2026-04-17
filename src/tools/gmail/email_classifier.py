@@ -26,7 +26,8 @@ class EmailClassifierTool(BaseTool[EmailClassifierInput, EmailClassifierOutput])
 
     def execute(self, input: EmailClassifierInput) -> EmailClassifierOutput:
         bundles = []
-        for message_id in input.message_ids:
+        message_ids = input.message_ids or self._default_message_ids()
+        for message_id in message_ids:
             message = self.repository.get_message(message_id)
             if message is None:
                 continue
@@ -37,3 +38,12 @@ class EmailClassifierTool(BaseTool[EmailClassifierInput, EmailClassifierOutput])
             classified_count=len(bundles),
             emails=[bundle_to_summary(bundle) for bundle in bundles],
         )
+
+    def _default_message_ids(self) -> list[str]:
+        """Returns unclassified stored messages when no explicit ids are given."""
+
+        return [
+            bundle.message.id
+            for bundle in self.repository.list_messages()
+            if bundle.classification is None
+        ]

@@ -25,12 +25,16 @@ class EmailSummaryTool(BaseTool[EmailSummaryInput, EmailSummaryOutput]):
 
     def execute(self, input: EmailSummaryInput) -> EmailSummaryOutput:
         bundles = []
-        for message_id in input.message_ids[: input.max_items]:
-            message = self.repository.get_message(message_id)
-            if message is None:
-                continue
-            classification = self.repository.get_latest_classification(message_id)
-            bundles.append(MessageBundle(message=message, classification=classification, draft=None))
+        message_ids = input.message_ids[: input.max_items]
+        if message_ids:
+            for message_id in message_ids:
+                message = self.repository.get_message(message_id)
+                if message is None:
+                    continue
+                classification = self.repository.get_latest_classification(message_id)
+                bundles.append(MessageBundle(message=message, classification=classification, draft=None))
+        else:
+            bundles = self.repository.list_messages()[: input.max_items]
         details = [bundle_to_detail(bundle) for bundle in bundles]
         categories: dict[str, int] = {}
         for detail in details:

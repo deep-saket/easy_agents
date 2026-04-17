@@ -1,26 +1,65 @@
-"""Created: 2026-03-30
+"""Created: 2026-04-05
 
-Purpose: Tests the classifier behavior.
+Purpose: Tests MailMind email classification through the existing Gmail tool
+surface.
 """
 
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
-from src.mailmind.classifiers.rules import RulesBasedClassifier
-from src.mailmind.core.models import Category, EmailMessage, SuggestedAction
-from src.mailmind.core.policies import YAMLPolicyProvider
+from agents.mailmind.helpers import MailMindEmailClassifier
+from src.schemas.domain import EmailMessage
+from src.storage.duckdb_store import DuckDBMessageRepository
+from src.tools.gmail.email_classifier import EmailClassifierTool
 
 
-def test_rules_classifier_marks_research_role_high_priority() -> None:
-    classifier = RulesBasedClassifier(YAMLPolicyProvider(Path("policies/default_policy.yaml")))
-    message = EmailMessage(
-        source_id="s1",
-        from_email="talent@deepmind.com",
-        subject="Research Scientist role for foundation models",
-        body_text="We are selectively hiring a machine learning engineer for multimodal reasoning research.",
-        received_at="2026-03-29T08:00:00+00:00",
+@dataclass(slots=True)
+class FakeStructuredLLM:
+    """Returns a stable MailMind classifier payload for tests."""
+
+    def structured_generate(self, prompt: str, schema: type, **kwargs: object):
+        del prompt, kwargs
+        return schema.model_validate(
+            {
+                "category": "strong_ml_research_job",
+                "requires_action": True,
+                "action_type": "reply",
+                "impact_score": 0.93,
+                "priority_score": 0.9,
+                "confidence": 0.88,
+                "reason": "High-signal research opportunity.",
+                "reason_codes": ["research_role"],
+                "suggested_action": "notify_and_draft",
+                "summary": "Strong ML research job to review.",
+            }
+        )
+
+
+def test_mailmind_classifier_tool_classifies_unprocessed_email(tmp_path: Path) -> None:
+    repo = DuckDBMessageRepository(tmp_path / "mailmind.db")
+    repo.init_db()
+    message = repo.save_message(
+        EmailMessage(
+            source_id="gmail-1",
+            from_email="talent@deepmind.com",
+            subject="Research Scientist role",
+            body_text="We are hiring for frontier multimodal research.",
+            received_at=datetime.now(timezone.utc),
+        )
     )
-    result = classifier.classify(message)
-    assert result.category == Category.STRONG_ML_RESEARCH_JOB
-    assert result.suggested_action == SuggestedAction.NOTIFY_AND_DRAFT
-    assert result.priority_score >= 0.75
+    tool = EmailClassifierTool(
+        repository=repo,
+        classifier=MailMindEmailClassifier(llm=FakeStructuredLLM()),
+    )
 
+    result = tool.execute(tool.input_schema())
+    stored = repo.get_latest_classification(message.id)
+
+    assert result.classified_count == 1
+    assert result.emails[0].category == "strong_ml_research_job"
+    assert stored is not None
+    assert stored.requires_action is True
+    assert stored.reasoning == "High-signal research opportunity."

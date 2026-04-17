@@ -10,19 +10,31 @@ from dataclasses import dataclass, field
 from time import perf_counter
 from typing import Any
 
+from src.llm.base import BaseLLM
 from src.platform_logging.tracing import record_llm_call
 from src.schemas.tool_io import ToolCall
 
 
 @dataclass(slots=True)
-class FunctionGemmaLLM:
+class FunctionGemmaLLM(BaseLLM):
     """Represents the function gemma l l m component."""
     model_name: str = "google/functiongemma-270m-it"
     device_map: str = "auto"
     torch_dtype: str = "auto"
-    max_new_tokens: int = 128
+    max_new_tokens: int | None = None
     _processor: Any = field(default=None, init=False, repr=False)
     _model: Any = field(default=None, init=False, repr=False)
+
+    def generate(self, prompt: str, **kwargs: Any) -> str:
+        raise NotImplementedError("Function Gemma should be used through structured_generate or select_tool_call.")
+
+    def structured_generate(self, prompt: str, schema: type, **kwargs: Any) -> Any:
+        payload = self.select_tool_call(
+            user_input=prompt,
+            tool_catalog=kwargs["tool_catalog"],
+            memory_state=kwargs.get("memory_state"),
+        )
+        return schema.model_validate(payload)
 
     def select_tool_call(
         self,
@@ -51,14 +63,14 @@ class FunctionGemmaLLM:
             return_dict=True,
             return_tensors="pt",
         )
+        prompt_tokens = int(inputs["input_ids"].shape[-1])
         outputs = model.generate(
             **inputs.to(model.device),
             pad_token_id=processor.eos_token_id,
-            max_new_tokens=self.max_new_tokens,
+            max_new_tokens=self._resolve_max_new_tokens(model=model, prompt_tokens=prompt_tokens),
         )
         output_ids = outputs[0][len(inputs["input_ids"][0]) :]
         content = processor.decode(output_ids, skip_special_tokens=True)
-        prompt_tokens = int(inputs["input_ids"].shape[-1])
         completion_tokens = int(output_ids.shape[-1])
         total_tokens = prompt_tokens + completion_tokens
         record_llm_call(
@@ -122,3 +134,12 @@ class FunctionGemmaLLM:
                 device_map=self.device_map,
             )
         return self._model
+
+    def _resolve_max_new_tokens(self, *, model: Any, prompt_tokens: int) -> int:
+        if self.max_new_tokens is not None:
+            return self.max_new_tokens
+
+        context_limit = getattr(getattr(model, "config", None), "max_position_embeddings", None)
+        if isinstance(context_limit, int) and context_limit > prompt_tokens:
+            return max(1, context_limit - prompt_tokens)
+        return 512
