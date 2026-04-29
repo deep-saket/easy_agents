@@ -38,6 +38,7 @@ class MemoryRetrieveNode(BaseGraphNode):
     memories: list[Any] | None = None
     system_prompt: str | None = None
     user_prompt: str | None = None
+    max_queries_per_target: int = 3
 
     def plan(
         self,
@@ -97,6 +98,7 @@ class MemoryRetrieveNode(BaseGraphNode):
             user_prompt=self.user_prompt,
         )
         assembled_context: dict[str, Any] = {}
+        retrieval_events: list[dict[str, Any]] = []
         for item in retrieval_plan:
             target = str(item.get("target", "")).lower()
             limit = int(item.get("limit", 5))
@@ -109,19 +111,61 @@ class MemoryRetrieveNode(BaseGraphNode):
             if self.memory_retriever is None:
                 assembled_context[target] = []
                 continue
-            assembled_context[target] = self._retrieve(
-                user_input,
-                filters=self._filters_for_target(target, context),
-                limit=limit,
-                context=context,
-            )
-        return {"memory_context": assembled_context}
+            filters = self._filters_for_target(item, context)
+            stop_on_first_hit = bool(item.get("stop_on_first_hit", True))
+            min_results = max(int(item.get("min_results", 1)), 1)
+            per_target_results: dict[str, Any] = {}
+            for query in self._target_queries(item=item, user_input=user_input):
+                records = self._retrieve(
+                    query,
+                    filters=filters,
+                    limit=limit,
+                    context=context,
+                )
+                for record in records:
+                    record_id = str(getattr(record, "id", ""))
+                    if record_id and record_id not in per_target_results:
+                        per_target_results[record_id] = record
+                retrieval_events.append(
+                    {
+                        "target": target,
+                        "query": query,
+                        "filters": dict(filters),
+                        "limit": limit,
+                        "result_count": len(records),
+                        "result_ids": [str(getattr(record, "id", "")) for record in records if getattr(record, "id", None)],
+                    }
+                )
+                if stop_on_first_hit and len(per_target_results) >= min_results:
+                    break
+            assembled_context[target] = list(per_target_results.values())[:limit]
+        return {
+            "memory_context": assembled_context,
+            "memory_retrievals": retrieval_events,
+        }
 
     def _default_plan(self, *, memory: Any | None, memory_targets: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
         """Builds the default retrieval plan for configured memory targets."""
         del memory
         return [
-            {"target": target.get("type", ""), "limit": int(target.get("limit", 5))}
+            {
+                "target": target.get("type", ""),
+                "limit": int(target.get("limit", 5)),
+                "layer": target.get("layer"),
+                "scope": target.get("scope"),
+                "agent_id": target.get("agent_id"),
+                "source_type": target.get("source_type"),
+                "source_id": target.get("source_id"),
+                "tags": target.get("tags"),
+                "metadata": target.get("metadata"),
+                "query": target.get("query"),
+                "query_candidates": target.get("query_candidates"),
+                "created_before": target.get("created_before"),
+                "created_after": target.get("created_after"),
+                "stop_on_first_hit": target.get("stop_on_first_hit", True),
+                "min_results": int(target.get("min_results", 1)),
+                "max_queries": int(target.get("max_queries", self.max_queries_per_target)),
+            }
             for target in self._memory_targets(memory_targets)
         ]
 
@@ -131,17 +175,17 @@ class MemoryRetrieveNode(BaseGraphNode):
         targets: list[dict[str, Any]] = []
         for memory in configured:
             if memory is WorkingMemory or getattr(memory, "__name__", None) == "WorkingMemory":
-                targets.append({"type": "working", "limit": 5, "layer": "hot"})
+                targets.append({"type": "working", "limit": 5})
                 continue
             if memory is ProceduralMemory or getattr(memory, "__name__", None) == "ProceduralMemory":
-                targets.append({"type": "procedural", "limit": 5, "layer": "warm"})
+                targets.append({"type": "procedural", "limit": 5})
                 continue
             memory_type = getattr(getattr(memory, "model_fields", {}), "get", lambda *_: None)("type")
             if memory_type is not None:
-                targets.append({"type": str(memory_type.default), "limit": 5, "layer": getattr(memory, "default_layer", "warm")})
+                targets.append({"type": str(memory_type.default), "limit": 5})
                 continue
             if hasattr(memory, "type"):
-                targets.append({"type": str(getattr(memory, "type")), "limit": 5, "layer": "warm"})
+                targets.append({"type": str(getattr(memory, "type")), "limit": 5})
         for target in state_targets or []:
             if not isinstance(target, dict):
                 continue
@@ -154,9 +198,20 @@ class MemoryRetrieveNode(BaseGraphNode):
                 {
                     "type": target_type,
                     "limit": int(target.get("limit", 5)),
-                    "layer": str(target.get("layer", "warm")),
+                    "layer": target.get("layer"),
                     "scope": target.get("scope"),
+                    "agent_id": target.get("agent_id"),
+                    "source_type": target.get("source_type"),
+                    "source_id": target.get("source_id"),
+                    "tags": target.get("tags"),
                     "metadata": dict(target.get("metadata", {})) if isinstance(target.get("metadata"), dict) else {},
+                    "query": target.get("query"),
+                    "query_candidates": target.get("query_candidates"),
+                    "created_before": target.get("created_before"),
+                    "created_after": target.get("created_after"),
+                    "stop_on_first_hit": bool(target.get("stop_on_first_hit", True)),
+                    "min_results": int(target.get("min_results", 1)),
+                    "max_queries": int(target.get("max_queries", self.max_queries_per_target)),
                 }
             )
         return targets
@@ -188,9 +243,33 @@ class MemoryRetrieveNode(BaseGraphNode):
         )
 
     @staticmethod
-    def _filters_for_target(target: str, context: RetrievalContext) -> dict[str, object]:
+    def _filters_for_target(target_plan: dict[str, Any], context: RetrievalContext) -> dict[str, object]:
         """Builds retrieval filters for one long-term memory target."""
-        return {"type": target, "agent_id": context.agent_id}
+        target = str(target_plan.get("target", "")).lower()
+        filters: dict[str, object] = {"type": target}
+        if target_plan.get("layer") is not None:
+            filters["layer"] = target_plan["layer"]
+        if target_plan.get("scope") is not None:
+            filters["scope"] = target_plan["scope"]
+        if target_plan.get("source_type") is not None:
+            filters["source_type"] = target_plan["source_type"]
+        if target_plan.get("source_id") is not None:
+            filters["source_id"] = target_plan["source_id"]
+        if target_plan.get("tags") is not None:
+            filters["tags"] = target_plan["tags"]
+        if target_plan.get("created_before") is not None:
+            filters["created_before"] = target_plan["created_before"]
+        if target_plan.get("created_after") is not None:
+            filters["created_after"] = target_plan["created_after"]
+        metadata = target_plan.get("metadata")
+        if isinstance(metadata, dict) and metadata:
+            filters["metadata"] = metadata
+        explicit_agent_id = target_plan.get("agent_id")
+        if explicit_agent_id is not None:
+            filters["agent_id"] = explicit_agent_id
+        elif context.agent_id is not None:
+            filters["agent_id"] = context.agent_id
+        return filters
 
     def _retrieve(
         self,
@@ -205,6 +284,41 @@ class MemoryRetrieveNode(BaseGraphNode):
             return self.memory_retriever.retrieve(query, filters=filters, limit=limit, context=context)
         except TypeError:
             return self.memory_retriever.retrieve(query, filters=filters, limit=limit)
+
+    def _target_queries(self, *, item: dict[str, Any], user_input: str) -> list[str]:
+        """Builds ordered, de-duplicated queries for one retrieval target."""
+        query_values: list[str] = []
+        raw_primary_query = item.get("query")
+        primary_query = str(raw_primary_query).strip() if raw_primary_query is not None else ""
+        if primary_query:
+            query_values.append(primary_query)
+        else:
+            query_values.append(user_input)
+
+        query_candidates = item.get("query_candidates")
+        if isinstance(query_candidates, str) and query_candidates.strip():
+            query_values.append(query_candidates.strip())
+        elif isinstance(query_candidates, (list, tuple, set)):
+            query_values.extend(
+                str(candidate).strip()
+                for candidate in query_candidates
+                if candidate is not None and str(candidate).strip()
+            )
+
+        max_queries = max(1, int(item.get("max_queries", self.max_queries_per_target)))
+        return self._dedupe_strings(query_values)[:max_queries]
+
+    @staticmethod
+    def _dedupe_strings(values: list[str]) -> list[str]:
+        unique: list[str] = []
+        seen: set[str] = set()
+        for value in values:
+            key = value.strip().lower()
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            unique.append(value.strip())
+        return unique
 
     @staticmethod
     def _parse_plan(raw: str) -> list[dict[str, Any]]:

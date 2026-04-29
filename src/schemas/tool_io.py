@@ -171,8 +171,19 @@ class MemorySearchInput(BaseModel):
     """Represents input for memory search operations."""
 
     query: str = ""
+    query_candidates: list[str] = Field(default_factory=list)
+    stop_on_first_hit: bool = True
+    max_queries: int = 3
     filters: dict[str, Any] = Field(default_factory=dict)
     limit: int = 20
+
+
+class MemorySearchAttempt(BaseModel):
+    """Represents one query attempt inside a memory-search call."""
+
+    query: str
+    result_count: int
+    result_ids: list[str] = Field(default_factory=list)
 
 
 class MemorySearchOutput(BaseModel):
@@ -180,6 +191,8 @@ class MemorySearchOutput(BaseModel):
 
     total: int = 0
     memories: list[MemoryRecord] = Field(default_factory=list)
+    selected_query: str | None = None
+    attempts: list[MemorySearchAttempt] = Field(default_factory=list)
 
 
 class MemoryWriteInput(BaseModel):
@@ -209,6 +222,7 @@ __all__ = [
     "GmailFetchInput",
     "GmailFetchOutput",
     "MemorySearchInput",
+    "MemorySearchAttempt",
     "MemorySearchOutput",
     "MemoryWriteInput",
     "MemoryWriteOutput",

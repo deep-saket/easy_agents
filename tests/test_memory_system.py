@@ -118,3 +118,24 @@ def test_sleeping_task_queue_orders_by_priority_and_pops_head(tmp_path: Path) ->
     assert popped is not None
     assert popped.task_type == "summarize"
     assert [(task.task_type, task.priority) for task in remaining] == [("reindex", 1)]
+
+
+def test_memory_store_supports_created_before_and_after_filters(tmp_path: Path) -> None:
+    store = build_store(tmp_path, "local", scope="agent_local", agent_id="mailmind")
+    cutoff = utc_now() - timedelta(days=1)
+    older = SemanticMemory(
+        content={"fact": "older memory"},
+        created_at=cutoff - timedelta(hours=2),
+        agent_id="mailmind",
+    ).store_warm(store)
+    newer = SemanticMemory(
+        content={"fact": "newer memory"},
+        created_at=cutoff + timedelta(hours=2),
+        agent_id="mailmind",
+    ).store_warm(store)
+
+    before_results = store.search("", filters={"created_before": cutoff.isoformat()}, limit=10)
+    after_results = store.search("", filters={"created_after": cutoff.isoformat()}, limit=10)
+
+    assert [record.id for record in before_results] == [older.id]
+    assert [record.id for record in after_results] == [newer.id]

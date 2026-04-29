@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Easy Agents Graph Builder</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="layout">
+      <aside class="sidebar left">
+        <h1>Graph Builder</h1>
+        <p class="muted">Compose reusable agent graphs.</p>
+
+        <section>
+          <h2>Graph Mode</h2>
+          <select id="graph-mode">
+            <option value="chain_of_thought">Chain of Thought</option>
+            <option value="tree_of_thought">Tree of Thought</option>
+            <option value="graph_of_thought" selected>Graph of Thought</option>
+          </select>
+          <label>
+            Edge Style
+            <select id="edge-style">
+              <option value="square" selected>Square</option>
+              <option value="straight">Straight</option>
+            </select>
+          </label>
+          <div id="validation-status" class="validation ok">No validation issues.</div>
+        </section>
+
+        <section>
+          <h2>Nodes</h2>
+          <div id="node-palette" class="palette"></div>
+        </section>
+
+        <section>
+          <h2>Agents</h2>
+          <div id="agent-palette" class="palette"></div>
+        </section>
+
+        <section>
+          <h2>Actions</h2>
+          <div class="actions">
+            <button id="connect-mode" type="button">Edge Tool: Off</button>
+            <button id="delete-loops" type="button">Delete Loop Edges</button>
+            <button id="fit-view" type="button">Fit View</button>
+            <button id="clear-graph" type="button">Clear</button>
+            <button id="export-runtime" type="button">Export Runtime Bundle</button>
+            <button id="import-json" type="button">Import JSON</button>
+            <button id="export-svg" type="button">Export SVG</button>
+            <button id="export-png" type="button">Export PNG</button>
+          </div>
+          <p class="hint">Edge Tool: use any of 4 ports (top/right/bottom/left), or click source node then target node.</p>
+          <label class="checkbox-row">
+            <input id="include-description-export" type="checkbox" checked />
+            Include descriptions in image exports
+          </label>
+          <input id="import-file" type="file" accept="application/json" hidden />
+          <p class="hint">Delete/Backspace removes selected node or edge.</p>
+        </section>
+      </aside>
+
+      <main class="canvas-panel">
+        <div class="statusbar">
+          <span id="status">Ready</span>
+        </div>
+        <div id="canvas-wrap">
+          <svg id="edge-layer" xmlns="http://www.w3.org/2000/svg"></svg>
+          <div id="node-layer"></div>
+        </div>
+      </main>
+
+      <aside class="sidebar right">
+        <h2>Inspector</h2>
+        <div id="inspector-empty" class="muted">Select a node to edit.</div>
+        <form id="node-inspector" class="inspector hidden">
+          <label>
+            Label
+            <input id="node-label" type="text" />
+          </label>
+          <label>
+            Kind
+            <select id="node-kind"></select>
+          </label>
+          <label>
+            Description
+            <textarea id="node-description" rows="3"></textarea>
+          </label>
+          <label>
+            Tools (comma separated)
+            <input id="node-tools" type="text" placeholder="gmail_fetch,email_summary" />
+          </label>
+          <label>
+            Config JSON
+            <textarea id="node-config" rows="9" spellcheck="false"></textarea>
+          </label>
+          <div id="config-error" class="error hidden"></div>
+          <button id="apply-node" type="submit">Apply Node Changes</button>
+        </form>
+
+        <div id="edge-inspector-empty" class="muted">Select an edge to edit routing.</div>
+        <form id="edge-inspector" class="inspector hidden">
+          <label>
+            Edge ID
+            <input id="edge-id" type="text" readonly />
+          </label>
+          <label>
+            Manual Steps (L/R/U/D with pixels)
+            <input id="edge-steps" type="text" placeholder="L2,U4,R5" />
+          </label>
+          <p class="hint">Example: <code>L8,U4,R5</code>. Empty value uses auto routing.</p>
+          <button id="apply-edge" type="submit">Apply Edge Shape</button>
+          <button id="delete-edge" type="button">Delete Edge</button>
+        </form>
+
+        <section>
+          <h2>Issues</h2>
+          <div id="issue-list" class="issue-list"></div>
+        </section>
+      </aside>
+    </div>
+
+    <script type="module" src="/static/app.js"></script>
+  </body>
+</html>

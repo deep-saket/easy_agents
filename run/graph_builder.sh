@@ -10,8 +10,8 @@ if [[ -f "./setup.sh" ]]; then
   source ./setup.sh
 fi
 
-HOST="${WHATSAPP_ENDPOINT_HOST:-0.0.0.0}"
-PORT="${WHATSAPP_ENDPOINT_PORT:-8010}"
+HOST="${GRAPH_BUILDER_HOST:-127.0.0.1}"
+PORT="${GRAPH_BUILDER_PORT:-8020}"
 
 if command -v lsof >/dev/null 2>&1; then
   EXISTING_PIDS="$(lsof -ti tcp:"$PORT" || true)"
@@ -29,4 +29,4 @@ if command -v lsof >/dev/null 2>&1; then
   fi
 fi
 
-.venv/bin/uvicorn endpoints.whatsapp:app --host "$HOST" --port "$PORT"
+.venv/bin/uvicorn endpoints.graph_builder:app --host "$HOST" --port "$PORT" --reload

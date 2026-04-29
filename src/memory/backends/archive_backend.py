@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from src.memory.backends.base import MemoryBackend
+from src.memory.layers.shared import filters_match
 from src.memory.models import MemoryRecord
 from src.memory.types import parse_memory_item
 
@@ -43,13 +44,7 @@ class ArchiveMemoryBackend(MemoryBackend):
         for record in self._read_all():
             if query_text and query_text not in (record.content_text or "").lower():
                 continue
-            if filters.get("scope") and record.scope != filters["scope"]:
-                continue
-            if filters.get("type") and record.type != filters["type"]:
-                continue
-            if filters.get("agent_id") and record.agent_id != filters["agent_id"]:
-                continue
-            if filters.get("agent") and record.agent_id != filters["agent"]:
+            if not filters_match(record, filters):
                 continue
             matches.append(record)
         return matches[:limit]

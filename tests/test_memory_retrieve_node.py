@@ -104,3 +104,48 @@ def test_memory_retrieve_node_respects_state_memory_targets(tmp_path) -> None:
 
     assert set(result["memory_context"].keys()) == {"semantic"}
     assert result["memory_context"]["semantic"]
+
+
+def test_memory_retrieve_node_retries_query_candidates_and_emits_retrieval_events(tmp_path) -> None:
+    store = build_store(tmp_path)
+    stored = SemanticMemory(
+        content={"fact": "user prefers async updates"},
+        agent_id="mailmind",
+        metadata={"topic": "preference"},
+    ).store_warm(store)
+    retriever = LayeredMemoryRetriever(store=store)
+    working = WorkingMemory(session_id="s4")
+    working.set_state(agent_id="mailmind")
+    node = MemoryRetrieveNode(
+        tool_registry=ToolRegistry(),
+        memory_retriever=retriever,
+        memories=[],
+    )
+
+    result = node.execute(
+        {
+            "user_input": "find preference",
+            "memory": working,
+            "steps": 0,
+            "confidence": 1.0,
+            "memory_targets": [
+                {
+                    "type": "semantic",
+                    "limit": 3,
+                    "enabled": True,
+                    "query": "something unrelated",
+                    "query_candidates": ["async updates"],
+                    "metadata": {"topic": "preference"},
+                    "stop_on_first_hit": True,
+                }
+            ],
+        }
+    )
+
+    matches = result["memory_context"]["semantic"]
+    assert [record.id for record in matches] == [stored.id]
+    assert len(result["memory_retrievals"]) == 2
+    assert result["memory_retrievals"][0]["query"] == "something unrelated"
+    assert result["memory_retrievals"][0]["result_count"] == 0
+    assert result["memory_retrievals"][1]["query"] == "async updates"
+    assert result["memory_retrievals"][1]["result_count"] == 1

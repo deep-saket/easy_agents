@@ -4,6 +4,7 @@ Purpose: Exposes reusable shared agent graph nodes.
 """
 
 from src.nodes.base import BaseGraphNode
+from src.nodes.agent_node import AgentNode
 from src.nodes.approval_node import ApprovalNode
 from src.nodes.intent_node import IntentNode
 from src.nodes.memory_node import MemoryNode
@@ -19,6 +20,7 @@ from src.nodes.whatsapp_node import WhatsAppNode
 
 __all__ = [
     "ApprovalNode",
+    "AgentNode",
     "AgentState",
     "BaseGraphNode",
     "IntentNode",

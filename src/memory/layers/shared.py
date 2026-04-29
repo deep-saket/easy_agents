@@ -6,6 +6,7 @@ Purpose: Implements the shared module for the shared memory platform layer.
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel
@@ -46,6 +47,14 @@ def filters_match(item: MemoryRecord, filters: dict[str, object] | None) -> bool
             expected_tags = value if isinstance(value, list) else [value]
             if not all(tag in item.tags for tag in expected_tags):
                 return False
+        if key == "created_before":
+            cutoff = _to_datetime(value)
+            if cutoff is not None and item.created_at > cutoff:
+                return False
+        if key == "created_after":
+            cutoff = _to_datetime(value)
+            if cutoff is not None and item.created_at < cutoff:
+                return False
         if key == "metadata":
             expected = value if isinstance(value, dict) else {}
             for metadata_key, metadata_value in expected.items():
@@ -60,3 +69,19 @@ def filters_match(item: MemoryRecord, filters: dict[str, object] | None) -> bool
         if key in {"source", "priority", "source_type", "source_id"} and item.normalized_metadata().get(key) != value:
             return False
     return True
+
+
+def _to_datetime(value: object) -> datetime | None:
+    if isinstance(value, datetime):
+        return value
+    if not isinstance(value, str):
+        return None
+    candidate = value.strip()
+    if not candidate:
+        return None
+    if candidate.endswith("Z"):
+        candidate = candidate[:-1] + "+00:00"
+    try:
+        return datetime.fromisoformat(candidate)
+    except ValueError:
+        return None

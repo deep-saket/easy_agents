@@ -39,6 +39,22 @@ def _row_dict(description: list[tuple[Any, ...]], row: tuple[Any, ...]) -> dict[
     return {column[0]: value for column, value in zip(description, row, strict=False)}
 
 
+def _to_datetime_filter(value: Any) -> datetime | str | None:
+    if isinstance(value, datetime):
+        return value
+    if not isinstance(value, str):
+        return None
+    candidate = value.strip()
+    if not candidate:
+        return None
+    if candidate.endswith("Z"):
+        candidate = candidate[:-1] + "+00:00"
+    try:
+        return datetime.fromisoformat(candidate)
+    except ValueError:
+        return candidate
+
+
 @dataclass(slots=True)
 class DuckDBMemoryBackend(MemoryBackend):
     """Stores memory records in DuckDB.
@@ -170,6 +186,14 @@ class DuckDBMemoryBackend(MemoryBackend):
         if filters.get("agent") is not None:
             clauses.append("agent_id = ?")
             params.append(filters["agent"])
+        created_before = _to_datetime_filter(filters.get("created_before"))
+        if created_before is not None:
+            clauses.append("created_at <= ?")
+            params.append(created_before)
+        created_after = _to_datetime_filter(filters.get("created_after"))
+        if created_after is not None:
+            clauses.append("created_at >= ?")
+            params.append(created_after)
         tags = filters.get("tags")
         if isinstance(tags, str):
             tags = [tags]

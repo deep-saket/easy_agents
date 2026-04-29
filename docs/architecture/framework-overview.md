@@ -59,6 +59,9 @@ At a high level, a turn flows like this:
 
 This is implemented with reusable nodes under `src/nodes/`.
 
+`AgentNode` allows nesting one full agent runtime as a node inside another
+graph, enabling agent-of-agents composition without rewriting capability logic.
+
 ## Example Agents
 
 - [Simple Conversation Agent](../agents/simple-conversation.md)

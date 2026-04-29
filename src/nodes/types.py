@@ -50,6 +50,17 @@ class MemoryTargetSpec(TypedDict, total=False):
     limit: int
     enabled: bool
     metadata: dict[str, Any]
+    agent_id: str
+    source_type: str
+    source_id: str
+    tags: list[str] | str
+    query: str
+    query_candidates: list[str]
+    created_before: str
+    created_after: str
+    stop_on_first_hit: bool
+    min_results: int
+    max_queries: int
 
 
 class AgentState(TypedDict, total=False):
