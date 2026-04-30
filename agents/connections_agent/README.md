@@ -259,3 +259,23 @@ Flow:
 3. wire planner prompts for verification -> payment -> follow-up loops
 4. add agent-as-tool modules (`negotiation`, `qa_review`, `dispute_triage`)
 5. add metrics dashboard hooks for RPC, PTP-kept rate, and recovery %
+
+## Implementation Status (Local Offline Build)
+
+Implemented under this directory (no `src/` modifications):
+
+- Agent runtime: `agent.py`
+- Rule planner: `planner.py`
+- Custom reflect behavior: `nodes.py`
+- Local repository: `repository.py`
+- Tool package: `tools/`
+- Dummy fixtures: `data/`
+- Runtime state files: `runtime/`
+- Missing-data requirements: `docs/missing-data-requirements.md`
+
+Run the local agent:
+
+```bash
+python -m agents.connections_agent.main "case_fetch case_id=COLL-1001"
+python -m agents.connections_agent.main --interactive
+```
