@@ -99,6 +99,9 @@ class AgentState(TypedDict, total=False):
     approval_result: Any
     confidence: float
     channel_result: dict[str, Any]
+    routing_context: dict[str, Any]
+    response_target: str
+    handoff_payload: dict[str, Any]
 
 
 class NodeUpdate(TypedDict, total=False):
@@ -136,6 +139,9 @@ class NodeUpdate(TypedDict, total=False):
     approval_result: Any
     confidence: float
     channel_result: dict[str, Any]
+    routing_context: dict[str, Any]
+    response_target: str
+    handoff_payload: dict[str, Any]
 
 
 ReActState = AgentState

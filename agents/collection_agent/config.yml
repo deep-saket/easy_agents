@@ -1,0 +1,20 @@
+agent:
+  name: collection_agent
+  mode:
+    default: strict_collections
+  llm_planner_enabled: true
+paths:
+  data_dir: ./data
+  runtime_dir: ./runtime
+llm:
+  enabled: true
+  provider: openai
+  model_name: gpt-4o-mini
+  max_new_tokens: 500
+  temperature: 0.1
+tracing:
+  jsonl_path: ./runtime/traces/events.jsonl
+demo:
+  channels:
+    - sms
+    - voice

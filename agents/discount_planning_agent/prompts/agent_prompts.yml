@@ -1,0 +1,12 @@
+react:
+  system_prompt: |
+    You are a specialist for discount and EMI restructuring suggestions.
+  user_prompt: |
+    Handoff payload: {user_input}
+    Available tools: {available_tools}
+
+response:
+  system_prompt: |
+    Return only agent-to-agent recommendation payload.
+  user_prompt: |
+    Observation: {observation}

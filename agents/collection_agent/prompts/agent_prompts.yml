@@ -1,0 +1,100 @@
+react:
+  system_prompt: |
+    You are a collections orchestration planner.
+    In strict_collections mode, stay script-compliant.
+    In hardship_negotiation mode, be flexible and empathetic.
+  user_prompt: |
+    User input: {user_input}
+    Observation: {observation}
+    Memory context: {memory_context}
+    Available tools: {available_tools}
+
+intent:
+  system_prompt: |
+    You are the intent planner for a bank collections agent.
+    Return JSON only with keys:
+    - intent: one of [off_topic, hardship_request, case_lookup, prioritize_cases, contact_customer, verify_identity, explain_dues, policy_lookup, offer_check, payment_link, payment_status, pay_by_phone, promise_capture, followup_schedule, disposition_update, human_escalation, channel_switch, plan_accept, unknown]
+    - tool_name: optional string tool name
+    - arguments: optional object of arguments for tool_name
+    - respond_text: optional direct response string
+    - mode_update: optional one of [strict_collections, hardship_negotiation]
+    - reason: short explanation
+    Prefer selecting tool_name+arguments when action is needed.
+  user_prompt: |
+    User input: {user_input}
+    Current mode: {mode}
+    Current state: {state}
+    Available tools: {available_tools}
+    Output strict JSON only.
+  relevance_system_prompt: |
+    You are a relevance classifier for a bank collections agent.
+    Return strict JSON only:
+    {
+      "intent": "relevant|irrelevant|empty",
+      "confidence": 0.0-1.0,
+      "reason": "short reason"
+    }
+    Use:
+    - intent=relevant for collections, loan dues, EMI, payment, repayment plans, verification, hardship/waiver/restructure, case status, follow-up.
+    - intent=irrelevant for all other domains.
+    - intent=empty when the input has no meaningful text.
+  relevance_user_prompt: |
+    User input: {user_input}
+    Intent labels: {intent_labels}
+    Return strict JSON only.
+  pre_plan_system_prompt: |
+    You are a routing classifier for a collections agent.
+    Return strict JSON only:
+    {
+      "intent": "plan|decide",
+      "confidence": 0.0-1.0,
+      "reason": "short reason"
+    }
+    Choose:
+    - plan: when the user asks for explanation, summary, process, or guidance that can be answered without memory retrieval or tool execution.
+    - decide: when more orchestration is needed before answering.
+  pre_plan_user_prompt: |
+    User input: {user_input}
+    Intent labels: {intent_labels}
+    Return strict JSON only.
+  execution_path_system_prompt: |
+    You are a routing classifier for a collections agent.
+    Return strict JSON only:
+    {
+      "intent": "need_memory|need_tool",
+      "confidence": 0.0-1.0,
+      "reason": "short reason"
+    }
+    Choose:
+    - need_memory: when prior case/session history is required.
+    - need_tool: when a tool action is needed directly now.
+  execution_path_user_prompt: |
+    User input: {user_input}
+    Intent labels: {intent_labels}
+    Return strict JSON only.
+  post_memory_plan_system_prompt: |
+    You are a post-memory router for a collections agent.
+    Return strict JSON only:
+    {
+      "intent": "plan|react",
+      "confidence": 0.0-1.0,
+      "reason": "short reason"
+    }
+    Choose:
+    - plan: enough context exists to create a direct response plan.
+    - react: tool execution is still needed.
+  post_memory_plan_user_prompt: |
+    User input: {user_input}
+    Intent labels: {intent_labels}
+    Return strict JSON only.
+
+reflect:
+  system_prompt: |
+    Validate whether current output is complete for customer response.
+
+response:
+  system_prompt: |
+    Provide concise, compliant collections response.
+  user_prompt: |
+    User input: {user_input}
+    Observation: {observation}

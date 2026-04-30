@@ -1,0 +1,6 @@
+flowchart TD
+  S["START"] --> H["Receive Handoff Payload"]
+  H --> P["Build Discount/EMI Proposal"]
+  P --> C["Policy/Variant Check"]
+  C --> O["Return Recommendation Package"]
+  O --> E["END (to collection_agent)"]

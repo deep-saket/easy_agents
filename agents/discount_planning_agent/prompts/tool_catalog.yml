@@ -1,0 +1,15 @@
+tools:
+- name: discount_policy_snapshot
+  purpose: Build policy bounds for concession decisions.
+  input: case_id, loan_id(optional)
+  output: waiver_allowed, max_waiver_pct, restructure_allowed, max_tenure_months
+
+- name: emi_plan_simulator
+  purpose: Simulate EMI and tenure variants.
+  input: case_id, target_monthly_emi(optional), principal_due(optional)
+  output: variants, best_fit_variant
+
+- name: discount_offer_optimizer
+  purpose: Pick best discount/EMI package under policy bounds.
+  input: case_id, policy_snapshot, variants, max_discount_cap(optional)
+  output: recommended_offer, offer_variants, rationale, confidence

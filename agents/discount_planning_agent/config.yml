@@ -1,0 +1,12 @@
+agent:
+  name: discount_planning_agent
+  mode:
+    default: discount_optimization
+llm:
+  enabled: true
+  provider: openai
+  model_name: gpt-4o-mini
+  temperature: 0.1
+paths:
+  data_dir: ./data
+  runtime_dir: ./runtime

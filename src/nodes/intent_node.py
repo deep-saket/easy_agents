@@ -42,6 +42,11 @@ class IntentNode(BaseGraphNode):
     intent_labels: list[str] = field(default_factory=list)
     default_intent: str = "unknown"
     default_confidence: float = 0.0
+    route_map: dict[str, str] = field(default_factory=dict)
+    default_route: str = "default"
+    fallback_keyword_map: dict[str, list[str]] = field(default_factory=dict)
+    empty_input_intent: str | None = None
+    response_map: dict[str, str] = field(default_factory=dict)
 
     def classify(
         self,
@@ -71,11 +76,7 @@ class IntentNode(BaseGraphNode):
             intent_labels=labels,
         )
         if self.llm is None:
-            return {
-                "intent": self.default_intent,
-                "confidence": self.default_confidence,
-                "reason": "IntentNode used its deterministic fallback because no llm was configured.",
-            }
+            return self._deterministic_classify(user_input=user_input, labels=labels)
 
         raw = self.llm.generate(rendered_system_prompt or "", rendered_user_prompt).strip()
         return self._parse_intent_payload(raw)
@@ -95,7 +96,21 @@ class IntentNode(BaseGraphNode):
             system_prompt=self.system_prompt,
             user_prompt=self.user_prompt,
         )
-        return {"intent": intent}
+        update: NodeUpdate = {"intent": intent}
+        intent_name = self._normalize_intent_name(intent.get("intent") if isinstance(intent, dict) else None)
+        mapped_response = self._lookup_mapped_value(self.response_map, intent_name)
+        if mapped_response is not None:
+            update["response"] = mapped_response
+        return update
+
+    def route(self, state: AgentState) -> str:
+        intent_payload = state.get("intent")
+        intent_name = None
+        if isinstance(intent_payload, dict):
+            intent_name = intent_payload.get("intent")
+        normalized = self._normalize_intent_name(intent_name)
+        route = self._lookup_mapped_value(self.route_map, normalized)
+        return route if route is not None else self.default_route
 
     @staticmethod
     def _render_user_prompt(*, user_prompt: str, user_input: str, intent_labels: list[str] | None) -> str:
@@ -145,3 +160,44 @@ class IntentNode(BaseGraphNode):
             "confidence": float(payload.get("confidence", self.default_confidence)),
             "reason": payload.get("reason"),
         }
+
+    def _deterministic_classify(self, *, user_input: str, labels: list[str]) -> dict[str, Any]:
+        normalized_input = user_input.strip().lower()
+        if not normalized_input and self.empty_input_intent:
+            return {
+                "intent": self.empty_input_intent,
+                "confidence": 1.0,
+                "reason": "IntentNode mapped empty input via empty_input_intent.",
+            }
+
+        for intent_name, keywords in self.fallback_keyword_map.items():
+            if any(keyword.lower() in normalized_input for keyword in keywords):
+                return {
+                    "intent": intent_name,
+                    "confidence": 0.65,
+                    "reason": "IntentNode matched fallback keyword mapping.",
+                }
+
+        default_intent = self.default_intent
+        if labels and default_intent not in labels:
+            default_intent = labels[0]
+        return {
+            "intent": default_intent,
+            "confidence": self.default_confidence,
+            "reason": "IntentNode used deterministic default classification.",
+        }
+
+    @staticmethod
+    def _normalize_intent_name(intent_name: Any) -> str:
+        if intent_name is None:
+            return ""
+        return str(intent_name).strip().lower()
+
+    @staticmethod
+    def _lookup_mapped_value(mapping: dict[str, str], normalized_key: str) -> str | None:
+        if not mapping:
+            return None
+        if normalized_key in mapping:
+            return mapping[normalized_key]
+        lowered = {str(key).strip().lower(): value for key, value in mapping.items()}
+        return lowered.get(normalized_key)

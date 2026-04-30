@@ -1,0 +1,14 @@
+[
+  {
+    "product": "personal_loan",
+    "risk_band": "medium",
+    "max_waiver_pct": 8,
+    "max_tenure_months": 24
+  },
+  {
+    "product": "personal_loan",
+    "risk_band": "high",
+    "max_waiver_pct": 5,
+    "max_tenure_months": 36
+  }
+]
