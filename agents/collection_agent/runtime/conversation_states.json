@@ -1,0 +1,361 @@
+{
+  "demo-smoke": {
+    "mode": "hardship_negotiation",
+    "active_channel": "voice",
+    "active_case_id": "COLL-1002",
+    "hardship_reason": "job_loss",
+    "last_tool_used": "disposition_update",
+    "plan_revision_index": 1,
+    "current_plan": {
+      "plan_id": "PLAN-39C1E0A4CA",
+      "case_id": "COLL-1002",
+      "hardship_reason": "job_loss",
+      "months": 34,
+      "monthly_amount": 1167.65,
+      "first_due_date": "2026-05-07",
+      "rationale": "Based on hardship='job_loss', total_due=39700.00, revision=1.",
+      "status": "revised"
+    }
+  },
+  "verify-refactor": {
+    "mode": "hardship_negotiation",
+    "active_channel": "voice",
+    "active_case_id": "COLL-1001",
+    "last_tool_used": "channel_switch",
+    "hardship_reason": "job_loss",
+    "plan_revision_index": 0,
+    "current_plan": {
+      "plan_id": "PLAN-8363427902",
+      "case_id": "COLL-1001",
+      "hardship_reason": "job_loss",
+      "months": 6,
+      "monthly_amount": 2225.0,
+      "first_due_date": "2026-05-07",
+      "rationale": "Based on hardship='job_loss', total_due=13350.00, revision=0.",
+      "status": "proposed"
+    }
+  },
+  "trace-check": {
+    "mode": "strict_collections",
+    "active_channel": "sms",
+    "active_case_id": "COLL-1001",
+    "last_tool_used": "case_fetch"
+  },
+  "trace-check-2": {
+    "mode": "strict_collections",
+    "active_channel": "sms",
+    "active_case_id": "COLL-1001",
+    "last_tool_used": "contact_attempt"
+  },
+  "gate-test-1": {
+    "mode": "strict_collections",
+    "active_channel": "sms",
+    "active_case_id": "COLL-1001"
+  },
+  "gate-test-3": {
+    "mode": "strict_collections",
+    "active_channel": "sms",
+    "active_case_id": "COLL-1001",
+    "last_tool_used": "case_fetch"
+  },
+  "gate-empty": {
+    "mode": "strict_collections",
+    "active_channel": "sms",
+    "active_case_id": "COLL-1001"
+  },
+  "gate-empty-2": {
+    "mode": "strict_collections",
+    "active_channel": "sms",
+    "active_case_id": "COLL-1001"
+  },
+  "intent-gate-empty": {
+    "mode": "strict_collections",
+    "active_channel": "sms",
+    "active_case_id": "COLL-1001"
+  },
+  "intent-gate-irr": {
+    "mode": "strict_collections",
+    "active_channel": "sms",
+    "active_case_id": "COLL-1001"
+  },
+  "intent-gate-rel": {
+    "mode": "strict_collections",
+    "active_channel": "sms",
+    "active_case_id": "COLL-1001",
+    "last_tool_used": "case_fetch"
+  },
+  "homogeneity-check": {
+    "mode": "strict_collections",
+    "active_channel": "sms",
+    "active_case_id": "COLL-1001"
+  },
+  "smoke-1": {
+    "mode": "strict_collections",
+    "active_channel": "sms",
+    "active_case_id": "COLL-1001"
+  },
+  "smoke-2": {
+    "mode": "strict_collections",
+    "active_channel": "sms",
+    "active_case_id": "COLL-1001"
+  },
+  "smoke-3": {
+    "mode": "strict_collections",
+    "active_channel": "sms",
+    "active_case_id": "COLL-1001"
+  },
+  "smoke-4": {
+    "mode": "strict_collections",
+    "active_channel": "sms",
+    "active_case_id": "COLL-1001",
+    "last_tool_used": "case_fetch"
+  },
+  "s-empty": {
+    "mode": "strict_collections",
+    "active_channel": "sms",
+    "active_case_id": "COLL-1001"
+  },
+  "s-irr": {
+    "mode": "strict_collections",
+    "active_channel": "sms",
+    "active_case_id": "COLL-1001"
+  },
+  "s-preplan": {
+    "mode": "strict_collections",
+    "active_channel": "sms",
+    "active_case_id": "COLL-1001"
+  },
+  "s-needmem": {
+    "mode": "strict_collections",
+    "active_channel": "sms",
+    "active_case_id": "COLL-1001"
+  },
+  "s-react": {
+    "mode": "strict_collections",
+    "active_channel": "sms",
+    "active_case_id": "COLL-1001",
+    "last_tool_used": "case_fetch"
+  },
+  "debug-preplan": {
+    "mode": "strict_collections",
+    "active_channel": "sms",
+    "active_case_id": "COLL-1001"
+  },
+  "s-phone": {
+    "mode": "strict_collections",
+    "active_channel": "sms",
+    "active_case_id": "COLL-1001"
+  },
+  "verify-plan-advance": {
+    "mode": "hardship_negotiation",
+    "active_channel": "voice",
+    "active_case_id": "COLL-1002",
+    "hardship_reason": "job_loss",
+    "plan_revision_index": 0,
+    "current_plan": {
+      "plan_id": "PLAN-EXIST-1",
+      "case_id": "COLL-1002",
+      "months": 12,
+      "monthly_amount": 2200.0,
+      "first_due_date": "2026-05-10",
+      "status": "proposed"
+    }
+  },
+  "verify-plan-advance2": {
+    "mode": "hardship_negotiation",
+    "active_channel": "voice",
+    "active_case_id": "COLL-1002",
+    "hardship_reason": "job_loss",
+    "plan_revision_index": 1,
+    "current_plan": {
+      "plan_id": "PLAN-801178D0BA",
+      "case_id": "COLL-1002",
+      "hardship_reason": "job_loss",
+      "months": 12,
+      "monthly_amount": 3308.33,
+      "first_due_date": "2026-05-07",
+      "rationale": "Based on hardship='job_loss', total_due=39700.00, revision=1.",
+      "status": "revised"
+    },
+    "last_tool_used": "plan_propose"
+  },
+  "verify-discount-handoff": {
+    "mode": "strict_collections",
+    "active_channel": "sms",
+    "active_case_id": "COLL-1001",
+    "last_tool_used": "case_fetch"
+  },
+  "verify-discount-handoff2": {
+    "mode": "hardship_negotiation",
+    "active_channel": "sms",
+    "active_case_id": "COLL-1002",
+    "hardship_reason": "job_loss",
+    "last_tool_used": "discount_planning_handoff"
+  },
+  "verify-discount-handoff3": {
+    "mode": "hardship_negotiation",
+    "active_channel": "sms",
+    "active_case_id": "COLL-1002",
+    "hardship_reason": "job_loss",
+    "last_tool_used": "discount_planning_handoff",
+    "discount_recommendation": {
+      "recommended_offer": {
+        "case_id": "COLL-1002",
+        "offer_type": "restructure",
+        "waiver_pct": 0.0,
+        "tenure_months": 24,
+        "monthly_emi": 1200.0,
+        "hardship_reason": "job_loss"
+      },
+      "offer_variants": [
+        {
+          "case_id": "COLL-1002",
+          "offer_type": "restructure",
+          "waiver_pct": 0.0,
+          "tenure_months": 30,
+          "monthly_emi": 1020.0,
+          "hardship_reason": "job_loss"
+        },
+        {
+          "case_id": "COLL-1002",
+          "offer_type": "restructure",
+          "waiver_pct": 0.0,
+          "tenure_months": 18,
+          "monthly_emi": 1440.0,
+          "hardship_reason": "job_loss"
+        }
+      ],
+      "rationale": "Selected baseline restructure from hardship reason and requested EMI target.",
+      "compliance_flags": [
+        "demo_policy_check_pending"
+      ],
+      "confidence": 0.62,
+      "next_action_hint": "Present recommended_offer first, then use offer_variants if rejected."
+    }
+  },
+  "verify-route-target": {
+    "mode": "hardship_negotiation",
+    "active_channel": "sms",
+    "active_case_id": "COLL-1002",
+    "hardship_reason": "job_loss",
+    "last_tool_used": "offer_eligibility"
+  },
+  "verify-route-target2": {
+    "mode": "hardship_negotiation",
+    "active_channel": "sms",
+    "active_case_id": "COLL-1002",
+    "hardship_reason": "job_loss",
+    "last_tool_used": "case_fetch",
+    "discount_recommendation": {
+      "recommended_offer": {
+        "case_id": "COLL-1002",
+        "offer_type": "restructure",
+        "waiver_pct": 0.0,
+        "tenure_months": 24,
+        "monthly_emi": 1200.0,
+        "hardship_reason": "job_loss"
+      },
+      "offer_variants": [
+        {
+          "case_id": "COLL-1002",
+          "offer_type": "restructure",
+          "waiver_pct": 0.0,
+          "tenure_months": 30,
+          "monthly_emi": 1020.0,
+          "hardship_reason": "job_loss"
+        },
+        {
+          "case_id": "COLL-1002",
+          "offer_type": "restructure",
+          "waiver_pct": 0.0,
+          "tenure_months": 18,
+          "monthly_emi": 1440.0,
+          "hardship_reason": "job_loss"
+        }
+      ],
+      "rationale": "Selected baseline restructure from hardship reason and requested EMI target.",
+      "compliance_flags": [
+        "demo_policy_check_pending"
+      ],
+      "confidence": 0.62,
+      "next_action_hint": "Present recommended_offer first, then use offer_variants if rejected."
+    }
+  },
+  "verify-external-handoff": {
+    "mode": "hardship_negotiation",
+    "active_channel": "sms",
+    "active_case_id": "COLL-1002",
+    "hardship_reason": "job_loss",
+    "last_tool_used": "offer_eligibility",
+    "discount_recommendation": {
+      "recommended_offer": {
+        "case_id": "COLL-1002",
+        "offer_type": "restructure",
+        "waiver_pct": 0.0,
+        "tenure_months": 24,
+        "monthly_emi": 1200.0,
+        "hardship_reason": "job_loss"
+      },
+      "offer_variants": [
+        {
+          "case_id": "COLL-1002",
+          "offer_type": "restructure",
+          "waiver_pct": 0.0,
+          "tenure_months": 30,
+          "monthly_emi": 1020.0,
+          "hardship_reason": "job_loss"
+        },
+        {
+          "case_id": "COLL-1002",
+          "offer_type": "restructure",
+          "waiver_pct": 0.0,
+          "tenure_months": 18,
+          "monthly_emi": 1440.0,
+          "hardship_reason": "job_loss"
+        }
+      ],
+      "rationale": "Selected baseline restructure from hardship reason and requested EMI target.",
+      "compliance_flags": [
+        "demo_policy_check_pending"
+      ],
+      "confidence": 0.62,
+      "next_action_hint": "Present recommended_offer first, then use offer_variants if rejected."
+    }
+  },
+  "verify-external-handoff2": {
+    "mode": "hardship_negotiation",
+    "active_channel": "sms",
+    "active_case_id": "COLL-1002",
+    "hardship_reason": "job_loss",
+    "last_tool_used": "case_fetch",
+    "discount_recommendation": null
+  },
+  "orchestr-test": {
+    "discount_recommendation": null,
+    "agent_loop_count": 1,
+    "mode": "strict_collections",
+    "active_channel": "sms",
+    "active_case_id": "COLL-1001",
+    "last_tool_used": "case_fetch"
+  },
+  "single-pass-check": {
+    "mode": "hardship_negotiation",
+    "active_channel": "sms",
+    "active_case_id": "COLL-1002",
+    "hardship_reason": "job_loss",
+    "last_tool_used": "offer_eligibility"
+  },
+  "mem-helper-demo": {
+    "discount_recommendation": null,
+    "agent_loop_count": 1,
+    "mode": "strict_collections",
+    "active_channel": "sms",
+    "active_case_id": "COLL-1001",
+    "last_tool_used": "case_fetch"
+  },
+  "mem-helper-demo2": {
+    "mode": "strict_collections",
+    "active_channel": "sms",
+    "active_case_id": "COLL-1001"
+  }
+}

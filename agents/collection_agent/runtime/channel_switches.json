@@ -1,0 +1,26 @@
+[
+  {
+    "switch_id": "CHSW-DE38329152",
+    "case_id": "COLL-1002",
+    "from_channel": "sms",
+    "to_channel": "voice",
+    "reason": "customer_requested",
+    "carried_context_summary": "No prior outreach events."
+  },
+  {
+    "switch_id": "CHSW-173DBF9334",
+    "case_id": "COLL-1002",
+    "from_channel": "sms",
+    "to_channel": "voice",
+    "reason": "customer_requested",
+    "carried_context_summary": "No prior outreach events."
+  },
+  {
+    "switch_id": "CHSW-360FA2FB45",
+    "case_id": "COLL-1001",
+    "from_channel": "sms",
+    "to_channel": "voice",
+    "reason": "customer_requested",
+    "carried_context_summary": "sms:not_reached"
+  }
+]

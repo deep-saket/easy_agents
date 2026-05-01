@@ -1,0 +1,48 @@
+{
+  "trace_id": "4847c1a4-60c8-4d72-a43c-716b3ae6f2c8",
+  "agent_name": "collection_agent",
+  "session_id": "homogeneity-check",
+  "user_input": "weather in delhi",
+  "status": "completed",
+  "started_at": "2026-04-30T21:35:28.033304+00:00",
+  "finished_at": "2026-04-30T21:35:28.034473+00:00",
+  "error": null,
+  "summary": {
+    "trace_id": "4847c1a4-60c8-4d72-a43c-716b3ae6f2c8",
+    "agent_name": "collection_agent",
+    "session_id": "homogeneity-check",
+    "status": "completed",
+    "node_hits": [
+      "relevance_intent",
+      "response"
+    ],
+    "node_count": 2,
+    "llm_call_count": 0,
+    "tool_call_count": 0,
+    "models": [],
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "total_tokens": 0,
+    "error": null
+  },
+  "nodes": [
+    {
+      "node_name": "relevance_intent",
+      "status": "completed",
+      "started_at": "2026-04-30T21:35:28.033856+00:00",
+      "finished_at": "2026-04-30T21:35:28.033962+00:00",
+      "duration_ms": 0.106,
+      "error": null
+    },
+    {
+      "node_name": "response",
+      "status": "completed",
+      "started_at": "2026-04-30T21:35:28.034272+00:00",
+      "finished_at": "2026-04-30T21:35:28.034314+00:00",
+      "duration_ms": 0.042,
+      "error": null
+    }
+  ],
+  "llm_calls": [],
+  "tool_calls": []
+}

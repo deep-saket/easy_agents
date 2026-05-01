@@ -1,0 +1,11 @@
+agent:
+  name: collection_memory_helper_agent
+  mode:
+    default: memory_update
+llm:
+  enabled: true
+  provider: openai
+  model_name: gpt-4o-mini
+  temperature: 0.1
+paths:
+  runtime_dir: ./runtime

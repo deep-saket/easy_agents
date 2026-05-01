@@ -1,0 +1,8 @@
+flowchart TD
+  S["START"] --> R["ReactNode"]
+  R -->|act| T["ToolExecutionNode\nupdate_key_event_memory"]
+  T --> R
+  R -->|respond/end| F["ReflectNode"]
+  F -->|incomplete| R
+  F -->|complete| O["ResponseNode"]
+  O --> E["END"]

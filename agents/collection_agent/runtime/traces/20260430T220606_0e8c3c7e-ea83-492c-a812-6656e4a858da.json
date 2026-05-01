@@ -1,0 +1,229 @@
+{
+  "trace_id": "0e8c3c7e-ea83-492c-a812-6656e4a858da",
+  "agent_name": "collection_agent",
+  "session_id": "verify-plan-advance2",
+  "user_input": "Yes I accept this payment plan",
+  "status": "completed",
+  "started_at": "2026-04-30T22:06:06.416227+00:00",
+  "finished_at": "2026-04-30T22:06:06.423541+00:00",
+  "error": null,
+  "summary": {
+    "trace_id": "0e8c3c7e-ea83-492c-a812-6656e4a858da",
+    "agent_name": "collection_agent",
+    "session_id": "verify-plan-advance2",
+    "status": "completed",
+    "node_hits": [
+      "relevance_intent",
+      "pre_plan_intent",
+      "execution_path_intent",
+      "react",
+      "tool_execution",
+      "react",
+      "tool_execution",
+      "react",
+      "tool_execution",
+      "react",
+      "origin_react_plan",
+      "plan_proposal",
+      "tool_execution",
+      "react",
+      "origin_react_plan",
+      "plan_proposal",
+      "reflect",
+      "relevant_response"
+    ],
+    "node_count": 18,
+    "llm_call_count": 0,
+    "tool_call_count": 4,
+    "models": [],
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "total_tokens": 0,
+    "error": null
+  },
+  "nodes": [
+    {
+      "node_name": "relevance_intent",
+      "status": "completed",
+      "started_at": "2026-04-30T22:06:06.416778+00:00",
+      "finished_at": "2026-04-30T22:06:06.416855+00:00",
+      "duration_ms": 0.077,
+      "error": null
+    },
+    {
+      "node_name": "pre_plan_intent",
+      "status": "completed",
+      "started_at": "2026-04-30T22:06:06.417057+00:00",
+      "finished_at": "2026-04-30T22:06:06.417069+00:00",
+      "duration_ms": 0.012,
+      "error": null
+    },
+    {
+      "node_name": "execution_path_intent",
+      "status": "completed",
+      "started_at": "2026-04-30T22:06:06.417231+00:00",
+      "finished_at": "2026-04-30T22:06:06.417241+00:00",
+      "duration_ms": 0.01,
+      "error": null
+    },
+    {
+      "node_name": "react",
+      "status": "completed",
+      "started_at": "2026-04-30T22:06:06.417380+00:00",
+      "finished_at": "2026-04-30T22:06:06.417396+00:00",
+      "duration_ms": 0.016,
+      "error": null
+    },
+    {
+      "node_name": "tool_execution",
+      "status": "completed",
+      "started_at": "2026-04-30T22:06:06.417548+00:00",
+      "finished_at": "2026-04-30T22:06:06.419260+00:00",
+      "duration_ms": 1.712,
+      "error": null
+    },
+    {
+      "node_name": "react",
+      "status": "completed",
+      "started_at": "2026-04-30T22:06:06.419365+00:00",
+      "finished_at": "2026-04-30T22:06:06.419372+00:00",
+      "duration_ms": 0.007,
+      "error": null
+    },
+    {
+      "node_name": "tool_execution",
+      "status": "completed",
+      "started_at": "2026-04-30T22:06:06.419527+00:00",
+      "finished_at": "2026-04-30T22:06:06.420212+00:00",
+      "duration_ms": 0.685,
+      "error": null
+    },
+    {
+      "node_name": "react",
+      "status": "completed",
+      "started_at": "2026-04-30T22:06:06.420327+00:00",
+      "finished_at": "2026-04-30T22:06:06.420336+00:00",
+      "duration_ms": 0.009,
+      "error": null
+    },
+    {
+      "node_name": "tool_execution",
+      "status": "completed",
+      "started_at": "2026-04-30T22:06:06.420471+00:00",
+      "finished_at": "2026-04-30T22:06:06.421121+00:00",
+      "duration_ms": 0.65,
+      "error": null
+    },
+    {
+      "node_name": "react",
+      "status": "completed",
+      "started_at": "2026-04-30T22:06:06.421222+00:00",
+      "finished_at": "2026-04-30T22:06:06.421228+00:00",
+      "duration_ms": 0.006,
+      "error": null
+    },
+    {
+      "node_name": "origin_react_plan",
+      "status": "completed",
+      "started_at": "2026-04-30T22:06:06.421382+00:00",
+      "finished_at": "2026-04-30T22:06:06.421385+00:00",
+      "duration_ms": 0.003,
+      "error": null
+    },
+    {
+      "node_name": "plan_proposal",
+      "status": "completed",
+      "started_at": "2026-04-30T22:06:06.421474+00:00",
+      "finished_at": "2026-04-30T22:06:06.421683+00:00",
+      "duration_ms": 0.209,
+      "error": null
+    },
+    {
+      "node_name": "tool_execution",
+      "status": "completed",
+      "started_at": "2026-04-30T22:06:06.421823+00:00",
+      "finished_at": "2026-04-30T22:06:06.422560+00:00",
+      "duration_ms": 0.737,
+      "error": null
+    },
+    {
+      "node_name": "react",
+      "status": "completed",
+      "started_at": "2026-04-30T22:06:06.422718+00:00",
+      "finished_at": "2026-04-30T22:06:06.422729+00:00",
+      "duration_ms": 0.011,
+      "error": null
+    },
+    {
+      "node_name": "origin_react_plan",
+      "status": "completed",
+      "started_at": "2026-04-30T22:06:06.422889+00:00",
+      "finished_at": "2026-04-30T22:06:06.422892+00:00",
+      "duration_ms": 0.003,
+      "error": null
+    },
+    {
+      "node_name": "plan_proposal",
+      "status": "completed",
+      "started_at": "2026-04-30T22:06:06.422982+00:00",
+      "finished_at": "2026-04-30T22:06:06.423157+00:00",
+      "duration_ms": 0.175,
+      "error": null
+    },
+    {
+      "node_name": "reflect",
+      "status": "completed",
+      "started_at": "2026-04-30T22:06:06.423311+00:00",
+      "finished_at": "2026-04-30T22:06:06.423317+00:00",
+      "duration_ms": 0.006,
+      "error": null
+    },
+    {
+      "node_name": "relevant_response",
+      "status": "completed",
+      "started_at": "2026-04-30T22:06:06.423455+00:00",
+      "finished_at": "2026-04-30T22:06:06.423459+00:00",
+      "duration_ms": 0.004,
+      "error": null
+    }
+  ],
+  "llm_calls": [],
+  "tool_calls": [
+    {
+      "tool_name": "promise_capture",
+      "node_name": "tool_execution",
+      "status": "completed",
+      "started_at": "2026-04-30T22:06:06.419128+00:00",
+      "finished_at": "2026-04-30T22:06:06.419128+00:00",
+      "duration_ms": 1.545,
+      "error": null
+    },
+    {
+      "tool_name": "followup_schedule",
+      "node_name": "tool_execution",
+      "status": "completed",
+      "started_at": "2026-04-30T22:06:06.420079+00:00",
+      "finished_at": "2026-04-30T22:06:06.420079+00:00",
+      "duration_ms": 0.541,
+      "error": null
+    },
+    {
+      "tool_name": "disposition_update",
+      "node_name": "tool_execution",
+      "status": "completed",
+      "started_at": "2026-04-30T22:06:06.420991+00:00",
+      "finished_at": "2026-04-30T22:06:06.420991+00:00",
+      "duration_ms": 0.509,
+      "error": null
+    },
+    {
+      "tool_name": "plan_propose",
+      "node_name": "tool_execution",
+      "status": "completed",
+      "started_at": "2026-04-30T22:06:06.422414+00:00",
+      "finished_at": "2026-04-30T22:06:06.422414+00:00",
+      "duration_ms": 0.58,
+      "error": null
+    }
+  ]
+}

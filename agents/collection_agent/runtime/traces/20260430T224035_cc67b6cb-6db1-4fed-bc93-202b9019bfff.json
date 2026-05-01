@@ -1,0 +1,184 @@
+{
+  "trace_id": "cc67b6cb-6db1-4fed-bc93-202b9019bfff",
+  "agent_name": "collection_agent",
+  "session_id": "verify-route-target2",
+  "user_input": "Need discount and lower emi around 1200 for case COLL-1002",
+  "status": "completed",
+  "started_at": "2026-04-30T22:40:35.342869+00:00",
+  "finished_at": "2026-04-30T22:40:35.348729+00:00",
+  "error": null,
+  "summary": {
+    "trace_id": "cc67b6cb-6db1-4fed-bc93-202b9019bfff",
+    "agent_name": "collection_agent",
+    "session_id": "verify-route-target2",
+    "status": "completed",
+    "node_hits": [
+      "relevance_intent",
+      "pre_plan_intent",
+      "execution_path_intent",
+      "react",
+      "tool_execution",
+      "react",
+      "origin_react_plan",
+      "plan_proposal",
+      "reflect",
+      "relevant_response",
+      "discount_handoff_prepare",
+      "discount_tool_execution",
+      "plan_proposal",
+      "reflect",
+      "relevant_response"
+    ],
+    "node_count": 15,
+    "llm_call_count": 0,
+    "tool_call_count": 2,
+    "models": [],
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "total_tokens": 0,
+    "error": null
+  },
+  "nodes": [
+    {
+      "node_name": "relevance_intent",
+      "status": "completed",
+      "started_at": "2026-04-30T22:40:35.343425+00:00",
+      "finished_at": "2026-04-30T22:40:35.343494+00:00",
+      "duration_ms": 0.069,
+      "error": null
+    },
+    {
+      "node_name": "pre_plan_intent",
+      "status": "completed",
+      "started_at": "2026-04-30T22:40:35.343713+00:00",
+      "finished_at": "2026-04-30T22:40:35.343727+00:00",
+      "duration_ms": 0.014,
+      "error": null
+    },
+    {
+      "node_name": "execution_path_intent",
+      "status": "completed",
+      "started_at": "2026-04-30T22:40:35.343898+00:00",
+      "finished_at": "2026-04-30T22:40:35.343909+00:00",
+      "duration_ms": 0.011,
+      "error": null
+    },
+    {
+      "node_name": "react",
+      "status": "completed",
+      "started_at": "2026-04-30T22:40:35.344057+00:00",
+      "finished_at": "2026-04-30T22:40:35.344430+00:00",
+      "duration_ms": 0.373,
+      "error": null
+    },
+    {
+      "node_name": "tool_execution",
+      "status": "completed",
+      "started_at": "2026-04-30T22:40:35.344605+00:00",
+      "finished_at": "2026-04-30T22:40:35.345635+00:00",
+      "duration_ms": 1.03,
+      "error": null
+    },
+    {
+      "node_name": "react",
+      "status": "completed",
+      "started_at": "2026-04-30T22:40:35.345750+00:00",
+      "finished_at": "2026-04-30T22:40:35.345764+00:00",
+      "duration_ms": 0.014,
+      "error": null
+    },
+    {
+      "node_name": "origin_react_plan",
+      "status": "completed",
+      "started_at": "2026-04-30T22:40:35.345989+00:00",
+      "finished_at": "2026-04-30T22:40:35.345994+00:00",
+      "duration_ms": 0.005,
+      "error": null
+    },
+    {
+      "node_name": "plan_proposal",
+      "status": "completed",
+      "started_at": "2026-04-30T22:40:35.346131+00:00",
+      "finished_at": "2026-04-30T22:40:35.346147+00:00",
+      "duration_ms": 0.016,
+      "error": null
+    },
+    {
+      "node_name": "reflect",
+      "status": "completed",
+      "started_at": "2026-04-30T22:40:35.346312+00:00",
+      "finished_at": "2026-04-30T22:40:35.346321+00:00",
+      "duration_ms": 0.009,
+      "error": null
+    },
+    {
+      "node_name": "relevant_response",
+      "status": "completed",
+      "started_at": "2026-04-30T22:40:35.346469+00:00",
+      "finished_at": "2026-04-30T22:40:35.346475+00:00",
+      "duration_ms": 0.006,
+      "error": null
+    },
+    {
+      "node_name": "discount_handoff_prepare",
+      "status": "completed",
+      "started_at": "2026-04-30T22:40:35.346637+00:00",
+      "finished_at": "2026-04-30T22:40:35.346640+00:00",
+      "duration_ms": 0.003,
+      "error": null
+    },
+    {
+      "node_name": "discount_tool_execution",
+      "status": "completed",
+      "started_at": "2026-04-30T22:40:35.346743+00:00",
+      "finished_at": "2026-04-30T22:40:35.348023+00:00",
+      "duration_ms": 1.28,
+      "error": null
+    },
+    {
+      "node_name": "plan_proposal",
+      "status": "completed",
+      "started_at": "2026-04-30T22:40:35.348126+00:00",
+      "finished_at": "2026-04-30T22:40:35.348293+00:00",
+      "duration_ms": 0.167,
+      "error": null
+    },
+    {
+      "node_name": "reflect",
+      "status": "completed",
+      "started_at": "2026-04-30T22:40:35.348474+00:00",
+      "finished_at": "2026-04-30T22:40:35.348479+00:00",
+      "duration_ms": 0.005,
+      "error": null
+    },
+    {
+      "node_name": "relevant_response",
+      "status": "completed",
+      "started_at": "2026-04-30T22:40:35.348605+00:00",
+      "finished_at": "2026-04-30T22:40:35.348609+00:00",
+      "duration_ms": 0.004,
+      "error": null
+    }
+  ],
+  "llm_calls": [],
+  "tool_calls": [
+    {
+      "tool_name": "offer_eligibility",
+      "node_name": "tool_execution",
+      "status": "completed",
+      "started_at": "2026-04-30T22:40:35.345464+00:00",
+      "finished_at": "2026-04-30T22:40:35.345464+00:00",
+      "duration_ms": 0.822,
+      "error": null
+    },
+    {
+      "tool_name": "discount_planning_handoff",
+      "node_name": "discount_tool_execution",
+      "status": "completed",
+      "started_at": "2026-04-30T22:40:35.347852+00:00",
+      "finished_at": "2026-04-30T22:40:35.347852+00:00",
+      "duration_ms": 1.087,
+      "error": null
+    }
+  ]
+}

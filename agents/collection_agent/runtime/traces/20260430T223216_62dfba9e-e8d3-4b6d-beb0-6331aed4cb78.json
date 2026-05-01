@@ -1,0 +1,310 @@
+{
+  "trace_id": "62dfba9e-e8d3-4b6d-beb0-6331aed4cb78",
+  "agent_name": "collection_agent",
+  "session_id": "verify-discount-handoff2",
+  "user_input": "Need discount and lower emi around 1200 for case COLL-1002",
+  "status": "failed",
+  "started_at": "2026-04-30T22:32:16.034307+00:00",
+  "finished_at": "2026-04-30T22:32:16.043336+00:00",
+  "error": "Recursion limit of 25 reached without hitting a stop condition. You can increase the limit by setting the `recursion_limit` config key.\nFor troubleshooting, visit: https://docs.langchain.com/oss/python/langgraph/errors/GRAPH_RECURSION_LIMIT",
+  "summary": {
+    "trace_id": "62dfba9e-e8d3-4b6d-beb0-6331aed4cb78",
+    "agent_name": "collection_agent",
+    "session_id": "verify-discount-handoff2",
+    "status": "failed",
+    "node_hits": [
+      "relevance_intent",
+      "pre_plan_intent",
+      "execution_path_intent",
+      "react",
+      "tool_execution",
+      "react",
+      "origin_react_plan",
+      "plan_proposal",
+      "tool_execution",
+      "react",
+      "origin_react_plan",
+      "plan_proposal",
+      "tool_execution",
+      "react",
+      "origin_react_plan",
+      "plan_proposal",
+      "tool_execution",
+      "react",
+      "origin_react_plan",
+      "plan_proposal",
+      "tool_execution",
+      "react",
+      "origin_react_plan",
+      "plan_proposal",
+      "tool_execution"
+    ],
+    "node_count": 25,
+    "llm_call_count": 0,
+    "tool_call_count": 6,
+    "models": [],
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "total_tokens": 0,
+    "error": "Recursion limit of 25 reached without hitting a stop condition. You can increase the limit by setting the `recursion_limit` config key.\nFor troubleshooting, visit: https://docs.langchain.com/oss/python/langgraph/errors/GRAPH_RECURSION_LIMIT"
+  },
+  "nodes": [
+    {
+      "node_name": "relevance_intent",
+      "status": "completed",
+      "started_at": "2026-04-30T22:32:16.034791+00:00",
+      "finished_at": "2026-04-30T22:32:16.034857+00:00",
+      "duration_ms": 0.066,
+      "error": null
+    },
+    {
+      "node_name": "pre_plan_intent",
+      "status": "completed",
+      "started_at": "2026-04-30T22:32:16.035074+00:00",
+      "finished_at": "2026-04-30T22:32:16.035088+00:00",
+      "duration_ms": 0.014,
+      "error": null
+    },
+    {
+      "node_name": "execution_path_intent",
+      "status": "completed",
+      "started_at": "2026-04-30T22:32:16.035258+00:00",
+      "finished_at": "2026-04-30T22:32:16.035270+00:00",
+      "duration_ms": 0.012,
+      "error": null
+    },
+    {
+      "node_name": "react",
+      "status": "completed",
+      "started_at": "2026-04-30T22:32:16.035416+00:00",
+      "finished_at": "2026-04-30T22:32:16.035778+00:00",
+      "duration_ms": 0.362,
+      "error": null
+    },
+    {
+      "node_name": "tool_execution",
+      "status": "completed",
+      "started_at": "2026-04-30T22:32:16.036015+00:00",
+      "finished_at": "2026-04-30T22:32:16.036827+00:00",
+      "duration_ms": 0.812,
+      "error": null
+    },
+    {
+      "node_name": "react",
+      "status": "completed",
+      "started_at": "2026-04-30T22:32:16.036943+00:00",
+      "finished_at": "2026-04-30T22:32:16.036956+00:00",
+      "duration_ms": 0.013,
+      "error": null
+    },
+    {
+      "node_name": "origin_react_plan",
+      "status": "completed",
+      "started_at": "2026-04-30T22:32:16.037132+00:00",
+      "finished_at": "2026-04-30T22:32:16.037134+00:00",
+      "duration_ms": 0.002,
+      "error": null
+    },
+    {
+      "node_name": "plan_proposal",
+      "status": "completed",
+      "started_at": "2026-04-30T22:32:16.037237+00:00",
+      "finished_at": "2026-04-30T22:32:16.037250+00:00",
+      "duration_ms": 0.013,
+      "error": null
+    },
+    {
+      "node_name": "tool_execution",
+      "status": "completed",
+      "started_at": "2026-04-30T22:32:16.037376+00:00",
+      "finished_at": "2026-04-30T22:32:16.038173+00:00",
+      "duration_ms": 0.797,
+      "error": null
+    },
+    {
+      "node_name": "react",
+      "status": "completed",
+      "started_at": "2026-04-30T22:32:16.038269+00:00",
+      "finished_at": "2026-04-30T22:32:16.038282+00:00",
+      "duration_ms": 0.013,
+      "error": null
+    },
+    {
+      "node_name": "origin_react_plan",
+      "status": "completed",
+      "started_at": "2026-04-30T22:32:16.038417+00:00",
+      "finished_at": "2026-04-30T22:32:16.038419+00:00",
+      "duration_ms": 0.002,
+      "error": null
+    },
+    {
+      "node_name": "plan_proposal",
+      "status": "completed",
+      "started_at": "2026-04-30T22:32:16.038504+00:00",
+      "finished_at": "2026-04-30T22:32:16.038512+00:00",
+      "duration_ms": 0.008,
+      "error": null
+    },
+    {
+      "node_name": "tool_execution",
+      "status": "completed",
+      "started_at": "2026-04-30T22:32:16.038641+00:00",
+      "finished_at": "2026-04-30T22:32:16.039422+00:00",
+      "duration_ms": 0.781,
+      "error": null
+    },
+    {
+      "node_name": "react",
+      "status": "completed",
+      "started_at": "2026-04-30T22:32:16.039530+00:00",
+      "finished_at": "2026-04-30T22:32:16.039544+00:00",
+      "duration_ms": 0.014,
+      "error": null
+    },
+    {
+      "node_name": "origin_react_plan",
+      "status": "completed",
+      "started_at": "2026-04-30T22:32:16.039673+00:00",
+      "finished_at": "2026-04-30T22:32:16.039675+00:00",
+      "duration_ms": 0.002,
+      "error": null
+    },
+    {
+      "node_name": "plan_proposal",
+      "status": "completed",
+      "started_at": "2026-04-30T22:32:16.039755+00:00",
+      "finished_at": "2026-04-30T22:32:16.039765+00:00",
+      "duration_ms": 0.01,
+      "error": null
+    },
+    {
+      "node_name": "tool_execution",
+      "status": "completed",
+      "started_at": "2026-04-30T22:32:16.039883+00:00",
+      "finished_at": "2026-04-30T22:32:16.040686+00:00",
+      "duration_ms": 0.803,
+      "error": null
+    },
+    {
+      "node_name": "react",
+      "status": "completed",
+      "started_at": "2026-04-30T22:32:16.040776+00:00",
+      "finished_at": "2026-04-30T22:32:16.040786+00:00",
+      "duration_ms": 0.01,
+      "error": null
+    },
+    {
+      "node_name": "origin_react_plan",
+      "status": "completed",
+      "started_at": "2026-04-30T22:32:16.040907+00:00",
+      "finished_at": "2026-04-30T22:32:16.040909+00:00",
+      "duration_ms": 0.002,
+      "error": null
+    },
+    {
+      "node_name": "plan_proposal",
+      "status": "completed",
+      "started_at": "2026-04-30T22:32:16.040988+00:00",
+      "finished_at": "2026-04-30T22:32:16.040995+00:00",
+      "duration_ms": 0.007,
+      "error": null
+    },
+    {
+      "node_name": "tool_execution",
+      "status": "completed",
+      "started_at": "2026-04-30T22:32:16.041112+00:00",
+      "finished_at": "2026-04-30T22:32:16.041932+00:00",
+      "duration_ms": 0.82,
+      "error": null
+    },
+    {
+      "node_name": "react",
+      "status": "completed",
+      "started_at": "2026-04-30T22:32:16.042020+00:00",
+      "finished_at": "2026-04-30T22:32:16.042030+00:00",
+      "duration_ms": 0.01,
+      "error": null
+    },
+    {
+      "node_name": "origin_react_plan",
+      "status": "completed",
+      "started_at": "2026-04-30T22:32:16.042190+00:00",
+      "finished_at": "2026-04-30T22:32:16.042192+00:00",
+      "duration_ms": 0.002,
+      "error": null
+    },
+    {
+      "node_name": "plan_proposal",
+      "status": "completed",
+      "started_at": "2026-04-30T22:32:16.042270+00:00",
+      "finished_at": "2026-04-30T22:32:16.042278+00:00",
+      "duration_ms": 0.008,
+      "error": null
+    },
+    {
+      "node_name": "tool_execution",
+      "status": "completed",
+      "started_at": "2026-04-30T22:32:16.042395+00:00",
+      "finished_at": "2026-04-30T22:32:16.043250+00:00",
+      "duration_ms": 0.855,
+      "error": null
+    }
+  ],
+  "llm_calls": [],
+  "tool_calls": [
+    {
+      "tool_name": "offer_eligibility",
+      "node_name": "tool_execution",
+      "status": "completed",
+      "started_at": "2026-04-30T22:32:16.036683+00:00",
+      "finished_at": "2026-04-30T22:32:16.036683+00:00",
+      "duration_ms": 0.63,
+      "error": null
+    },
+    {
+      "tool_name": "discount_planning_handoff",
+      "node_name": "tool_execution",
+      "status": "completed",
+      "started_at": "2026-04-30T22:32:16.038016+00:00",
+      "finished_at": "2026-04-30T22:32:16.038016+00:00",
+      "duration_ms": 0.629,
+      "error": null
+    },
+    {
+      "tool_name": "discount_planning_handoff",
+      "node_name": "tool_execution",
+      "status": "completed",
+      "started_at": "2026-04-30T22:32:16.039276+00:00",
+      "finished_at": "2026-04-30T22:32:16.039276+00:00",
+      "duration_ms": 0.625,
+      "error": null
+    },
+    {
+      "tool_name": "discount_planning_handoff",
+      "node_name": "tool_execution",
+      "status": "completed",
+      "started_at": "2026-04-30T22:32:16.040548+00:00",
+      "finished_at": "2026-04-30T22:32:16.040548+00:00",
+      "duration_ms": 0.653,
+      "error": null
+    },
+    {
+      "tool_name": "discount_planning_handoff",
+      "node_name": "tool_execution",
+      "status": "completed",
+      "started_at": "2026-04-30T22:32:16.041805+00:00",
+      "finished_at": "2026-04-30T22:32:16.041805+00:00",
+      "duration_ms": 0.684,
+      "error": null
+    },
+    {
+      "tool_name": "discount_planning_handoff",
+      "node_name": "tool_execution",
+      "status": "completed",
+      "started_at": "2026-04-30T22:32:16.043120+00:00",
+      "finished_at": "2026-04-30T22:32:16.043120+00:00",
+      "duration_ms": 0.716,
+      "error": null
+    }
+  ]
+}

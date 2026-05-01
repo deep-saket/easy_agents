@@ -1,0 +1,331 @@
+[
+  {
+    "created_at": "2026-04-30T22:32:16.037397+00:00",
+    "request": {
+      "case_id": "COLL-1002",
+      "reason_for_handoff": "Need optimized discount/EMI proposal for ongoing negotiation",
+      "current_plan": null,
+      "dues_snapshot": null,
+      "policy_constraints": null,
+      "hardship_reason": "job_loss",
+      "target_monthly_emi": 1200.0,
+      "max_discount_cap": null
+    },
+    "response": {
+      "recommended_offer": {
+        "case_id": "COLL-1002",
+        "offer_type": "restructure",
+        "waiver_pct": 0.0,
+        "tenure_months": 24,
+        "monthly_emi": 1200.0,
+        "hardship_reason": "job_loss"
+      },
+      "offer_variants": [
+        {
+          "case_id": "COLL-1002",
+          "offer_type": "restructure",
+          "waiver_pct": 0.0,
+          "tenure_months": 30,
+          "monthly_emi": 1020.0,
+          "hardship_reason": "job_loss"
+        },
+        {
+          "case_id": "COLL-1002",
+          "offer_type": "restructure",
+          "waiver_pct": 0.0,
+          "tenure_months": 18,
+          "monthly_emi": 1440.0,
+          "hardship_reason": "job_loss"
+        }
+      ],
+      "rationale": "Selected baseline restructure from hardship reason and requested EMI target.",
+      "compliance_flags": [
+        "demo_policy_check_pending"
+      ],
+      "confidence": 0.62,
+      "next_action_hint": "Present recommended_offer first, then use offer_variants if rejected."
+    }
+  },
+  {
+    "created_at": "2026-04-30T22:32:16.038656+00:00",
+    "request": {
+      "case_id": "COLL-1002",
+      "reason_for_handoff": "Need optimized discount/EMI proposal for ongoing negotiation",
+      "current_plan": null,
+      "dues_snapshot": null,
+      "policy_constraints": null,
+      "hardship_reason": "job_loss",
+      "target_monthly_emi": 1200.0,
+      "max_discount_cap": null
+    },
+    "response": {
+      "recommended_offer": {
+        "case_id": "COLL-1002",
+        "offer_type": "restructure",
+        "waiver_pct": 0.0,
+        "tenure_months": 24,
+        "monthly_emi": 1200.0,
+        "hardship_reason": "job_loss"
+      },
+      "offer_variants": [
+        {
+          "case_id": "COLL-1002",
+          "offer_type": "restructure",
+          "waiver_pct": 0.0,
+          "tenure_months": 30,
+          "monthly_emi": 1020.0,
+          "hardship_reason": "job_loss"
+        },
+        {
+          "case_id": "COLL-1002",
+          "offer_type": "restructure",
+          "waiver_pct": 0.0,
+          "tenure_months": 18,
+          "monthly_emi": 1440.0,
+          "hardship_reason": "job_loss"
+        }
+      ],
+      "rationale": "Selected baseline restructure from hardship reason and requested EMI target.",
+      "compliance_flags": [
+        "demo_policy_check_pending"
+      ],
+      "confidence": 0.62,
+      "next_action_hint": "Present recommended_offer first, then use offer_variants if rejected."
+    }
+  },
+  {
+    "created_at": "2026-04-30T22:32:16.039900+00:00",
+    "request": {
+      "case_id": "COLL-1002",
+      "reason_for_handoff": "Need optimized discount/EMI proposal for ongoing negotiation",
+      "current_plan": null,
+      "dues_snapshot": null,
+      "policy_constraints": null,
+      "hardship_reason": "job_loss",
+      "target_monthly_emi": 1200.0,
+      "max_discount_cap": null
+    },
+    "response": {
+      "recommended_offer": {
+        "case_id": "COLL-1002",
+        "offer_type": "restructure",
+        "waiver_pct": 0.0,
+        "tenure_months": 24,
+        "monthly_emi": 1200.0,
+        "hardship_reason": "job_loss"
+      },
+      "offer_variants": [
+        {
+          "case_id": "COLL-1002",
+          "offer_type": "restructure",
+          "waiver_pct": 0.0,
+          "tenure_months": 30,
+          "monthly_emi": 1020.0,
+          "hardship_reason": "job_loss"
+        },
+        {
+          "case_id": "COLL-1002",
+          "offer_type": "restructure",
+          "waiver_pct": 0.0,
+          "tenure_months": 18,
+          "monthly_emi": 1440.0,
+          "hardship_reason": "job_loss"
+        }
+      ],
+      "rationale": "Selected baseline restructure from hardship reason and requested EMI target.",
+      "compliance_flags": [
+        "demo_policy_check_pending"
+      ],
+      "confidence": 0.62,
+      "next_action_hint": "Present recommended_offer first, then use offer_variants if rejected."
+    }
+  },
+  {
+    "created_at": "2026-04-30T22:32:16.041125+00:00",
+    "request": {
+      "case_id": "COLL-1002",
+      "reason_for_handoff": "Need optimized discount/EMI proposal for ongoing negotiation",
+      "current_plan": null,
+      "dues_snapshot": null,
+      "policy_constraints": null,
+      "hardship_reason": "job_loss",
+      "target_monthly_emi": 1200.0,
+      "max_discount_cap": null
+    },
+    "response": {
+      "recommended_offer": {
+        "case_id": "COLL-1002",
+        "offer_type": "restructure",
+        "waiver_pct": 0.0,
+        "tenure_months": 24,
+        "monthly_emi": 1200.0,
+        "hardship_reason": "job_loss"
+      },
+      "offer_variants": [
+        {
+          "case_id": "COLL-1002",
+          "offer_type": "restructure",
+          "waiver_pct": 0.0,
+          "tenure_months": 30,
+          "monthly_emi": 1020.0,
+          "hardship_reason": "job_loss"
+        },
+        {
+          "case_id": "COLL-1002",
+          "offer_type": "restructure",
+          "waiver_pct": 0.0,
+          "tenure_months": 18,
+          "monthly_emi": 1440.0,
+          "hardship_reason": "job_loss"
+        }
+      ],
+      "rationale": "Selected baseline restructure from hardship reason and requested EMI target.",
+      "compliance_flags": [
+        "demo_policy_check_pending"
+      ],
+      "confidence": 0.62,
+      "next_action_hint": "Present recommended_offer first, then use offer_variants if rejected."
+    }
+  },
+  {
+    "created_at": "2026-04-30T22:32:16.042408+00:00",
+    "request": {
+      "case_id": "COLL-1002",
+      "reason_for_handoff": "Need optimized discount/EMI proposal for ongoing negotiation",
+      "current_plan": null,
+      "dues_snapshot": null,
+      "policy_constraints": null,
+      "hardship_reason": "job_loss",
+      "target_monthly_emi": 1200.0,
+      "max_discount_cap": null
+    },
+    "response": {
+      "recommended_offer": {
+        "case_id": "COLL-1002",
+        "offer_type": "restructure",
+        "waiver_pct": 0.0,
+        "tenure_months": 24,
+        "monthly_emi": 1200.0,
+        "hardship_reason": "job_loss"
+      },
+      "offer_variants": [
+        {
+          "case_id": "COLL-1002",
+          "offer_type": "restructure",
+          "waiver_pct": 0.0,
+          "tenure_months": 30,
+          "monthly_emi": 1020.0,
+          "hardship_reason": "job_loss"
+        },
+        {
+          "case_id": "COLL-1002",
+          "offer_type": "restructure",
+          "waiver_pct": 0.0,
+          "tenure_months": 18,
+          "monthly_emi": 1440.0,
+          "hardship_reason": "job_loss"
+        }
+      ],
+      "rationale": "Selected baseline restructure from hardship reason and requested EMI target.",
+      "compliance_flags": [
+        "demo_policy_check_pending"
+      ],
+      "confidence": 0.62,
+      "next_action_hint": "Present recommended_offer first, then use offer_variants if rejected."
+    }
+  },
+  {
+    "created_at": "2026-04-30T22:32:30.958079+00:00",
+    "request": {
+      "case_id": "COLL-1002",
+      "reason_for_handoff": "Need optimized discount/EMI proposal for ongoing negotiation",
+      "current_plan": null,
+      "dues_snapshot": null,
+      "policy_constraints": null,
+      "hardship_reason": "job_loss",
+      "target_monthly_emi": 1200.0,
+      "max_discount_cap": null
+    },
+    "response": {
+      "recommended_offer": {
+        "case_id": "COLL-1002",
+        "offer_type": "restructure",
+        "waiver_pct": 0.0,
+        "tenure_months": 24,
+        "monthly_emi": 1200.0,
+        "hardship_reason": "job_loss"
+      },
+      "offer_variants": [
+        {
+          "case_id": "COLL-1002",
+          "offer_type": "restructure",
+          "waiver_pct": 0.0,
+          "tenure_months": 30,
+          "monthly_emi": 1020.0,
+          "hardship_reason": "job_loss"
+        },
+        {
+          "case_id": "COLL-1002",
+          "offer_type": "restructure",
+          "waiver_pct": 0.0,
+          "tenure_months": 18,
+          "monthly_emi": 1440.0,
+          "hardship_reason": "job_loss"
+        }
+      ],
+      "rationale": "Selected baseline restructure from hardship reason and requested EMI target.",
+      "compliance_flags": [
+        "demo_policy_check_pending"
+      ],
+      "confidence": 0.62,
+      "next_action_hint": "Present recommended_offer first, then use offer_variants if rejected."
+    }
+  },
+  {
+    "created_at": "2026-04-30T22:40:35.346778+00:00",
+    "request": {
+      "case_id": "COLL-1002",
+      "reason_for_handoff": "Need optimized discount/EMI proposal for ongoing negotiation",
+      "current_plan": null,
+      "dues_snapshot": null,
+      "policy_constraints": null,
+      "hardship_reason": "job_loss",
+      "target_monthly_emi": 1200.0,
+      "max_discount_cap": null
+    },
+    "response": {
+      "recommended_offer": {
+        "case_id": "COLL-1002",
+        "offer_type": "restructure",
+        "waiver_pct": 0.0,
+        "tenure_months": 24,
+        "monthly_emi": 1200.0,
+        "hardship_reason": "job_loss"
+      },
+      "offer_variants": [
+        {
+          "case_id": "COLL-1002",
+          "offer_type": "restructure",
+          "waiver_pct": 0.0,
+          "tenure_months": 30,
+          "monthly_emi": 1020.0,
+          "hardship_reason": "job_loss"
+        },
+        {
+          "case_id": "COLL-1002",
+          "offer_type": "restructure",
+          "waiver_pct": 0.0,
+          "tenure_months": 18,
+          "monthly_emi": 1440.0,
+          "hardship_reason": "job_loss"
+        }
+      ],
+      "rationale": "Selected baseline restructure from hardship reason and requested EMI target.",
+      "compliance_flags": [
+        "demo_policy_check_pending"
+      ],
+      "confidence": 0.62,
+      "next_action_hint": "Present recommended_offer first, then use offer_variants if rejected."
+    }
+  }
+]

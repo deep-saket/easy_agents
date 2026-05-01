@@ -1,0 +1,48 @@
+{
+  "trace_id": "cb7199c6-cbfa-43d5-9f62-02afe47f48b9",
+  "agent_name": "collection_agent",
+  "session_id": "smoke-1",
+  "user_input": "",
+  "status": "completed",
+  "started_at": "2026-04-30T21:51:56.189546+00:00",
+  "finished_at": "2026-04-30T21:51:56.190489+00:00",
+  "error": null,
+  "summary": {
+    "trace_id": "cb7199c6-cbfa-43d5-9f62-02afe47f48b9",
+    "agent_name": "collection_agent",
+    "session_id": "smoke-1",
+    "status": "completed",
+    "node_hits": [
+      "relevance_intent",
+      "irrelevant_response"
+    ],
+    "node_count": 2,
+    "llm_call_count": 0,
+    "tool_call_count": 0,
+    "models": [],
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "total_tokens": 0,
+    "error": null
+  },
+  "nodes": [
+    {
+      "node_name": "relevance_intent",
+      "status": "completed",
+      "started_at": "2026-04-30T21:51:56.190111+00:00",
+      "finished_at": "2026-04-30T21:51:56.190176+00:00",
+      "duration_ms": 0.065,
+      "error": null
+    },
+    {
+      "node_name": "irrelevant_response",
+      "status": "completed",
+      "started_at": "2026-04-30T21:51:56.190389+00:00",
+      "finished_at": "2026-04-30T21:51:56.190393+00:00",
+      "duration_ms": 0.004,
+      "error": null
+    }
+  ],
+  "llm_calls": [],
+  "tool_calls": []
+}

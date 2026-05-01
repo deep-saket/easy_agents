@@ -47,6 +47,25 @@ class PlanProposalNode(BaseGraphNode):
             )
             return {"route": "continue", "decision": decision, "response_target": "customer"}
 
+        if self._is_conversation_termination(user_input):
+            decision = SimpleNamespace(
+                thought="Detected conversation termination intent.",
+                tool_call=None,
+                respond_directly=True,
+                response_text="Thank you. I am closing this conversation now.",
+                done=True,
+            )
+            return {
+                "route": "continue",
+                "decision": decision,
+                "response_target": "customer",
+                "additional_targets": ["collection_memory_helper_agent"],
+                "memory_helper_trigger": {
+                    "reason": "conversation_termination",
+                    "final_user_message": user_input,
+                },
+            }
+
         discount_recommendation = memory_state.get("discount_recommendation")
         if isinstance(discount_recommendation, dict) and discount_recommendation:
             response_text = self._build_discount_offer_response(discount_recommendation)
@@ -201,3 +220,21 @@ class PlanProposalNode(BaseGraphNode):
                 "If this works for you, I will capture your promise-to-pay and schedule follow-up."
             )
         return "I have prepared revised discount and EMI options. Please confirm if you want to proceed with the recommended offer."
+
+    @staticmethod
+    def _is_conversation_termination(text: str) -> bool:
+        lowered = text.lower().strip()
+        if not lowered:
+            return False
+        signals = [
+            "bye",
+            "goodbye",
+            "thanks that's all",
+            "thank you that's all",
+            "close this",
+            "done for now",
+            "that's all",
+            "end conversation",
+            "you can close",
+        ]
+        return any(signal in lowered for signal in signals)

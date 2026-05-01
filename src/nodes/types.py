@@ -102,6 +102,8 @@ class AgentState(TypedDict, total=False):
     routing_context: dict[str, Any]
     response_target: str
     handoff_payload: dict[str, Any]
+    additional_targets: list[str]
+    memory_helper_trigger: dict[str, Any]
 
 
 class NodeUpdate(TypedDict, total=False):
@@ -142,6 +144,8 @@ class NodeUpdate(TypedDict, total=False):
     routing_context: dict[str, Any]
     response_target: str
     handoff_payload: dict[str, Any]
+    additional_targets: list[str]
+    memory_helper_trigger: dict[str, Any]
 
 
 ReActState = AgentState

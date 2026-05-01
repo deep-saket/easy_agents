@@ -1,0 +1,112 @@
+{
+  "trace_id": "c997c649-9f3b-46cf-be9c-bb43ce272241",
+  "agent_name": "collection_agent",
+  "session_id": "intent-gate-rel",
+  "user_input": "fetch case COLL-1001",
+  "status": "completed",
+  "started_at": "2026-04-30T21:31:08.395377+00:00",
+  "finished_at": "2026-04-30T21:31:08.397193+00:00",
+  "error": null,
+  "summary": {
+    "trace_id": "c997c649-9f3b-46cf-be9c-bb43ce272241",
+    "agent_name": "collection_agent",
+    "session_id": "intent-gate-rel",
+    "status": "completed",
+    "node_hits": [
+      "relevance_intent",
+      "memory_retrieve",
+      "react",
+      "tool_execution",
+      "react",
+      "plan_proposal",
+      "reflect",
+      "response"
+    ],
+    "node_count": 8,
+    "llm_call_count": 0,
+    "tool_call_count": 1,
+    "models": [],
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "total_tokens": 0,
+    "error": null
+  },
+  "nodes": [
+    {
+      "node_name": "relevance_intent",
+      "status": "completed",
+      "started_at": "2026-04-30T21:31:08.395568+00:00",
+      "finished_at": "2026-04-30T21:31:08.395582+00:00",
+      "duration_ms": 0.014,
+      "error": null
+    },
+    {
+      "node_name": "memory_retrieve",
+      "status": "completed",
+      "started_at": "2026-04-30T21:31:08.395737+00:00",
+      "finished_at": "2026-04-30T21:31:08.395770+00:00",
+      "duration_ms": 0.033,
+      "error": null
+    },
+    {
+      "node_name": "react",
+      "status": "completed",
+      "started_at": "2026-04-30T21:31:08.395853+00:00",
+      "finished_at": "2026-04-30T21:31:08.395978+00:00",
+      "duration_ms": 0.125,
+      "error": null
+    },
+    {
+      "node_name": "tool_execution",
+      "status": "completed",
+      "started_at": "2026-04-30T21:31:08.396115+00:00",
+      "finished_at": "2026-04-30T21:31:08.396630+00:00",
+      "duration_ms": 0.515,
+      "error": null
+    },
+    {
+      "node_name": "react",
+      "status": "completed",
+      "started_at": "2026-04-30T21:31:08.396728+00:00",
+      "finished_at": "2026-04-30T21:31:08.396739+00:00",
+      "duration_ms": 0.011,
+      "error": null
+    },
+    {
+      "node_name": "plan_proposal",
+      "status": "completed",
+      "started_at": "2026-04-30T21:31:08.396901+00:00",
+      "finished_at": "2026-04-30T21:31:08.396904+00:00",
+      "duration_ms": 0.003,
+      "error": null
+    },
+    {
+      "node_name": "reflect",
+      "status": "completed",
+      "started_at": "2026-04-30T21:31:08.397017+00:00",
+      "finished_at": "2026-04-30T21:31:08.397020+00:00",
+      "duration_ms": 0.003,
+      "error": null
+    },
+    {
+      "node_name": "response",
+      "status": "completed",
+      "started_at": "2026-04-30T21:31:08.397126+00:00",
+      "finished_at": "2026-04-30T21:31:08.397128+00:00",
+      "duration_ms": 0.002,
+      "error": null
+    }
+  ],
+  "llm_calls": [],
+  "tool_calls": [
+    {
+      "tool_name": "case_fetch",
+      "node_name": "tool_execution",
+      "status": "completed",
+      "started_at": "2026-04-30T21:31:08.396547+00:00",
+      "finished_at": "2026-04-30T21:31:08.396547+00:00",
+      "duration_ms": 0.417,
+      "error": null
+    }
+  ]
+}

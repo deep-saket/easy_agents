@@ -1,0 +1,52 @@
+[
+  {
+    "plan_id": "PLAN-2B6C3DB81F",
+    "case_id": "COLL-1002",
+    "hardship_reason": "job_loss",
+    "months": 36,
+    "monthly_amount": 1102.78,
+    "first_due_date": "2026-05-07",
+    "rationale": "Based on hardship='job_loss', total_due=39700.00, revision=0.",
+    "status": "proposed"
+  },
+  {
+    "plan_id": "PLAN-39C1E0A4CA",
+    "case_id": "COLL-1002",
+    "hardship_reason": "job_loss",
+    "months": 34,
+    "monthly_amount": 1167.65,
+    "first_due_date": "2026-05-07",
+    "rationale": "Based on hardship='job_loss', total_due=39700.00, revision=1.",
+    "status": "revised"
+  },
+  {
+    "plan_id": "PLAN-8363427902",
+    "case_id": "COLL-1001",
+    "hardship_reason": "job_loss",
+    "months": 6,
+    "monthly_amount": 2225.0,
+    "first_due_date": "2026-05-07",
+    "rationale": "Based on hardship='job_loss', total_due=13350.00, revision=0.",
+    "status": "proposed"
+  },
+  {
+    "plan_id": "PLAN-4AAEB69D1F",
+    "case_id": "COLL-1002",
+    "hardship_reason": "job_loss",
+    "months": 34,
+    "monthly_amount": 1167.65,
+    "first_due_date": "2026-05-07",
+    "rationale": "Based on hardship='job_loss', total_due=39700.00, revision=1.",
+    "status": "revised"
+  },
+  {
+    "plan_id": "PLAN-801178D0BA",
+    "case_id": "COLL-1002",
+    "hardship_reason": "job_loss",
+    "months": 12,
+    "monthly_amount": 3308.33,
+    "first_due_date": "2026-05-07",
+    "rationale": "Based on hardship='job_loss', total_due=39700.00, revision=1.",
+    "status": "revised"
+  }
+]

@@ -1,0 +1,23 @@
+[
+  {
+    "audit_id": "AUD-D92191F37E",
+    "case_id": "COLL-1002",
+    "disposition_code": "plan_accepted_followup_scheduled",
+    "notes": "Demo flow: plan accepted and follow-up scheduled.",
+    "updated_at": "2026-04-30T20:15:59.727415+00:00"
+  },
+  {
+    "audit_id": "AUD-AC6F5BB1D7",
+    "case_id": "COLL-1002",
+    "disposition_code": "plan_accepted_followup_scheduled",
+    "notes": "Demo flow: plan accepted and follow-up scheduled.",
+    "updated_at": "2026-04-30T20:16:35.344554+00:00"
+  },
+  {
+    "audit_id": "AUD-17A3450DA6",
+    "case_id": "COLL-1002",
+    "disposition_code": "plan_accepted_followup_scheduled",
+    "notes": "Demo flow: plan accepted and follow-up scheduled.",
+    "updated_at": "2026-04-30T22:06:06.420486+00:00"
+  }
+]

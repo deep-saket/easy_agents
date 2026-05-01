@@ -26,6 +26,28 @@ Graph assets:
 - `graph.png`
 - `graph.jpg`
 
+## Node Definitions
+
+### `Receive Handoff Payload`
+
+- Accepts collection-agent handoff context (`case_id`, plan context, hardship hints, targets).
+- Normalizes payload for specialist processing.
+
+### `Build Discount/EMI Proposal`
+
+- Constructs candidate concession/restructure options.
+- Balances repayment feasibility and collections recovery goals.
+
+### `Policy/Variant Check`
+
+- Validates candidate options against policy boundaries and internal constraints.
+- Filters out non-compliant variants.
+
+### `Return Recommendation Package`
+
+- Returns normalized structured recommendation to collection agent:
+- `recommended_offer`, `offer_variants`, `rationale`, `confidence`, `compliance_flags`, `next_action_hint`.
+
 ## Tool Table
 
 | Tool | Description | Typical Inputs | Typical Output |

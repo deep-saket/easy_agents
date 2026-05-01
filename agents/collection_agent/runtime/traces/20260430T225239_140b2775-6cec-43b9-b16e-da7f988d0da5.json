@@ -1,0 +1,130 @@
+{
+  "trace_id": "140b2775-6cec-43b9-b16e-da7f988d0da5",
+  "agent_name": "collection_agent",
+  "session_id": "orchestr-test",
+  "user_input": "fetch case COLL-1002 and send payment link",
+  "status": "completed",
+  "started_at": "2026-04-30T22:52:39.656382+00:00",
+  "finished_at": "2026-04-30T22:52:39.660364+00:00",
+  "error": null,
+  "summary": {
+    "trace_id": "140b2775-6cec-43b9-b16e-da7f988d0da5",
+    "agent_name": "collection_agent",
+    "session_id": "orchestr-test",
+    "status": "completed",
+    "node_hits": [
+      "relevance_intent",
+      "pre_plan_intent",
+      "execution_path_intent",
+      "react",
+      "tool_execution",
+      "react",
+      "origin_react_plan",
+      "plan_proposal",
+      "reflect",
+      "relevant_response"
+    ],
+    "node_count": 10,
+    "llm_call_count": 0,
+    "tool_call_count": 1,
+    "models": [],
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "total_tokens": 0,
+    "error": null
+  },
+  "nodes": [
+    {
+      "node_name": "relevance_intent",
+      "status": "completed",
+      "started_at": "2026-04-30T22:52:39.656671+00:00",
+      "finished_at": "2026-04-30T22:52:39.656695+00:00",
+      "duration_ms": 0.024,
+      "error": null
+    },
+    {
+      "node_name": "pre_plan_intent",
+      "status": "completed",
+      "started_at": "2026-04-30T22:52:39.656945+00:00",
+      "finished_at": "2026-04-30T22:52:39.656965+00:00",
+      "duration_ms": 0.02,
+      "error": null
+    },
+    {
+      "node_name": "execution_path_intent",
+      "status": "completed",
+      "started_at": "2026-04-30T22:52:39.657201+00:00",
+      "finished_at": "2026-04-30T22:52:39.657214+00:00",
+      "duration_ms": 0.013,
+      "error": null
+    },
+    {
+      "node_name": "react",
+      "status": "completed",
+      "started_at": "2026-04-30T22:52:39.657596+00:00",
+      "finished_at": "2026-04-30T22:52:39.657627+00:00",
+      "duration_ms": 0.031,
+      "error": null
+    },
+    {
+      "node_name": "tool_execution",
+      "status": "completed",
+      "started_at": "2026-04-30T22:52:39.657817+00:00",
+      "finished_at": "2026-04-30T22:52:39.659336+00:00",
+      "duration_ms": 1.519,
+      "error": null
+    },
+    {
+      "node_name": "react",
+      "status": "completed",
+      "started_at": "2026-04-30T22:52:39.659519+00:00",
+      "finished_at": "2026-04-30T22:52:39.659535+00:00",
+      "duration_ms": 0.016,
+      "error": null
+    },
+    {
+      "node_name": "origin_react_plan",
+      "status": "completed",
+      "started_at": "2026-04-30T22:52:39.659688+00:00",
+      "finished_at": "2026-04-30T22:52:39.659690+00:00",
+      "duration_ms": 0.002,
+      "error": null
+    },
+    {
+      "node_name": "plan_proposal",
+      "status": "completed",
+      "started_at": "2026-04-30T22:52:39.659777+00:00",
+      "finished_at": "2026-04-30T22:52:39.659787+00:00",
+      "duration_ms": 0.01,
+      "error": null
+    },
+    {
+      "node_name": "reflect",
+      "status": "completed",
+      "started_at": "2026-04-30T22:52:39.659913+00:00",
+      "finished_at": "2026-04-30T22:52:39.659922+00:00",
+      "duration_ms": 0.009,
+      "error": null
+    },
+    {
+      "node_name": "relevant_response",
+      "status": "completed",
+      "started_at": "2026-04-30T22:52:39.660055+00:00",
+      "finished_at": "2026-04-30T22:52:39.660060+00:00",
+      "duration_ms": 0.005,
+      "error": null
+    }
+  ],
+  "llm_calls": [],
+  "tool_calls": [
+    {
+      "tool_name": "case_fetch",
+      "node_name": "tool_execution",
+      "status": "completed",
+      "started_at": "2026-04-30T22:52:39.659080+00:00",
+      "finished_at": "2026-04-30T22:52:39.659080+00:00",
+      "duration_ms": 1.215,
+      "error": null
+    }
+  ]
+}

@@ -1,0 +1,103 @@
+{
+  "trace_id": "e4857f7c-7629-4331-a11b-68ac0a5001f5",
+  "agent_name": "collection_agent",
+  "session_id": "trace-check",
+  "user_input": "fetch case COLL-1001",
+  "status": "completed",
+  "started_at": "2026-04-30T21:14:49.253198+00:00",
+  "finished_at": "2026-04-30T21:14:49.256335+00:00",
+  "error": null,
+  "summary": {
+    "trace_id": "e4857f7c-7629-4331-a11b-68ac0a5001f5",
+    "agent_name": "collection_agent",
+    "session_id": "trace-check",
+    "status": "completed",
+    "node_hits": [
+      "memory_retrieve",
+      "react",
+      "tool_execution",
+      "react",
+      "plan_proposal",
+      "reflect",
+      "response"
+    ],
+    "node_count": 7,
+    "llm_call_count": 0,
+    "tool_call_count": 1,
+    "models": [],
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "total_tokens": 0,
+    "error": null
+  },
+  "nodes": [
+    {
+      "node_name": "memory_retrieve",
+      "status": "completed",
+      "started_at": "2026-04-30T21:14:49.253784+00:00",
+      "finished_at": "2026-04-30T21:14:49.253894+00:00",
+      "duration_ms": 0.11,
+      "error": null
+    },
+    {
+      "node_name": "react",
+      "status": "completed",
+      "started_at": "2026-04-30T21:14:49.254142+00:00",
+      "finished_at": "2026-04-30T21:14:49.254375+00:00",
+      "duration_ms": 0.233,
+      "error": null
+    },
+    {
+      "node_name": "tool_execution",
+      "status": "completed",
+      "started_at": "2026-04-30T21:14:49.254613+00:00",
+      "finished_at": "2026-04-30T21:14:49.255172+00:00",
+      "duration_ms": 0.559,
+      "error": null
+    },
+    {
+      "node_name": "react",
+      "status": "completed",
+      "started_at": "2026-04-30T21:14:49.255342+00:00",
+      "finished_at": "2026-04-30T21:14:49.255415+00:00",
+      "duration_ms": 0.073,
+      "error": null
+    },
+    {
+      "node_name": "plan_proposal",
+      "status": "completed",
+      "started_at": "2026-04-30T21:14:49.255619+00:00",
+      "finished_at": "2026-04-30T21:14:49.255678+00:00",
+      "duration_ms": 0.059,
+      "error": null
+    },
+    {
+      "node_name": "reflect",
+      "status": "completed",
+      "started_at": "2026-04-30T21:14:49.255853+00:00",
+      "finished_at": "2026-04-30T21:14:49.255928+00:00",
+      "duration_ms": 0.075,
+      "error": null
+    },
+    {
+      "node_name": "response",
+      "status": "completed",
+      "started_at": "2026-04-30T21:14:49.256144+00:00",
+      "finished_at": "2026-04-30T21:14:49.256202+00:00",
+      "duration_ms": 0.058,
+      "error": null
+    }
+  ],
+  "llm_calls": [],
+  "tool_calls": [
+    {
+      "tool_name": "case_fetch",
+      "node_name": "tool_execution",
+      "status": "completed",
+      "started_at": "2026-04-30T21:14:49.255073+00:00",
+      "finished_at": "2026-04-30T21:14:49.255073+00:00",
+      "duration_ms": 0.384,
+      "error": null
+    }
+  ]
+}

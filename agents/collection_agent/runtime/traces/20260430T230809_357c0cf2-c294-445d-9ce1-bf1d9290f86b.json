@@ -1,0 +1,102 @@
+{
+  "trace_id": "357c0cf2-c294-445d-9ce1-bf1d9290f86b",
+  "agent_name": "collection_agent",
+  "session_id": "mem-helper-demo2",
+  "user_input": "Thanks that is all, goodbye",
+  "status": "completed",
+  "started_at": "2026-04-30T23:08:09.954180+00:00",
+  "finished_at": "2026-04-30T23:08:09.955999+00:00",
+  "error": null,
+  "summary": {
+    "trace_id": "357c0cf2-c294-445d-9ce1-bf1d9290f86b",
+    "agent_name": "collection_agent",
+    "session_id": "mem-helper-demo2",
+    "status": "completed",
+    "node_hits": [
+      "relevance_intent",
+      "pre_plan_intent",
+      "execution_path_intent",
+      "react",
+      "origin_react_plan",
+      "plan_proposal",
+      "reflect",
+      "relevant_response"
+    ],
+    "node_count": 8,
+    "llm_call_count": 0,
+    "tool_call_count": 0,
+    "models": [],
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "total_tokens": 0,
+    "error": null
+  },
+  "nodes": [
+    {
+      "node_name": "relevance_intent",
+      "status": "completed",
+      "started_at": "2026-04-30T23:08:09.954636+00:00",
+      "finished_at": "2026-04-30T23:08:09.954741+00:00",
+      "duration_ms": 0.105,
+      "error": null
+    },
+    {
+      "node_name": "pre_plan_intent",
+      "status": "completed",
+      "started_at": "2026-04-30T23:08:09.954964+00:00",
+      "finished_at": "2026-04-30T23:08:09.954977+00:00",
+      "duration_ms": 0.013,
+      "error": null
+    },
+    {
+      "node_name": "execution_path_intent",
+      "status": "completed",
+      "started_at": "2026-04-30T23:08:09.955153+00:00",
+      "finished_at": "2026-04-30T23:08:09.955163+00:00",
+      "duration_ms": 0.01,
+      "error": null
+    },
+    {
+      "node_name": "react",
+      "status": "completed",
+      "started_at": "2026-04-30T23:08:09.955315+00:00",
+      "finished_at": "2026-04-30T23:08:09.955326+00:00",
+      "duration_ms": 0.011,
+      "error": null
+    },
+    {
+      "node_name": "origin_react_plan",
+      "status": "completed",
+      "started_at": "2026-04-30T23:08:09.955488+00:00",
+      "finished_at": "2026-04-30T23:08:09.955490+00:00",
+      "duration_ms": 0.002,
+      "error": null
+    },
+    {
+      "node_name": "plan_proposal",
+      "status": "completed",
+      "started_at": "2026-04-30T23:08:09.955591+00:00",
+      "finished_at": "2026-04-30T23:08:09.955597+00:00",
+      "duration_ms": 0.006,
+      "error": null
+    },
+    {
+      "node_name": "reflect",
+      "status": "completed",
+      "started_at": "2026-04-30T23:08:09.955761+00:00",
+      "finished_at": "2026-04-30T23:08:09.955765+00:00",
+      "duration_ms": 0.004,
+      "error": null
+    },
+    {
+      "node_name": "relevant_response",
+      "status": "completed",
+      "started_at": "2026-04-30T23:08:09.955914+00:00",
+      "finished_at": "2026-04-30T23:08:09.955920+00:00",
+      "duration_ms": 0.006,
+      "error": null
+    }
+  ],
+  "llm_calls": [],
+  "tool_calls": []
+}

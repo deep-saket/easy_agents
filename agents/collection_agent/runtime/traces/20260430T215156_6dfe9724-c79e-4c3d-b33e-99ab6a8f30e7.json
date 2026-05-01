@@ -1,0 +1,75 @@
+{
+  "trace_id": "6dfe9724-c79e-4c3d-b33e-99ab6a8f30e7",
+  "agent_name": "collection_agent",
+  "session_id": "smoke-3",
+  "user_input": "Explain what collections process is",
+  "status": "completed",
+  "started_at": "2026-04-30T21:51:56.191705+00:00",
+  "finished_at": "2026-04-30T21:51:56.192568+00:00",
+  "error": null,
+  "summary": {
+    "trace_id": "6dfe9724-c79e-4c3d-b33e-99ab6a8f30e7",
+    "agent_name": "collection_agent",
+    "session_id": "smoke-3",
+    "status": "completed",
+    "node_hits": [
+      "relevance_intent",
+      "pre_plan_intent",
+      "planner",
+      "reflect",
+      "relevant_response"
+    ],
+    "node_count": 5,
+    "llm_call_count": 0,
+    "tool_call_count": 0,
+    "models": [],
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "total_tokens": 0,
+    "error": null
+  },
+  "nodes": [
+    {
+      "node_name": "relevance_intent",
+      "status": "completed",
+      "started_at": "2026-04-30T21:51:56.191908+00:00",
+      "finished_at": "2026-04-30T21:51:56.191920+00:00",
+      "duration_ms": 0.012,
+      "error": null
+    },
+    {
+      "node_name": "pre_plan_intent",
+      "status": "completed",
+      "started_at": "2026-04-30T21:51:56.192063+00:00",
+      "finished_at": "2026-04-30T21:51:56.192073+00:00",
+      "duration_ms": 0.01,
+      "error": null
+    },
+    {
+      "node_name": "planner",
+      "status": "completed",
+      "started_at": "2026-04-30T21:51:56.192198+00:00",
+      "finished_at": "2026-04-30T21:51:56.192238+00:00",
+      "duration_ms": 0.04,
+      "error": null
+    },
+    {
+      "node_name": "reflect",
+      "status": "completed",
+      "started_at": "2026-04-30T21:51:56.192368+00:00",
+      "finished_at": "2026-04-30T21:51:56.192375+00:00",
+      "duration_ms": 0.007,
+      "error": null
+    },
+    {
+      "node_name": "relevant_response",
+      "status": "completed",
+      "started_at": "2026-04-30T21:51:56.192500+00:00",
+      "finished_at": "2026-04-30T21:51:56.192503+00:00",
+      "duration_ms": 0.003,
+      "error": null
+    }
+  ],
+  "llm_calls": [],
+  "tool_calls": []
+}

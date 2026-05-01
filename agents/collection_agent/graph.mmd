@@ -22,8 +22,13 @@ flowchart TD
 
   RF -->|retry_react| RN
   RF -->|retry_plan| PP
-  RF -->|complete| RR["RelevantResponseNode\n- response + response_target"]
+  RF -->|complete| RR["RelevantResponseNode\n- response + response_target + additional_targets"]
   RR --> End
+
+  End -.external orchestration in main.-> X1["Target: customer"]
+  End -.external orchestration in main.-> X2["Target: self"]
+  End -.external orchestration in main.-> X3["Target: discount_planning_agent"]
+  End -.external orchestration in main.-> X4["Additional target: collection_memory_helper_agent"]
 
   subgraph TBOX["Collection Tool Box"]
     T1["case_fetch"]

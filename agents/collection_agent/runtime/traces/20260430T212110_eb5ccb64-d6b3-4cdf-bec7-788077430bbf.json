@@ -1,0 +1,112 @@
+{
+  "trace_id": "eb5ccb64-d6b3-4cdf-bec7-788077430bbf",
+  "agent_name": "collection_agent",
+  "session_id": "gate-test-3",
+  "user_input": "fetch case COLL-1001",
+  "status": "completed",
+  "started_at": "2026-04-30T21:21:10.580114+00:00",
+  "finished_at": "2026-04-30T21:21:10.583299+00:00",
+  "error": null,
+  "summary": {
+    "trace_id": "eb5ccb64-d6b3-4cdf-bec7-788077430bbf",
+    "agent_name": "collection_agent",
+    "session_id": "gate-test-3",
+    "status": "completed",
+    "node_hits": [
+      "relevance_gate",
+      "memory_retrieve",
+      "react",
+      "tool_execution",
+      "react",
+      "plan_proposal",
+      "reflect",
+      "response"
+    ],
+    "node_count": 8,
+    "llm_call_count": 0,
+    "tool_call_count": 1,
+    "models": [],
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "total_tokens": 0,
+    "error": null
+  },
+  "nodes": [
+    {
+      "node_name": "relevance_gate",
+      "status": "completed",
+      "started_at": "2026-04-30T21:21:10.580621+00:00",
+      "finished_at": "2026-04-30T21:21:10.580684+00:00",
+      "duration_ms": 0.063,
+      "error": null
+    },
+    {
+      "node_name": "memory_retrieve",
+      "status": "completed",
+      "started_at": "2026-04-30T21:21:10.581028+00:00",
+      "finished_at": "2026-04-30T21:21:10.581100+00:00",
+      "duration_ms": 0.072,
+      "error": null
+    },
+    {
+      "node_name": "react",
+      "status": "completed",
+      "started_at": "2026-04-30T21:21:10.581279+00:00",
+      "finished_at": "2026-04-30T21:21:10.581450+00:00",
+      "duration_ms": 0.171,
+      "error": null
+    },
+    {
+      "node_name": "tool_execution",
+      "status": "completed",
+      "started_at": "2026-04-30T21:21:10.581668+00:00",
+      "finished_at": "2026-04-30T21:21:10.582254+00:00",
+      "duration_ms": 0.586,
+      "error": null
+    },
+    {
+      "node_name": "react",
+      "status": "completed",
+      "started_at": "2026-04-30T21:21:10.582422+00:00",
+      "finished_at": "2026-04-30T21:21:10.582459+00:00",
+      "duration_ms": 0.037,
+      "error": null
+    },
+    {
+      "node_name": "plan_proposal",
+      "status": "completed",
+      "started_at": "2026-04-30T21:21:10.582653+00:00",
+      "finished_at": "2026-04-30T21:21:10.582682+00:00",
+      "duration_ms": 0.029,
+      "error": null
+    },
+    {
+      "node_name": "reflect",
+      "status": "completed",
+      "started_at": "2026-04-30T21:21:10.582897+00:00",
+      "finished_at": "2026-04-30T21:21:10.582929+00:00",
+      "duration_ms": 0.032,
+      "error": null
+    },
+    {
+      "node_name": "response",
+      "status": "completed",
+      "started_at": "2026-04-30T21:21:10.583136+00:00",
+      "finished_at": "2026-04-30T21:21:10.583168+00:00",
+      "duration_ms": 0.032,
+      "error": null
+    }
+  ],
+  "llm_calls": [],
+  "tool_calls": [
+    {
+      "tool_name": "case_fetch",
+      "node_name": "tool_execution",
+      "status": "completed",
+      "started_at": "2026-04-30T21:21:10.582145+00:00",
+      "finished_at": "2026-04-30T21:21:10.582145+00:00",
+      "duration_ms": 0.435,
+      "error": null
+    }
+  ]
+}

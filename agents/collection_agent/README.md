@@ -8,7 +8,8 @@ Main customer-facing collections agent.
 - Response includes both:
   - `response` text
   - `response_target` (`customer` | `self` | `discount_planning_agent`)
-- Outer runtime loop (`run`) decides who gets that response next.
+  - optional `additional_targets` (for example `collection_memory_helper_agent`)
+- Outer orchestration loop in `main.py` decides who gets that response next.
 
 ## Graph (single-pass)
 
@@ -37,7 +38,7 @@ flowchart TD
 
   RF -->|retry_react| RN
   RF -->|retry_plan| PP
-  RF -->|complete| RR["RelevantResponseNode\n- response + response_target"]
+  RF -->|complete| RR["RelevantResponseNode\n- response + response_target + additional_targets"]
   RR --> End
 ```
 
@@ -47,6 +48,57 @@ Graph assets:
 - `graph.png`
 - `graph.jpg`
 
+## Node Definitions
+
+### `IntentNode (Relevance Gate)`
+
+- Classifies whether input is in collections scope.
+- Routes to relevant flow or immediate irrelevant response.
+
+### `IrrelevantResponseNode`
+
+- Produces static out-of-scope response.
+- Terminates current graph pass.
+
+### `IntentNode (Pre-Plan Gate)`
+
+- Decides whether to start from plan proposal or execution path decision.
+
+### `IntentNode (Execution Path)`
+
+- Chooses between memory-first route or immediate tool/planning route.
+
+### `MemoryRetrieveNode`
+
+- Loads session memory context for better continuity and follow-up handling.
+
+### `IntentNode (Post-Memory Plan Gate)`
+
+- Re-evaluates whether to continue with plan proposal or React flow after memory retrieval.
+
+### `ReactNode`
+
+- Decides next operation (`act`, `respond`, `end`) and tool arguments when needed.
+
+### `ToolExecutionNode`
+
+- Executes selected tool and returns structured observation payload.
+
+### `PlanProposalNode`
+
+- Advances conversation plan, triggers plan revisions, and emits routing targets (`customer`, `self`, `discount_planning_agent`).
+- Detects conversation termination and may add `collection_memory_helper_agent` to additional targets.
+
+### `CollectionReflectNode`
+
+- Checks if current pass is complete.
+- Routes back for another planning cycle when output is incomplete.
+
+### `RelevantResponseNode`
+
+- Produces final response payload for this graph pass.
+- Emits `response_target` and optional `additional_targets` for external orchestration in `main.py`.
+
 ## Outer routing (outside graph)
 
 After graph ends at response:
@@ -54,11 +106,12 @@ After graph ends at response:
 1. if `response_target=customer` -> return to UI/user
 2. if `response_target=self` -> re-run collection agent with internal response context
 3. if `response_target=discount_planning_agent` -> call discount agent, store result in memory, re-run collection agent
+4. if `additional_targets` contains `collection_memory_helper_agent` -> send full conversation payload to memory helper agent after turn completion
 
 Implementation note:
 
 - `CollectionAgent.run()` and `CollectionAgent.run_turn()` perform one forward graph pass only.
-- Multi-agent hop orchestration is handled in `agents/collection_agent/main.py` interactive loop.
+- Multi-agent hop orchestration is handled in `agents/collection_agent/main.py` interactive loop (not inside `CollectionAgent.run()`).
 - Loop guards in interactive mode:
   - soft cap default: `10` hops (`--agent-hop-soft-cap`)
   - hard cap default: `50` hops (`--agent-hop-hard-cap`)
@@ -88,8 +141,18 @@ Implementation note:
 ## Specialist agent used outside graph
 
 - `agents/discount_planning_agent`
+- `agents/collection_memory_helper_agent`
 
 Collection agent does not treat specialist handoff as an internal graph node or tool.
+
+## Key-event memory stores
+
+Both stores are physically under collection agent runtime so collection logic can read them directly:
+
+- `agents/collection_agent/runtime/memory/global_key_event_memory.json`
+  - cross-user key event patterns and counts (planning influence)
+- `agents/collection_agent/runtime/memory/user_key_event_memory.json`
+  - session-level key events, summary, and follow-up hints (conversation advancement influence)
 
 ## Regenerate graph
 

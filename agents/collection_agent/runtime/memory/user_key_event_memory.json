@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "updated_at": "2026-04-30T23:08:09.956802+00:00",
+  "users": {
+    "mem-helper-demo2": {
+      "case_id": "COLL-1001",
+      "summary": "No conversation content available for summarization.",
+      "key_events": [],
+      "trigger": {
+        "reason": "conversation_termination",
+        "final_user_message": "Thanks that is all, goodbye"
+      },
+      "next_considerations": [
+        "Begin next turn with dues summary and one clear next action."
+      ],
+      "updated_at": "2026-04-30T23:08:09.956800+00:00"
+    }
+  }
+}

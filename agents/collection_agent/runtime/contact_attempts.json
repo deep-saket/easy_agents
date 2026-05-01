@@ -1,0 +1,20 @@
+[
+  {
+    "attempt_id": "ATT-34A632A4D9",
+    "case_id": "COLL-1001",
+    "channel": "sms",
+    "template_id": null,
+    "status": "not_reached",
+    "notes": null,
+    "created_at": "2026-04-30T20:15:38.635148+00:00"
+  },
+  {
+    "attempt_id": "ATT-5E4DDC46AB",
+    "case_id": "COLL-1001",
+    "channel": "sms",
+    "template_id": null,
+    "status": "not_reached",
+    "notes": null,
+    "created_at": "2026-04-30T21:15:10.697817+00:00"
+  }
+]

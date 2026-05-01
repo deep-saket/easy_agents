@@ -14,7 +14,6 @@ from agents.collection_agent.nodes import CollectionReflectNode, CollectionRespo
 from agents.collection_agent.planner import CollectionPlanner
 from agents.collection_agent.prompts import load_collection_agent_prompts, render_collection_tool_catalog_yaml
 from agents.collection_agent.repository import CollectionRepository
-from agents.discount_planning_agent.agent import DiscountPlanningAgent
 from agents.collection_agent.tools import (
     CaseFetchTool,
     CasePrioritizeTool,
@@ -58,7 +57,6 @@ class CollectionAgent(BaseAgent):
     tool_registry: ToolRegistry | None = None
     tool_executor: ToolExecutor | None = None
     planner: CollectionPlanner | None = None
-    discount_agent: DiscountPlanningAgent | None = None
     logger: Any | None = None
     trace_sink: Any | None = None
     trace_output_dir: Path | None = None
@@ -92,7 +90,6 @@ class CollectionAgent(BaseAgent):
             intent_system_prompt=str(intent_prompts.get("system_prompt", "")),
             intent_user_prompt=str(intent_prompts.get("user_prompt", "")),
         )
-        self.discount_agent = self.discount_agent or DiscountPlanningAgent(llm=self.llm)
 
         self.memory_retrieve_node = MemoryRetrieveNode(tool_registry=self.tool_registry, memories=[WorkingMemory])
         self.relevance_intent_node = IntentNode(
@@ -134,6 +131,10 @@ class CollectionAgent(BaseAgent):
                     "promise",
                     "waiver",
                     "restructure",
+                    "bye",
+                    "goodbye",
+                    "end conversation",
+                    "that's all",
                 ]
             },
             response_map={

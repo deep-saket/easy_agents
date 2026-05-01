@@ -1,0 +1,48 @@
+{
+  "trace_id": "05440241-f34a-4997-ba53-af168c825126",
+  "agent_name": "collection_agent",
+  "session_id": "smoke-2",
+  "user_input": "What is the weather today?",
+  "status": "completed",
+  "started_at": "2026-04-30T21:51:56.190917+00:00",
+  "finished_at": "2026-04-30T21:51:56.191376+00:00",
+  "error": null,
+  "summary": {
+    "trace_id": "05440241-f34a-4997-ba53-af168c825126",
+    "agent_name": "collection_agent",
+    "session_id": "smoke-2",
+    "status": "completed",
+    "node_hits": [
+      "relevance_intent",
+      "irrelevant_response"
+    ],
+    "node_count": 2,
+    "llm_call_count": 0,
+    "tool_call_count": 0,
+    "models": [],
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "total_tokens": 0,
+    "error": null
+  },
+  "nodes": [
+    {
+      "node_name": "relevance_intent",
+      "status": "completed",
+      "started_at": "2026-04-30T21:51:56.191138+00:00",
+      "finished_at": "2026-04-30T21:51:56.191153+00:00",
+      "duration_ms": 0.015,
+      "error": null
+    },
+    {
+      "node_name": "irrelevant_response",
+      "status": "completed",
+      "started_at": "2026-04-30T21:51:56.191296+00:00",
+      "finished_at": "2026-04-30T21:51:56.191300+00:00",
+      "duration_ms": 0.004,
+      "error": null
+    }
+  ],
+  "llm_calls": [],
+  "tool_calls": []
+}

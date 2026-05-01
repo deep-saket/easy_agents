@@ -1,0 +1,48 @@
+{
+  "trace_id": "40cb55b1-2aba-4a70-b729-cdedf34dee02",
+  "agent_name": "collection_agent",
+  "session_id": "mem-helper-demo",
+  "user_input": "Thanks that is all, goodbye",
+  "status": "completed",
+  "started_at": "2026-04-30T23:07:46.129807+00:00",
+  "finished_at": "2026-04-30T23:07:46.130209+00:00",
+  "error": null,
+  "summary": {
+    "trace_id": "40cb55b1-2aba-4a70-b729-cdedf34dee02",
+    "agent_name": "collection_agent",
+    "session_id": "mem-helper-demo",
+    "status": "completed",
+    "node_hits": [
+      "relevance_intent",
+      "irrelevant_response"
+    ],
+    "node_count": 2,
+    "llm_call_count": 0,
+    "tool_call_count": 0,
+    "models": [],
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "total_tokens": 0,
+    "error": null
+  },
+  "nodes": [
+    {
+      "node_name": "relevance_intent",
+      "status": "completed",
+      "started_at": "2026-04-30T23:07:46.129996+00:00",
+      "finished_at": "2026-04-30T23:07:46.130007+00:00",
+      "duration_ms": 0.011,
+      "error": null
+    },
+    {
+      "node_name": "irrelevant_response",
+      "status": "completed",
+      "started_at": "2026-04-30T23:07:46.130135+00:00",
+      "finished_at": "2026-04-30T23:07:46.130138+00:00",
+      "duration_ms": 0.003,
+      "error": null
+    }
+  ],
+  "llm_calls": [],
+  "tool_calls": []
+}

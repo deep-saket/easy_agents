@@ -11,6 +11,8 @@ from typing import Any
 import yaml
 
 from agents.collection_agent.agent import CollectionAgent
+from agents.collection_memory_helper_agent.agent import CollectionMemoryHelperAgent
+from agents.collection_memory_helper_agent.repository import CollectionMemoryRepository
 from agents.discount_planning_agent.agent import DiscountPlanningAgent
 from agents.collection_agent.repository import CollectionRepository
 from agents.collection_agent.tools.data_store import CollectionDataStore
@@ -142,6 +144,7 @@ def _route_internal_turn(
     *,
     collection_agent: CollectionAgent,
     discount_agent: DiscountPlanningAgent,
+    memory_helper_agent: CollectionMemoryHelperAgent,
     session_id: str,
     initial_input: str,
     soft_cap: int,
@@ -161,11 +164,25 @@ def _route_internal_turn(
             print(format_trace_summary(collection_agent))
 
         if target == "customer":
+            _run_memory_helper_if_requested(
+                collection_agent=collection_agent,
+                memory_helper_agent=memory_helper_agent,
+                session_id=session_id,
+                state=state,
+                trace_readable=trace_readable,
+            )
             return response
 
         if hop >= soft_cap:
             memory.set_state(agent_loop_blocked=True, agent_loop_count=hop)
             guard_state = collection_agent.run_turn("system loop guard", session_id=session_id)
+            _run_memory_helper_if_requested(
+                collection_agent=collection_agent,
+                memory_helper_agent=memory_helper_agent,
+                session_id=session_id,
+                state=guard_state,
+                trace_readable=trace_readable,
+            )
             return str(guard_state.get("response", response))
 
         if target == "self":
@@ -195,6 +212,13 @@ def _route_internal_turn(
 
     memory.set_state(agent_loop_blocked=True, agent_loop_count=hard_cap)
     guard_state = collection_agent.run_turn("system hard loop guard", session_id=session_id)
+    _run_memory_helper_if_requested(
+        collection_agent=collection_agent,
+        memory_helper_agent=memory_helper_agent,
+        session_id=session_id,
+        state=guard_state,
+        trace_readable=trace_readable,
+    )
     return str(
         guard_state.get(
             "response",
@@ -203,9 +227,50 @@ def _route_internal_turn(
     )
 
 
+def _run_memory_helper_if_requested(
+    *,
+    collection_agent: CollectionAgent,
+    memory_helper_agent: CollectionMemoryHelperAgent,
+    session_id: str,
+    state: dict[str, Any],
+    trace_readable: bool,
+) -> None:
+    targets = state.get("additional_targets")
+    if not isinstance(targets, list):
+        return
+    lowered_targets = {str(item).strip().lower() for item in targets}
+    if "collection_memory_helper_agent" not in lowered_targets:
+        return
+
+    trigger = state.get("memory_helper_trigger") if isinstance(state.get("memory_helper_trigger"), dict) else {}
+    payload = _build_memory_helper_payload(collection_agent=collection_agent, session_id=session_id, trigger=trigger)
+    helper_result = memory_helper_agent.run(payload)
+    if trace_readable:
+        print("[memory-helper] updated")
+        print(json.dumps(helper_result, ensure_ascii=True))
+
+
+def _build_memory_helper_payload(
+    *,
+    collection_agent: CollectionAgent,
+    session_id: str,
+    trigger: dict[str, Any],
+) -> dict[str, Any]:
+    repository = collection_agent.repository
+    messages = [message.model_dump(mode="json") for message in repository.list_conversation_messages(session_id)]
+    state = repository.get_conversation_state(session_id) or {}
+    return {
+        "session_id": session_id,
+        "trigger": trigger,
+        "conversation_messages": messages,
+        "conversation_state": state,
+    }
+
+
 def interactive(
     agent: CollectionAgent,
     discount_agent: DiscountPlanningAgent,
+    memory_helper_agent: CollectionMemoryHelperAgent,
     session_id: str,
     trace_readable: bool,
     soft_cap: int,
@@ -221,10 +286,17 @@ def interactive(
         if not text:
             continue
         if text.lower() in {"exit", "quit"}:
+            payload = _build_memory_helper_payload(
+                collection_agent=agent,
+                session_id=session_id,
+                trigger={"reason": "interactive_exit"},
+            )
+            memory_helper_agent.run(payload)
             break
         output = _route_internal_turn(
             collection_agent=agent,
             discount_agent=discount_agent,
+            memory_helper_agent=memory_helper_agent,
             session_id=session_id,
             initial_input=text,
             soft_cap=soft_cap,
@@ -255,6 +327,10 @@ def main() -> None:
         trace_output_dir=base_dir / "runtime" / "traces",
     )
     discount_agent = DiscountPlanningAgent(llm=llm)
+    memory_helper_agent = CollectionMemoryHelperAgent(
+        repository=CollectionMemoryRepository(collection_runtime_dir=base_dir / "runtime"),
+        llm=llm,
+    )
 
     if args.interactive:
         soft_cap = max(1, int(args.agent_hop_soft_cap))
@@ -262,6 +338,7 @@ def main() -> None:
         interactive(
             agent,
             discount_agent,
+            memory_helper_agent,
             args.session_id,
             args.trace_readable,
             soft_cap,
@@ -271,9 +348,19 @@ def main() -> None:
     if not args.message:
         raise SystemExit("message is required unless --interactive is used")
 
-    print(agent.run(args.message, session_id=args.session_id))
-    if args.trace_readable:
-        print(format_trace_summary(agent))
+    soft_cap = max(1, int(args.agent_hop_soft_cap))
+    hard_cap = max(soft_cap, int(args.agent_hop_hard_cap))
+    output = _route_internal_turn(
+        collection_agent=agent,
+        discount_agent=discount_agent,
+        memory_helper_agent=memory_helper_agent,
+        session_id=args.session_id,
+        initial_input=args.message,
+        soft_cap=soft_cap,
+        hard_cap=hard_cap,
+        trace_readable=args.trace_readable,
+    )
+    print(output)
 
 
 if __name__ == "__main__":

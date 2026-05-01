@@ -1,0 +1,1489 @@
+[
+  {
+    "id": "b1100684-e369-4bfe-965f-d4eac33b9235",
+    "tool_name": "offer_eligibility",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "amount": 1002.0,
+      "hardship_flag": true
+    },
+    "output_payload": {
+      "case_id": "COLL-1002",
+      "allowed": true,
+      "offer_type": "restructure",
+      "approved_waiver_pct": 0.0,
+      "reason_codes": [
+        "high_dpd_restructure_rule"
+      ],
+      "recommended_next": "present_offer"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T20:15:38.635232Z"
+  },
+  {
+    "id": "335cac24-b59c-49b4-a2a1-0842de23cba1",
+    "tool_name": "plan_propose",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "hardship_reason": "job_loss",
+      "revision_index": 0,
+      "max_installment_amount": 1002.0
+    },
+    "output_payload": {
+      "plan_id": "PLAN-DBBBA8594A",
+      "case_id": "COLL-1002",
+      "hardship_reason": "job_loss",
+      "months": 18,
+      "monthly_amount": 2205.56,
+      "first_due_date": "2026-05-07",
+      "rationale": "Based on hardship='job_loss', total_due=39700.00, revision=0.",
+      "status": "proposed"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T20:15:38.636098Z"
+  },
+  {
+    "id": "38929de2-045f-4509-a33c-e4eee3fa81d6",
+    "tool_name": "plan_propose",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "hardship_reason": "job_loss",
+      "revision_index": 1,
+      "max_installment_amount": 1200.0
+    },
+    "output_payload": {
+      "plan_id": "PLAN-92090ABCD3",
+      "case_id": "COLL-1002",
+      "hardship_reason": "job_loss",
+      "months": 18,
+      "monthly_amount": 2205.56,
+      "first_due_date": "2026-05-07",
+      "rationale": "Based on hardship='job_loss', total_due=39700.00, revision=1.",
+      "status": "revised"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T20:15:38.705769Z"
+  },
+  {
+    "id": "5c644f38-ad59-4af5-b3f4-0bd530c27f57",
+    "tool_name": "offer_eligibility",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "amount": 1002.0,
+      "hardship_flag": true
+    },
+    "output_payload": {
+      "case_id": "COLL-1002",
+      "allowed": true,
+      "offer_type": "restructure",
+      "approved_waiver_pct": 0.0,
+      "reason_codes": [
+        "high_dpd_restructure_rule"
+      ],
+      "recommended_next": "present_offer"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T20:15:54.196548Z"
+  },
+  {
+    "id": "31936104-4ee1-4aa5-80ec-4d06840d1430",
+    "tool_name": "plan_propose",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "hardship_reason": "job_loss",
+      "revision_index": 0,
+      "max_installment_amount": 1002.0
+    },
+    "output_payload": {
+      "plan_id": "PLAN-FF90F873AA",
+      "case_id": "COLL-1002",
+      "hardship_reason": "job_loss",
+      "months": 36,
+      "monthly_amount": 1102.78,
+      "first_due_date": "2026-05-07",
+      "rationale": "Based on hardship='job_loss', total_due=39700.00, revision=0.",
+      "status": "proposed"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T20:15:54.197459Z"
+  },
+  {
+    "id": "249b5c02-27f0-4222-8bf9-5db7248681ae",
+    "tool_name": "plan_propose",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "hardship_reason": "job_loss",
+      "revision_index": 1,
+      "max_installment_amount": 1200.0
+    },
+    "output_payload": {
+      "plan_id": "PLAN-1B65FC4F68",
+      "case_id": "COLL-1002",
+      "hardship_reason": "job_loss",
+      "months": 34,
+      "monthly_amount": 1167.65,
+      "first_due_date": "2026-05-07",
+      "rationale": "Based on hardship='job_loss', total_due=39700.00, revision=1.",
+      "status": "revised"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T20:15:54.266678Z"
+  },
+  {
+    "id": "6989d517-b43a-45e8-a226-512f287ec2c2",
+    "tool_name": "channel_switch",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "amount": 1002.0,
+      "from_channel": "sms",
+      "to_channel": "voice"
+    },
+    "output_payload": {
+      "switch_id": "CHSW-DE38329152",
+      "case_id": "COLL-1002",
+      "from_channel": "sms",
+      "to_channel": "voice",
+      "reason": "customer_requested",
+      "carried_context_summary": "No prior outreach events."
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T20:15:59.725345Z"
+  },
+  {
+    "id": "7defe2d0-9a04-4c13-b339-7698bd7a0ac4",
+    "tool_name": "followup_schedule",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "scheduled_for": "2026-05-07",
+      "preferred_channel": "voice",
+      "reason": "promise_to_pay"
+    },
+    "output_payload": {
+      "schedule_id": "SCH-468D59B0D4",
+      "case_id": "COLL-1002",
+      "scheduled_for": "2026-05-07",
+      "preferred_channel": "voice",
+      "reason": "promise_to_pay"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T20:15:59.726771Z"
+  },
+  {
+    "id": "42319aed-58f6-4f4c-9c29-c6a37567f5b3",
+    "tool_name": "plan_propose",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "hardship_reason": "job_loss",
+      "revision_index": 1,
+      "max_installment_amount": 1002.0
+    },
+    "output_payload": {
+      "plan_id": "PLAN-40D7E7ADC9",
+      "case_id": "COLL-1002",
+      "hardship_reason": "job_loss",
+      "months": 36,
+      "monthly_amount": 1102.78,
+      "first_due_date": "2026-05-07",
+      "rationale": "Based on hardship='job_loss', total_due=39700.00, revision=1.",
+      "status": "revised"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T20:15:59.727300Z"
+  },
+  {
+    "id": "6f336cc0-8baf-4a3b-abe6-a368afd3d4a4",
+    "tool_name": "offer_eligibility",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "amount": 1002.0,
+      "hardship_flag": true
+    },
+    "output_payload": {
+      "case_id": "COLL-1002",
+      "allowed": true,
+      "offer_type": "restructure",
+      "approved_waiver_pct": 0.0,
+      "reason_codes": [
+        "high_dpd_restructure_rule"
+      ],
+      "recommended_next": "present_offer"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T20:16:34.299008Z"
+  },
+  {
+    "id": "8ce6595d-2ade-4cf9-b4f8-fc6615f01e4f",
+    "tool_name": "plan_propose",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "hardship_reason": "job_loss",
+      "revision_index": 0,
+      "max_installment_amount": 1002.0
+    },
+    "output_payload": {
+      "plan_id": "PLAN-2B6C3DB81F",
+      "case_id": "COLL-1002",
+      "hardship_reason": "job_loss",
+      "months": 36,
+      "monthly_amount": 1102.78,
+      "first_due_date": "2026-05-07",
+      "rationale": "Based on hardship='job_loss', total_due=39700.00, revision=0.",
+      "status": "proposed"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T20:16:34.302995Z"
+  },
+  {
+    "id": "be99c3b4-71af-4028-8ce8-0e669c16c634",
+    "tool_name": "channel_switch",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "amount": 1002.0,
+      "from_channel": "sms",
+      "to_channel": "voice"
+    },
+    "output_payload": {
+      "switch_id": "CHSW-173DBF9334",
+      "case_id": "COLL-1002",
+      "from_channel": "sms",
+      "to_channel": "voice",
+      "reason": "customer_requested",
+      "carried_context_summary": "No prior outreach events."
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T20:16:34.667049Z"
+  },
+  {
+    "id": "f24f66fc-8ae3-4f0d-92e5-d4355ed234a8",
+    "tool_name": "plan_propose",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "hardship_reason": "job_loss",
+      "revision_index": 1,
+      "max_installment_amount": 1200.0
+    },
+    "output_payload": {
+      "plan_id": "PLAN-39C1E0A4CA",
+      "case_id": "COLL-1002",
+      "hardship_reason": "job_loss",
+      "months": 34,
+      "monthly_amount": 1167.65,
+      "first_due_date": "2026-05-07",
+      "rationale": "Based on hardship='job_loss', total_due=39700.00, revision=1.",
+      "status": "revised"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T20:16:35.027011Z"
+  },
+  {
+    "id": "0e68ea75-e295-40c8-9f7c-46107c4c8ff9",
+    "tool_name": "promise_capture",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "promised_date": "2026-05-07",
+      "promised_amount": 1167.65,
+      "channel": "voice"
+    },
+    "output_payload": {
+      "promise_id": "PTP-1E0E2212D5",
+      "case_id": "COLL-1002",
+      "promised_date": "2026-05-07",
+      "promised_amount": 1167.65,
+      "status": "captured"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T20:16:35.342919Z"
+  },
+  {
+    "id": "4a36c16b-6347-4578-bc77-426c0557c357",
+    "tool_name": "followup_schedule",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "scheduled_for": "2026-05-07",
+      "preferred_channel": "voice",
+      "reason": "promise_to_pay"
+    },
+    "output_payload": {
+      "schedule_id": "SCH-A8FEF4B6E7",
+      "case_id": "COLL-1002",
+      "scheduled_for": "2026-05-07",
+      "preferred_channel": "voice",
+      "reason": "promise_to_pay"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T20:16:35.343844Z"
+  },
+  {
+    "id": "c53f0bf1-7a01-43f5-80b3-8f730b62f3d5",
+    "tool_name": "disposition_update",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "disposition_code": "plan_accepted_followup_scheduled",
+      "notes": "Demo flow: plan accepted and follow-up scheduled."
+    },
+    "output_payload": {
+      "case_id": "COLL-1002",
+      "disposition_code": "plan_accepted_followup_scheduled",
+      "audit_id": "AUD-AC6F5BB1D7",
+      "updated_at": "2026-04-30T20:16:35.344554Z"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T20:16:35.344550Z"
+  },
+  {
+    "id": "eecfa3f5-a923-4003-b4d4-fc2d8d494a05",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "amount": 1001.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1001",
+          "customer_id": "CUST-2001",
+          "loan_id": "LOAN-3001",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 47,
+          "emi_amount": 12500.0,
+          "overdue_amount": 12500.0,
+          "late_fee": 850.0,
+          "status": "open",
+          "risk_band": "medium"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T21:05:02.889407Z"
+  },
+  {
+    "id": "b12bc005-6b79-4d62-9b1e-4cc0fde43acd",
+    "tool_name": "offer_eligibility",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "hardship_flag": true
+    },
+    "output_payload": {
+      "case_id": "COLL-1001",
+      "allowed": true,
+      "offer_type": "waiver",
+      "approved_waiver_pct": 8.0,
+      "reason_codes": [
+        "hardship_waiver_rule"
+      ],
+      "recommended_next": "present_offer"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T21:05:02.891147Z"
+  },
+  {
+    "id": "e9474551-fbc3-45f3-8785-f5bbfb8e977e",
+    "tool_name": "plan_propose",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "hardship_reason": "job_loss",
+      "revision_index": 0
+    },
+    "output_payload": {
+      "plan_id": "PLAN-8363427902",
+      "case_id": "COLL-1001",
+      "hardship_reason": "job_loss",
+      "months": 6,
+      "monthly_amount": 2225.0,
+      "first_due_date": "2026-05-07",
+      "rationale": "Based on hardship='job_loss', total_due=13350.00, revision=0.",
+      "status": "proposed"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T21:05:02.891935Z"
+  },
+  {
+    "id": "69078e0d-8fd1-4529-9a6d-e3588393bfa5",
+    "tool_name": "channel_switch",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "from_channel": "sms",
+      "to_channel": "voice"
+    },
+    "output_payload": {
+      "switch_id": "CHSW-360FA2FB45",
+      "case_id": "COLL-1001",
+      "from_channel": "sms",
+      "to_channel": "voice",
+      "reason": "customer_requested",
+      "carried_context_summary": "sms:not_reached"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T21:05:02.893359Z"
+  },
+  {
+    "id": "30d4b3a8-6d01-48c5-9ad5-1b27576d6b36",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "amount": 1001.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1001",
+          "customer_id": "CUST-2001",
+          "loan_id": "LOAN-3001",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 47,
+          "emi_amount": 12500.0,
+          "overdue_amount": 12500.0,
+          "late_fee": 850.0,
+          "status": "open",
+          "risk_band": "medium"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T21:14:49.254684Z"
+  },
+  {
+    "id": "b9c386b4-6da9-42ac-b991-fc4e8d7df51e",
+    "tool_name": "contact_attempt",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "amount": 1001.0,
+      "channel": "sms",
+      "reached": false
+    },
+    "output_payload": {
+      "attempt_id": "ATT-5E4DDC46AB",
+      "case_id": "COLL-1001",
+      "channel": "sms",
+      "status": "not_reached",
+      "created_at": "2026-04-30T21:15:10.697817Z"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T21:15:10.697806Z"
+  },
+  {
+    "id": "5a234af1-a332-4362-b38a-96cfb5d6d805",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "amount": 1001.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1001",
+          "customer_id": "CUST-2001",
+          "loan_id": "LOAN-3001",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 47,
+          "emi_amount": 12500.0,
+          "overdue_amount": 12500.0,
+          "late_fee": 850.0,
+          "status": "open",
+          "risk_band": "medium"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T21:21:10.581706Z"
+  },
+  {
+    "id": "3c041cdd-9da8-41cf-9d62-9b0939a8d83c",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "amount": 1001.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1001",
+          "customer_id": "CUST-2001",
+          "loan_id": "LOAN-3001",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 47,
+          "emi_amount": 12500.0,
+          "overdue_amount": 12500.0,
+          "late_fee": 850.0,
+          "status": "open",
+          "risk_band": "medium"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T21:31:08.396126Z"
+  },
+  {
+    "id": "70922d28-12ee-4afa-bdc4-4e8c4006d3fb",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "amount": 1002.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1002",
+          "customer_id": "CUST-2002",
+          "loan_id": "LOAN-3002",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 73,
+          "emi_amount": 18900.0,
+          "overdue_amount": 37800.0,
+          "late_fee": 1900.0,
+          "status": "open",
+          "risk_band": "high"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T21:51:56.193879Z"
+  },
+  {
+    "id": "a30694fd-524c-4569-a7fa-60be83f88aff",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "amount": 1002.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1002",
+          "customer_id": "CUST-2002",
+          "loan_id": "LOAN-3002",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 73,
+          "emi_amount": 18900.0,
+          "overdue_amount": 37800.0,
+          "late_fee": 1900.0,
+          "status": "open",
+          "risk_band": "high"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T22:01:23.047999Z"
+  },
+  {
+    "id": "93b392b5-627e-4c56-975e-e148cd78c21b",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "amount": 1002.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1002",
+          "customer_id": "CUST-2002",
+          "loan_id": "LOAN-3002",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 73,
+          "emi_amount": 18900.0,
+          "overdue_amount": 37800.0,
+          "late_fee": 1900.0,
+          "status": "open",
+          "risk_band": "high"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T22:02:09.193547Z"
+  },
+  {
+    "id": "af13383d-13d0-4e16-8c26-b226613f47c5",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "amount": 1200.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1002",
+          "customer_id": "CUST-2002",
+          "loan_id": "LOAN-3002",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 73,
+          "emi_amount": 18900.0,
+          "overdue_amount": 37800.0,
+          "late_fee": 1900.0,
+          "status": "open",
+          "risk_band": "high"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T22:05:56.019644Z"
+  },
+  {
+    "id": "a614841e-1ed6-4810-b2e8-00e8ea7522db",
+    "tool_name": "plan_propose",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "hardship_reason": "job_loss",
+      "revision_index": 1,
+      "max_installment_amount": 1200.0
+    },
+    "output_payload": {
+      "plan_id": "PLAN-4AAEB69D1F",
+      "case_id": "COLL-1002",
+      "hardship_reason": "job_loss",
+      "months": 34,
+      "monthly_amount": 1167.65,
+      "first_due_date": "2026-05-07",
+      "rationale": "Based on hardship='job_loss', total_due=39700.00, revision=1.",
+      "status": "revised"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T22:05:56.021154Z"
+  },
+  {
+    "id": "7f9aee58-dca4-44f4-be37-be5f241afe56",
+    "tool_name": "promise_capture",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "promised_date": "2026-05-07",
+      "promised_amount": 1167.65,
+      "channel": "voice"
+    },
+    "output_payload": {
+      "promise_id": "PTP-1C779655B7",
+      "case_id": "COLL-1002",
+      "promised_date": "2026-05-07",
+      "promised_amount": 1167.65,
+      "status": "captured"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T22:06:06.417576Z"
+  },
+  {
+    "id": "79aba48d-7ee7-4686-9bd8-a0479f693560",
+    "tool_name": "followup_schedule",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "scheduled_for": "2026-05-07",
+      "preferred_channel": "voice",
+      "reason": "promise_to_pay"
+    },
+    "output_payload": {
+      "schedule_id": "SCH-2EBC559177",
+      "case_id": "COLL-1002",
+      "scheduled_for": "2026-05-07",
+      "preferred_channel": "voice",
+      "reason": "promise_to_pay"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T22:06:06.419535Z"
+  },
+  {
+    "id": "50cfc2cc-9101-4494-b091-44cfbf0d3548",
+    "tool_name": "disposition_update",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "disposition_code": "plan_accepted_followup_scheduled",
+      "notes": "Demo flow: plan accepted and follow-up scheduled."
+    },
+    "output_payload": {
+      "case_id": "COLL-1002",
+      "disposition_code": "plan_accepted_followup_scheduled",
+      "audit_id": "AUD-17A3450DA6",
+      "updated_at": "2026-04-30T22:06:06.420486Z"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T22:06:06.420479Z"
+  },
+  {
+    "id": "dbfba31f-9134-4238-b679-56b8e954d0b0",
+    "tool_name": "plan_propose",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "hardship_reason": "job_loss",
+      "revision_index": 1
+    },
+    "output_payload": {
+      "plan_id": "PLAN-801178D0BA",
+      "case_id": "COLL-1002",
+      "hardship_reason": "job_loss",
+      "months": 12,
+      "monthly_amount": 3308.33,
+      "first_due_date": "2026-05-07",
+      "rationale": "Based on hardship='job_loss', total_due=39700.00, revision=1.",
+      "status": "revised"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T22:06:06.421832Z"
+  },
+  {
+    "id": "23b3ce09-f669-4436-9c2d-dba7de096dd7",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "amount": 1200.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1002",
+          "customer_id": "CUST-2002",
+          "loan_id": "LOAN-3002",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 73,
+          "emi_amount": 18900.0,
+          "overdue_amount": 37800.0,
+          "late_fee": 1900.0,
+          "status": "open",
+          "risk_band": "high"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T22:31:37.839758Z"
+  },
+  {
+    "id": "ba596bc6-4207-4386-8f7f-8cd7ed5f89c3",
+    "tool_name": "offer_eligibility",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "amount": 1200.0,
+      "hardship_flag": true
+    },
+    "output_payload": {
+      "case_id": "COLL-1002",
+      "allowed": true,
+      "offer_type": "restructure",
+      "approved_waiver_pct": 0.0,
+      "reason_codes": [
+        "high_dpd_restructure_rule"
+      ],
+      "recommended_next": "present_offer"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T22:32:16.036044Z"
+  },
+  {
+    "id": "de08a185-93e5-44ca-8596-b571443097cb",
+    "tool_name": "discount_planning_handoff",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "reason_for_handoff": "Need optimized discount/EMI proposal for ongoing negotiation",
+      "current_plan": null,
+      "hardship_reason": "job_loss",
+      "target_monthly_emi": 1200.0
+    },
+    "output_payload": {
+      "recommended_offer": {
+        "case_id": "COLL-1002",
+        "offer_type": "restructure",
+        "waiver_pct": 0.0,
+        "tenure_months": 24,
+        "monthly_emi": 1200.0,
+        "hardship_reason": "job_loss"
+      },
+      "offer_variants": [
+        {
+          "case_id": "COLL-1002",
+          "offer_type": "restructure",
+          "waiver_pct": 0.0,
+          "tenure_months": 30,
+          "monthly_emi": 1020.0,
+          "hardship_reason": "job_loss"
+        },
+        {
+          "case_id": "COLL-1002",
+          "offer_type": "restructure",
+          "waiver_pct": 0.0,
+          "tenure_months": 18,
+          "monthly_emi": 1440.0,
+          "hardship_reason": "job_loss"
+        }
+      ],
+      "rationale": "Selected baseline restructure from hardship reason and requested EMI target.",
+      "compliance_flags": [
+        "demo_policy_check_pending"
+      ],
+      "confidence": 0.62,
+      "next_action_hint": "Present recommended_offer first, then use offer_variants if rejected."
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T22:32:16.037385Z"
+  },
+  {
+    "id": "6f402ea4-c3c0-4a85-a30f-9a7ec6cff52f",
+    "tool_name": "discount_planning_handoff",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "reason_for_handoff": "Need optimized discount/EMI proposal for ongoing negotiation",
+      "current_plan": null,
+      "hardship_reason": "job_loss",
+      "target_monthly_emi": 1200.0
+    },
+    "output_payload": {
+      "recommended_offer": {
+        "case_id": "COLL-1002",
+        "offer_type": "restructure",
+        "waiver_pct": 0.0,
+        "tenure_months": 24,
+        "monthly_emi": 1200.0,
+        "hardship_reason": "job_loss"
+      },
+      "offer_variants": [
+        {
+          "case_id": "COLL-1002",
+          "offer_type": "restructure",
+          "waiver_pct": 0.0,
+          "tenure_months": 30,
+          "monthly_emi": 1020.0,
+          "hardship_reason": "job_loss"
+        },
+        {
+          "case_id": "COLL-1002",
+          "offer_type": "restructure",
+          "waiver_pct": 0.0,
+          "tenure_months": 18,
+          "monthly_emi": 1440.0,
+          "hardship_reason": "job_loss"
+        }
+      ],
+      "rationale": "Selected baseline restructure from hardship reason and requested EMI target.",
+      "compliance_flags": [
+        "demo_policy_check_pending"
+      ],
+      "confidence": 0.62,
+      "next_action_hint": "Present recommended_offer first, then use offer_variants if rejected."
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T22:32:16.038648Z"
+  },
+  {
+    "id": "70b93b6f-291e-4461-a399-7c3058bd7162",
+    "tool_name": "discount_planning_handoff",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "reason_for_handoff": "Need optimized discount/EMI proposal for ongoing negotiation",
+      "current_plan": null,
+      "hardship_reason": "job_loss",
+      "target_monthly_emi": 1200.0
+    },
+    "output_payload": {
+      "recommended_offer": {
+        "case_id": "COLL-1002",
+        "offer_type": "restructure",
+        "waiver_pct": 0.0,
+        "tenure_months": 24,
+        "monthly_emi": 1200.0,
+        "hardship_reason": "job_loss"
+      },
+      "offer_variants": [
+        {
+          "case_id": "COLL-1002",
+          "offer_type": "restructure",
+          "waiver_pct": 0.0,
+          "tenure_months": 30,
+          "monthly_emi": 1020.0,
+          "hardship_reason": "job_loss"
+        },
+        {
+          "case_id": "COLL-1002",
+          "offer_type": "restructure",
+          "waiver_pct": 0.0,
+          "tenure_months": 18,
+          "monthly_emi": 1440.0,
+          "hardship_reason": "job_loss"
+        }
+      ],
+      "rationale": "Selected baseline restructure from hardship reason and requested EMI target.",
+      "compliance_flags": [
+        "demo_policy_check_pending"
+      ],
+      "confidence": 0.62,
+      "next_action_hint": "Present recommended_offer first, then use offer_variants if rejected."
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T22:32:16.039892Z"
+  },
+  {
+    "id": "36690db9-d0e9-4e45-bd09-a1958b05466b",
+    "tool_name": "discount_planning_handoff",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "reason_for_handoff": "Need optimized discount/EMI proposal for ongoing negotiation",
+      "current_plan": null,
+      "hardship_reason": "job_loss",
+      "target_monthly_emi": 1200.0
+    },
+    "output_payload": {
+      "recommended_offer": {
+        "case_id": "COLL-1002",
+        "offer_type": "restructure",
+        "waiver_pct": 0.0,
+        "tenure_months": 24,
+        "monthly_emi": 1200.0,
+        "hardship_reason": "job_loss"
+      },
+      "offer_variants": [
+        {
+          "case_id": "COLL-1002",
+          "offer_type": "restructure",
+          "waiver_pct": 0.0,
+          "tenure_months": 30,
+          "monthly_emi": 1020.0,
+          "hardship_reason": "job_loss"
+        },
+        {
+          "case_id": "COLL-1002",
+          "offer_type": "restructure",
+          "waiver_pct": 0.0,
+          "tenure_months": 18,
+          "monthly_emi": 1440.0,
+          "hardship_reason": "job_loss"
+        }
+      ],
+      "rationale": "Selected baseline restructure from hardship reason and requested EMI target.",
+      "compliance_flags": [
+        "demo_policy_check_pending"
+      ],
+      "confidence": 0.62,
+      "next_action_hint": "Present recommended_offer first, then use offer_variants if rejected."
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T22:32:16.041119Z"
+  },
+  {
+    "id": "0532448a-efe8-4125-a17a-fe0e8bcc54e9",
+    "tool_name": "discount_planning_handoff",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "reason_for_handoff": "Need optimized discount/EMI proposal for ongoing negotiation",
+      "current_plan": null,
+      "hardship_reason": "job_loss",
+      "target_monthly_emi": 1200.0
+    },
+    "output_payload": {
+      "recommended_offer": {
+        "case_id": "COLL-1002",
+        "offer_type": "restructure",
+        "waiver_pct": 0.0,
+        "tenure_months": 24,
+        "monthly_emi": 1200.0,
+        "hardship_reason": "job_loss"
+      },
+      "offer_variants": [
+        {
+          "case_id": "COLL-1002",
+          "offer_type": "restructure",
+          "waiver_pct": 0.0,
+          "tenure_months": 30,
+          "monthly_emi": 1020.0,
+          "hardship_reason": "job_loss"
+        },
+        {
+          "case_id": "COLL-1002",
+          "offer_type": "restructure",
+          "waiver_pct": 0.0,
+          "tenure_months": 18,
+          "monthly_emi": 1440.0,
+          "hardship_reason": "job_loss"
+        }
+      ],
+      "rationale": "Selected baseline restructure from hardship reason and requested EMI target.",
+      "compliance_flags": [
+        "demo_policy_check_pending"
+      ],
+      "confidence": 0.62,
+      "next_action_hint": "Present recommended_offer first, then use offer_variants if rejected."
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T22:32:16.042402Z"
+  },
+  {
+    "id": "acebdb97-d4c9-4a6d-8faf-ba55a6495e35",
+    "tool_name": "offer_eligibility",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "amount": 1200.0,
+      "hardship_flag": true
+    },
+    "output_payload": {
+      "case_id": "COLL-1002",
+      "allowed": true,
+      "offer_type": "restructure",
+      "approved_waiver_pct": 0.0,
+      "reason_codes": [
+        "high_dpd_restructure_rule"
+      ],
+      "recommended_next": "present_offer"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T22:32:30.956575Z"
+  },
+  {
+    "id": "42c4a64a-2c92-4205-a4c3-caeb159942d3",
+    "tool_name": "discount_planning_handoff",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "reason_for_handoff": "Need optimized discount/EMI proposal for ongoing negotiation",
+      "current_plan": null,
+      "hardship_reason": "job_loss",
+      "target_monthly_emi": 1200.0
+    },
+    "output_payload": {
+      "recommended_offer": {
+        "case_id": "COLL-1002",
+        "offer_type": "restructure",
+        "waiver_pct": 0.0,
+        "tenure_months": 24,
+        "monthly_emi": 1200.0,
+        "hardship_reason": "job_loss"
+      },
+      "offer_variants": [
+        {
+          "case_id": "COLL-1002",
+          "offer_type": "restructure",
+          "waiver_pct": 0.0,
+          "tenure_months": 30,
+          "monthly_emi": 1020.0,
+          "hardship_reason": "job_loss"
+        },
+        {
+          "case_id": "COLL-1002",
+          "offer_type": "restructure",
+          "waiver_pct": 0.0,
+          "tenure_months": 18,
+          "monthly_emi": 1440.0,
+          "hardship_reason": "job_loss"
+        }
+      ],
+      "rationale": "Selected baseline restructure from hardship reason and requested EMI target.",
+      "compliance_flags": [
+        "demo_policy_check_pending"
+      ],
+      "confidence": 0.62,
+      "next_action_hint": "Present recommended_offer first, then use offer_variants if rejected."
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T22:32:30.958066Z"
+  },
+  {
+    "id": "35dcfc43-48d0-441b-80af-1acec1c0a33d",
+    "tool_name": "offer_eligibility",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "amount": 1200.0,
+      "hardship_flag": true
+    },
+    "output_payload": {
+      "case_id": "COLL-1002",
+      "allowed": true,
+      "offer_type": "restructure",
+      "approved_waiver_pct": 0.0,
+      "reason_codes": [
+        "high_dpd_restructure_rule"
+      ],
+      "recommended_next": "present_offer"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T22:40:22.500176Z"
+  },
+  {
+    "id": "aef75ee0-7c2c-4f8b-b13d-78072c021ef9",
+    "tool_name": "offer_eligibility",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "amount": 1200.0,
+      "hardship_flag": true
+    },
+    "output_payload": {
+      "case_id": "COLL-1002",
+      "allowed": true,
+      "offer_type": "restructure",
+      "approved_waiver_pct": 0.0,
+      "reason_codes": [
+        "high_dpd_restructure_rule"
+      ],
+      "recommended_next": "present_offer"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T22:40:35.344634Z"
+  },
+  {
+    "id": "c1712fa5-ec5a-4d44-b7b9-9a39ee0907a1",
+    "tool_name": "discount_planning_handoff",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "reason_for_handoff": "Need optimized discount/EMI proposal for ongoing negotiation",
+      "current_plan": null,
+      "hardship_reason": "job_loss",
+      "target_monthly_emi": 1200.0
+    },
+    "output_payload": {
+      "recommended_offer": {
+        "case_id": "COLL-1002",
+        "offer_type": "restructure",
+        "waiver_pct": 0.0,
+        "tenure_months": 24,
+        "monthly_emi": 1200.0,
+        "hardship_reason": "job_loss"
+      },
+      "offer_variants": [
+        {
+          "case_id": "COLL-1002",
+          "offer_type": "restructure",
+          "waiver_pct": 0.0,
+          "tenure_months": 30,
+          "monthly_emi": 1020.0,
+          "hardship_reason": "job_loss"
+        },
+        {
+          "case_id": "COLL-1002",
+          "offer_type": "restructure",
+          "waiver_pct": 0.0,
+          "tenure_months": 18,
+          "monthly_emi": 1440.0,
+          "hardship_reason": "job_loss"
+        }
+      ],
+      "rationale": "Selected baseline restructure from hardship reason and requested EMI target.",
+      "compliance_flags": [
+        "demo_policy_check_pending"
+      ],
+      "confidence": 0.62,
+      "next_action_hint": "Present recommended_offer first, then use offer_variants if rejected."
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T22:40:35.346759Z"
+  },
+  {
+    "id": "32cac369-0b36-4d68-8778-d4f81733c14a",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "amount": 1002.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1002",
+          "customer_id": "CUST-2002",
+          "loan_id": "LOAN-3002",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 73,
+          "emi_amount": 18900.0,
+          "overdue_amount": 37800.0,
+          "late_fee": 1900.0,
+          "status": "open",
+          "risk_band": "high"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T22:40:35.349963Z"
+  },
+  {
+    "id": "41964898-c515-4b86-9e8e-44b6a72e2822",
+    "tool_name": "offer_eligibility",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "amount": 1200.0,
+      "hardship_flag": true
+    },
+    "output_payload": {
+      "case_id": "COLL-1002",
+      "allowed": true,
+      "offer_type": "restructure",
+      "approved_waiver_pct": 0.0,
+      "reason_codes": [
+        "high_dpd_restructure_rule"
+      ],
+      "recommended_next": "present_offer"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T22:48:00.208328Z"
+  },
+  {
+    "id": "5063aa52-3b34-4205-ab88-9e5a6384264d",
+    "tool_name": "offer_eligibility",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "amount": 1200.0,
+      "hardship_flag": true
+    },
+    "output_payload": {
+      "case_id": "COLL-1002",
+      "allowed": true,
+      "offer_type": "restructure",
+      "approved_waiver_pct": 0.0,
+      "reason_codes": [
+        "high_dpd_restructure_rule"
+      ],
+      "recommended_next": "present_offer"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T22:48:16.503165Z"
+  },
+  {
+    "id": "6aaaa2be-17e4-4378-b730-709e8f06e0e1",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "amount": 1002.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1002",
+          "customer_id": "CUST-2002",
+          "loan_id": "LOAN-3002",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 73,
+          "emi_amount": 18900.0,
+          "overdue_amount": 37800.0,
+          "late_fee": 1900.0,
+          "status": "open",
+          "risk_band": "high"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T22:48:16.506187Z"
+  },
+  {
+    "id": "d970fdb6-c17a-4023-b823-2298b66721aa",
+    "tool_name": "offer_eligibility",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "amount": 1200.0,
+      "hardship_flag": true
+    },
+    "output_payload": {
+      "case_id": "COLL-1002",
+      "allowed": true,
+      "offer_type": "restructure",
+      "approved_waiver_pct": 0.0,
+      "reason_codes": [
+        "high_dpd_restructure_rule"
+      ],
+      "recommended_next": "present_offer"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T22:52:39.639399Z"
+  },
+  {
+    "id": "af3c8275-2827-448d-8db1-158c03420a6e",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "amount": 1002.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1002",
+          "customer_id": "CUST-2002",
+          "loan_id": "LOAN-3002",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 73,
+          "emi_amount": 18900.0,
+          "overdue_amount": 37800.0,
+          "late_fee": 1900.0,
+          "status": "open",
+          "risk_band": "high"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T22:52:39.650804Z"
+  },
+  {
+    "id": "5eccc1c6-010b-4e2d-a942-2f3b2c63543a",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "amount": 1002.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1002",
+          "customer_id": "CUST-2002",
+          "loan_id": "LOAN-3002",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 73,
+          "emi_amount": 18900.0,
+          "overdue_amount": 37800.0,
+          "late_fee": 1900.0,
+          "status": "open",
+          "risk_band": "high"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T22:52:39.657853Z"
+  },
+  {
+    "id": "b202589b-60c3-4d7b-933f-fb69c8300bdf",
+    "tool_name": "offer_eligibility",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "amount": 1200.0,
+      "hardship_flag": true
+    },
+    "output_payload": {
+      "case_id": "COLL-1002",
+      "allowed": true,
+      "offer_type": "restructure",
+      "approved_waiver_pct": 0.0,
+      "reason_codes": [
+        "high_dpd_restructure_rule"
+      ],
+      "recommended_next": "present_offer"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T22:53:06.441874Z"
+  },
+  {
+    "id": "6068480c-4f5f-45df-bbce-91159b2293f0",
+    "tool_name": "offer_eligibility",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "amount": 1200.0,
+      "hardship_flag": true
+    },
+    "output_payload": {
+      "case_id": "COLL-1002",
+      "allowed": true,
+      "offer_type": "restructure",
+      "approved_waiver_pct": 0.0,
+      "reason_codes": [
+        "high_dpd_restructure_rule"
+      ],
+      "recommended_next": "present_offer"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T23:07:46.124135Z"
+  },
+  {
+    "id": "c19b83e4-b410-42c0-bb1f-52e637d4b0cf",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "amount": 1002.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1002",
+          "customer_id": "CUST-2002",
+          "loan_id": "LOAN-3002",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 73,
+          "emi_amount": 18900.0,
+          "overdue_amount": 37800.0,
+          "late_fee": 1900.0,
+          "status": "open",
+          "risk_band": "high"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-04-30T23:07:46.127559Z"
+  }
+]

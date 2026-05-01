@@ -1,0 +1,130 @@
+{
+  "trace_id": "42773986-2312-4f71-b66c-6e66adebd37f",
+  "agent_name": "collection_agent",
+  "session_id": "orchestr-test",
+  "user_input": "collections emi restructuring recommendation ready for case COLL-1002",
+  "status": "completed",
+  "started_at": "2026-04-30T22:52:39.647385+00:00",
+  "finished_at": "2026-04-30T22:52:39.655849+00:00",
+  "error": null,
+  "summary": {
+    "trace_id": "42773986-2312-4f71-b66c-6e66adebd37f",
+    "agent_name": "collection_agent",
+    "session_id": "orchestr-test",
+    "status": "completed",
+    "node_hits": [
+      "relevance_intent",
+      "pre_plan_intent",
+      "execution_path_intent",
+      "react",
+      "tool_execution",
+      "react",
+      "origin_react_plan",
+      "plan_proposal",
+      "reflect",
+      "relevant_response"
+    ],
+    "node_count": 10,
+    "llm_call_count": 0,
+    "tool_call_count": 1,
+    "models": [],
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "total_tokens": 0,
+    "error": null
+  },
+  "nodes": [
+    {
+      "node_name": "relevance_intent",
+      "status": "completed",
+      "started_at": "2026-04-30T22:52:39.648400+00:00",
+      "finished_at": "2026-04-30T22:52:39.648484+00:00",
+      "duration_ms": 0.084,
+      "error": null
+    },
+    {
+      "node_name": "pre_plan_intent",
+      "status": "completed",
+      "started_at": "2026-04-30T22:52:39.649417+00:00",
+      "finished_at": "2026-04-30T22:52:39.649482+00:00",
+      "duration_ms": 0.065,
+      "error": null
+    },
+    {
+      "node_name": "execution_path_intent",
+      "status": "completed",
+      "started_at": "2026-04-30T22:52:39.650044+00:00",
+      "finished_at": "2026-04-30T22:52:39.650073+00:00",
+      "duration_ms": 0.029,
+      "error": null
+    },
+    {
+      "node_name": "react",
+      "status": "completed",
+      "started_at": "2026-04-30T22:52:39.650399+00:00",
+      "finished_at": "2026-04-30T22:52:39.650466+00:00",
+      "duration_ms": 0.067,
+      "error": null
+    },
+    {
+      "node_name": "tool_execution",
+      "status": "completed",
+      "started_at": "2026-04-30T22:52:39.650770+00:00",
+      "finished_at": "2026-04-30T22:52:39.653663+00:00",
+      "duration_ms": 2.893,
+      "error": null
+    },
+    {
+      "node_name": "react",
+      "status": "completed",
+      "started_at": "2026-04-30T22:52:39.654004+00:00",
+      "finished_at": "2026-04-30T22:52:39.654036+00:00",
+      "duration_ms": 0.032,
+      "error": null
+    },
+    {
+      "node_name": "origin_react_plan",
+      "status": "completed",
+      "started_at": "2026-04-30T22:52:39.654359+00:00",
+      "finished_at": "2026-04-30T22:52:39.654362+00:00",
+      "duration_ms": 0.003,
+      "error": null
+    },
+    {
+      "node_name": "plan_proposal",
+      "status": "completed",
+      "started_at": "2026-04-30T22:52:39.654466+00:00",
+      "finished_at": "2026-04-30T22:52:39.654824+00:00",
+      "duration_ms": 0.358,
+      "error": null
+    },
+    {
+      "node_name": "reflect",
+      "status": "completed",
+      "started_at": "2026-04-30T22:52:39.655531+00:00",
+      "finished_at": "2026-04-30T22:52:39.655546+00:00",
+      "duration_ms": 0.015,
+      "error": null
+    },
+    {
+      "node_name": "relevant_response",
+      "status": "completed",
+      "started_at": "2026-04-30T22:52:39.655748+00:00",
+      "finished_at": "2026-04-30T22:52:39.655757+00:00",
+      "duration_ms": 0.009,
+      "error": null
+    }
+  ],
+  "llm_calls": [],
+  "tool_calls": [
+    {
+      "tool_name": "case_fetch",
+      "node_name": "tool_execution",
+      "status": "completed",
+      "started_at": "2026-04-30T22:52:39.653014+00:00",
+      "finished_at": "2026-04-30T22:52:39.653014+00:00",
+      "duration_ms": 2.196,
+      "error": null
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "trace_id": "de197453-77d8-436d-88cc-d1495e4927b4",
+  "agent_name": "collection_agent",
+  "session_id": "gate-test-1",
+  "user_input": "what is weather today",
+  "status": "completed",
+  "started_at": "2026-04-30T21:21:09.869840+00:00",
+  "finished_at": "2026-04-30T21:21:09.871022+00:00",
+  "error": null,
+  "summary": {
+    "trace_id": "de197453-77d8-436d-88cc-d1495e4927b4",
+    "agent_name": "collection_agent",
+    "session_id": "gate-test-1",
+    "status": "completed",
+    "node_hits": [
+      "relevance_gate",
+      "irrelevant_response"
+    ],
+    "node_count": 2,
+    "llm_call_count": 0,
+    "tool_call_count": 0,
+    "models": [],
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "total_tokens": 0,
+    "error": null
+  },
+  "nodes": [
+    {
+      "node_name": "relevance_gate",
+      "status": "completed",
+      "started_at": "2026-04-30T21:21:09.870437+00:00",
+      "finished_at": "2026-04-30T21:21:09.870493+00:00",
+      "duration_ms": 0.056,
+      "error": null
+    },
+    {
+      "node_name": "irrelevant_response",
+      "status": "completed",
+      "started_at": "2026-04-30T21:21:09.870784+00:00",
+      "finished_at": "2026-04-30T21:21:09.870823+00:00",
+      "duration_ms": 0.039,
+      "error": null
+    }
+  ],
+  "llm_calls": [],
+  "tool_calls": []
+}

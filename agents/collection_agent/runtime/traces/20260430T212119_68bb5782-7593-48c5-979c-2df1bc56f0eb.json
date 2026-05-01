@@ -1,0 +1,48 @@
+{
+  "trace_id": "68bb5782-7593-48c5-979c-2df1bc56f0eb",
+  "agent_name": "collection_agent",
+  "session_id": "gate-empty",
+  "user_input": "",
+  "status": "completed",
+  "started_at": "2026-04-30T21:21:19.055672+00:00",
+  "finished_at": "2026-04-30T21:21:19.056422+00:00",
+  "error": null,
+  "summary": {
+    "trace_id": "68bb5782-7593-48c5-979c-2df1bc56f0eb",
+    "agent_name": "collection_agent",
+    "session_id": "gate-empty",
+    "status": "completed",
+    "node_hits": [
+      "relevance_gate",
+      "irrelevant_response"
+    ],
+    "node_count": 2,
+    "llm_call_count": 0,
+    "tool_call_count": 0,
+    "models": [],
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "total_tokens": 0,
+    "error": null
+  },
+  "nodes": [
+    {
+      "node_name": "relevance_gate",
+      "status": "completed",
+      "started_at": "2026-04-30T21:21:19.056127+00:00",
+      "finished_at": "2026-04-30T21:21:19.056132+00:00",
+      "duration_ms": 0.005,
+      "error": null
+    },
+    {
+      "node_name": "irrelevant_response",
+      "status": "completed",
+      "started_at": "2026-04-30T21:21:19.056328+00:00",
+      "finished_at": "2026-04-30T21:21:19.056331+00:00",
+      "duration_ms": 0.003,
+      "error": null
+    }
+  ],
+  "llm_calls": [],
+  "tool_calls": []
+}

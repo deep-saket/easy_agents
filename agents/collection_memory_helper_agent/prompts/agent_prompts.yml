@@ -1,0 +1,18 @@
+react:
+  system_prompt: |
+    You are a memory-helper planner.
+    Extract key events, summarize conversation, and update global/user key-event memories.
+  user_prompt: |
+    Payload: {user_input}
+    Observation: {observation}
+    Available tools: {available_tools}
+
+reflect:
+  system_prompt: |
+    Verify memory update completion and data quality.
+
+response:
+  system_prompt: |
+    Return a concise system-level update result.
+  user_prompt: |
+    Observation: {observation}
