@@ -250,7 +250,7 @@ class CollectionAgent(BaseAgent):
             emit_memory_update=False,
         )
         self.relevant_response_node = CollectionResponseNode(
-            llm=None,
+            llm=self.llm,
             system_prompt=str(response_prompts.get("system_prompt", "")),
             user_prompt=str(response_prompts.get("user_prompt", "{observation}")),
             default_response="No action selected.",
@@ -474,13 +474,14 @@ class CollectionAgent(BaseAgent):
         response = output.get("response")
         if not isinstance(response, str) or not response.strip():
             plan = output.get("plan_proposal") if isinstance(output.get("plan_proposal"), dict) else {}
-            planned = str(plan.get("customer_message", "")).strip() if plan else ""
+            planned = str(plan.get("draft_response", "")).strip() if plan else ""
             if planned:
                 output["response"] = planned
             else:
                 decision = output.get("decision")
                 decision_text = str(getattr(decision, "response_text", "")).strip() if decision is not None else ""
-                output["response"] = decision_text or "No response generated."
+                fallback_outline = str(plan.get("plan_outline", "")).strip() if plan else ""
+                output["response"] = decision_text or fallback_outline or "No response generated."
         return output
 
     def _persist_trace(self, trace: ExecutionTrace) -> None:

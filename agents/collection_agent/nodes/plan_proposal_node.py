@@ -41,10 +41,9 @@ class PlanProposalNode(BaseGraphNode):
                 "response_target": "customer",
                 "plan_proposal": {
                     "target": "customer",
-                    "customer_message": (
-                        "I have been running internal planning loops for too long on this request. "
-                        "Please confirm one concrete next step (pay now, ask for plan revision, or schedule follow-up)."
-                    ),
+                    "intent": "loop_guard",
+                    "guidance": "Internal planning loop exceeded threshold.",
+                    "next_actions": ["pay_now", "plan_revision", "schedule_followup"],
                     "plan_origin": "loop_guard",
                 },
             }
@@ -55,7 +54,8 @@ class PlanProposalNode(BaseGraphNode):
                 "response_target": "customer",
                 "plan_proposal": {
                     "target": "customer",
-                    "customer_message": "Thank you. I am closing this conversation now.",
+                    "intent": "conversation_termination",
+                    "guidance": "Conversation is being closed politely.",
                     "plan_origin": "conversation_termination",
                 },
                 "additional_targets": ["collection_memory_helper_agent"],
@@ -67,7 +67,6 @@ class PlanProposalNode(BaseGraphNode):
 
         discount_recommendation = memory_state.get("discount_recommendation")
         if isinstance(discount_recommendation, dict) and discount_recommendation:
-            response_text = self._build_discount_offer_response(discount_recommendation)
             if memory is not None:
                 memory.set_state(discount_recommendation=None)
             return {
@@ -75,7 +74,8 @@ class PlanProposalNode(BaseGraphNode):
                 "response_target": "customer",
                 "plan_proposal": {
                     "target": "customer",
-                    "customer_message": response_text,
+                    "intent": "discount_recommendation",
+                    "discount_recommendation": discount_recommendation,
                     "plan_origin": "discount_recommendation",
                 },
             }
@@ -266,8 +266,23 @@ class PlanProposalNode(BaseGraphNode):
         if opener_message:
             return {
                 "target": "customer",
-                "customer_message": opener_message,
+                "intent": "outbound_opening",
+                "opening_context": opener_message,
                 "plan_origin": "outbound_opening",
+            }
+
+        preplan_message = self._build_preplan_customer_message(
+            user_input=user_input,
+            memory_state=memory_state,
+            plan_origin=plan_origin,
+            observation=observation,
+        )
+        if preplan_message:
+            return {
+                "target": "customer",
+                "intent": "help_options",
+                "help_context": preplan_message,
+                "plan_origin": "preplan_customer_guidance",
             }
 
         decision_text = str(getattr(decision, "response_text", "") or "").strip()
@@ -279,12 +294,14 @@ class PlanProposalNode(BaseGraphNode):
             if decision_text.lower().startswith("proposed plan for "):
                 return {
                     "target": target,
+                    "intent": "plan_recommendation",
                     "plan_outline": decision_text,
                     "plan_origin": "react_direct_plan_outline",
                 }
             return {
                 "target": target,
-                "customer_message": decision_text,
+                "intent": "direct_response",
+                "draft_response": decision_text,
                 "plan_origin": "react_direct",
             }
 
@@ -297,26 +314,22 @@ class PlanProposalNode(BaseGraphNode):
             if total <= 0 or not cases:
                 return {
                     "target": "customer",
-                    "customer_message": (
-                        "I could not find an active dues case right now. Please confirm your case ID or customer ID so I can proceed."
-                    ),
+                    "intent": "case_not_found",
+                    "case_lookup_status": "not_found",
                     "plan_origin": "tool_case_fetch",
                 }
             primary = cases[0] if isinstance(cases[0], dict) else {}
-            customer_name = str(memory_state.get("active_customer_name", "Customer")).strip() or "Customer"
-            case_id = str(primary.get("case_id", memory_state.get("active_case_id", "COLL-1001")))
-            overdue_amount = float(primary.get("overdue_amount", 0.0))
-            emi_amount = float(primary.get("emi_amount", 0.0))
-            dpd = int(primary.get("dpd", 0))
-            late_fee = float(primary.get("late_fee", 0.0))
             return {
                 "target": "customer",
-                "customer_message": (
-                    f"Hello {customer_name}, this is the collections desk regarding case {case_id}. "
-                    f"Our records show overdue amount {overdue_amount:.2f}, EMI {emi_amount:.2f}, "
-                    f"late fee {late_fee:.2f}, and {dpd} days past due. "
-                    "Would you like to pay now, request a payment arrangement, or schedule a follow-up?"
-                ),
+                "intent": "case_snapshot",
+                "case_snapshot": {
+                    "case_id": str(primary.get("case_id", memory_state.get("active_case_id", "COLL-1001"))),
+                    "customer_name": str(memory_state.get("active_customer_name", "Customer")).strip() or "Customer",
+                    "overdue_amount": float(primary.get("overdue_amount", 0.0)),
+                    "emi_amount": float(primary.get("emi_amount", 0.0)),
+                    "late_fee": float(primary.get("late_fee", 0.0)),
+                    "dpd": int(primary.get("dpd", 0)),
+                },
                 "plan_origin": "tool_case_fetch",
             }
 
@@ -327,10 +340,12 @@ class PlanProposalNode(BaseGraphNode):
             if months is not None and monthly_amount is not None:
                 return {
                     "target": "customer",
-                    "customer_message": (
-                        f"I can offer a {int(months)}-month plan at {float(monthly_amount):.2f} per month. "
-                        f"First due date is {first_due_date}. Does this work for you?"
-                    ),
+                    "intent": "plan_offer",
+                    "plan_offer": {
+                        "months": int(months),
+                        "monthly_amount": float(monthly_amount),
+                        "first_due_date": str(first_due_date),
+                    },
                     "plan_origin": "tool_plan_propose",
                 }
 
@@ -338,23 +353,27 @@ class PlanProposalNode(BaseGraphNode):
             if decision_text.lower().startswith("proposed plan for "):
                 return {
                     "target": target,
+                    "intent": "plan_recommendation",
                     "plan_outline": decision_text,
                     "plan_origin": "react_direct_raw_plan_outline",
                 }
             if decision_text.startswith("Executed "):
                 return {
                     "target": target,
+                    "intent": "tool_summary",
                     "plan_outline": decision_text,
                     "plan_origin": "react_tool_summary",
                 }
             return {
                 "target": target,
-                "customer_message": decision_text,
+                "intent": "direct_response",
+                "draft_response": decision_text,
                 "plan_origin": "react_direct_raw",
             }
 
         return {
             "target": "customer",
+            "intent": "plan_recommendation",
             "plan_outline": default_plan,
             "plan_origin": "default_direct_plan",
         }
@@ -365,7 +384,7 @@ class PlanProposalNode(BaseGraphNode):
         user_input: str,
         memory_state: dict[str, Any],
         plan_origin: str,
-    ) -> str | None:
+    ) -> dict[str, Any] | None:
         lowered = user_input.lower()
         if plan_origin != "pre_plan_intent" and "outbound collections call" not in lowered:
             return None
@@ -387,12 +406,50 @@ class PlanProposalNode(BaseGraphNode):
                 if first_point:
                     prior_signal = f" I also note from prior interactions: {first_point}."
 
-        return (
-            f"Hello {customer_name}, this is the collections team calling regarding case {case_id}. "
-            f"Our records show an overdue amount of INR {float(overdue_amount):.2f}. "
-            "I can help you clear dues now or discuss a suitable repayment arrangement."
-            f"{prior_signal} Are you available to proceed with payment today?"
-        )
+        return {
+            "customer_name": customer_name,
+            "case_id": case_id,
+            "overdue_amount": float(overdue_amount),
+            "prior_signal": prior_signal.strip(),
+        }
+
+    @staticmethod
+    def _build_preplan_customer_message(
+        *,
+        user_input: str,
+        memory_state: dict[str, Any],
+        plan_origin: str,
+        observation: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        if plan_origin not in {"pre_plan_intent", "post_memory_plan_intent"}:
+            return None
+        if observation:
+            return None
+
+        lowered = user_input.lower()
+        customer_name = str(memory_state.get("active_customer_name", "Customer")).strip() or "Customer"
+        case_id = str(memory_state.get("active_case_id", "COLL-1001")).strip() or "COLL-1001"
+
+        help_signals = [
+            "how can you help",
+            "what can you do",
+            "help me",
+            "options",
+            "what are my options",
+        ]
+        if any(signal in lowered for signal in help_signals):
+            return {
+                "customer_name": customer_name,
+                "case_id": case_id,
+                "options": [
+                    "pay_dues_now",
+                    "set_repayment_arrangement",
+                    "schedule_followup",
+                ],
+                "preferred_next_step": "verify_identity_then_share_exact_dues",
+            }
+
+        return None
 
     @staticmethod
     def _extract_named_amount(*, user_input: str, key: str) -> float | None:
