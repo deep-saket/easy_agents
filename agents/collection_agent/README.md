@@ -145,6 +145,47 @@ Implementation note:
 
 Collection agent does not treat specialist handoff as an internal graph node or tool.
 
+## Pipecat voice runtime integration
+
+Pipecat integration is added as a runtime adapter, not as an internal graph node.
+
+- shared integration helpers: `src/interfaces/pipecat_runner.py`
+- collection voice bot entrypoint: `agents/collection_agent/pipecat_bot.py`
+
+### What this does
+
+- Pipecat handles transport/session/audio IO (WebRTC, Daily, telephony transports).
+- OpenAI STT converts caller audio to text.
+- Text is routed to existing collection orchestration (`_route_internal_turn`) with discount and memory-helper handoffs unchanged.
+- Returned text is converted back to speech via OpenAI TTS.
+
+### Runtime config
+
+Defined in `agents/collection_agent/config.yml` under `voice_runtime`:
+
+- `stt_model`
+- `tts_model`
+- `tts_voice`
+- `pipecat.vad_enabled`
+- `pipecat.audio_in_sample_rate`
+- `pipecat.audio_out_sample_rate`
+
+### Run
+
+```bash
+# install optional dependencies
+pip install ".[voice-realtime]"
+
+# local browser WebRTC
+python agents/collection_agent/pipecat_bot.py -t webrtc
+
+# daily transport
+python agents/collection_agent/pipecat_bot.py -t daily
+
+# telephony transport via twilio (public proxy required)
+python agents/collection_agent/pipecat_bot.py -t twilio -x <your-ngrok-domain>
+```
+
 ## Key-event memory stores
 
 Both stores are physically under collection agent runtime so collection logic can read them directly:

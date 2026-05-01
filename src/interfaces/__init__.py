@@ -14,6 +14,14 @@ from src.interfaces.email import (
     PolicyProvider,
     SupportsReprocess,
 )
+from src.interfaces.pipecat_runner import (
+    PipecatNotInstalledError,
+    PipecatRunnerConfig,
+    build_runner_bot,
+    build_transport_params,
+    ensure_pipecat_available,
+    run_pipecat_main,
+)
 
 __all__ = [
     "ApprovalQueue",
@@ -24,5 +32,11 @@ __all__ = [
     "MessageRepository",
     "Notifier",
     "PolicyProvider",
+    "PipecatNotInstalledError",
+    "PipecatRunnerConfig",
     "SupportsReprocess",
+    "build_runner_bot",
+    "build_transport_params",
+    "ensure_pipecat_available",
+    "run_pipecat_main",
 ]

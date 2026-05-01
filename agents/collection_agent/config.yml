@@ -12,9 +12,20 @@ llm:
   model_name: gpt-4o-mini
   max_new_tokens: 500
   temperature: 0.1
+voice_runtime:
+  stt_model: gpt-4o-mini-transcribe
+  tts_model: gpt-4o-mini-tts
+  tts_voice: alloy
+  pipecat:
+    enabled: true
+    vad_enabled: true
+    audio_in_sample_rate: 16000
+    audio_out_sample_rate: 24000
 tracing:
   jsonl_path: ./runtime/traces/events.jsonl
 demo:
+  agent_hop_soft_cap: 10
+  agent_hop_hard_cap: 50
   channels:
     - sms
     - voice

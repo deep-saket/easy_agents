@@ -50,6 +50,9 @@ voice-processing = [
   "torchaudio>=2.2,<3.0",
   "yt-dlp>=2025.1.15",
 ]
+voice-realtime = [
+  "pipecat-ai[openai,runner,websocket]>=1.0.0,<2.0",
+]
 
 [project.scripts]
 voice-processing = "voice_processing.cli:main"
