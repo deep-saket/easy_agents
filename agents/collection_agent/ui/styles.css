@@ -1,0 +1,299 @@
+:root {
+  --bg: #f3f5f8;
+  --surface: #ffffff;
+  --surface-2: #f9fbff;
+  --text: #112032;
+  --muted: #5d6b7b;
+  --border: #d6dce5;
+  --accent: #0d66d0;
+  --accent-soft: #e6f0ff;
+  --good: #0d8a52;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  color: var(--text);
+  background: radial-gradient(circle at top right, #dbe7ff, var(--bg) 35%);
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 1fr 420px;
+  min-height: 100vh;
+}
+
+.main-pane {
+  padding: 1.25rem;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.topbar p {
+  margin: 0.4rem 0 0;
+  color: var(--muted);
+}
+
+.session-controls {
+  display: grid;
+  gap: 0.3rem;
+  min-width: 240px;
+}
+
+input,
+button,
+select {
+  font: inherit;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.55rem 0.75rem;
+}
+
+button {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+  cursor: pointer;
+}
+
+.chat-section,
+.panel,
+.state-pane-content {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.chat-section {
+  padding: 0.85rem;
+}
+
+.chat-log {
+  min-height: 220px;
+  max-height: 320px;
+  overflow: auto;
+  display: grid;
+  gap: 0.6rem;
+  margin-bottom: 0.8rem;
+}
+
+.bubble {
+  padding: 0.65rem 0.8rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  white-space: pre-wrap;
+}
+
+.bubble.user {
+  background: var(--accent-soft);
+}
+
+.bubble.agent {
+  background: #f6fff9;
+  border-color: #c8ebd7;
+}
+
+.bubble.system {
+  background: #fff7e8;
+  border-color: #f2dcaa;
+}
+
+.chat-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.6rem;
+}
+
+.debug-section {
+  margin-top: 1rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.panel {
+  padding: 0.85rem;
+}
+
+.llm-status {
+  margin-top: 0.35rem;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.demo-users-panel {
+  margin-bottom: 1rem;
+}
+
+.demo-users {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0.7rem;
+}
+
+.demo-user-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  padding: 0.65rem;
+}
+
+.demo-user-card h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+}
+
+.demo-user-meta {
+  margin: 0 0 0.22rem;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+.demo-user-actions {
+  margin-top: 0.45rem;
+}
+
+.demo-user-actions button {
+  width: 100%;
+}
+
+.panel h2,
+.state-pane h2,
+.state-pane h3 {
+  margin: 0 0 0.6rem;
+}
+
+.execution-chart {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.hop-row {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  padding: 0.6rem;
+}
+
+.hop-title {
+  font-weight: 600;
+  margin-bottom: 0.3rem;
+}
+
+.hop-nodes,
+.hop-tools {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.thinking-trace {
+  max-height: 300px;
+  overflow: auto;
+  font-family: "IBM Plex Mono", "Consolas", monospace;
+  background: #0f1722;
+  color: #d9e5ff;
+  border-radius: 10px;
+  padding: 0.75rem;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.trace-line {
+  margin: 0 0 0.2rem;
+}
+
+.state-pane {
+  border-left: 1px solid var(--border);
+  background: #f8fbff;
+  position: relative;
+  transition: width 0.24s ease;
+  width: 420px;
+}
+
+.state-pane-content {
+  margin: 0.9rem;
+  padding: 0.85rem;
+  height: calc(100vh - 1.8rem);
+  overflow: auto;
+}
+
+.collapse-button {
+  position: absolute;
+  left: -82px;
+  top: 14px;
+  width: 76px;
+  background: #1a2d4c;
+  border-color: #1a2d4c;
+}
+
+.json-view {
+  margin: 0;
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 8px;
+  padding: 0.6rem;
+  max-height: 300px;
+  overflow: auto;
+  font-family: "IBM Plex Mono", "Consolas", monospace;
+  font-size: 0.82rem;
+}
+
+.app-shell.collapsed {
+  grid-template-columns: 1fr 32px;
+}
+
+.app-shell.collapsed .state-pane {
+  width: 32px;
+}
+
+.app-shell.collapsed .state-pane-content {
+  display: none;
+}
+
+.app-shell.collapsed .collapse-button {
+  left: -96px;
+}
+
+.status-ok {
+  color: var(--good);
+}
+
+@media (max-width: 1080px) {
+  .app-shell,
+  .app-shell.collapsed {
+    grid-template-columns: 1fr;
+  }
+
+  .state-pane,
+  .app-shell.collapsed .state-pane {
+    width: auto;
+    border-left: 0;
+    border-top: 1px solid var(--border);
+  }
+
+  .collapse-button,
+  .app-shell.collapsed .collapse-button {
+    left: auto;
+    right: 12px;
+    top: 12px;
+  }
+
+  .state-pane-content {
+    height: auto;
+    max-height: 42vh;
+  }
+}

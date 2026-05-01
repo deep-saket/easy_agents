@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Collection Agent Debug UI</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell" id="appShell">
+      <main class="main-pane">
+        <header class="topbar">
+          <div>
+            <h1>Collection Agent Debug Console</h1>
+            <p>Run test turns, inspect execution chart, and trace state updates.</p>
+            <p id="llmStatus" class="llm-status"></p>
+          </div>
+          <div class="session-controls">
+            <label for="sessionId">Session</label>
+            <input id="sessionId" type="text" value="collection-ui-session" />
+          </div>
+        </header>
+
+        <section class="panel demo-users-panel">
+          <h2>Start As Demo User</h2>
+          <div id="demoUsers" class="demo-users"></div>
+        </section>
+
+        <section class="chat-section">
+          <div id="chatLog" class="chat-log"></div>
+          <form id="chatForm" class="chat-form">
+            <input id="messageInput" type="text" placeholder="Type a test input for the agent" required />
+            <button type="submit" id="sendButton">Run Turn</button>
+          </form>
+        </section>
+
+        <section class="debug-section">
+          <div class="panel">
+            <h2>Execution Chart</h2>
+            <div id="executionChart" class="execution-chart"></div>
+          </div>
+          <div class="panel">
+            <h2>Thinking Trace</h2>
+            <div id="thinkingTrace" class="thinking-trace"></div>
+          </div>
+        </section>
+      </main>
+
+      <aside class="state-pane" id="statePane">
+        <button class="collapse-button" id="collapseButton" type="button">Collapse</button>
+        <div class="state-pane-content">
+          <h2>Graph State Inspector</h2>
+          <label for="snapshotPicker">Snapshot</label>
+          <select id="snapshotPicker"></select>
+
+          <h3>State</h3>
+          <pre id="stateJson" class="json-view"></pre>
+
+          <h3>Working Memory</h3>
+          <pre id="memoryJson" class="json-view"></pre>
+        </div>
+      </aside>
+    </div>
+
+    <script src="/static/app.js" type="module"></script>
+  </body>
+</html>

@@ -1,0 +1,499 @@
+"""Collection Agent debug UI server.
+
+Purpose: Provides a local web UI for text-mode testing with execution timeline,
+thinking events, and graph-state snapshots.
+"""
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+from fastapi import APIRouter, FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
+
+from agents.collection_agent.agent import CollectionAgent
+from agents.collection_agent.main import DEFAULT_CONFIG_PATH, build_llm, load_collection_config
+from agents.collection_agent.repository import CollectionRepository
+from agents.collection_agent.tools.data_store import CollectionDataStore
+from agents.collection_memory_helper_agent.agent import CollectionMemoryHelperAgent
+from agents.collection_memory_helper_agent.repository import CollectionMemoryRepository
+from agents.discount_planning_agent.agent import DiscountPlanningAgent
+
+
+STATIC_DIR = Path(__file__).resolve().parent
+
+
+class InMemoryTraceSink:
+    """Captures per-turn trace events for the debug UI."""
+
+    def __init__(self) -> None:
+        self.events: list[dict[str, Any]] = []
+
+    def emit(self, event: dict[str, Any]) -> None:
+        self.events.append(_json_safe(event))
+
+
+class RunTurnRequest(BaseModel):
+    """Input payload for one UI chat turn."""
+
+    message: str = Field(min_length=1)
+    session_id: str = Field(default="collection-ui-session")
+    soft_cap: int = Field(default=10, ge=1)
+    hard_cap: int = Field(default=50, ge=1)
+
+
+class SessionStateResponse(BaseModel):
+    """Session snapshot response for right-side state panel refresh."""
+
+    session_id: str
+    conversation_state: dict[str, Any]
+    working_memory_state: dict[str, Any]
+
+
+class StartConversationRequest(BaseModel):
+    """Input payload for demo-user initiated collection conversation."""
+
+    user_code: str = Field(min_length=1, description="One of: user_a, user_b, user_c")
+    session_id: str | None = Field(default=None)
+    soft_cap: int = Field(default=10, ge=1)
+    hard_cap: int = Field(default=50, ge=1)
+
+
+@dataclass(slots=True)
+class CollectionDebugRuntime:
+    """Owns runtime agents and executes hop-by-hop internal routing."""
+
+    base_dir: Path
+    config_path: Path
+    llm: Any | None
+    llm_error: str | None
+    collection_agent: CollectionAgent
+    discount_agent: DiscountPlanningAgent
+    memory_helper_agent: CollectionMemoryHelperAgent
+    demo_users: list[dict[str, Any]]
+
+    @classmethod
+    def create(cls, base_dir: Path) -> "CollectionDebugRuntime":
+        config_path = base_dir / "config.yml"
+        raw_config = load_collection_config(config_path if config_path.exists() else DEFAULT_CONFIG_PATH)
+
+        llm_error: str | None = None
+        try:
+            llm = build_llm(raw_config)
+        except Exception as exc:  # pragma: no cover - fallback path for local demo use
+            llm = None
+            llm_error = str(exc)
+
+        collection_repo = CollectionRepository(runtime_dir=base_dir / "runtime")
+        collection_store = CollectionDataStore(base_dir=base_dir)
+        memory_repo = CollectionMemoryRepository(collection_runtime_dir=base_dir / "runtime")
+        demo_users = _load_demo_users(base_dir)
+
+        collection_agent = CollectionAgent(
+            repository=collection_repo,
+            data_store=collection_store,
+            llm=llm,
+            trace_output_dir=base_dir / "runtime" / "traces",
+        )
+        discount_agent = DiscountPlanningAgent(llm=llm)
+        memory_helper_agent = CollectionMemoryHelperAgent(repository=memory_repo, llm=llm)
+
+        return cls(
+            base_dir=base_dir,
+            config_path=config_path,
+            llm=llm,
+            llm_error=llm_error,
+            collection_agent=collection_agent,
+            discount_agent=discount_agent,
+            memory_helper_agent=memory_helper_agent,
+            demo_users=demo_users,
+        )
+
+    def list_demo_users(self) -> list[dict[str, Any]]:
+        return _json_safe(self.demo_users)
+
+    def start_conversation(self, request: StartConversationRequest) -> dict[str, Any]:
+        user_code = request.user_code.strip().lower()
+        matched = next((item for item in self.demo_users if item.get("user_code") == user_code), None)
+        if matched is None:
+            raise ValueError(f"Unknown user_code={user_code}. Use one of: user_a, user_b, user_c")
+
+        requested_session = request.session_id.strip() if isinstance(request.session_id, str) else ""
+        session_id = requested_session or f"collection-{user_code}"
+
+        memory = self.collection_agent.session_store.load(session_id)
+        memory.set_state(
+            mode="strict_collections",
+            active_channel="voice",
+            active_case_id=str(matched["case"]["case_id"]),
+            active_user_id=str(matched["customer"]["customer_id"]),
+            active_customer_name=str(matched["customer"]["name"]),
+            agent_loop_blocked=False,
+            agent_loop_count=0,
+        )
+
+        opener_input = (
+            "Start outbound collections call now. "
+            f"Customer={matched['customer']['name']} "
+            f"customer_id={matched['customer']['customer_id']} "
+            f"case_id={matched['case']['case_id']} "
+            f"overdue_amount={matched['case']['overdue_amount']} "
+            "Generate the first call pitch introducing dues and asking for payment intent."
+        )
+
+        turn = self.run_turn(
+            RunTurnRequest(
+                message=opener_input,
+                session_id=session_id,
+                soft_cap=request.soft_cap,
+                hard_cap=request.hard_cap,
+            )
+        )
+        return {
+            "session_id": session_id,
+            "user": _json_safe(matched),
+            "opener_input": opener_input,
+            "turn": turn,
+        }
+
+    def run_turn(self, request: RunTurnRequest) -> dict[str, Any]:
+        session_id = request.session_id.strip() or "collection-ui-session"
+        soft_cap = max(1, int(request.soft_cap))
+        hard_cap = max(soft_cap, int(request.hard_cap))
+
+        current_input = request.message
+        hops: list[dict[str, Any]] = []
+
+        for hop_index in range(1, hard_cap + 1):
+            trace_sink = InMemoryTraceSink()
+            self.collection_agent.trace_sink = trace_sink
+            state = self.collection_agent.run_turn(current_input, session_id=session_id)
+            trace = self.collection_agent.last_trace
+
+            response = str(state.get("response", "No response generated."))
+            target = str(state.get("response_target", "customer")).strip().lower()
+            memory_state = self._memory_state(session_id=session_id)
+
+            hop_payload: dict[str, Any] = {
+                "hop": hop_index,
+                "input": current_input,
+                "response": response,
+                "response_target": target,
+                "node_history": _json_safe(state.get("node_history", [])),
+                "conversation_phase": str(state.get("conversation_phase", "")),
+                "thinking": self._thinking_lines(trace_sink.events),
+                "events": trace_sink.events,
+                "trace_summary": trace.summary() if trace is not None else {},
+                "state": self._sanitize_state(state),
+                "working_memory_state": memory_state,
+            }
+            hops.append(hop_payload)
+
+            if target == "customer":
+                helper_result = self._run_memory_helper_if_requested(session_id=session_id, state=state)
+                if helper_result is not None:
+                    hop_payload["memory_helper"] = _json_safe(helper_result)
+                return {
+                    "session_id": session_id,
+                    "final_response": response,
+                    "final_target": "customer",
+                    "hops": hops,
+                    "final_state": self._sanitize_state(state),
+                    "final_working_memory_state": self._memory_state(session_id=session_id),
+                    "llm": self._llm_meta(),
+                }
+
+            if hop_index >= soft_cap:
+                self.collection_agent.session_store.load(session_id).set_state(
+                    agent_loop_blocked=True,
+                    agent_loop_count=hop_index,
+                )
+                guard_sink = InMemoryTraceSink()
+                self.collection_agent.trace_sink = guard_sink
+                guard_state = self.collection_agent.run_turn("system loop guard", session_id=session_id)
+                guard_response = str(guard_state.get("response", response))
+                helper_result = self._run_memory_helper_if_requested(session_id=session_id, state=guard_state)
+                guard_payload = {
+                    "hop": hop_index + 1,
+                    "input": "system loop guard",
+                    "response": guard_response,
+                    "response_target": str(guard_state.get("response_target", "customer")),
+                    "node_history": _json_safe(guard_state.get("node_history", [])),
+                    "conversation_phase": str(guard_state.get("conversation_phase", "")),
+                    "thinking": self._thinking_lines(guard_sink.events),
+                    "events": guard_sink.events,
+                    "trace_summary": self.collection_agent.last_trace.summary()
+                    if self.collection_agent.last_trace is not None
+                    else {},
+                    "state": self._sanitize_state(guard_state),
+                    "working_memory_state": self._memory_state(session_id=session_id),
+                    "memory_helper": _json_safe(helper_result) if helper_result is not None else None,
+                }
+                hops.append(guard_payload)
+                return {
+                    "session_id": session_id,
+                    "final_response": guard_response,
+                    "final_target": "customer",
+                    "hops": hops,
+                    "final_state": self._sanitize_state(guard_state),
+                    "final_working_memory_state": self._memory_state(session_id=session_id),
+                    "llm": self._llm_meta(),
+                }
+
+            if target == "self":
+                current_input = response
+                continue
+
+            if target == "discount_planning_agent":
+                handoff_payload = (
+                    state.get("handoff_payload")
+                    if isinstance(state.get("handoff_payload"), dict)
+                    else {
+                        "case_id": str(memory_state.get("active_case_id", "COLL-1001")),
+                        "reason_for_handoff": "Need discount planning recommendation",
+                        "current_plan": memory_state.get("current_plan"),
+                        "hardship_reason": memory_state.get("hardship_reason"),
+                    }
+                )
+                discount_output = self.discount_agent.run(handoff_payload)
+                self.collection_agent.session_store.load(session_id).set_state(
+                    discount_recommendation=discount_output,
+                    agent_loop_count=hop_index,
+                )
+                hop_payload["discount_handoff"] = {
+                    "handoff_payload": _json_safe(handoff_payload),
+                    "discount_output": _json_safe(discount_output),
+                }
+                current_input = (
+                    "collections emi restructuring recommendation ready for case "
+                    f"{handoff_payload.get('case_id', memory_state.get('active_case_id', 'COLL-1001'))}"
+                )
+                continue
+
+            return {
+                "session_id": session_id,
+                "final_response": response,
+                "final_target": target,
+                "hops": hops,
+                "final_state": self._sanitize_state(state),
+                "final_working_memory_state": self._memory_state(session_id=session_id),
+                "llm": self._llm_meta(),
+            }
+
+        # Should not be reached due to hard cap + returns above.
+        return {
+            "session_id": session_id,
+            "final_response": "No terminal response generated.",
+            "final_target": "customer",
+            "hops": hops,
+            "final_state": {},
+            "final_working_memory_state": self._memory_state(session_id=session_id),
+            "llm": self._llm_meta(),
+        }
+
+    def session_state(self, session_id: str) -> SessionStateResponse:
+        sid = session_id.strip() or "collection-ui-session"
+        state = self.collection_agent.repository.get_conversation_state(sid) or {}
+        return SessionStateResponse(
+            session_id=sid,
+            conversation_state=_json_safe(state),
+            working_memory_state=self._memory_state(session_id=sid),
+        )
+
+    def _run_memory_helper_if_requested(self, *, session_id: str, state: dict[str, Any]) -> dict[str, Any] | None:
+        targets = state.get("additional_targets")
+        if not isinstance(targets, list):
+            return None
+
+        lowered_targets = {str(item).strip().lower() for item in targets}
+        if "collection_memory_helper_agent" not in lowered_targets:
+            return None
+
+        trigger = state.get("memory_helper_trigger") if isinstance(state.get("memory_helper_trigger"), dict) else {}
+        payload = self._build_memory_helper_payload(session_id=session_id, trigger=trigger)
+        return self.memory_helper_agent.run(payload)
+
+    def _build_memory_helper_payload(self, *, session_id: str, trigger: dict[str, Any]) -> dict[str, Any]:
+        repository = self.collection_agent.repository
+        messages = [message.model_dump(mode="json") for message in repository.list_conversation_messages(session_id)]
+        conversation_state = repository.get_conversation_state(session_id) or {}
+
+        user_id = str(conversation_state.get("active_user_id", "")).strip()
+        if not user_id:
+            case_id = str(conversation_state.get("active_case_id", "")).strip()
+            if case_id:
+                case_row = self.collection_agent.data_store.get_case(case_id=case_id)
+                if isinstance(case_row, dict) and case_row.get("customer_id"):
+                    user_id = str(case_row["customer_id"])
+
+        return {
+            "session_id": session_id,
+            "user_id": user_id or None,
+            "trigger": trigger,
+            "conversation_messages": messages,
+            "conversation_state": conversation_state,
+        }
+
+    def _sanitize_state(self, state: dict[str, Any]) -> dict[str, Any]:
+        payload: dict[str, Any] = {}
+        for key, value in state.items():
+            if key == "memory":
+                continue
+            payload[str(key)] = _json_safe(value)
+        return payload
+
+    def _memory_state(self, *, session_id: str) -> dict[str, Any]:
+        return _json_safe(dict(self.collection_agent.session_store.load(session_id).state))
+
+    def _thinking_lines(self, events: list[dict[str, Any]]) -> list[str]:
+        lines: list[str] = []
+        for event in events:
+            kind = str(event.get("event", "")).strip()
+            if kind == "node_started":
+                lines.append(f"node start: {event.get('node_name')}")
+            elif kind == "node_finished":
+                status = str(event.get("status", "completed"))
+                lines.append(f"node finish: {event.get('node_name')} [{status}]")
+            elif kind == "tool_call":
+                status = str(event.get("status", ""))
+                lines.append(f"tool: {event.get('tool_name')} [{status}]")
+            elif kind == "llm_call":
+                model_name = str(event.get("model_name", ""))
+                tokens = event.get("total_tokens")
+                token_text = f", tokens={tokens}" if tokens is not None else ""
+                lines.append(f"llm: {model_name}{token_text}")
+            elif kind == "node_state":
+                route = event.get("route")
+                if route is not None:
+                    lines.append(f"route selected: {route}")
+        return lines
+
+    def _llm_meta(self) -> dict[str, Any]:
+        provider = None
+        model_name = None
+        if self.llm is not None:
+            provider = str(self.llm.__class__.__name__)
+            model_name = getattr(self.llm, "model_name", None)
+        return {
+            "provider": provider,
+            "model_name": model_name,
+            "startup_error": self.llm_error,
+        }
+
+
+def _json_safe(value: Any) -> Any:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, dict):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_json_safe(item) for item in value]
+    if hasattr(value, "model_dump"):
+        return _json_safe(value.model_dump(mode="json"))
+    if hasattr(value, "_asdict"):
+        return _json_safe(value._asdict())
+    if hasattr(value, "__dict__"):
+        return {key: _json_safe(item) for key, item in vars(value).items() if not key.startswith("_")}
+    return repr(value)
+
+
+def _load_demo_users(base_dir: Path) -> list[dict[str, Any]]:
+    customers_path = base_dir / "data" / "customers.json"
+    cases_path = base_dir / "data" / "cases.json"
+    customers_payload = json.loads(customers_path.read_text(encoding="utf-8"))
+    cases_payload = json.loads(cases_path.read_text(encoding="utf-8"))
+
+    customers = [dict(row) for row in customers_payload if isinstance(row, dict)]
+    cases = [dict(row) for row in cases_payload if isinstance(row, dict)]
+    case_by_customer = {str(case.get("customer_id")): case for case in cases}
+
+    labels = ["user_a", "user_b", "user_c"]
+    result: list[dict[str, Any]] = []
+    for index, customer in enumerate(customers[:3]):
+        user_code = labels[index]
+        challenge = customer.get("challenge", {}) if isinstance(customer.get("challenge"), dict) else {}
+        case_row = case_by_customer.get(str(customer.get("customer_id", "")), {})
+        result.append(
+            {
+                "user_code": user_code,
+                "display_name": f"User {chr(ord('A') + index)}",
+                "customer": {
+                    "customer_id": str(customer.get("customer_id", "")),
+                    "name": str(customer.get("name", "")),
+                    "phone": str(customer.get("phone", "")),
+                    "email": str(customer.get("email", "")),
+                    "dob": str(challenge.get("dob", "")),
+                    "zip": str(challenge.get("zip", "")),
+                    "last4_pan": str(challenge.get("last4_pan", "")),
+                },
+                "case": {
+                    "case_id": str(case_row.get("case_id", "")),
+                    "loan_id": str(case_row.get("loan_id", "")),
+                    "product": str(case_row.get("product", "")),
+                    "dpd": case_row.get("dpd"),
+                    "emi_amount": case_row.get("emi_amount"),
+                    "overdue_amount": case_row.get("overdue_amount"),
+                    "late_fee": case_row.get("late_fee"),
+                    "risk_band": str(case_row.get("risk_band", "")),
+                },
+            }
+        )
+    return result
+
+
+def create_router(runtime: CollectionDebugRuntime) -> APIRouter:
+    router = APIRouter(prefix="/api", tags=["collection_agent_ui"])
+
+    @router.post("/run-turn")
+    async def run_turn(body: RunTurnRequest) -> dict[str, Any]:
+        return runtime.run_turn(body)
+
+    @router.get("/session/{session_id}")
+    async def session_state(session_id: str) -> SessionStateResponse:
+        return runtime.session_state(session_id)
+
+    @router.get("/demo-users")
+    async def demo_users() -> dict[str, Any]:
+        return {"users": runtime.list_demo_users()}
+
+    @router.post("/start-conversation")
+    async def start_conversation(body: StartConversationRequest) -> dict[str, Any]:
+        try:
+            return runtime.start_conversation(body)
+        except ValueError as exc:
+            return {"error": str(exc), "users": runtime.list_demo_users()}
+
+    return router
+
+
+def create_app(base_dir: Path | None = None) -> FastAPI:
+    resolved_base_dir = (base_dir or Path(__file__).resolve().parents[1]).resolve()
+    runtime = CollectionDebugRuntime.create(resolved_base_dir)
+
+    app = FastAPI(title="Collection Agent Debug UI")
+    app.include_router(create_router(runtime))
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="collection-agent-ui-static")
+
+    @app.get("/")
+    async def home() -> FileResponse:
+        return FileResponse(STATIC_DIR / "index.html")
+
+    @app.get("/health")
+    async def health() -> dict[str, str]:
+        return {"status": "ok"}
+
+    return app
+
+
+app = create_app()
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host="127.0.0.1", port=8060)
