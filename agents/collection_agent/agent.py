@@ -12,10 +12,11 @@ from uuid import uuid4
 from langgraph.graph import END, START, StateGraph
 
 from agents.collection_memory_helper_agent.repository import CollectionMemoryRepository
-from agents.collection_agent.nodes import CollectionReflectNode, CollectionResponseNode, PlanProposalNode
+from agents.collection_agent.nodes import CollectionIntentNode, CollectionReflectNode, CollectionResponseNode, PlanProposalNode
 from agents.collection_agent.planner import CollectionPlanner
 from agents.collection_agent.prompts import load_collection_agent_prompts, render_collection_tool_catalog_yaml
 from agents.collection_agent.repository import CollectionRepository
+from agents.collection_agent.state import CollectionGraphState
 from agents.collection_agent.tools import (
     CaseFetchTool,
     CasePrioritizeTool,
@@ -38,7 +39,6 @@ from agents.collection_agent.tools.data_store import CollectionDataStore
 from src.agents.base_agent import BaseAgent
 from src.memory.session_store import SessionStore
 from src.memory.types import WorkingMemory
-from src.nodes.intent_node import IntentNode
 from src.nodes.memory_retrieve_node import MemoryRetrieveNode
 from src.nodes.react_node import ReactNode
 from src.nodes.tool_execution_node import ToolExecutionNode
@@ -98,10 +98,11 @@ class CollectionAgent(BaseAgent):
         )
 
         self.memory_retrieve_node = MemoryRetrieveNode(tool_registry=self.tool_registry, memories=[WorkingMemory])
-        self.relevance_intent_node = IntentNode(
+        self.relevance_intent_node = CollectionIntentNode(
             llm=self.llm,
             system_prompt=str(intent_prompts.get("relevance_system_prompt", "")),
             user_prompt=str(intent_prompts.get("relevance_user_prompt", "")),
+            output_key="relevance_intent",
             intent_labels=["relevant", "irrelevant", "empty"],
             default_intent="irrelevant",
             default_confidence=0.3,
@@ -149,10 +150,11 @@ class CollectionAgent(BaseAgent):
                 "unknown": "This request is outside collections scope. I can only help with loan dues, EMI, payments, verification, hardship plans, and follow-ups.",
             },
         )
-        self.pre_plan_intent_node = IntentNode(
+        self.pre_plan_intent_node = CollectionIntentNode(
             llm=self.llm,
             system_prompt=str(intent_prompts.get("pre_plan_system_prompt", "")),
             user_prompt=str(intent_prompts.get("pre_plan_user_prompt", "")),
+            output_key="pre_plan_intent",
             intent_labels=["plan", "decide"],
             default_intent="decide",
             default_confidence=0.4,
@@ -176,10 +178,11 @@ class CollectionAgent(BaseAgent):
                 ]
             },
         )
-        self.execution_path_intent_node = IntentNode(
+        self.execution_path_intent_node = CollectionIntentNode(
             llm=self.llm,
             system_prompt=str(intent_prompts.get("execution_path_system_prompt", "")),
             user_prompt=str(intent_prompts.get("execution_path_user_prompt", "")),
+            output_key="execution_path_intent",
             intent_labels=["need_memory", "need_tool"],
             default_intent="need_tool",
             default_confidence=0.4,
@@ -203,10 +206,11 @@ class CollectionAgent(BaseAgent):
                 ]
             },
         )
-        self.post_memory_plan_intent_node = IntentNode(
+        self.post_memory_plan_intent_node = CollectionIntentNode(
             llm=self.llm,
             system_prompt=str(intent_prompts.get("post_memory_plan_system_prompt", "")),
             user_prompt=str(intent_prompts.get("post_memory_plan_user_prompt", "")),
+            output_key="post_memory_plan_intent",
             intent_labels=["plan", "react"],
             default_intent="react",
             default_confidence=0.4,
@@ -235,7 +239,7 @@ class CollectionAgent(BaseAgent):
             available_tools=render_collection_tool_catalog_yaml(),
             max_steps=8,
         )
-        self.plan_node = PlanProposalNode()
+        self.plan_node = PlanProposalNode(llm=self.llm)
         self.tool_execution_node = ToolExecutionNode(executor=self.tool_executor)
         self.reflect_node = CollectionReflectNode(
             llm=self.llm,
@@ -282,7 +286,7 @@ class CollectionAgent(BaseAgent):
         return registry
 
     def _build_graph(self) -> Any:
-        graph = StateGraph(AgentState)
+        graph = StateGraph(CollectionGraphState)
         graph.add_node("relevance_intent", self._wrap_node("relevance_intent", self.relevance_intent_node.execute))
         graph.add_node("pre_plan_intent", self._wrap_node("pre_plan_intent", self.pre_plan_intent_node.execute))
         graph.add_node(
@@ -393,9 +397,13 @@ class CollectionAgent(BaseAgent):
         return graph.compile()
 
     def _wrap_node(self, node_name: str, fn: Any) -> Any:
-        def _wrapped(state: AgentState) -> AgentState:
+        def _wrapped(state: CollectionGraphState) -> CollectionGraphState:
             with trace_node(node_name):
                 result = fn(state)
+            if isinstance(result, dict):
+                history = list(state.get("node_history", []))
+                result["node_history"] = [*history, node_name]
+                result.setdefault("conversation_phase", self._phase_for_node(node_name))
             emit_trace_event(
                 {
                     "event": "node_state",
@@ -417,6 +425,9 @@ class CollectionAgent(BaseAgent):
         if "mode" not in memory.state:
             memory.set_state(mode="strict_collections", active_channel="sms", active_case_id="COLL-1001")
         self._sync_user_and_memory_context(memory=memory, user_input=user_input)
+        user_id = str(memory.state.get("active_user_id", "")).strip()
+        case_id = str(memory.state.get("active_case_id", "COLL-1001")).strip()
+        channel = str(memory.state.get("active_channel", "sms")).strip()
         trace = ExecutionTrace(agent_name=self.agent_name, session_id=session_key, user_input=user_input)
         try:
             with trace_turn(trace, sink=self.trace_sink):
@@ -426,11 +437,18 @@ class CollectionAgent(BaseAgent):
                         "turn_id": str(uuid4()),
                         "user_input": user_input,
                         "memory": memory,
+                        "user_id": user_id,
+                        "case_id": case_id,
+                        "channel": channel,
                         "memory_targets": [{"type": "working", "enabled": True, "limit": 8}],
                         "observation": None,
+                        "node_history": [],
+                        "conversation_phase": "turn_started",
+                        "tool_errors": [],
                         "steps": 0,
                     }
                 )
+                state = self._finalize_output_state(state)
                 trace.finish(status="completed")
         except Exception as exc:
             trace.finish(status="failed", error=str(exc))
@@ -444,6 +462,26 @@ class CollectionAgent(BaseAgent):
     def run(self, user_input: str, session_id: str | None = None) -> str:
         state = self.run_turn(user_input=user_input, session_id=session_id)
         return str(state.get("response", "No response generated."))
+
+    def _finalize_output_state(self, state: AgentState) -> AgentState:
+        """Guarantees output contract keys for downstream orchestration."""
+        output = dict(state)
+        response_target = str(output.get("response_target", "customer")).strip().lower()
+        if response_target not in {"customer", "self", "discount_planning_agent"}:
+            response_target = "customer"
+        output["response_target"] = response_target
+
+        response = output.get("response")
+        if not isinstance(response, str) or not response.strip():
+            plan = output.get("plan_proposal") if isinstance(output.get("plan_proposal"), dict) else {}
+            planned = str(plan.get("customer_message", "")).strip() if plan else ""
+            if planned:
+                output["response"] = planned
+            else:
+                decision = output.get("decision")
+                decision_text = str(getattr(decision, "response_text", "")).strip() if decision is not None else ""
+                output["response"] = decision_text or "No response generated."
+        return output
 
     def _persist_trace(self, trace: ExecutionTrace) -> None:
         target_dir = self.trace_output_dir
@@ -496,6 +534,23 @@ class CollectionAgent(BaseAgent):
             if isinstance(case_row, dict) and case_row.get("customer_id"):
                 return str(case_row["customer_id"])
         return None
+
+    @staticmethod
+    def _phase_for_node(node_name: str) -> str:
+        phase_map = {
+            "relevance_intent": "relevance_classification",
+            "pre_plan_intent": "pre_plan_routing",
+            "execution_path_intent": "execution_routing",
+            "memory_retrieve": "memory_hydration",
+            "post_memory_plan_intent": "post_memory_routing",
+            "react": "action_planning",
+            "tool_execution": "tool_execution",
+            "plan_proposal": "plan_proposal",
+            "reflect": "quality_reflection",
+            "relevant_response": "response_packaging",
+            "irrelevant_response": "response_packaging",
+        }
+        return phase_map.get(node_name, "graph_processing")
 
 
 __all__ = ["CollectionAgent"]
