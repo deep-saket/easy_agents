@@ -32,7 +32,7 @@ class CollectionMemoryHelperPlanner(PlannerNode):
                 thought="Memory update complete.",
                 tool_call=None,
                 respond_directly=True,
-                response_text=f"Memory helper updated stores. Extracted events: {output.get('extracted_key_events', [])}",
+                response_text=f"Memory helper updated stores. Extracted key points: {output.get('extracted_key_points', [])}",
                 done=True,
             )
 
@@ -55,6 +55,7 @@ class CollectionMemoryHelperPlanner(PlannerNode):
             pass
         return {
             "session_id": "unknown",
+            "user_id": None,
             "trigger": {"reason": "unparsed_payload"},
             "conversation_messages": [{"role": "user", "content": user_input}],
             "conversation_state": {},

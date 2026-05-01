@@ -1,0 +1,63 @@
+{
+  "trace_id": "9320b16c-9bdf-4228-9e68-1180b804f445",
+  "agent_name": "collection_agent",
+  "session_id": "nv-check-2",
+  "user_input": "customer for COLL-1001 wants to pay now via sms, create payment link",
+  "status": "failed",
+  "started_at": "2026-05-01T11:35:06.852688+00:00",
+  "finished_at": "2026-05-01T11:35:11.140461+00:00",
+  "error": "HTTP Error 502: Bad Gateway",
+  "summary": {
+    "trace_id": "9320b16c-9bdf-4228-9e68-1180b804f445",
+    "agent_name": "collection_agent",
+    "session_id": "nv-check-2",
+    "status": "failed",
+    "node_hits": [
+      "relevance_intent",
+      "pre_plan_intent"
+    ],
+    "node_count": 2,
+    "llm_call_count": 1,
+    "tool_call_count": 0,
+    "models": [
+      "meta/llama-3.1-70b-instruct"
+    ],
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "total_tokens": 0,
+    "error": "HTTP Error 502: Bad Gateway"
+  },
+  "nodes": [
+    {
+      "node_name": "relevance_intent",
+      "status": "completed",
+      "started_at": "2026-05-01T11:35:06.853879+00:00",
+      "finished_at": "2026-05-01T11:35:09.341445+00:00",
+      "duration_ms": 2487.566,
+      "error": null
+    },
+    {
+      "node_name": "pre_plan_intent",
+      "status": "failed",
+      "started_at": "2026-05-01T11:35:09.342261+00:00",
+      "finished_at": "2026-05-01T11:35:11.139584+00:00",
+      "duration_ms": 1797.323,
+      "error": "HTTP Error 502: Bad Gateway"
+    }
+  ],
+  "llm_calls": [
+    {
+      "call_id": "544930f9-e52b-4e9d-9259-fbf81e814966",
+      "node_name": "relevance_intent",
+      "model_name": "meta/llama-3.1-70b-instruct",
+      "call_kind": "generate",
+      "prompt_tokens": null,
+      "completion_tokens": null,
+      "total_tokens": null,
+      "started_at": "2026-05-01T11:35:09.341166+00:00",
+      "finished_at": "2026-05-01T11:35:09.341166+00:00",
+      "duration_ms": 2486.579
+    }
+  ],
+  "tool_calls": []
+}

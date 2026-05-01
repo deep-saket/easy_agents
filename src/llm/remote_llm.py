@@ -187,6 +187,13 @@ class OpenAILLM(OpenAICompatibleLLM):
 
 
 @dataclass(slots=True)
+class NvidiaLLM(OpenAICompatibleLLM):
+    """Calls NVIDIA hosted Integrate API using an API key."""
+
+    endpoint_url: str = "https://integrate.api.nvidia.com"
+
+
+@dataclass(slots=True)
 class GroqLLM(OpenAICompatibleLLM):
     """Calls the hosted Groq OpenAI-compatible Chat Completions API."""
 

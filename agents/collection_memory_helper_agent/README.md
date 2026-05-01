@@ -6,12 +6,13 @@ It updates two JSON memories under `agents/collection_agent/runtime/memory`.
 ## Memory Types
 
 - Global key event memory (`global_key_event_memory.json`)
-  - cross-user key patterns and counts
-  - planning influence signals
+  - cross-user successful/unsuccessful procedural cues
+  - event counters and sample signals that influence planning prompts
 
 - User key event memory (`user_key_event_memory.json`)
-  - session-level summary and key follow-up considerations
-  - conversation-specific events
+  - user-level conversation summary (latest)
+  - user-level procedural key points for follow-up calls
+  - user-level follow-up considerations and outcome history
 
 ## Graph
 
@@ -54,4 +55,4 @@ flowchart TD
 
 | Tool | Description | Input | Output |
 | --- | --- | --- | --- |
-| `update_key_event_memory` | Extracts key events, summarizes conversation, updates global/user memory JSON databases. | `session_id`, `trigger`, `conversation_messages`, `conversation_state` | `status`, `global_events_updated`, `extracted_key_events`, `user_summary` |
+| `update_key_event_memory` | Extracts procedural key points, summarizes conversation, classifies outcome, and updates global/user memory JSON databases. | `session_id`, `user_id`, `trigger`, `conversation_messages`, `conversation_state` | `status`, `user_id`, `global_cues_updated`, `conversation_outcome`, `extracted_key_points`, `user_summary` |

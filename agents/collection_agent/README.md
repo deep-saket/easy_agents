@@ -186,14 +186,43 @@ python agents/collection_agent/pipecat_bot.py -t daily
 python agents/collection_agent/pipecat_bot.py -t twilio -x <your-ngrok-domain>
 ```
 
+## NVIDIA model setup (LLM provider)
+
+Collection agent now supports `llm.provider: nvidia` using NVIDIA hosted Integrate API (OpenAI-compatible chat endpoint).
+
+Update `agents/collection_agent/config.yml`:
+
+```yaml
+llm:
+  enabled: true
+  provider: nvidia
+  model_name: meta/llama-3.1-70b-instruct
+  base_url: https://integrate.api.nvidia.com
+```
+
+Set env:
+
+```bash
+export NVIDIA_API_KEY="nvapi-..."
+```
+
+Optional override at runtime:
+
+```bash
+python agents/collection_agent/main.py --interactive --nvidia-api-key "nvapi-..."
+```
+
 ## Key-event memory stores
 
 Both stores are physically under collection agent runtime so collection logic can read them directly:
 
 - `agents/collection_agent/runtime/memory/global_key_event_memory.json`
-  - cross-user key event patterns and counts (planning influence)
+  - cross-user successful/unsuccessful procedural cues
+  - event counters and sample signals used as planning hints
 - `agents/collection_agent/runtime/memory/user_key_event_memory.json`
-  - session-level key events, summary, and follow-up hints (conversation advancement influence)
+  - per-`user_id` latest summary
+  - per-`user_id` procedural key points + follow-up considerations
+  - per-`user_id` conversation outcome history
 
 ## Regenerate graph
 

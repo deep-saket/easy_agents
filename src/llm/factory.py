@@ -8,7 +8,7 @@ from __future__ import annotations
 from src.llm.function_gemma import FunctionGemmaLLM
 from src.llm.local_llm import FunctionCallingLocalLLM, LocalLLM
 from src.llm.qwen import Qwen3_1_7BLLM
-from src.llm.remote_llm import GroqLLM, OpenAICompatibleLLM, OpenAILLM, RemoteLLM
+from src.llm.remote_llm import GroqLLM, NvidiaLLM, OpenAICompatibleLLM, OpenAILLM, RemoteLLM
 
 
 class LLMFactory:
@@ -119,6 +119,31 @@ class LLMFactory:
         default_body: dict[str, object] | None = None,
     ) -> OpenAILLM:
         return OpenAILLM(
+            model_name=model_name,
+            api_key=api_key,
+            timeout_seconds=timeout_seconds,
+            max_new_tokens=max_new_tokens,
+            default_headers=default_headers or {},
+            default_body=default_body or {},
+            api_path=api_path,
+            temperature=temperature,
+        )
+
+    @staticmethod
+    def build_nvidia_llm(
+        *,
+        model_name: str,
+        api_key: str,
+        base_url: str = "https://integrate.api.nvidia.com",
+        timeout_seconds: float = 300.0,
+        api_path: str = "/v1/chat/completions",
+        max_new_tokens: int | None = None,
+        temperature: float | None = None,
+        default_headers: dict[str, str] | None = None,
+        default_body: dict[str, object] | None = None,
+    ) -> NvidiaLLM:
+        return NvidiaLLM(
+            endpoint_url=base_url,
             model_name=model_name,
             api_key=api_key,
             timeout_seconds=timeout_seconds,

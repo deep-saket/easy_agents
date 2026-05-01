@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import re
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
 from langgraph.graph import END, START, StateGraph
 
+from agents.collection_memory_helper_agent.repository import CollectionMemoryRepository
 from agents.collection_agent.nodes import CollectionReflectNode, CollectionResponseNode, PlanProposalNode
 from agents.collection_agent.planner import CollectionPlanner
 from agents.collection_agent.prompts import load_collection_agent_prompts, render_collection_tool_catalog_yaml
@@ -60,6 +62,7 @@ class CollectionAgent(BaseAgent):
     logger: Any | None = None
     trace_sink: Any | None = None
     trace_output_dir: Path | None = None
+    memory_repository: CollectionMemoryRepository | None = None
     agent_name: str = "collection_agent"
     last_trace: ExecutionTrace | None = None
 
@@ -78,6 +81,9 @@ class CollectionAgent(BaseAgent):
             trace_sink=self.trace_sink,
         )
         self.session_store = self.session_store or SessionStore(self.repository)
+        self.memory_repository = self.memory_repository or CollectionMemoryRepository(
+            collection_runtime_dir=self.repository.runtime_dir
+        )
         self.tool_registry = self.tool_registry or self._build_tool_registry()
         self.tool_executor = self.tool_executor or ToolExecutor(
             registry=self.tool_registry,
@@ -410,6 +416,7 @@ class CollectionAgent(BaseAgent):
         memory = self.session_store.load(session_key)
         if "mode" not in memory.state:
             memory.set_state(mode="strict_collections", active_channel="sms", active_case_id="COLL-1001")
+        self._sync_user_and_memory_context(memory=memory, user_input=user_input)
         trace = ExecutionTrace(agent_name=self.agent_name, session_id=session_key, user_input=user_input)
         try:
             with trace_turn(trace, sink=self.trace_sink):
@@ -456,6 +463,39 @@ class CollectionAgent(BaseAgent):
         repository = CollectionRepository(runtime_dir=root / "runtime")
         data_store = CollectionDataStore(base_dir=root)
         return cls(repository=repository, data_store=data_store, trace_output_dir=root / "runtime" / "traces")
+
+    def _sync_user_and_memory_context(self, *, memory: Any, user_input: str) -> None:
+        case_match = re.search(r"(COLL-\d+)", user_input, re.IGNORECASE)
+        if case_match:
+            memory.set_state(active_case_id=case_match.group(1).upper())
+        user_id = self._resolve_user_id(memory_state=dict(memory.state), user_input=user_input)
+        if user_id:
+            memory.set_state(active_user_id=user_id)
+        global_context = self.memory_repository.get_global_memory_context(limit=6) if self.memory_repository else {}
+        user_context = (
+            self.memory_repository.get_user_memory_context(user_id) if self.memory_repository and user_id else None
+        )
+        memory.set_state(
+            global_key_event_memory=global_context,
+            user_key_event_memory=(user_context or {}),
+        )
+
+    def _resolve_user_id(self, *, memory_state: dict[str, Any], user_input: str) -> str | None:
+        from_state = memory_state.get("active_user_id") or memory_state.get("user_id")
+        if from_state is not None and str(from_state).strip():
+            return str(from_state).strip()
+
+        customer_match = re.search(r"(CUST-\d+)", user_input, re.IGNORECASE)
+        if customer_match:
+            return customer_match.group(1).upper()
+
+        case_match = re.search(r"(COLL-\d+)", user_input, re.IGNORECASE)
+        case_id = case_match.group(1).upper() if case_match else str(memory_state.get("active_case_id", "")).upper()
+        if case_id:
+            case_row = self.data_store.get_case(case_id=case_id)
+            if isinstance(case_row, dict) and case_row.get("customer_id"):
+                return str(case_row["customer_id"])
+        return None
 
 
 __all__ = ["CollectionAgent"]

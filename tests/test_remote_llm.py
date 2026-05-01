@@ -219,3 +219,38 @@ def test_factory_builds_direct_groq_llm(monkeypatch) -> None:
         ],
         "max_tokens": 48,
     }
+
+
+def test_factory_builds_direct_nvidia_llm(monkeypatch) -> None:
+    llm = LLMFactory.build_nvidia_llm(
+        model_name="meta/llama-3.1-70b-instruct",
+        api_key="nvidia-secret",
+        max_new_tokens=64,
+        temperature=0.2,
+    )
+    captured: dict[str, object] = {}
+
+    def fake_urlopen(req, timeout):
+        captured["url"] = req.full_url
+        captured["timeout"] = timeout
+        captured["headers"] = dict(req.header_items())
+        captured["body"] = json.loads(req.data.decode("utf-8"))
+        payload = {"choices": [{"message": {"content": "nvidia reply"}}]}
+        return FakeHTTPResponse(json.dumps(payload).encode("utf-8"))
+
+    monkeypatch.setattr("src.llm.remote_llm.request.urlopen", fake_urlopen)
+
+    result = llm.generate_result("sys", "user")
+
+    assert result.content == "nvidia reply"
+    assert captured["url"] == "https://integrate.api.nvidia.com/v1/chat/completions"
+    assert captured["headers"]["Authorization"] == "Bearer nvidia-secret"
+    assert captured["body"] == {
+        "model": "meta/llama-3.1-70b-instruct",
+        "messages": [
+            {"role": "system", "content": "sys"},
+            {"role": "user", "content": "user"},
+        ],
+        "max_tokens": 64,
+        "temperature": 0.2,
+    }

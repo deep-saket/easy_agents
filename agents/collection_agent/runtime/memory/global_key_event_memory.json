@@ -1,5 +1,49 @@
 {
-  "version": 1,
-  "updated_at": "2026-04-30T23:07:46.119044+00:00",
-  "events": []
+  "version": 2,
+  "updated_at": "2026-05-01T11:50:52.746207+00:00",
+  "event_counters": {
+    "conversation_outcome::successful": 3,
+    "conversation_outcome::unsuccessful": 3
+  },
+  "successful_cues": [
+    {
+      "cue_id": "collect-payment-link-after-dues-clarity",
+      "cue": "When user asks to pay now, send payment link right after dues explanation.",
+      "count": 3,
+      "last_seen": "2026-05-01T00:00:00+00:00",
+      "sample_signals": [
+        "payment_intent: customer asked for immediate payment link"
+      ],
+      "sample_user_ids": [
+        "CUST-2001",
+        "CUST-2005"
+      ]
+    }
+  ],
+  "unsuccessful_cues": [
+    {
+      "cue_id": "avoid-hard-push-before-hardship-ack",
+      "cue": "Hard push fails when hardship is not acknowledged before options are discussed.",
+      "count": 2,
+      "last_seen": "2026-05-01T00:00:00+00:00",
+      "sample_signals": [
+        "hardship_signal: cannot pay this month due to job loss"
+      ],
+      "sample_user_ids": [
+        "CUST-2002"
+      ]
+    },
+    {
+      "cue_id": "user-asked-for-discount/waiver-style-assistance.",
+      "cue": "User asked for discount/waiver style assistance.",
+      "count": 1,
+      "last_seen": "2026-05-01T11:50:52.746202+00:00",
+      "sample_signals": [
+        "user: I need lower EMI | agent: I can propose discount plan | user: Bye"
+      ],
+      "sample_user_ids": [
+        "CUST-2001"
+      ]
+    }
+  ]
 }

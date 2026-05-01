@@ -8,8 +8,9 @@ paths:
   runtime_dir: ./runtime
 llm:
   enabled: true
-  provider: openai
-  model_name: gpt-4o-mini
+  provider: nvidia
+  model_name: meta/llama-3.1-70b-instruct
+  base_url: https://integrate.api.nvidia.com
   max_new_tokens: 500
   temperature: 0.1
 voice_runtime:

@@ -50,6 +50,7 @@ def build_parser(defaults: dict[str, Any]) -> argparse.ArgumentParser:
     parser.add_argument("--interactive", action="store_true", help="Interactive mode")
     parser.add_argument("--config", default=str(defaults.get("config_path", DEFAULT_CONFIG_PATH)), help="Path to collection config")
     parser.add_argument("--openai-api-key", default=None, help="Override OPENAI_API_KEY for this run")
+    parser.add_argument("--nvidia-api-key", default=None, help="Override NVIDIA_API_KEY for this run")
     parser.add_argument("--disable-llm", action="store_true", help="Disable LLM usage and run deterministic planner fallback")
     parser.add_argument("--trace-jsonl", default=None, help="Optional JSONL event trace output path")
     parser.add_argument("--trace-stdout-json", action="store_true", help="Emit real-time trace events to stdout as JSON lines")
@@ -69,7 +70,12 @@ def build_parser(defaults: dict[str, Any]) -> argparse.ArgumentParser:
     return parser
 
 
-def build_llm(config: dict[str, Any], cli_openai_api_key: str | None = None, force_disable: bool = False) -> Any | None:
+def build_llm(
+    config: dict[str, Any],
+    cli_openai_api_key: str | None = None,
+    cli_nvidia_api_key: str | None = None,
+    force_disable: bool = False,
+) -> Any | None:
     llm_cfg = dict(config.get("llm", {})) if isinstance(config.get("llm"), dict) else {}
     if force_disable:
         return None
@@ -82,18 +88,36 @@ def build_llm(config: dict[str, Any], cli_openai_api_key: str | None = None, for
     max_new_tokens = llm_cfg.get("max_new_tokens")
     temperature = llm_cfg.get("temperature")
 
-    if provider != "openai":
-        raise ValueError(f"Collection Agent currently supports provider=openai for this runtime, got: {provider}")
+    if provider == "openai":
+        api_key = cli_openai_api_key or os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError(
+                "OPENAI_API_KEY is required for llm.provider=openai. Pass --openai-api-key or export OPENAI_API_KEY."
+            )
+        return LLMFactory.build_openai_llm(
+            model_name=model_name,
+            api_key=api_key,
+            max_new_tokens=max_new_tokens,
+            temperature=temperature,
+        )
 
-    api_key = cli_openai_api_key or os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise ValueError("OPENAI_API_KEY is required for llm.provider=openai. Pass --openai-api-key or export OPENAI_API_KEY.")
+    if provider == "nvidia":
+        api_key = cli_nvidia_api_key or os.getenv("NVIDIA_API_KEY")
+        if not api_key:
+            raise ValueError(
+                "NVIDIA_API_KEY is required for llm.provider=nvidia. Pass --nvidia-api-key or export NVIDIA_API_KEY."
+            )
+        base_url = str(llm_cfg.get("base_url") or os.getenv("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com"))
+        return LLMFactory.build_nvidia_llm(
+            model_name=model_name,
+            api_key=api_key,
+            base_url=base_url,
+            max_new_tokens=max_new_tokens,
+            temperature=temperature,
+        )
 
-    return LLMFactory.build_openai_llm(
-        model_name=model_name,
-        api_key=api_key,
-        max_new_tokens=max_new_tokens,
-        temperature=temperature,
+    raise ValueError(
+        f"Collection Agent supports llm.provider values: openai, nvidia. Got: {provider}"
     )
 
 
@@ -259,8 +283,16 @@ def _build_memory_helper_payload(
     repository = collection_agent.repository
     messages = [message.model_dump(mode="json") for message in repository.list_conversation_messages(session_id)]
     state = repository.get_conversation_state(session_id) or {}
+    user_id = str(state.get("active_user_id", "")).strip()
+    if not user_id:
+        case_id = str(state.get("active_case_id", "")).strip()
+        if case_id:
+            case_row = collection_agent.data_store.get_case(case_id=case_id)
+            if isinstance(case_row, dict) and case_row.get("customer_id"):
+                user_id = str(case_row["customer_id"])
     return {
         "session_id": session_id,
+        "user_id": user_id or None,
         "trigger": trigger,
         "conversation_messages": messages,
         "conversation_state": state,
@@ -317,7 +349,12 @@ def main() -> None:
     args = parser.parse_args()
 
     base_dir = Path(args.base_dir)
-    llm = build_llm(config, cli_openai_api_key=args.openai_api_key, force_disable=args.disable_llm)
+    llm = build_llm(
+        config,
+        cli_openai_api_key=args.openai_api_key,
+        cli_nvidia_api_key=args.nvidia_api_key,
+        force_disable=args.disable_llm,
+    )
     trace_sink = build_trace_sink(args, base_dir, config)
     agent = CollectionAgent(
         repository=CollectionRepository(runtime_dir=base_dir / "runtime"),

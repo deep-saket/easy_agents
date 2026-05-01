@@ -1,0 +1,39 @@
+{
+  "trace_id": "9663b520-d3d8-416b-b9d7-8859b1464819",
+  "agent_name": "collection_agent",
+  "session_id": "nvidia-smoke",
+  "user_input": "fetch case COLL-1001",
+  "status": "failed",
+  "started_at": "2026-05-01T11:31:34.206945+00:00",
+  "finished_at": "2026-05-01T11:31:34.333313+00:00",
+  "error": "<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1006)>",
+  "summary": {
+    "trace_id": "9663b520-d3d8-416b-b9d7-8859b1464819",
+    "agent_name": "collection_agent",
+    "session_id": "nvidia-smoke",
+    "status": "failed",
+    "node_hits": [
+      "relevance_intent"
+    ],
+    "node_count": 1,
+    "llm_call_count": 0,
+    "tool_call_count": 0,
+    "models": [],
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "total_tokens": 0,
+    "error": "<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1006)>"
+  },
+  "nodes": [
+    {
+      "node_name": "relevance_intent",
+      "status": "failed",
+      "started_at": "2026-05-01T11:31:34.208343+00:00",
+      "finished_at": "2026-05-01T11:31:34.332855+00:00",
+      "duration_ms": 124.512,
+      "error": "<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1006)>"
+    }
+  ],
+  "llm_calls": [],
+  "tool_calls": []
+}

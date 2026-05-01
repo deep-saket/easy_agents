@@ -1,0 +1,162 @@
+{
+  "trace_id": "1d5cc3ce-875c-4f40-9d8b-59149a3a9784",
+  "agent_name": "collection_agent",
+  "session_id": "nv-check-1",
+  "user_input": "fetch case COLL-1001",
+  "status": "completed",
+  "started_at": "2026-05-01T11:35:09.137352+00:00",
+  "finished_at": "2026-05-01T11:35:29.587375+00:00",
+  "error": null,
+  "summary": {
+    "trace_id": "1d5cc3ce-875c-4f40-9d8b-59149a3a9784",
+    "agent_name": "collection_agent",
+    "session_id": "nv-check-1",
+    "status": "completed",
+    "node_hits": [
+      "relevance_intent",
+      "pre_plan_intent",
+      "execution_path_intent",
+      "memory_retrieve",
+      "post_memory_plan_intent",
+      "origin_post_memory_plan",
+      "plan_proposal",
+      "reflect",
+      "relevant_response"
+    ],
+    "node_count": 9,
+    "llm_call_count": 4,
+    "tool_call_count": 0,
+    "models": [
+      "meta/llama-3.1-70b-instruct"
+    ],
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "total_tokens": 0,
+    "error": null
+  },
+  "nodes": [
+    {
+      "node_name": "relevance_intent",
+      "status": "completed",
+      "started_at": "2026-05-01T11:35:09.138599+00:00",
+      "finished_at": "2026-05-01T11:35:23.212208+00:00",
+      "duration_ms": 14073.609,
+      "error": null
+    },
+    {
+      "node_name": "pre_plan_intent",
+      "status": "completed",
+      "started_at": "2026-05-01T11:35:23.214246+00:00",
+      "finished_at": "2026-05-01T11:35:25.432970+00:00",
+      "duration_ms": 2218.724,
+      "error": null
+    },
+    {
+      "node_name": "execution_path_intent",
+      "status": "completed",
+      "started_at": "2026-05-01T11:35:25.433951+00:00",
+      "finished_at": "2026-05-01T11:35:27.639545+00:00",
+      "duration_ms": 2205.594,
+      "error": null
+    },
+    {
+      "node_name": "memory_retrieve",
+      "status": "completed",
+      "started_at": "2026-05-01T11:35:27.640539+00:00",
+      "finished_at": "2026-05-01T11:35:27.640831+00:00",
+      "duration_ms": 0.292,
+      "error": null
+    },
+    {
+      "node_name": "post_memory_plan_intent",
+      "status": "completed",
+      "started_at": "2026-05-01T11:35:27.641460+00:00",
+      "finished_at": "2026-05-01T11:35:29.583640+00:00",
+      "duration_ms": 1942.18,
+      "error": null
+    },
+    {
+      "node_name": "origin_post_memory_plan",
+      "status": "completed",
+      "started_at": "2026-05-01T11:35:29.584566+00:00",
+      "finished_at": "2026-05-01T11:35:29.584684+00:00",
+      "duration_ms": 0.118,
+      "error": null
+    },
+    {
+      "node_name": "plan_proposal",
+      "status": "completed",
+      "started_at": "2026-05-01T11:35:29.585150+00:00",
+      "finished_at": "2026-05-01T11:35:29.585263+00:00",
+      "duration_ms": 0.113,
+      "error": null
+    },
+    {
+      "node_name": "reflect",
+      "status": "completed",
+      "started_at": "2026-05-01T11:35:29.585801+00:00",
+      "finished_at": "2026-05-01T11:35:29.586527+00:00",
+      "duration_ms": 0.726,
+      "error": null
+    },
+    {
+      "node_name": "relevant_response",
+      "status": "completed",
+      "started_at": "2026-05-01T11:35:29.587044+00:00",
+      "finished_at": "2026-05-01T11:35:29.587120+00:00",
+      "duration_ms": 0.076,
+      "error": null
+    }
+  ],
+  "llm_calls": [
+    {
+      "call_id": "b53e0b04-f040-4074-ad13-d505ddbed0ed",
+      "node_name": "relevance_intent",
+      "model_name": "meta/llama-3.1-70b-instruct",
+      "call_kind": "generate",
+      "prompt_tokens": null,
+      "completion_tokens": null,
+      "total_tokens": null,
+      "started_at": "2026-05-01T11:35:23.211763+00:00",
+      "finished_at": "2026-05-01T11:35:23.211763+00:00",
+      "duration_ms": 14072.451
+    },
+    {
+      "call_id": "ef33fc85-554c-4a17-8c4c-742f738a4705",
+      "node_name": "pre_plan_intent",
+      "model_name": "meta/llama-3.1-70b-instruct",
+      "call_kind": "generate",
+      "prompt_tokens": null,
+      "completion_tokens": null,
+      "total_tokens": null,
+      "started_at": "2026-05-01T11:35:25.432649+00:00",
+      "finished_at": "2026-05-01T11:35:25.432649+00:00",
+      "duration_ms": 2217.299
+    },
+    {
+      "call_id": "3a1223e3-0f26-4cee-9b0b-a03bb70ac479",
+      "node_name": "execution_path_intent",
+      "model_name": "meta/llama-3.1-70b-instruct",
+      "call_kind": "generate",
+      "prompt_tokens": null,
+      "completion_tokens": null,
+      "total_tokens": null,
+      "started_at": "2026-05-01T11:35:27.639160+00:00",
+      "finished_at": "2026-05-01T11:35:27.639160+00:00",
+      "duration_ms": 2204.363
+    },
+    {
+      "call_id": "b8d61106-4797-4ca6-b9f6-90cabe9aa313",
+      "node_name": "post_memory_plan_intent",
+      "model_name": "meta/llama-3.1-70b-instruct",
+      "call_kind": "generate",
+      "prompt_tokens": null,
+      "completion_tokens": null,
+      "total_tokens": null,
+      "started_at": "2026-05-01T11:35:29.583310+00:00",
+      "finished_at": "2026-05-01T11:35:29.583310+00:00",
+      "duration_ms": 1940.928
+    }
+  ],
+  "tool_calls": []
+}

@@ -357,5 +357,125 @@
     "mode": "strict_collections",
     "active_channel": "sms",
     "active_case_id": "COLL-1001"
+  },
+  "nvidia-smoke": {
+    "mode": "strict_collections",
+    "active_channel": "sms",
+    "active_case_id": "COLL-1001",
+    "node_llms": {
+      "intent": "meta/llama-3.1-70b-instruct",
+      "reflect": "meta/llama-3.1-70b-instruct"
+    }
+  },
+  "nv-check-2": {
+    "mode": "strict_collections",
+    "active_channel": "sms",
+    "active_case_id": "COLL-1001",
+    "node_llms": {
+      "intent": "meta/llama-3.1-70b-instruct"
+    }
+  },
+  "nv-check-1": {
+    "mode": "strict_collections",
+    "active_channel": "sms",
+    "active_case_id": "COLL-1001",
+    "node_llms": {
+      "intent": "meta/llama-3.1-70b-instruct",
+      "reflect": "meta/llama-3.1-70b-instruct"
+    }
+  },
+  "nv-check-2b": {
+    "mode": "strict_collections",
+    "active_channel": "sms",
+    "active_case_id": "COLL-1001",
+    "node_llms": {
+      "intent": "meta/llama-3.1-70b-instruct",
+      "planner": "meta/llama-3.1-70b-instruct"
+    }
+  },
+  "nv-check-3": {
+    "mode": "strict_collections",
+    "active_channel": "sms",
+    "active_case_id": "COLL-1001",
+    "node_llms": {
+      "intent": "meta/llama-3.1-70b-instruct",
+      "reflect": "meta/llama-3.1-70b-instruct"
+    }
+  },
+  "mem-user-check": {
+    "mode": "strict_collections",
+    "active_channel": "sms",
+    "active_case_id": "COLL-1001",
+    "active_user_id": "CUST-2001",
+    "global_key_event_memory": {
+      "updated_at": "2026-05-01T11:50:52.746207+00:00",
+      "event_counters": {
+        "conversation_outcome::successful": 3,
+        "conversation_outcome::unsuccessful": 3
+      },
+      "successful_cues": [
+        {
+          "cue_id": "collect-payment-link-after-dues-clarity",
+          "cue": "When user asks to pay now, send payment link right after dues explanation.",
+          "count": 3,
+          "last_seen": "2026-05-01T00:00:00+00:00",
+          "sample_signals": [
+            "payment_intent: customer asked for immediate payment link"
+          ],
+          "sample_user_ids": [
+            "CUST-2001",
+            "CUST-2005"
+          ]
+        }
+      ],
+      "unsuccessful_cues": [
+        {
+          "cue_id": "avoid-hard-push-before-hardship-ack",
+          "cue": "Hard push fails when hardship is not acknowledged before options are discussed.",
+          "count": 2,
+          "last_seen": "2026-05-01T00:00:00+00:00",
+          "sample_signals": [
+            "hardship_signal: cannot pay this month due to job loss"
+          ],
+          "sample_user_ids": [
+            "CUST-2002"
+          ]
+        },
+        {
+          "cue_id": "user-asked-for-discount/waiver-style-assistance.",
+          "cue": "User asked for discount/waiver style assistance.",
+          "count": 1,
+          "last_seen": "2026-05-01T11:50:52.746202+00:00",
+          "sample_signals": [
+            "user: I need lower EMI | agent: I can propose discount plan | user: Bye"
+          ],
+          "sample_user_ids": [
+            "CUST-2001"
+          ]
+        }
+      ]
+    },
+    "user_key_event_memory": {
+      "user_id": "CUST-2001",
+      "profile": {
+        "case_ids": [
+          "COLL-1001"
+        ],
+        "preferred_channel": "sms",
+        "risk_band": "unknown"
+      },
+      "latest_summary": "user: I need lower EMI | agent: I can propose discount plan | user: Bye",
+      "procedural_key_points": [
+        "Start with identity verification before discussing account specifics.",
+        "After dues explanation, provide one-click payment option.",
+        "User asked for discount/waiver style assistance."
+      ],
+      "follow_up_considerations": [
+        "Start next follow-up with discount and EMI options first."
+      ],
+      "last_outcome": "neutral",
+      "last_case_id": "COLL-1001"
+    },
+    "last_tool_used": "case_fetch"
   }
 }

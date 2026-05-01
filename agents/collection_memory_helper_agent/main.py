@@ -15,6 +15,7 @@ if __name__ == "__main__":
     agent = CollectionMemoryHelperAgent(repository=CollectionMemoryRepository(collection_runtime_dir=collection_runtime))
     sample = {
         "session_id": "demo-memory",
+        "user_id": "CUST-2001",
         "trigger": {"reason": "manual_demo"},
         "conversation_messages": [
             {"role": "user", "content": "I need lower EMI"},

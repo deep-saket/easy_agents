@@ -1,5 +1,5 @@
 tools:
 - name: update_key_event_memory
-  purpose: Extract key events, summarize conversation, and persist global/user memory JSON records.
-  input: session_id, trigger, conversation_messages, conversation_state
-  output: status, global_events_updated, extracted_key_events, user_summary
+  purpose: Extract procedural key points + summary, classify outcome, and persist global/user memory JSON records.
+  input: session_id, user_id, trigger, conversation_messages, conversation_state
+  output: status, user_id, global_cues_updated, conversation_outcome, extracted_key_points, user_summary

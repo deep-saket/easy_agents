@@ -21,6 +21,13 @@ This directory stores generated runtime artifacts for `agents/collection_agent`.
 | `conversation_states.json` | object (`session_id -> state`) | Working state (`mode`, `active_case_id`, `current_plan`, etc.) |
 | `tool_logs.json` | array | Tool executor audit entries (input/output/status/error/timestamp) |
 
+### Longitudinal memory stores
+
+| File | Type | Purpose |
+| --- | --- | --- |
+| `memory/global_key_event_memory.json` | object | Cross-user successful/unsuccessful procedural cues + counters |
+| `memory/user_key_event_memory.json` | object (`user_id -> memory`) | User-specific summary, procedural key points, follow-up considerations, outcome history |
+
 ### Tool runtime artifacts
 
 | File | Type | Written by tools |

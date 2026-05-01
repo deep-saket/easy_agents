@@ -113,6 +113,17 @@ def build_llm(settings: AppSettings):
             api_key=api_key,
             max_new_tokens=settings.llm.max_new_tokens,
         )
+    if provider == "nvidia":
+        api_key = os.getenv("NVIDIA_API_KEY")
+        if not api_key:
+            raise ValueError("NVIDIA_API_KEY is required when llm.provider=nvidia.")
+        base_url = os.getenv("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com")
+        return LLMFactory.build_nvidia_llm(
+            model_name=settings.llm.model_name,
+            api_key=api_key,
+            base_url=base_url,
+            max_new_tokens=settings.llm.max_new_tokens,
+        )
     if provider == "groq":
         api_key = os.getenv("GROQ_API_KEY")
         if not api_key:

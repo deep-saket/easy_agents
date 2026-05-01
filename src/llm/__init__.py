@@ -7,7 +7,7 @@ Purpose: Compatibility wrapper for the shared lowercase `llm` package.
 from src.llm.base import BaseLLM
 from src.llm.factory import LLMFactory
 from src.llm.local_llm import FunctionCallingLocalLLM, LocalLLM
-from src.llm.remote_llm import EndpointLLM, GroqLLM, OpenAICompatibleLLM, OpenAILLM, RemoteLLM
+from src.llm.remote_llm import EndpointLLM, GroqLLM, NvidiaLLM, OpenAICompatibleLLM, OpenAILLM, RemoteLLM
 
 __all__ = [
     "BaseLLM",
@@ -16,6 +16,7 @@ __all__ = [
     "GroqLLM",
     "LLMFactory",
     "LocalLLM",
+    "NvidiaLLM",
     "OpenAICompatibleLLM",
     "OpenAILLM",
     "RemoteLLM",

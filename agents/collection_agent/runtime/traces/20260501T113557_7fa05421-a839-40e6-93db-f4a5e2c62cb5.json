@@ -1,0 +1,136 @@
+{
+  "trace_id": "7fa05421-a839-40e6-93db-f4a5e2c62cb5",
+  "agent_name": "collection_agent",
+  "session_id": "nv-check-2b",
+  "user_input": "customer for COLL-1001 wants to pay now via sms, create payment link",
+  "status": "failed",
+  "started_at": "2026-05-01T11:35:57.589407+00:00",
+  "finished_at": "2026-05-01T11:36:06.329731+00:00",
+  "error": "1 validation error for PaymentLinkCreateInput\namount\n  Input should be a valid number, unable to parse string as a number [type=float_parsing, input_value='total_due', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/float_parsing",
+  "summary": {
+    "trace_id": "7fa05421-a839-40e6-93db-f4a5e2c62cb5",
+    "agent_name": "collection_agent",
+    "session_id": "nv-check-2b",
+    "status": "failed",
+    "node_hits": [
+      "relevance_intent",
+      "pre_plan_intent",
+      "execution_path_intent",
+      "react",
+      "tool_execution"
+    ],
+    "node_count": 5,
+    "llm_call_count": 4,
+    "tool_call_count": 1,
+    "models": [
+      "meta/llama-3.1-70b-instruct"
+    ],
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "total_tokens": 0,
+    "error": "1 validation error for PaymentLinkCreateInput\namount\n  Input should be a valid number, unable to parse string as a number [type=float_parsing, input_value='total_due', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/float_parsing"
+  },
+  "nodes": [
+    {
+      "node_name": "relevance_intent",
+      "status": "completed",
+      "started_at": "2026-05-01T11:35:57.590191+00:00",
+      "finished_at": "2026-05-01T11:35:59.531420+00:00",
+      "duration_ms": 1941.229,
+      "error": null
+    },
+    {
+      "node_name": "pre_plan_intent",
+      "status": "completed",
+      "started_at": "2026-05-01T11:35:59.532731+00:00",
+      "finished_at": "2026-05-01T11:36:01.671525+00:00",
+      "duration_ms": 2138.794,
+      "error": null
+    },
+    {
+      "node_name": "execution_path_intent",
+      "status": "completed",
+      "started_at": "2026-05-01T11:36:01.673000+00:00",
+      "finished_at": "2026-05-01T11:36:03.555005+00:00",
+      "duration_ms": 1882.005,
+      "error": null
+    },
+    {
+      "node_name": "react",
+      "status": "completed",
+      "started_at": "2026-05-01T11:36:03.556248+00:00",
+      "finished_at": "2026-05-01T11:36:06.323835+00:00",
+      "duration_ms": 2767.587,
+      "error": null
+    },
+    {
+      "node_name": "tool_execution",
+      "status": "failed",
+      "started_at": "2026-05-01T11:36:06.324861+00:00",
+      "finished_at": "2026-05-01T11:36:06.329222+00:00",
+      "duration_ms": 4.361,
+      "error": "1 validation error for PaymentLinkCreateInput\namount\n  Input should be a valid number, unable to parse string as a number [type=float_parsing, input_value='total_due', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/float_parsing"
+    }
+  ],
+  "llm_calls": [
+    {
+      "call_id": "b26815c1-0628-4326-8355-cd6b74d55d3f",
+      "node_name": "relevance_intent",
+      "model_name": "meta/llama-3.1-70b-instruct",
+      "call_kind": "generate",
+      "prompt_tokens": null,
+      "completion_tokens": null,
+      "total_tokens": null,
+      "started_at": "2026-05-01T11:35:59.531082+00:00",
+      "finished_at": "2026-05-01T11:35:59.531082+00:00",
+      "duration_ms": 1940.399
+    },
+    {
+      "call_id": "039531d3-7236-4146-af36-cc799ef3c532",
+      "node_name": "pre_plan_intent",
+      "model_name": "meta/llama-3.1-70b-instruct",
+      "call_kind": "generate",
+      "prompt_tokens": null,
+      "completion_tokens": null,
+      "total_tokens": null,
+      "started_at": "2026-05-01T11:36:01.671048+00:00",
+      "finished_at": "2026-05-01T11:36:01.671048+00:00",
+      "duration_ms": 2137.763
+    },
+    {
+      "call_id": "4c9ce0a4-371f-43b9-ad2a-e89e6ed86a20",
+      "node_name": "execution_path_intent",
+      "model_name": "meta/llama-3.1-70b-instruct",
+      "call_kind": "generate",
+      "prompt_tokens": null,
+      "completion_tokens": null,
+      "total_tokens": null,
+      "started_at": "2026-05-01T11:36:03.554383+00:00",
+      "finished_at": "2026-05-01T11:36:03.554383+00:00",
+      "duration_ms": 1880.529
+    },
+    {
+      "call_id": "1c57c9e9-755e-436a-a514-9166cdd4fd15",
+      "node_name": "react",
+      "model_name": "meta/llama-3.1-70b-instruct",
+      "call_kind": "generate",
+      "prompt_tokens": null,
+      "completion_tokens": null,
+      "total_tokens": null,
+      "started_at": "2026-05-01T11:36:06.322976+00:00",
+      "finished_at": "2026-05-01T11:36:06.322976+00:00",
+      "duration_ms": 2765.864
+    }
+  ],
+  "tool_calls": [
+    {
+      "tool_name": "payment_link_create",
+      "node_name": "tool_execution",
+      "status": "failed",
+      "started_at": "2026-05-01T11:36:06.328777+00:00",
+      "finished_at": "2026-05-01T11:36:06.328777+00:00",
+      "duration_ms": 3.548,
+      "error": "1 validation error for PaymentLinkCreateInput\namount\n  Input should be a valid number, unable to parse string as a number [type=float_parsing, input_value='total_due', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/float_parsing"
+    }
+  ]
+}
