@@ -27,6 +27,8 @@ class CollectionGraphState(AgentState, total=False):
 
     # Per-turn diagnostics and orchestration helpers
     node_history: list[str]
+    previous_node: str
+    next_node: str | list[str]
     conversation_phase: str
     tool_errors: list[dict[str, Any]]
     response_metadata: dict[str, Any]

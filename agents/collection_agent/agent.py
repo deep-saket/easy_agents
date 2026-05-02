@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import json
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 from uuid import uuid4
 
 from langgraph.graph import END, START, StateGraph
@@ -63,8 +63,50 @@ class CollectionAgent(BaseAgent):
     trace_sink: Any | None = None
     trace_output_dir: Path | None = None
     memory_repository: CollectionMemoryRepository | None = None
+    allow_deterministic_fallback: bool = False
     agent_name: str = "collection_agent"
     last_trace: ExecutionTrace | None = None
+
+    _STATIC_NEXT_NODE_MAP: ClassVar[dict[str, str]] = {
+        "memory_retrieve": "post_memory_plan_intent",
+        "tool_execution": "react",
+        "relevant_response": "END",
+        "irrelevant_response": "END",
+    }
+
+    _ROUTE_NEXT_NODE_MAP: ClassVar[dict[str, dict[str, str]]] = {
+        "relevance_intent": {
+            "relevant": "pre_plan_intent",
+            "irrelevant": "irrelevant_response",
+            "empty": "irrelevant_response",
+        },
+        "pre_plan_intent": {
+            "plan": "plan_proposal",
+            "decide": "execution_path_intent",
+        },
+        "execution_path_intent": {
+            "need_memory": "memory_retrieve",
+            "need_tool": "react",
+        },
+        "post_memory_plan_intent": {
+            "plan": "plan_proposal",
+            "react": "react",
+        },
+        "react": {
+            "act": "tool_execution",
+            "respond": "plan_proposal",
+            "end": "plan_proposal",
+        },
+        "plan_proposal": {
+            "propose": "tool_execution",
+            "continue": "reflect",
+        },
+        "reflect": {
+            "retry_react": "react",
+            "retry_plan_proposal": "plan_proposal",
+            "complete": "relevant_response",
+        },
+    }
 
     def __post_init__(self) -> None:
         prompts = load_collection_agent_prompts()
@@ -95,11 +137,14 @@ class CollectionAgent(BaseAgent):
             llm=self.llm,
             intent_system_prompt=str(intent_prompts.get("system_prompt", "")),
             intent_user_prompt=str(intent_prompts.get("user_prompt", "")),
+            require_llm=not self.allow_deterministic_fallback,
+            allow_rule_fallback=self.allow_deterministic_fallback,
         )
 
         self.memory_retrieve_node = MemoryRetrieveNode(tool_registry=self.tool_registry, memories=[WorkingMemory])
         self.relevance_intent_node = CollectionIntentNode(
             llm=self.llm,
+            allow_deterministic_fallback=self.allow_deterministic_fallback,
             system_prompt=str(intent_prompts.get("relevance_system_prompt", "")),
             user_prompt=str(intent_prompts.get("relevance_user_prompt", "")),
             output_key="relevance_intent",
@@ -152,6 +197,7 @@ class CollectionAgent(BaseAgent):
         )
         self.pre_plan_intent_node = CollectionIntentNode(
             llm=self.llm,
+            allow_deterministic_fallback=self.allow_deterministic_fallback,
             system_prompt=str(intent_prompts.get("pre_plan_system_prompt", "")),
             user_prompt=str(intent_prompts.get("pre_plan_user_prompt", "")),
             output_key="pre_plan_intent",
@@ -180,6 +226,7 @@ class CollectionAgent(BaseAgent):
         )
         self.execution_path_intent_node = CollectionIntentNode(
             llm=self.llm,
+            allow_deterministic_fallback=self.allow_deterministic_fallback,
             system_prompt=str(intent_prompts.get("execution_path_system_prompt", "")),
             user_prompt=str(intent_prompts.get("execution_path_user_prompt", "")),
             output_key="execution_path_intent",
@@ -208,6 +255,7 @@ class CollectionAgent(BaseAgent):
         )
         self.post_memory_plan_intent_node = CollectionIntentNode(
             llm=self.llm,
+            allow_deterministic_fallback=self.allow_deterministic_fallback,
             system_prompt=str(intent_prompts.get("post_memory_plan_system_prompt", "")),
             user_prompt=str(intent_prompts.get("post_memory_plan_user_prompt", "")),
             output_key="post_memory_plan_intent",
@@ -297,27 +345,6 @@ class CollectionAgent(BaseAgent):
             "post_memory_plan_intent",
             self._wrap_node("post_memory_plan_intent", self.post_memory_plan_intent_node.execute),
         )
-        graph.add_node(
-            "origin_pre_plan",
-            self._wrap_node(
-                "origin_pre_plan",
-                lambda _state: {"routing_context": {"plan_origin": "pre_plan_intent"}},
-            ),
-        )
-        graph.add_node(
-            "origin_post_memory_plan",
-            self._wrap_node(
-                "origin_post_memory_plan",
-                lambda _state: {"routing_context": {"plan_origin": "post_memory_plan_intent"}},
-            ),
-        )
-        graph.add_node(
-            "origin_react_plan",
-            self._wrap_node(
-                "origin_react_plan",
-                lambda _state: {"routing_context": {"plan_origin": "react"}},
-            ),
-        )
         graph.add_node("react", self._wrap_node("react", self.react_node.execute))
         graph.add_node("plan_proposal", self._wrap_node("plan_proposal", self.plan_node.execute))
         graph.add_node("tool_execution", self._wrap_node("tool_execution", self.tool_execution_node.execute))
@@ -341,7 +368,7 @@ class CollectionAgent(BaseAgent):
             "pre_plan_intent",
             self.pre_plan_intent_node.route,
             {
-                "plan": "origin_pre_plan",
+                "plan": "plan_proposal",
                 "decide": "execution_path_intent",
             },
         )
@@ -358,20 +385,17 @@ class CollectionAgent(BaseAgent):
             "post_memory_plan_intent",
             self.post_memory_plan_intent_node.route,
             {
-                "plan": "origin_post_memory_plan",
+                "plan": "plan_proposal",
                 "react": "react",
             },
         )
-        graph.add_edge("origin_pre_plan", "plan_proposal")
-        graph.add_edge("origin_post_memory_plan", "plan_proposal")
-        graph.add_edge("origin_react_plan", "plan_proposal")
         graph.add_conditional_edges(
             "react",
             self.react_node.route,
             {
                 "act": "tool_execution",
-                "respond": "origin_react_plan",
-                "end": "origin_react_plan",
+                "respond": "plan_proposal",
+                "end": "plan_proposal",
             },
         )
         graph.add_conditional_edges(
@@ -401,26 +425,163 @@ class CollectionAgent(BaseAgent):
             trace_state = {k: v for k, v in state.items() if k != "memory"}
             with trace_node(node_name, state=trace_state):
                 result = fn(state)
+            state_update: dict[str, Any] = {}
             if isinstance(result, dict):
+                route_value = self._infer_route_value(node_name=node_name, prior_state=state, update=result)
+                self._apply_plan_origin_context(node_name=node_name, route_value=route_value, update=result)
                 history = list(state.get("node_history", []))
+                previous_node = history[-1] if history else "START"
                 result["node_history"] = [*history, node_name]
+                result["previous_node"] = previous_node
+                result["next_node"] = self._resolve_next_node(
+                    node_name=node_name,
+                    update=result,
+                    route_value=route_value,
+                )
                 result.setdefault("conversation_phase", self._phase_for_node(node_name))
+                state_update = {k: v for k, v in result.items() if k != "memory"}
+                if route_value:
+                    state_update.setdefault("route", route_value)
+            debug_message = self._build_node_debug_message(node_name=node_name, state=state, update=state_update)
             emit_trace_event(
                 {
                     "event": "node_state",
                     "node_name": node_name,
                     "step": state.get("steps", 0),
                     "decision": repr(state.get("decision")),
-                    "observation": result.get("observation") if isinstance(result, dict) else None,
-                    "response": result.get("response") if isinstance(result, dict) else None,
-                    "route": result.get("route") if isinstance(result, dict) else None,
+                    "observation": state_update.get("observation") if isinstance(state_update, dict) else None,
+                    "response": state_update.get("response") if isinstance(state_update, dict) else None,
+                    "route": state_update.get("route") if isinstance(state_update, dict) else None,
+                    "state_update_keys": sorted(state_update.keys()),
+                    "state_update": state_update,
+                    "human_message": debug_message,
                 }
             )
             return result
 
         return _wrapped
 
+    def _resolve_next_node(
+        self,
+        *,
+        node_name: str,
+        update: dict[str, Any],
+        route_value: str | None = None,
+    ) -> str | list[str]:
+        if node_name in self._STATIC_NEXT_NODE_MAP:
+            return self._STATIC_NEXT_NODE_MAP[node_name]
+
+        route_map = self._ROUTE_NEXT_NODE_MAP.get(node_name, {})
+        if not route_value:
+            route_value = str(update.get("route", "")).strip().lower()
+        if route_value and route_value in route_map:
+            return route_map[route_value]
+
+        next_candidates = sorted(set(route_map.values()))
+        if not next_candidates:
+            return "unknown"
+        if len(next_candidates) == 1:
+            return next_candidates[0]
+        return next_candidates
+
+    def _infer_route_value(self, *, node_name: str, prior_state: CollectionGraphState, update: dict[str, Any]) -> str | None:
+        merged_state: dict[str, Any] = dict(prior_state)
+        merged_state.update(update)
+        if node_name == "relevance_intent":
+            return str(self.relevance_intent_node.route(merged_state)).strip().lower()
+        if node_name == "pre_plan_intent":
+            return str(self.pre_plan_intent_node.route(merged_state)).strip().lower()
+        if node_name == "execution_path_intent":
+            return str(self.execution_path_intent_node.route(merged_state)).strip().lower()
+        if node_name == "post_memory_plan_intent":
+            return str(self.post_memory_plan_intent_node.route(merged_state)).strip().lower()
+        if node_name == "react":
+            return str(self.react_node.route(merged_state)).strip().lower()
+        if node_name == "plan_proposal":
+            return str(self.plan_node.route(merged_state)).strip().lower()
+        if node_name == "reflect":
+            return str(self.reflect_node.route(merged_state)).strip().lower()
+        return None
+
+    @staticmethod
+    def _set_plan_origin(update: dict[str, Any], *, plan_origin: str) -> None:
+        context = update.get("routing_context")
+        context_map = dict(context) if isinstance(context, dict) else {}
+        context_map["plan_origin"] = plan_origin
+        update["routing_context"] = context_map
+
+    def _apply_plan_origin_context(self, *, node_name: str, route_value: str | None, update: dict[str, Any]) -> None:
+        if node_name == "pre_plan_intent" and route_value == "plan":
+            self._set_plan_origin(update, plan_origin="pre_plan_intent")
+            return
+        if node_name == "post_memory_plan_intent" and route_value == "plan":
+            self._set_plan_origin(update, plan_origin="post_memory_plan_intent")
+            return
+        if node_name == "react" and route_value in {"respond", "end"}:
+            self._set_plan_origin(update, plan_origin="react")
+
+    @staticmethod
+    def _build_node_debug_message(*, node_name: str, state: CollectionGraphState, update: dict[str, Any]) -> str:
+        if node_name in {"relevance_intent", "pre_plan_intent", "execution_path_intent", "post_memory_plan_intent"}:
+            payload = update.get(node_name) if isinstance(update.get(node_name), dict) else {}
+            intent = str(payload.get("intent", "unknown"))
+            reason = str(payload.get("reason", "")).strip()
+            route = str(update.get("route", "")).strip()
+            reason_part = f" reason={reason}" if reason else ""
+            route_part = f", route={route}" if route else ""
+            return f"{node_name}: classified intent={intent}{route_part}.{reason_part}".strip()
+
+        if node_name == "react":
+            decision = update.get("decision")
+            tool_call = None
+            if isinstance(decision, dict):
+                tool_call = decision.get("tool_call")
+            elif decision is not None:
+                tool_call = getattr(decision, "tool_call", None)
+            if isinstance(tool_call, dict):
+                tool_name = str(tool_call.get("tool_name", "unknown_tool"))
+                return f"react: selected tool `{tool_name}` for execution."
+            if tool_call is not None:
+                tool_name = str(getattr(tool_call, "tool_name", "unknown_tool"))
+                return f"react: selected tool `{tool_name}` for execution."
+            if update.get("response"):
+                return "react: prepared direct response path."
+            return "react: planned next action."
+
+        if node_name == "tool_execution":
+            obs = update.get("observation") if isinstance(update.get("observation"), dict) else {}
+            phase = obs.get("tool_phase") if isinstance(obs.get("tool_phase"), dict) else obs
+            tool_name = str(phase.get("tool_name", "unknown_tool")) if isinstance(phase, dict) else "unknown_tool"
+            return f"tool_execution: executed `{tool_name}` and captured observation."
+
+        if node_name == "plan_proposal":
+            proposal = update.get("plan_proposal") if isinstance(update.get("plan_proposal"), dict) else {}
+            outline = str(proposal.get("plan_outline", "")).strip()
+            if outline:
+                return f"plan_proposal: built plan outline - {outline}"
+            intent = str(proposal.get("intent", "generic_plan"))
+            return f"plan_proposal: built proposal intent={intent}."
+
+        if node_name == "reflect":
+            feedback = update.get("reflection_feedback") if isinstance(update.get("reflection_feedback"), dict) else {}
+            complete = feedback.get("is_complete")
+            reason = str(feedback.get("reason", "")).strip()
+            completion = "complete" if complete else "needs retry"
+            reason_part = f" reason={reason}" if reason else ""
+            return f"reflect: validation is {completion}.{reason_part}".strip()
+
+        if node_name in {"relevant_response", "irrelevant_response"}:
+            target = str(update.get("response_target", state.get("response_target", "customer")))
+            return f"{node_name}: packaged final response for target={target}."
+
+        return f"{node_name}: node executed."
+
     def run_turn(self, user_input: str, session_id: str | None = None) -> AgentState:
+        if self.llm is None and not self.allow_deterministic_fallback:
+            raise RuntimeError(
+                "CollectionAgent requires an active LLM. "
+                "Deterministic classification fallback is disabled."
+            )
         session_key = session_id or "collection-demo-session"
         memory = self.session_store.load(session_key)
         if "mode" not in memory.state:
