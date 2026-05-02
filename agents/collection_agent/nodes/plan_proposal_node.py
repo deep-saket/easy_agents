@@ -32,11 +32,38 @@ class PlanProposalNode(BaseGraphNode):
         observed_tool = str(observation.get("tool_name", "")) if isinstance(observation, dict) else ""
         output = observation.get("output", {}) if isinstance(observation, dict) else {}
         decision = state.get("decision")
+        existing_plan = self._get_existing_conversation_plan(state=state, memory_state=memory_state)
+
+        def with_plan(update: NodeUpdate) -> NodeUpdate:
+            response_target = str(update.get("response_target", "customer")).strip().lower() or "customer"
+            route = str(update.get("route", "continue")).strip().lower() or "continue"
+            proposal = update.get("plan_proposal") if isinstance(update.get("plan_proposal"), dict) else {}
+            plan = self._build_or_update_conversation_plan(
+                existing_plan=existing_plan,
+                user_input=user_input,
+                memory_state=memory_state,
+                mode=mode,
+                plan_origin=plan_origin,
+                response_target=response_target,
+                route=route,
+                observed_tool=observed_tool,
+                proposal=proposal,
+            )
+            update["conversation_plan"] = plan
+            if proposal:
+                proposal["conversation_plan_id"] = plan.get("plan_id")
+                proposal["conversation_plan_version"] = plan.get("version")
+                proposal["conversation_plan_current_node"] = plan.get("current_node_id")
+                proposal["conversation_plan"] = plan
+                update["plan_proposal"] = proposal
+            if memory is not None:
+                memory.set_state(active_conversation_plan=plan)
+            return update
 
         if bool(memory_state.get("agent_loop_blocked", False)):
             if memory is not None:
                 memory.set_state(agent_loop_blocked=False)
-            return {
+            return with_plan({
                 "route": "continue",
                 "response_target": "customer",
                 "plan_proposal": {
@@ -46,10 +73,10 @@ class PlanProposalNode(BaseGraphNode):
                     "next_actions": ["pay_now", "plan_revision", "schedule_followup"],
                     "plan_origin": "loop_guard",
                 },
-            }
+            })
 
         if self._is_conversation_termination(user_input):
-            return {
+            return with_plan({
                 "route": "continue",
                 "response_target": "customer",
                 "plan_proposal": {
@@ -63,13 +90,13 @@ class PlanProposalNode(BaseGraphNode):
                     "reason": "conversation_termination",
                     "final_user_message": user_input,
                 },
-            }
+            })
 
         discount_recommendation = memory_state.get("discount_recommendation")
         if isinstance(discount_recommendation, dict) and discount_recommendation:
             if memory is not None:
                 memory.set_state(discount_recommendation=None)
-            return {
+            return with_plan({
                 "route": "continue",
                 "response_target": "customer",
                 "plan_proposal": {
@@ -78,14 +105,14 @@ class PlanProposalNode(BaseGraphNode):
                     "discount_recommendation": discount_recommendation,
                     "plan_origin": "discount_recommendation",
                 },
-            }
+            })
 
         revision_index = int(memory_state.get("plan_revision_index", 0))
         hardship_reason = str(memory_state.get("hardship_reason", "income_reduction"))
         case_id = str(memory_state.get("active_case_id", "COLL-1001"))
 
         if self._needs_discount_specialist(user_input) and case_id:
-            return {
+            return with_plan({
                 "route": "continue",
                 "response": "Routing internally to discount planning specialist.",
                 "response_target": "discount_planning_agent",
@@ -96,7 +123,7 @@ class PlanProposalNode(BaseGraphNode):
                     "hardship_reason": hardship_reason,
                     "target_monthly_emi": self._extract_amount(user_input),
                 },
-            }
+            })
 
         if mode != "hardship_negotiation":
             plan_proposal = self._build_plan_proposal(
@@ -104,14 +131,15 @@ class PlanProposalNode(BaseGraphNode):
                 memory_state=memory_state,
                 observation=(observation if isinstance(observation, dict) else None),
                 decision=decision,
-                default_plan=self._build_direct_plan_response(user_input=user_input, memory_state=memory_state),
+                default_plan=self._build_generic_plan_outline(user_input=user_input, memory_state=memory_state),
                 plan_origin=plan_origin,
+                mode=mode,
             )
-            return {
+            return with_plan({
                 "route": "continue",
                 "response_target": str(plan_proposal.get("target", "customer")),
                 "plan_proposal": plan_proposal,
-            }
+            })
 
         if observed_tool == "plan_propose":
             if memory is not None and isinstance(output, dict):
@@ -121,14 +149,15 @@ class PlanProposalNode(BaseGraphNode):
                 memory_state=memory_state,
                 observation=(observation if isinstance(observation, dict) else None),
                 decision=decision,
-                default_plan=self._build_direct_plan_response(user_input=user_input, memory_state=memory_state),
+                default_plan=self._build_generic_plan_outline(user_input=user_input, memory_state=memory_state),
                 plan_origin=plan_origin,
+                mode=mode,
             )
-            return {
+            return with_plan({
                 "route": "continue",
                 "response_target": "customer",
                 "plan_proposal": plan_proposal,
-            }
+            })
 
         should_propose = False
 
@@ -148,14 +177,15 @@ class PlanProposalNode(BaseGraphNode):
                 memory_state=memory_state,
                 observation=(observation if isinstance(observation, dict) else None),
                 decision=decision,
-                default_plan=self._build_direct_plan_response(user_input=user_input, memory_state=memory_state),
+                default_plan=self._build_generic_plan_outline(user_input=user_input, memory_state=memory_state),
                 plan_origin=plan_origin,
+                mode=mode,
             )
-            return {
+            return with_plan({
                 "route": "continue",
                 "response_target": str(plan_proposal.get("target", "customer")),
                 "plan_proposal": plan_proposal,
-            }
+            })
 
         max_installment = self._extract_amount(user_input)
         arguments: dict[str, Any] = {
@@ -176,10 +206,11 @@ class PlanProposalNode(BaseGraphNode):
             response_text=None,
             done=False,
         )
-        return {
+        return with_plan({
             "route": "propose",
             "decision": decision,
-        }
+            "response_target": "self",
+        })
 
     def route(self, state: AgentState) -> str:
         return str(state.get("route", "continue"))
@@ -216,24 +247,22 @@ class PlanProposalNode(BaseGraphNode):
         return any(keyword in lowered for keyword in keywords)
 
     @staticmethod
-    def _build_direct_plan_response(*, user_input: str, memory_state: dict[str, Any]) -> str:
+    def _build_generic_plan_outline(*, user_input: str, memory_state: dict[str, Any]) -> str:
         case_id = str(memory_state.get("active_case_id", "COLL-1001"))
-        channel = str(memory_state.get("active_channel", "sms"))
         lowered = user_input.lower()
-        if any(token in lowered for token in ["pay now", "payment link", "link"]):
+        if any(token in lowered for token in ["pay now", "payment link", "link", "proceed with payment"]):
             return (
-                f"Proposed plan for {case_id}: complete identity verification, confirm current dues, "
-                "generate a payment link, and close the case after payment confirmation."
+                f"Plan for {case_id}: confirm customer identity and dues context, complete immediate payment flow, "
+                "and confirm closure after payment acknowledgment."
             )
-        if any(token in lowered for token in ["cannot pay", "hardship", "discount", "settlement", "waiver"]):
+        if any(token in lowered for token in ["cannot pay", "hardship", "discount", "settlement", "waiver", "emi"]):
             return (
-                f"Proposed plan for {case_id}: verify hardship reason, check policy eligibility for concessions, "
-                "share the best eligible repayment option, and schedule follow-up on the same channel "
-                f"({channel}) if immediate payment is not possible."
+                f"Plan for {case_id}: validate hardship constraints, determine eligible assistance options, "
+                "propose revised repayment path, and capture next commitment with follow-up."
             )
         return (
-            f"Proposed plan for {case_id}: verify customer identity, explain overdue dues and policy options, "
-            "attempt payment collection, and if payment is deferred, capture a promise-to-pay and schedule follow-up."
+            f"Plan for {case_id}: verify account context, provide concise dues explanation, "
+            "collect payment intent, and capture commitment or follow-up details."
         )
 
     @staticmethod
@@ -257,199 +286,57 @@ class PlanProposalNode(BaseGraphNode):
         decision: Any | None,
         default_plan: str,
         plan_origin: str,
+        mode: str,
     ) -> dict[str, Any]:
-        opener_message = self._build_outbound_opening_message(
-            user_input=user_input,
-            memory_state=memory_state,
-            plan_origin=plan_origin,
-        )
-        if opener_message:
-            return {
-                "target": "customer",
-                "intent": "outbound_opening",
-                "opening_context": opener_message,
-                "plan_origin": "outbound_opening",
-            }
-
-        preplan_message = self._build_preplan_customer_message(
-            user_input=user_input,
-            memory_state=memory_state,
-            plan_origin=plan_origin,
-            observation=observation,
-        )
-        if preplan_message:
-            return {
-                "target": "customer",
-                "intent": "help_options",
-                "help_context": preplan_message,
-                "plan_origin": "preplan_customer_guidance",
-            }
-
         decision_text = str(getattr(decision, "response_text", "") or "").strip()
         decision_target = str(getattr(decision, "response_target", "") or "").strip().lower()
         target = decision_target if decision_target in {"customer", "self", "discount_planning_agent"} else "customer"
-
-        # Prefer explicit direct-response text unless it is raw tool debug output.
-        if decision_text and not decision_text.startswith("Executed "):
-            if decision_text.lower().startswith("proposed plan for "):
-                return {
-                    "target": target,
-                    "intent": "plan_recommendation",
-                    "plan_outline": decision_text,
-                    "plan_origin": "react_direct_plan_outline",
-                }
-            return {
-                "target": target,
-                "intent": "direct_response",
-                "draft_response": decision_text,
-                "plan_origin": "react_direct",
-            }
-
         observed_tool = str(observation.get("tool_name", "")) if isinstance(observation, dict) else ""
         output = observation.get("output", {}) if isinstance(observation, dict) else {}
 
-        if observed_tool == "case_fetch":
-            total = int(output.get("total", 0)) if output.get("total") is not None else 0
-            cases = output.get("cases") if isinstance(output.get("cases"), list) else []
-            if total <= 0 or not cases:
-                return {
-                    "target": "customer",
-                    "intent": "case_not_found",
-                    "case_lookup_status": "not_found",
-                    "plan_origin": "tool_case_fetch",
-                }
-            primary = cases[0] if isinstance(cases[0], dict) else {}
-            return {
-                "target": "customer",
-                "intent": "case_snapshot",
-                "case_snapshot": {
-                    "case_id": str(primary.get("case_id", memory_state.get("active_case_id", "COLL-1001"))),
-                    "customer_name": str(memory_state.get("active_customer_name", "Customer")).strip() or "Customer",
-                    "overdue_amount": float(primary.get("overdue_amount", 0.0)),
-                    "emi_amount": float(primary.get("emi_amount", 0.0)),
-                    "late_fee": float(primary.get("late_fee", 0.0)),
-                    "dpd": int(primary.get("dpd", 0)),
-                },
-                "plan_origin": "tool_case_fetch",
-            }
-
-        if observed_tool == "plan_propose" and isinstance(output, dict):
-            months = output.get("months")
-            monthly_amount = output.get("monthly_amount")
-            first_due_date = output.get("first_due_date")
-            if months is not None and monthly_amount is not None:
-                return {
-                    "target": "customer",
-                    "intent": "plan_offer",
-                    "plan_offer": {
-                        "months": int(months),
-                        "monthly_amount": float(monthly_amount),
-                        "first_due_date": str(first_due_date),
-                    },
-                    "plan_origin": "tool_plan_propose",
-                }
-
+        plan_outline = default_plan
         if decision_text:
-            if decision_text.lower().startswith("proposed plan for "):
-                return {
-                    "target": target,
-                    "intent": "plan_recommendation",
-                    "plan_outline": decision_text,
-                    "plan_origin": "react_direct_raw_plan_outline",
-                }
-            if decision_text.startswith("Executed "):
-                return {
-                    "target": target,
-                    "intent": "tool_summary",
-                    "plan_outline": decision_text,
-                    "plan_origin": "react_tool_summary",
-                }
-            return {
-                "target": target,
-                "intent": "direct_response",
-                "draft_response": decision_text,
-                "plan_origin": "react_direct_raw",
-            }
+            if decision_text.lower().startswith("proposed plan for ") or decision_text.lower().startswith("plan for "):
+                plan_outline = decision_text
+            elif decision_text.startswith("Executed "):
+                plan_outline = f"Tool execution result observed: {decision_text}"
+            else:
+                plan_outline = f"Direct response path selected: {decision_text}"
+        elif observed_tool:
+            plan_outline = (
+                f"Observation-driven plan: interpret `{observed_tool}` output, provide the next customer response, "
+                "and request one concrete next action."
+            )
 
         return {
-            "target": "customer",
-            "intent": "plan_recommendation",
-            "plan_outline": default_plan,
-            "plan_origin": "default_direct_plan",
-        }
-
-    def _build_outbound_opening_message(
-        self,
-        *,
-        user_input: str,
-        memory_state: dict[str, Any],
-        plan_origin: str,
-    ) -> dict[str, Any] | None:
-        lowered = user_input.lower()
-        if plan_origin != "pre_plan_intent" and "outbound collections call" not in lowered:
-            return None
-        if "first call pitch" not in lowered and "outbound collections call" not in lowered:
-            return None
-
-        customer_name = str(memory_state.get("active_customer_name", "Customer")).strip() or "Customer"
-        case_id = str(memory_state.get("active_case_id", "COLL-1001")).strip() or "COLL-1001"
-        overdue_amount = self._extract_named_amount(user_input=user_input, key="overdue_amount")
-        if overdue_amount is None:
-            overdue_amount = self._extract_amount(user_input) or 0.0
-
-        user_memory = memory_state.get("user_key_event_memory")
-        prior_signal = ""
-        if isinstance(user_memory, dict):
-            key_points = user_memory.get("key_points")
-            if isinstance(key_points, list) and key_points:
-                first_point = str(key_points[0]).strip()
-                if first_point:
-                    prior_signal = f" I also note from prior interactions: {first_point}."
-
-        return {
-            "customer_name": customer_name,
-            "case_id": case_id,
-            "overdue_amount": float(overdue_amount),
-            "prior_signal": prior_signal.strip(),
+            "target": target,
+            "intent": "generic_plan",
+            "plan_outline": plan_outline,
+            "draft_response": decision_text if decision_text and not decision_text.startswith("Executed ") else "",
+            "plan_origin": plan_origin or "default_direct_plan",
+            "mode": mode,
+            "context": {
+                "case_id": str(memory_state.get("active_case_id", "COLL-1001")),
+                "customer_name": str(memory_state.get("active_customer_name", "Customer")).strip() or "Customer",
+                "overdue_amount": float(memory_state.get("active_overdue_amount", 0.0) or 0.0),
+                "observed_tool": observed_tool,
+                "observed_tool_output": output if isinstance(output, dict) else {},
+            },
+            "next_actions": self._derive_next_actions(user_input=user_input, mode=mode, observed_tool=observed_tool),
         }
 
     @staticmethod
-    def _build_preplan_customer_message(
-        *,
-        user_input: str,
-        memory_state: dict[str, Any],
-        plan_origin: str,
-        observation: dict[str, Any] | None,
-    ) -> dict[str, Any] | None:
-        if plan_origin not in {"pre_plan_intent", "post_memory_plan_intent"}:
-            return None
-        if observation:
-            return None
-
+    def _derive_next_actions(*, user_input: str, mode: str, observed_tool: str) -> list[str]:
         lowered = user_input.lower()
-        customer_name = str(memory_state.get("active_customer_name", "Customer")).strip() or "Customer"
-        case_id = str(memory_state.get("active_case_id", "COLL-1001")).strip() or "COLL-1001"
-
-        help_signals = [
-            "how can you help",
-            "what can you do",
-            "help me",
-            "options",
-            "what are my options",
-        ]
-        if any(signal in lowered for signal in help_signals):
-            return {
-                "customer_name": customer_name,
-                "case_id": case_id,
-                "options": [
-                    "pay_dues_now",
-                    "set_repayment_arrangement",
-                    "schedule_followup",
-                ],
-                "preferred_next_step": "verify_identity_then_share_exact_dues",
-            }
-
-        return None
+        actions: list[str] = ["confirm_identity", "confirm_dues", "collect_payment_intent"]
+        if "pay now" in lowered or "payment link" in lowered:
+            actions.append("complete_payment_flow")
+        if mode == "hardship_negotiation":
+            actions.append("evaluate_assistance_options")
+        if observed_tool:
+            actions.append("interpret_tool_observation")
+        actions.append("capture_next_commitment")
+        return actions
 
     @staticmethod
     def _extract_named_amount(*, user_input: str, key: str) -> float | None:
@@ -476,3 +363,173 @@ class PlanProposalNode(BaseGraphNode):
             "you can close",
         ]
         return any(signal in lowered for signal in signals)
+
+    @staticmethod
+    def _get_existing_conversation_plan(*, state: AgentState, memory_state: dict[str, Any]) -> dict[str, Any]:
+        state_plan = state.get("conversation_plan")
+        if isinstance(state_plan, dict) and state_plan:
+            return dict(state_plan)
+        memory_plan = memory_state.get("active_conversation_plan")
+        if isinstance(memory_plan, dict) and memory_plan:
+            return dict(memory_plan)
+        return {}
+
+    def _build_or_update_conversation_plan(
+        self,
+        *,
+        existing_plan: dict[str, Any],
+        user_input: str,
+        memory_state: dict[str, Any],
+        mode: str,
+        plan_origin: str,
+        response_target: str,
+        route: str,
+        observed_tool: str,
+        proposal: dict[str, Any],
+    ) -> dict[str, Any]:
+        plan = self._create_initial_plan_graph(memory_state=memory_state, mode=mode) if not existing_plan else dict(existing_plan)
+        plan.setdefault("nodes", [])
+        plan.setdefault("edges", [])
+        plan.setdefault("revision_log", [])
+        plan.setdefault("status", "active")
+        plan.setdefault("version", 1)
+        plan.setdefault("objective", "Drive compliant collections conversation toward payment resolution.")
+        plan.setdefault("plan_id", f"plan-{str(memory_state.get('active_case_id', 'COLL-1001')).strip().upper()}")
+
+        previous_current = str(plan.get("current_node_id", ""))
+        next_current = self._infer_current_node_id(
+            user_input=user_input,
+            observed_tool=observed_tool,
+            response_target=response_target,
+            route=route,
+            proposal=proposal,
+        )
+        node_ids = {str(node.get("id")) for node in plan.get("nodes", []) if isinstance(node, dict)}
+        if next_current not in node_ids:
+            next_current = "collect_payment_intent"
+
+        if previous_current and previous_current != next_current:
+            for node in plan["nodes"]:
+                if isinstance(node, dict) and str(node.get("id")) == previous_current and node.get("status") == "in_progress":
+                    node["status"] = "done"
+
+        for node in plan["nodes"]:
+            if not isinstance(node, dict):
+                continue
+            node_id = str(node.get("id", ""))
+            if node_id == next_current:
+                if route == "propose":
+                    node["status"] = "in_progress"
+                    node["owner"] = "collection_agent"
+                elif response_target == "discount_planning_agent":
+                    node["status"] = "blocked"
+                    node["owner"] = "discount_planning_agent"
+                elif response_target == "self":
+                    node["status"] = "in_progress"
+                    node["owner"] = "collection_agent"
+                else:
+                    node["status"] = "in_progress"
+            elif node.get("status") not in {"done", "skipped"} and node.get("status") is None:
+                node["status"] = "pending"
+
+        lowered = user_input.lower()
+        should_revise = (
+            self._is_plan_rejection(user_input)
+            or self._needs_discount_specialist(user_input)
+            or "hardship" in lowered
+            or "cannot pay" in lowered
+            or response_target != "customer"
+        )
+        if should_revise:
+            plan["version"] = int(plan.get("version", 1)) + 1
+            plan["revision_log"].append(
+                {
+                    "revision": int(plan.get("version", 1)),
+                    "reason": f"context shift: target={response_target}, route={route}, origin={plan_origin}",
+                }
+            )
+
+        plan["current_node_id"] = next_current
+        plan["previous_node_id"] = previous_current or None
+        plan["next_node_ids"] = self._next_nodes_from_edges(nodes=plan.get("edges", []), current_node_id=next_current)
+        plan["updated_from"] = plan_origin or "react"
+        plan["last_response_target"] = response_target
+        plan["status"] = "completed" if self._is_conversation_termination(user_input) else "active"
+        return plan
+
+    @staticmethod
+    def _create_initial_plan_graph(*, memory_state: dict[str, Any], mode: str) -> dict[str, Any]:
+        case_id = str(memory_state.get("active_case_id", "COLL-1001")).strip().upper() or "COLL-1001"
+        return {
+            "plan_id": f"plan-{case_id}",
+            "version": 1,
+            "status": "active",
+            "mode": mode,
+            "objective": "Move borrower conversation to payment, promise-to-pay, or compliant follow-up.",
+            "current_node_id": "open_and_context",
+            "previous_node_id": None,
+            "next_node_ids": ["verify_identity"],
+            "nodes": [
+                {"id": "open_and_context", "label": "Open call and establish case context", "owner": "collection_agent", "status": "in_progress"},
+                {"id": "verify_identity", "label": "Verify customer identity", "owner": "customer", "status": "pending"},
+                {"id": "explain_dues", "label": "Explain dues and policy options", "owner": "customer", "status": "pending"},
+                {"id": "collect_payment_intent", "label": "Collect payment intent", "owner": "customer", "status": "pending"},
+                {"id": "evaluate_assistance", "label": "Evaluate discount/restructure assistance", "owner": "discount_planning_agent", "status": "pending"},
+                {"id": "resolve_outcome", "label": "Finalize payment, promise, or follow-up", "owner": "customer", "status": "pending"},
+            ],
+            "edges": [
+                {"from": "open_and_context", "to": "verify_identity", "condition": "case_context_ready"},
+                {"from": "verify_identity", "to": "explain_dues", "condition": "identity_verified"},
+                {"from": "explain_dues", "to": "collect_payment_intent", "condition": "dues_explained"},
+                {"from": "collect_payment_intent", "to": "resolve_outcome", "condition": "pay_now"},
+                {"from": "collect_payment_intent", "to": "evaluate_assistance", "condition": "cannot_pay_full"},
+                {"from": "evaluate_assistance", "to": "resolve_outcome", "condition": "assistance_ready"},
+            ],
+            "revision_log": [],
+            "updated_from": "initial",
+            "last_response_target": "customer",
+        }
+
+    def _infer_current_node_id(
+        self,
+        *,
+        user_input: str,
+        observed_tool: str,
+        response_target: str,
+        route: str,
+        proposal: dict[str, Any],
+    ) -> str:
+        lowered = user_input.lower()
+        proposal_intent = str(proposal.get("intent", "")).strip().lower() if isinstance(proposal, dict) else ""
+        if proposal_intent == "conversation_termination" or self._is_conversation_termination(user_input):
+            return "resolve_outcome"
+        if response_target == "discount_planning_agent":
+            return "evaluate_assistance"
+        if route == "propose":
+            return "evaluate_assistance"
+        if observed_tool in {"customer_verify"} or "verify" in lowered:
+            return "verify_identity"
+        if observed_tool in {"dues_explain_build", "loan_policy_lookup"} or any(
+            token in lowered for token in ["dues", "overdue", "emi", "policy", "amount due"]
+        ):
+            return "explain_dues"
+        if observed_tool in {"payment_link_create", "pay_by_phone_collect", "payment_status_check"} or any(
+            token in lowered for token in ["pay now", "payment", "link", "settle"]
+        ):
+            return "resolve_outcome"
+        if any(token in lowered for token in ["cannot pay", "hardship", "discount", "waiver", "restructure", "settlement"]):
+            return "evaluate_assistance"
+        return "collect_payment_intent"
+
+    @staticmethod
+    def _next_nodes_from_edges(*, nodes: list[Any], current_node_id: str) -> list[str]:
+        next_nodes: list[str] = []
+        for edge in nodes:
+            if not isinstance(edge, dict):
+                continue
+            if str(edge.get("from", "")) != current_node_id:
+                continue
+            to = str(edge.get("to", "")).strip()
+            if to:
+                next_nodes.append(to)
+        return next_nodes

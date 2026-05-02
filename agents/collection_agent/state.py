@@ -33,6 +33,7 @@ class CollectionGraphState(AgentState, total=False):
     tool_errors: list[dict[str, Any]]
     response_metadata: dict[str, Any]
     plan_proposal: dict[str, Any]
+    conversation_plan: dict[str, Any]
 
 
 CollectionNodeUpdate = CollectionGraphState

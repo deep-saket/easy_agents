@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import json
 import re
+import threading
 from pathlib import Path
 from typing import Any, ClassVar
 from uuid import uuid4
@@ -66,6 +67,8 @@ class CollectionAgent(BaseAgent):
     allow_deterministic_fallback: bool = False
     agent_name: str = "collection_agent"
     last_trace: ExecutionTrace | None = None
+    _session_locks: dict[str, threading.Lock] = field(default_factory=dict, init=False, repr=False)
+    _session_locks_guard: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
 
     _STATIC_NEXT_NODE_MAP: ClassVar[dict[str, str]] = {
         "memory_retrieve": "post_memory_plan_intent",
@@ -583,51 +586,65 @@ class CollectionAgent(BaseAgent):
                 "Deterministic classification fallback is disabled."
             )
         session_key = session_id or "collection-demo-session"
-        memory = self.session_store.load(session_key)
-        if "mode" not in memory.state:
-            memory.set_state(mode="strict_collections", active_channel="sms", active_case_id="COLL-1001")
-        turn_index = int(memory.state.get("turn_index", 0))
-        self._sync_user_and_memory_context(memory=memory, user_input=user_input)
-        user_id = str(memory.state.get("active_user_id", "")).strip()
-        case_id = str(memory.state.get("active_case_id", "COLL-1001")).strip()
-        channel = str(memory.state.get("active_channel", "sms")).strip()
-        trace = ExecutionTrace(agent_name=self.agent_name, session_id=session_key, user_input=user_input)
+        session_lock = self._get_session_lock(session_key)
+        session_lock.acquire()
         try:
-            with trace_turn(trace, sink=self.trace_sink):
-                state = self.graph.invoke(
-                    {
-                        "session_id": session_key,
-                        "turn_id": str(uuid4()),
-                        "user_input": user_input,
-                        "memory": memory,
-                        "user_id": user_id,
-                        "case_id": case_id,
-                        "channel": channel,
-                        "memory_targets": [{"type": "working", "enabled": True, "limit": 8}],
-                        "observation": None,
-                        "node_history": [],
-                        "conversation_phase": "turn_started",
-                        "tool_errors": [],
-                        "steps": 0,
-                        "turn_index": turn_index,
+            memory = self.session_store.load(session_key)
+            if "mode" not in memory.state:
+                memory.set_state(mode="strict_collections", active_channel="sms", active_case_id="COLL-1001")
+            turn_index = int(memory.state.get("turn_index", 0))
+            self._sync_user_and_memory_context(memory=memory, user_input=user_input)
+            user_id = str(memory.state.get("active_user_id", "")).strip()
+            case_id = str(memory.state.get("active_case_id", "COLL-1001")).strip()
+            channel = str(memory.state.get("active_channel", "sms")).strip()
+            existing_conversation_plan = (
+                dict(memory.state.get("active_conversation_plan", {}))
+                if isinstance(memory.state.get("active_conversation_plan"), dict)
+                else {}
+            )
+            trace = ExecutionTrace(agent_name=self.agent_name, session_id=session_key, user_input=user_input)
+            try:
+                with trace_turn(trace, sink=self.trace_sink):
+                    state = self.graph.invoke(
+                        {
+                            "session_id": session_key,
+                            "turn_id": str(uuid4()),
+                            "user_input": user_input,
+                            "memory": memory,
+                            "user_id": user_id,
+                            "case_id": case_id,
+                            "channel": channel,
+                            "memory_targets": [{"type": "working", "enabled": True, "limit": 8}],
+                            "observation": None,
+                            "node_history": [],
+                            "conversation_phase": "turn_started",
+                            "tool_errors": [],
+                            "conversation_plan": existing_conversation_plan,
+                            "steps": 0,
+                            "turn_index": turn_index,
+                        }
+                    )
+                    state = self._finalize_output_state(state)
+                    memory_updates: dict[str, Any] = {
+                        "turn_index": turn_index + 1,
+                        "last_user_input": user_input,
+                        "last_agent_response": str(state.get("response", "")).strip(),
+                        "last_response_target": str(state.get("response_target", "customer")).strip().lower() or "customer",
                     }
-                )
-                state = self._finalize_output_state(state)
-                memory.set_state(
-                    turn_index=turn_index + 1,
-                    last_user_input=user_input,
-                    last_agent_response=str(state.get("response", "")).strip(),
-                    last_response_target=str(state.get("response_target", "customer")).strip().lower() or "customer",
-                )
-                trace.finish(status="completed")
-        except Exception as exc:
-            trace.finish(status="failed", error=str(exc))
+                    if isinstance(state.get("conversation_plan"), dict):
+                        memory_updates["active_conversation_plan"] = dict(state["conversation_plan"])
+                    memory.set_state(**memory_updates)
+                    trace.finish(status="completed")
+            except Exception as exc:
+                trace.finish(status="failed", error=str(exc))
+                self.last_trace = trace
+                self._persist_trace(trace)
+                raise
             self.last_trace = trace
             self._persist_trace(trace)
-            raise
-        self.last_trace = trace
-        self._persist_trace(trace)
-        return state
+            return state
+        finally:
+            session_lock.release()
 
     def run(self, user_input: str, session_id: str | None = None) -> str:
         state = self.run_turn(user_input=user_input, session_id=session_id)
@@ -740,6 +757,14 @@ class CollectionAgent(BaseAgent):
             if isinstance(case_row, dict) and case_row.get("customer_id"):
                 return str(case_row["customer_id"])
         return None
+
+    def _get_session_lock(self, session_key: str) -> threading.Lock:
+        with self._session_locks_guard:
+            lock = self._session_locks.get(session_key)
+            if lock is None:
+                lock = threading.Lock()
+                self._session_locks[session_key] = lock
+        return lock
 
     @staticmethod
     def _phase_for_node(node_name: str) -> str:

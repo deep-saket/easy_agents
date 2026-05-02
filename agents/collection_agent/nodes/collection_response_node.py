@@ -51,31 +51,102 @@ class CollectionResponseNode(ResponseNode):
         observation = state.get("observation")
         memory = state.get("memory")
         memory_state = dict(getattr(memory, "state", {})) if memory is not None else {}
-        customer_name = str(memory_state.get("active_customer_name", "Customer"))
-        case_id = str(memory_state.get("active_case_id", "COLL-1001"))
+        response_target = str(proposal.get("target", state.get("response_target", "customer"))).strip().lower() or "customer"
+        conversation_plan = (
+            proposal.get("conversation_plan")
+            if isinstance(proposal.get("conversation_plan"), dict)
+            else (state.get("conversation_plan") if isinstance(state.get("conversation_plan"), dict) else {})
+        )
+        facts = self._resolve_case_facts(state=state, proposal=proposal)
+        customer_name = facts["customer_name"]
+        case_id = facts["case_id"]
+        overdue_amount = facts["overdue_amount"]
+        prior_agent_response = str(memory_state.get("last_agent_response", "")).strip()
+        turn_index = int(memory_state.get("turn_index", state.get("turn_index", 0)) or 0)
+        is_opening_turn = turn_index <= 0
 
         system_prompt = (
             f"{self.system_prompt or ''}\n"
-            "You are a bank collections assistant. Convert plan_proposal into a customer-facing response.\n"
+            "You are a bank collections assistant. Convert plan_proposal into the correct target-directed message.\n"
+            "Allowed response_target values: customer, self, discount_planning_agent.\n"
             "Never mention internal terms such as plan_proposal, plan, node, tool, or workflow.\n"
-            "Use clear, polite, concise language and ask one concrete next-step question when needed."
+            "Use clear, polite, concise language and ask one concrete next-step question when needed.\n"
+            "Never output placeholders such as [insert amount], [name], or [link].\n"
+            "If amount context is provided, always include that numeric amount.\n"
+            "Only use greeting/opening call introduction when is_opening_turn=true; avoid re-greeting on follow-up turns.\n"
+            "When response_target=customer: produce end-customer message only.\n"
+            "When response_target=self: produce concise internal execution directive for next planner pass.\n"
+            "When response_target=discount_planning_agent: produce concise specialist handoff note with case context and assistance request."
         ).strip()
         user_prompt = (
             f"User input: {user_input}\n"
             f"Customer name: {customer_name}\n"
             f"Case id: {case_id}\n"
+            f"Overdue amount INR: {overdue_amount:.2f}\n"
+            f"Response target: {response_target}\n"
+            f"is_opening_turn: {json.dumps(is_opening_turn)}\n"
+            f"Previous agent response (if any): {prior_agent_response}\n"
             f"Plan proposal: {json.dumps(proposal, ensure_ascii=True)}\n"
+            f"Conversation plan graph: {json.dumps(conversation_plan, ensure_ascii=True)}\n"
             f"Observation: {json.dumps(observation, ensure_ascii=True, default=str)}\n"
-            "Generate only the final customer-facing response text."
+            "Generate only the final target-directed message text."
         )
         try:
             response = self.llm.generate(system_prompt, user_prompt).strip()
         except Exception:
             return None
-        return response or None
+        if not response:
+            return None
+        return self._post_process_rendered_response(
+            text=response,
+            customer_name=customer_name,
+            overdue_amount=overdue_amount,
+            is_opening_turn=is_opening_turn,
+        )
 
     def _fallback_render_from_proposal(self, *, proposal: dict[str, Any]) -> str:
+        target = str(proposal.get("target", "customer")).strip().lower() or "customer"
+        if target == "self":
+            return "Continue internal planning using latest context and determine next execution step."
+        if target == "discount_planning_agent":
+            context = proposal.get("context") if isinstance(proposal.get("context"), dict) else {}
+            case_id = str(context.get("case_id", "COLL-1001")).strip() or "COLL-1001"
+            overdue = float(context.get("overdue_amount", 0.0) or 0.0)
+            return (
+                f"Need discount planning support for case {case_id} with overdue INR {overdue:.2f}. "
+                "Recommend a compliant concession or EMI restructure option."
+            )
+
         intent = str(proposal.get("intent", "")).strip().lower()
+        if intent == "generic_plan":
+            draft = str(proposal.get("draft_response", "")).strip()
+            if draft and not draft.lower().startswith("proposed plan for "):
+                return draft
+
+            context = proposal.get("context") if isinstance(proposal.get("context"), dict) else {}
+            name = str(context.get("customer_name", "Customer")).strip() or "Customer"
+            case_id = str(context.get("case_id", "COLL-1001")).strip() or "COLL-1001"
+            overdue = float(context.get("overdue_amount", 0.0) or 0.0)
+            observed_tool = str(context.get("observed_tool", "")).strip()
+            plan_outline = str(proposal.get("plan_outline", "")).strip()
+            next_actions = proposal.get("next_actions") if isinstance(proposal.get("next_actions"), list) else []
+
+            if observed_tool == "case_fetch":
+                return (
+                    f"Hello {name}, for case {case_id}, the current overdue amount is INR {overdue:.2f}. "
+                    "Would you like to pay now, request an arrangement, or schedule a follow-up?"
+                )
+
+            if any(str(item).strip() == "complete_payment_flow" for item in next_actions):
+                return (
+                    f"Thank you {name}. Your current due amount is INR {overdue:.2f}. "
+                    "I can generate a secure payment link right now. Would you like it via SMS or email?"
+                )
+
+            if plan_outline:
+                return self._render_plan_outline(plan_outline)
+            return "Please confirm how you would like to proceed with your dues."
+
         if intent == "outbound_opening":
             ctx = proposal.get("opening_context") if isinstance(proposal.get("opening_context"), dict) else {}
             name = str(ctx.get("customer_name", "Customer")).strip() or "Customer"
@@ -154,6 +225,16 @@ class CollectionResponseNode(ResponseNode):
                 )
             return "I can share a repayment plan option now. Would you like me to proceed?"
 
+        if intent == "payment_collection_prompt":
+            ctx = proposal.get("payment_context") if isinstance(proposal.get("payment_context"), dict) else {}
+            name = str(ctx.get("customer_name", "Customer")).strip() or "Customer"
+            amount = float(ctx.get("overdue_amount", 0.0) or 0.0)
+            return (
+                f"Thank you {name}. Your current due amount is INR {amount:.2f}. "
+                "I can generate a secure payment link right now. "
+                "Would you like the link via SMS or email?"
+            )
+
         draft = str(proposal.get("draft_response", "")).strip()
         if draft:
             return draft
@@ -170,7 +251,7 @@ class CollectionResponseNode(ResponseNode):
         if not text:
             return "Please confirm how you would like to proceed with your dues."
 
-        normalized = re.sub(r"^Proposed plan for\s+[^:]+:\s*", "", text, flags=re.IGNORECASE).strip()
+        normalized = re.sub(r"^(?:Proposed\s+plan|Plan)\s+for\s+[^:]+:\s*", "", text, flags=re.IGNORECASE).strip()
         executed_match = re.match(r"^Executed\s+([a-zA-Z0-9_]+)\s*:\s*(.*)$", text)
         if executed_match:
             details = executed_match.group(2).strip()
@@ -192,3 +273,72 @@ class CollectionResponseNode(ResponseNode):
             f"Here is the next best way to proceed: {normalized}. "
             "If you agree, I will execute this now."
         )
+
+    @staticmethod
+    def _resolve_case_facts(*, state: AgentState, proposal: dict[str, Any]) -> dict[str, Any]:
+        memory = state.get("memory")
+        memory_state = dict(getattr(memory, "state", {})) if memory is not None else {}
+        customer_name = str(memory_state.get("active_customer_name", "Customer")).strip() or "Customer"
+        case_id = str(memory_state.get("active_case_id", "COLL-1001")).strip() or "COLL-1001"
+        overdue_amount = float(memory_state.get("active_overdue_amount", 0.0) or 0.0)
+
+        context = proposal.get("context") if isinstance(proposal.get("context"), dict) else {}
+        if context:
+            customer_name = str(context.get("customer_name", customer_name)).strip() or customer_name
+            case_id = str(context.get("case_id", case_id)).strip() or case_id
+            overdue_amount = float(context.get("overdue_amount", overdue_amount) or overdue_amount)
+
+        opening_context = proposal.get("opening_context") if isinstance(proposal.get("opening_context"), dict) else {}
+        if opening_context:
+            customer_name = str(opening_context.get("customer_name", customer_name)).strip() or customer_name
+            case_id = str(opening_context.get("case_id", case_id)).strip() or case_id
+            overdue_amount = float(opening_context.get("overdue_amount", overdue_amount) or overdue_amount)
+
+        case_snapshot = proposal.get("case_snapshot") if isinstance(proposal.get("case_snapshot"), dict) else {}
+        if case_snapshot:
+            customer_name = str(case_snapshot.get("customer_name", customer_name)).strip() or customer_name
+            case_id = str(case_snapshot.get("case_id", case_id)).strip() or case_id
+            overdue_amount = float(case_snapshot.get("overdue_amount", overdue_amount) or overdue_amount)
+
+        payment_context = proposal.get("payment_context") if isinstance(proposal.get("payment_context"), dict) else {}
+        if payment_context:
+            customer_name = str(payment_context.get("customer_name", customer_name)).strip() or customer_name
+            case_id = str(payment_context.get("case_id", case_id)).strip() or case_id
+            overdue_amount = float(payment_context.get("overdue_amount", overdue_amount) or overdue_amount)
+
+        return {
+            "customer_name": customer_name,
+            "case_id": case_id,
+            "overdue_amount": overdue_amount,
+        }
+
+    @staticmethod
+    def _post_process_rendered_response(
+        *,
+        text: str,
+        customer_name: str,
+        overdue_amount: float,
+        is_opening_turn: bool,
+    ) -> str:
+        rendered = text.strip()
+
+        # Replace placeholder fragments with deterministic values.
+        rendered = re.sub(
+            r"\[(?:insert\s+)?amount\]",
+            f"INR {overdue_amount:.2f}",
+            rendered,
+            flags=re.IGNORECASE,
+        )
+        rendered = re.sub(
+            r"\[(?:customer\s+)?name\]",
+            customer_name,
+            rendered,
+            flags=re.IGNORECASE,
+        )
+
+        # Avoid repeating opener greeting on follow-up turns.
+        if not is_opening_turn:
+            rendered = re.sub(r'^["\']?\s*(hello|hi)\s+[^,]{1,60},\s*', "", rendered, flags=re.IGNORECASE).strip()
+            rendered = rendered.strip(' "\'')
+
+        return rendered
