@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+import time
 from typing import Any
 
 import yaml
@@ -66,6 +67,12 @@ def build_parser(defaults: dict[str, Any]) -> argparse.ArgumentParser:
         type=int,
         default=int(defaults.get("agent_hop_hard_cap", 50)),
         help="Hard safety cap for internal agent hops per user turn (default: 50)",
+    )
+    parser.add_argument(
+        "--agent-hop-timeout-seconds",
+        type=float,
+        default=float(defaults.get("agent_hop_timeout_seconds", 20)),
+        help="Max wall-clock seconds for internal self-hops before customer-facing timeout response (default: 20)",
     )
     return parser
 
@@ -173,13 +180,23 @@ def _route_internal_turn(
     initial_input: str,
     soft_cap: int,
     hard_cap: int,
+    timeout_seconds: float,
     trace_readable: bool,
 ) -> str:
     memory = collection_agent.session_store.load(session_id)
     current_input = initial_input
+    current_sender = "customer"
+    started_at = time.monotonic()
 
     for hop in range(1, hard_cap + 1):
-        state = collection_agent.run_turn(current_input, session_id=session_id)
+        if (time.monotonic() - started_at) >= timeout_seconds:
+            memory.set_state(agent_loop_blocked=True, agent_loop_count=hop, agent_timeout_triggered=True)
+            return (
+                "I am still processing internal steps and do not want to keep you waiting. "
+                "Please choose one next step: pay now, request arrangement, or schedule follow-up."
+            )
+
+        state = collection_agent.run_turn(current_input, session_id=session_id, sender=current_sender)
         response = str(state.get("response", "No response generated."))
         target = str(state.get("response_target", "customer")).strip().lower()
 
@@ -199,7 +216,7 @@ def _route_internal_turn(
 
         if hop >= soft_cap:
             memory.set_state(agent_loop_blocked=True, agent_loop_count=hop)
-            guard_state = collection_agent.run_turn("system loop guard", session_id=session_id)
+            guard_state = collection_agent.run_turn("system loop guard", session_id=session_id, sender="self")
             _run_memory_helper_if_requested(
                 collection_agent=collection_agent,
                 memory_helper_agent=memory_helper_agent,
@@ -211,31 +228,13 @@ def _route_internal_turn(
 
         if target == "self":
             current_input = response
-            continue
-
-        if target == "discount_planning_agent":
-            handoff_payload = (
-                state.get("handoff_payload")
-                if isinstance(state.get("handoff_payload"), dict)
-                else {
-                    "case_id": str(memory.state.get("active_case_id", "COLL-1001")),
-                    "reason_for_handoff": "Need discount planning recommendation",
-                    "current_plan": memory.state.get("current_plan"),
-                    "hardship_reason": memory.state.get("hardship_reason"),
-                }
-            )
-            discount_output = discount_agent.run(handoff_payload)
-            memory.set_state(discount_recommendation=discount_output, agent_loop_count=hop)
-            current_input = (
-                f"collections emi restructuring recommendation ready for case "
-                f"{handoff_payload.get('case_id', memory.state.get('active_case_id', 'COLL-1001'))}"
-            )
+            current_sender = "self"
             continue
 
         return response
 
     memory.set_state(agent_loop_blocked=True, agent_loop_count=hard_cap)
-    guard_state = collection_agent.run_turn("system hard loop guard", session_id=session_id)
+    guard_state = collection_agent.run_turn("system hard loop guard", session_id=session_id, sender="self")
     _run_memory_helper_if_requested(
         collection_agent=collection_agent,
         memory_helper_agent=memory_helper_agent,
@@ -307,6 +306,7 @@ def interactive(
     trace_readable: bool,
     soft_cap: int,
     hard_cap: int,
+    timeout_seconds: float,
 ) -> None:
     print("Collection Agent demo interactive mode. Type 'exit' to stop.")
     while True:
@@ -333,6 +333,7 @@ def interactive(
             initial_input=text,
             soft_cap=soft_cap,
             hard_cap=hard_cap,
+            timeout_seconds=timeout_seconds,
             trace_readable=trace_readable,
         )
         print(f"agent> {output}")
@@ -380,6 +381,7 @@ def main() -> None:
             args.trace_readable,
             soft_cap,
             hard_cap,
+            max(1.0, float(args.agent_hop_timeout_seconds)),
         )
         return
     if not args.message:
@@ -395,6 +397,7 @@ def main() -> None:
         initial_input=args.message,
         soft_cap=soft_cap,
         hard_cap=hard_cap,
+        timeout_seconds=max(1.0, float(args.agent_hop_timeout_seconds)),
         trace_readable=args.trace_readable,
     )
     print(output)

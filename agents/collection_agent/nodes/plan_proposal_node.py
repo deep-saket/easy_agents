@@ -1,19 +1,59 @@
-"""Plan proposal node for hardship negotiation loop."""
+"""Plan proposal node for collections conversation planning."""
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any
 
+from pydantic import BaseModel, Field
+
+from agents.collection_agent.llm_structured import StructuredOutputRunner
 from src.nodes.base import BaseGraphNode
 from src.nodes.types import AgentState, NodeUpdate
 
 
+class _PlanTreeNode(BaseModel):
+    id: str
+    label: str
+    owner: str = "collection_agent"
+    status: str = "pending"
+
+
+class _PlanTreeEdge(BaseModel):
+    from_node: str = Field(alias="from")
+    to_node: str = Field(alias="to")
+    condition: str | None = None
+
+
+class _PlanTreeUpdate(BaseModel):
+    operation: str = "advance"
+    current_node_id: str | None = None
+    selected_next_node_id: str | None = None
+    new_nodes: list[_PlanTreeNode] = Field(default_factory=list)
+    new_edges: list[_PlanTreeEdge] = Field(default_factory=list)
+    remove_node_ids: list[str] = Field(default_factory=list)
+    mark_done: list[str] = Field(default_factory=list)
+    mark_skipped: list[str] = Field(default_factory=list)
+    mark_blocked: list[str] = Field(default_factory=list)
+    status: str | None = None
+
+
+class _PlanProposalPayload(BaseModel):
+    target: str = "customer"
+    intent: str = "generic_plan"
+    plan_outline: str
+    draft_response: str | None = None
+    next_actions: list[str] = Field(default_factory=list)
+    plan_tree_update: _PlanTreeUpdate | None = None
+
+
 @dataclass(slots=True)
 class PlanProposalNode(BaseGraphNode):
-    """Injects plan proposal/revision tool calls when hardship negotiation is active."""
+    """Builds conversation plan proposals and updates a per-session plan tree."""
 
     llm: Any | None = None
 
@@ -51,9 +91,11 @@ class PlanProposalNode(BaseGraphNode):
             )
             update["conversation_plan"] = plan
             if proposal:
+                current_id = str(plan.get("current_node_id", ""))
                 proposal["conversation_plan_id"] = plan.get("plan_id")
                 proposal["conversation_plan_version"] = plan.get("version")
-                proposal["conversation_plan_current_node"] = plan.get("current_node_id")
+                proposal["conversation_plan_current_node"] = current_id
+                proposal["conversation_plan_current_label"] = self._node_label(plan, current_id)
                 proposal["conversation_plan"] = plan
                 update["plan_proposal"] = proposal
             if memory is not None:
@@ -63,67 +105,80 @@ class PlanProposalNode(BaseGraphNode):
         if bool(memory_state.get("agent_loop_blocked", False)):
             if memory is not None:
                 memory.set_state(agent_loop_blocked=False)
-            return with_plan({
-                "route": "continue",
-                "response_target": "customer",
-                "plan_proposal": {
-                    "target": "customer",
-                    "intent": "loop_guard",
-                    "guidance": "Internal planning loop exceeded threshold.",
-                    "next_actions": ["pay_now", "plan_revision", "schedule_followup"],
-                    "plan_origin": "loop_guard",
-                },
-            })
+            return with_plan(
+                {
+                    "route": "continue",
+                    "response_target": "customer",
+                    "plan_proposal": {
+                        "target": "customer",
+                        "intent": "loop_guard",
+                        "guidance": "Internal planning loop exceeded threshold.",
+                        "next_actions": ["pay_now", "plan_revision", "schedule_followup"],
+                        "plan_origin": "loop_guard",
+                    },
+                }
+            )
 
         if self._is_conversation_termination(user_input):
-            return with_plan({
-                "route": "continue",
-                "response_target": "customer",
-                "plan_proposal": {
-                    "target": "customer",
-                    "intent": "conversation_termination",
-                    "guidance": "Conversation is being closed politely.",
-                    "plan_origin": "conversation_termination",
-                },
-                "additional_targets": ["collection_memory_helper_agent"],
-                "memory_helper_trigger": {
-                    "reason": "conversation_termination",
-                    "final_user_message": user_input,
-                },
-            })
+            return with_plan(
+                {
+                    "route": "continue",
+                    "response_target": "customer",
+                    "plan_proposal": {
+                        "target": "customer",
+                        "intent": "conversation_termination",
+                        "guidance": "Conversation is being closed politely.",
+                        "plan_origin": "conversation_termination",
+                        "plan_tree_update": {
+                            "operation": "complete",
+                            "status": "completed",
+                            "selected_next_node_id": "resolve_outcome",
+                        },
+                    },
+                    "additional_targets": ["collection_memory_helper_agent"],
+                    "memory_helper_trigger": {
+                        "reason": "conversation_termination",
+                        "final_user_message": user_input,
+                    },
+                }
+            )
 
         discount_recommendation = memory_state.get("discount_recommendation")
         if isinstance(discount_recommendation, dict) and discount_recommendation:
             if memory is not None:
                 memory.set_state(discount_recommendation=None)
-            return with_plan({
-                "route": "continue",
-                "response_target": "customer",
-                "plan_proposal": {
-                    "target": "customer",
-                    "intent": "discount_recommendation",
-                    "discount_recommendation": discount_recommendation,
-                    "plan_origin": "discount_recommendation",
-                },
-            })
+            return with_plan(
+                {
+                    "route": "continue",
+                    "response_target": "customer",
+                    "plan_proposal": {
+                        "target": "customer",
+                        "intent": "discount_recommendation",
+                        "discount_recommendation": discount_recommendation,
+                        "plan_origin": "discount_recommendation",
+                        "plan_tree_update": {
+                            "operation": "advance",
+                            "selected_next_node_id": "evaluate_assistance",
+                        },
+                    },
+                }
+            )
 
         revision_index = int(memory_state.get("plan_revision_index", 0))
         hardship_reason = str(memory_state.get("hardship_reason", "income_reduction"))
         case_id = str(memory_state.get("active_case_id", "COLL-1001"))
 
         if self._needs_discount_specialist(user_input) and case_id:
-            return with_plan({
-                "route": "continue",
-                "response": "Routing internally to discount planning specialist.",
-                "response_target": "discount_planning_agent",
-                "handoff_payload": {
-                    "case_id": case_id,
-                    "reason_for_handoff": "Need optimized discount/EMI proposal for ongoing negotiation",
-                    "current_plan": memory_state.get("current_plan"),
-                    "hardship_reason": hardship_reason,
-                    "target_monthly_emi": self._extract_amount(user_input),
-                },
-            })
+            return with_plan(
+                {
+                    "route": "continue",
+                    "response": (
+                        "Need internal assistance-path planning. "
+                        "Gather eligibility and revised repayment options before responding to customer."
+                    ),
+                    "response_target": "self",
+                }
+            )
 
         if mode != "hardship_negotiation":
             plan_proposal = self._build_plan_proposal(
@@ -134,12 +189,15 @@ class PlanProposalNode(BaseGraphNode):
                 default_plan=self._build_generic_plan_outline(user_input=user_input, memory_state=memory_state),
                 plan_origin=plan_origin,
                 mode=mode,
+                existing_plan=existing_plan,
             )
-            return with_plan({
-                "route": "continue",
-                "response_target": str(plan_proposal.get("target", "customer")),
-                "plan_proposal": plan_proposal,
-            })
+            return with_plan(
+                {
+                    "route": "continue",
+                    "response_target": str(plan_proposal.get("target", "customer")),
+                    "plan_proposal": plan_proposal,
+                }
+            )
 
         if observed_tool == "plan_propose":
             if memory is not None and isinstance(output, dict):
@@ -152,15 +210,17 @@ class PlanProposalNode(BaseGraphNode):
                 default_plan=self._build_generic_plan_outline(user_input=user_input, memory_state=memory_state),
                 plan_origin=plan_origin,
                 mode=mode,
+                existing_plan=existing_plan,
             )
-            return with_plan({
-                "route": "continue",
-                "response_target": "customer",
-                "plan_proposal": plan_proposal,
-            })
+            return with_plan(
+                {
+                    "route": "continue",
+                    "response_target": "customer",
+                    "plan_proposal": plan_proposal,
+                }
+            )
 
         should_propose = False
-
         if observed_tool == "offer_eligibility":
             should_propose = True
         if observed_tool == "channel_switch" and not memory_state.get("current_plan"):
@@ -180,12 +240,15 @@ class PlanProposalNode(BaseGraphNode):
                 default_plan=self._build_generic_plan_outline(user_input=user_input, memory_state=memory_state),
                 plan_origin=plan_origin,
                 mode=mode,
+                existing_plan=existing_plan,
             )
-            return with_plan({
-                "route": "continue",
-                "response_target": str(plan_proposal.get("target", "customer")),
-                "plan_proposal": plan_proposal,
-            })
+            return with_plan(
+                {
+                    "route": "continue",
+                    "response_target": str(plan_proposal.get("target", "customer")),
+                    "plan_proposal": plan_proposal,
+                }
+            )
 
         max_installment = self._extract_amount(user_input)
         arguments: dict[str, Any] = {
@@ -206,11 +269,23 @@ class PlanProposalNode(BaseGraphNode):
             response_text=None,
             done=False,
         )
-        return with_plan({
-            "route": "propose",
-            "decision": decision,
-            "response_target": "self",
-        })
+        return with_plan(
+            {
+                "route": "propose",
+                "decision": decision,
+                "response_target": "self",
+                "plan_proposal": {
+                    "target": "self",
+                    "intent": "tool_plan_proposal",
+                    "plan_outline": "Need hardship-plan computation before responding to customer.",
+                    "next_actions": ["run_plan_propose_tool", "review_offer", "respond_to_customer"],
+                    "plan_tree_update": {
+                        "operation": "branch",
+                        "selected_next_node_id": "evaluate_assistance",
+                    },
+                },
+            }
+        )
 
     def route(self, state: AgentState) -> str:
         return str(state.get("route", "continue"))
@@ -227,7 +302,7 @@ class PlanProposalNode(BaseGraphNode):
 
     @staticmethod
     def _extract_amount(text: str) -> float | None:
-        match = re.search(r"(?:\$|inr\s*)?(\d+(?:\.\d+)?)", text, re.IGNORECASE)
+        match = re.search(r"(?:\\$|inr\\s*)?(\\d+(?:\\.\\d+)?)", text, re.IGNORECASE)
         if not match:
             return None
         return float(match.group(1))
@@ -265,18 +340,6 @@ class PlanProposalNode(BaseGraphNode):
             "collect payment intent, and capture commitment or follow-up details."
         )
 
-    @staticmethod
-    def _build_discount_offer_response(output: dict[str, Any]) -> str:
-        recommended = output.get("recommended_offer", {}) if isinstance(output, dict) else {}
-        monthly_emi = recommended.get("monthly_emi")
-        tenure = recommended.get("tenure_months")
-        if monthly_emi is not None and tenure is not None:
-            return (
-                f"I can offer a revised plan at {float(monthly_emi):.2f} per month for {int(tenure)} months. "
-                "If this works for you, I will capture your promise-to-pay and schedule follow-up."
-            )
-        return "I have prepared revised discount and EMI options. Please confirm if you want to proceed with the recommended offer."
-
     def _build_plan_proposal(
         self,
         *,
@@ -287,10 +350,24 @@ class PlanProposalNode(BaseGraphNode):
         default_plan: str,
         plan_origin: str,
         mode: str,
+        existing_plan: dict[str, Any],
     ) -> dict[str, Any]:
+        llm_proposal = self._build_plan_proposal_with_llm(
+            user_input=user_input,
+            memory_state=memory_state,
+            observation=observation,
+            decision=decision,
+            default_plan=default_plan,
+            plan_origin=plan_origin,
+            mode=mode,
+            existing_plan=existing_plan,
+        )
+        if llm_proposal is not None:
+            return llm_proposal
+
         decision_text = str(getattr(decision, "response_text", "") or "").strip()
         decision_target = str(getattr(decision, "response_target", "") or "").strip().lower()
-        target = decision_target if decision_target in {"customer", "self", "discount_planning_agent"} else "customer"
+        target = decision_target if decision_target in {"customer", "self"} else "customer"
         observed_tool = str(observation.get("tool_name", "")) if isinstance(observation, dict) else ""
         output = observation.get("output", {}) if isinstance(observation, dict) else {}
 
@@ -325,6 +402,90 @@ class PlanProposalNode(BaseGraphNode):
             "next_actions": self._derive_next_actions(user_input=user_input, mode=mode, observed_tool=observed_tool),
         }
 
+    def _build_plan_proposal_with_llm(
+        self,
+        *,
+        user_input: str,
+        memory_state: dict[str, Any],
+        observation: dict[str, Any] | None,
+        decision: Any | None,
+        default_plan: str,
+        plan_origin: str,
+        mode: str,
+        existing_plan: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        if self.llm is None:
+            return None
+
+        decision_payload = {
+            "response_text": str(getattr(decision, "response_text", "") or "").strip(),
+            "respond_directly": bool(getattr(decision, "respond_directly", False)),
+            "tool_call": {
+                "tool_name": str(getattr(getattr(decision, "tool_call", None), "tool_name", "") or "").strip(),
+                "arguments": getattr(getattr(decision, "tool_call", None), "arguments", {}) or {},
+            },
+        }
+        obs_tool = str(observation.get("tool_name", "")) if isinstance(observation, dict) else ""
+        obs_output = observation.get("output", {}) if isinstance(observation, dict) else {}
+
+        system_prompt = (
+            "You are the plan proposal node for a bank collections agent. "
+            "Produce strict JSON only. "
+            "Output should propose/update a branching conversation plan tree and choose the current/next node. "
+            "Allowed `target`: customer or self. "
+            "No placeholders. Keep plan_outline concise and action-oriented."
+        )
+        user_prompt = (
+            f"User input: {user_input}\n"
+            f"Plan origin: {plan_origin}\n"
+            f"Mode: {mode}\n"
+            f"Default plan outline: {default_plan}\n"
+            f"Existing plan tree JSON: {json.dumps(existing_plan, ensure_ascii=True, default=str)}\n"
+            f"Decision context JSON: {json.dumps(decision_payload, ensure_ascii=True, default=str)}\n"
+            f"Observation tool: {obs_tool}\n"
+            f"Observation output JSON: {json.dumps(obs_output, ensure_ascii=True, default=str)}\n"
+            f"Customer context JSON: {json.dumps({'case_id': str(memory_state.get('active_case_id', 'COLL-1001')), 'customer_name': str(memory_state.get('active_customer_name', 'Customer')).strip() or 'Customer', 'overdue_amount': float(memory_state.get('active_overdue_amount', 0.0) or 0.0)}, ensure_ascii=True)}\n"
+            "Return JSON with keys:\n"
+            "- target: customer|self\n"
+            "- intent: short snake_case intent\n"
+            "- plan_outline: concise plan summary\n"
+            "- draft_response: optional message draft\n"
+            "- next_actions: array of next action ids\n"
+            "- plan_tree_update: object with operation, current_node_id, selected_next_node_id, "
+            "new_nodes (array of {id,label,owner,status}), new_edges (array of {from,to,condition}), "
+            "remove_node_ids, mark_done, mark_skipped, mark_blocked, status\n"
+            "Use operation=insert or branch when user direction changes. "
+            "Use remove_node_ids for obsolete path pruning."
+        )
+        try:
+            payload = StructuredOutputRunner(self.llm, max_retries=2).run(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                schema=_PlanProposalPayload,
+            )
+        except Exception:
+            return None
+
+        proposal = payload.model_dump(mode="json", by_alias=True)
+        target = str(proposal.get("target", "customer")).strip().lower()
+        if target not in {"customer", "self"}:
+            target = "customer"
+        proposal["target"] = target
+        proposal["plan_origin"] = plan_origin or "default_direct_plan"
+        proposal["mode"] = mode
+        proposal["context"] = {
+            "case_id": str(memory_state.get("active_case_id", "COLL-1001")),
+            "customer_name": str(memory_state.get("active_customer_name", "Customer")).strip() or "Customer",
+            "overdue_amount": float(memory_state.get("active_overdue_amount", 0.0) or 0.0),
+            "observed_tool": obs_tool,
+            "observed_tool_output": obs_output if isinstance(obs_output, dict) else {},
+        }
+        if not isinstance(proposal.get("next_actions"), list) or not proposal.get("next_actions"):
+            proposal["next_actions"] = self._derive_next_actions(
+                user_input=user_input, mode=mode, observed_tool=obs_tool
+            )
+        return proposal
+
     @staticmethod
     def _derive_next_actions(*, user_input: str, mode: str, observed_tool: str) -> list[str]:
         lowered = user_input.lower()
@@ -337,14 +498,6 @@ class PlanProposalNode(BaseGraphNode):
             actions.append("interpret_tool_observation")
         actions.append("capture_next_commitment")
         return actions
-
-    @staticmethod
-    def _extract_named_amount(*, user_input: str, key: str) -> float | None:
-        pattern = rf"{re.escape(key)}\s*=\s*(\d+(?:\.\d+)?)"
-        match = re.search(pattern, user_input, re.IGNORECASE)
-        if not match:
-            return None
-        return float(match.group(1))
 
     @staticmethod
     def _is_conversation_termination(text: str) -> bool:
@@ -390,47 +543,28 @@ class PlanProposalNode(BaseGraphNode):
         plan = self._create_initial_plan_graph(memory_state=memory_state, mode=mode) if not existing_plan else dict(existing_plan)
         plan.setdefault("nodes", [])
         plan.setdefault("edges", [])
+        plan.setdefault("timeline", [])
         plan.setdefault("revision_log", [])
         plan.setdefault("status", "active")
         plan.setdefault("version", 1)
         plan.setdefault("objective", "Drive compliant collections conversation toward payment resolution.")
         plan.setdefault("plan_id", f"plan-{str(memory_state.get('active_case_id', 'COLL-1001')).strip().upper()}")
+        plan.setdefault("root_node_id", "open_and_context")
 
-        previous_current = str(plan.get("current_node_id", ""))
-        next_current = self._infer_current_node_id(
+        previous_current = str(plan.get("current_node_id", "")) or str(plan.get("root_node_id", "open_and_context"))
+        plan_update = proposal.get("plan_tree_update") if isinstance(proposal.get("plan_tree_update"), dict) else {}
+        inferred_next = self._infer_current_node_id(
             user_input=user_input,
             observed_tool=observed_tool,
             response_target=response_target,
             route=route,
             proposal=proposal,
+            plan_update=plan_update,
         )
-        node_ids = {str(node.get("id")) for node in plan.get("nodes", []) if isinstance(node, dict)}
-        if next_current not in node_ids:
-            next_current = "collect_payment_intent"
-
-        if previous_current and previous_current != next_current:
-            for node in plan["nodes"]:
-                if isinstance(node, dict) and str(node.get("id")) == previous_current and node.get("status") == "in_progress":
-                    node["status"] = "done"
-
-        for node in plan["nodes"]:
-            if not isinstance(node, dict):
-                continue
-            node_id = str(node.get("id", ""))
-            if node_id == next_current:
-                if route == "propose":
-                    node["status"] = "in_progress"
-                    node["owner"] = "collection_agent"
-                elif response_target == "discount_planning_agent":
-                    node["status"] = "blocked"
-                    node["owner"] = "discount_planning_agent"
-                elif response_target == "self":
-                    node["status"] = "in_progress"
-                    node["owner"] = "collection_agent"
-                else:
-                    node["status"] = "in_progress"
-            elif node.get("status") not in {"done", "skipped"} and node.get("status") is None:
-                node["status"] = "pending"
+        self._apply_plan_tree_update(plan=plan, plan_update=plan_update)
+        next_current = self._resolve_next_current_node(plan=plan, previous_current=previous_current, candidate=inferred_next)
+        self._prune_disconnected_nodes(plan=plan, keep_ids={next_current})
+        self._enforce_status_consistency(plan=plan, current_node_id=next_current, response_target=response_target)
 
         lowered = user_input.lower()
         should_revise = (
@@ -439,6 +573,8 @@ class PlanProposalNode(BaseGraphNode):
             or "hardship" in lowered
             or "cannot pay" in lowered
             or response_target != "customer"
+            or bool(plan_update.get("new_nodes"))
+            or bool(plan_update.get("remove_node_ids"))
         )
         if should_revise:
             plan["version"] = int(plan.get("version", 1)) + 1
@@ -446,6 +582,7 @@ class PlanProposalNode(BaseGraphNode):
                 {
                     "revision": int(plan.get("version", 1)),
                     "reason": f"context shift: target={response_target}, route={route}, origin={plan_origin}",
+                    "at_utc": datetime.now(UTC).isoformat(),
                 }
             )
 
@@ -454,7 +591,23 @@ class PlanProposalNode(BaseGraphNode):
         plan["next_node_ids"] = self._next_nodes_from_edges(nodes=plan.get("edges", []), current_node_id=next_current)
         plan["updated_from"] = plan_origin or "react"
         plan["last_response_target"] = response_target
-        plan["status"] = "completed" if self._is_conversation_termination(user_input) else "active"
+        status_override = str(plan_update.get("status", "")).strip().lower() if isinstance(plan_update, dict) else ""
+        if status_override in {"active", "completed"}:
+            plan["status"] = status_override
+        else:
+            plan["status"] = "completed" if self._is_conversation_termination(user_input) else "active"
+        self._append_timeline_snapshot(
+            plan=plan,
+            update={
+                "origin": plan_origin,
+                "route": route,
+                "response_target": response_target,
+                "previous_node_id": previous_current,
+                "current_node_id": next_current,
+                "plan_outline": str(proposal.get("plan_outline", "")).strip(),
+                "operation": str(plan_update.get("operation", "advance")) if isinstance(plan_update, dict) else "advance",
+            },
+        )
         return plan
 
     @staticmethod
@@ -466,6 +619,7 @@ class PlanProposalNode(BaseGraphNode):
             "status": "active",
             "mode": mode,
             "objective": "Move borrower conversation to payment, promise-to-pay, or compliant follow-up.",
+            "root_node_id": "open_and_context",
             "current_node_id": "open_and_context",
             "previous_node_id": None,
             "next_node_ids": ["verify_identity"],
@@ -474,7 +628,7 @@ class PlanProposalNode(BaseGraphNode):
                 {"id": "verify_identity", "label": "Verify customer identity", "owner": "customer", "status": "pending"},
                 {"id": "explain_dues", "label": "Explain dues and policy options", "owner": "customer", "status": "pending"},
                 {"id": "collect_payment_intent", "label": "Collect payment intent", "owner": "customer", "status": "pending"},
-                {"id": "evaluate_assistance", "label": "Evaluate discount/restructure assistance", "owner": "discount_planning_agent", "status": "pending"},
+                {"id": "evaluate_assistance", "label": "Evaluate discount/restructure assistance", "owner": "collection_agent", "status": "pending"},
                 {"id": "resolve_outcome", "label": "Finalize payment, promise, or follow-up", "owner": "customer", "status": "pending"},
             ],
             "edges": [
@@ -485,10 +639,171 @@ class PlanProposalNode(BaseGraphNode):
                 {"from": "collect_payment_intent", "to": "evaluate_assistance", "condition": "cannot_pay_full"},
                 {"from": "evaluate_assistance", "to": "resolve_outcome", "condition": "assistance_ready"},
             ],
+            "timeline": [],
             "revision_log": [],
             "updated_from": "initial",
             "last_response_target": "customer",
         }
+
+    def _apply_plan_tree_update(self, *, plan: dict[str, Any], plan_update: dict[str, Any]) -> None:
+        if not isinstance(plan_update, dict) or not plan_update:
+            return
+        nodes = [dict(node) for node in plan.get("nodes", []) if isinstance(node, dict)]
+        edges = [dict(edge) for edge in plan.get("edges", []) if isinstance(edge, dict)]
+        node_map = {str(node.get("id", "")): node for node in nodes if str(node.get("id", "")).strip()}
+
+        for node_id in [str(x).strip() for x in plan_update.get("remove_node_ids", []) if str(x).strip()]:
+            node_map.pop(node_id, None)
+        if plan_update.get("remove_node_ids"):
+            removed_ids = {str(x).strip() for x in plan_update.get("remove_node_ids", []) if str(x).strip()}
+            edges = [
+                edge
+                for edge in edges
+                if str(edge.get("from", "")).strip() not in removed_ids and str(edge.get("to", "")).strip() not in removed_ids
+            ]
+
+        for raw in plan_update.get("new_nodes", []):
+            if not isinstance(raw, dict):
+                continue
+            node_id = str(raw.get("id", "")).strip()
+            if not node_id:
+                continue
+            node_map[node_id] = {
+                "id": node_id,
+                "label": str(raw.get("label", node_id)).strip() or node_id,
+                "owner": str(raw.get("owner", "collection_agent")).strip() or "collection_agent",
+                "status": str(raw.get("status", "pending")).strip() or "pending",
+            }
+
+        edge_set = set()
+        for edge in edges:
+            src = str(edge.get("from", "")).strip()
+            dst = str(edge.get("to", "")).strip()
+            cond = str(edge.get("condition", "")).strip()
+            if not src or not dst:
+                continue
+            if src not in node_map or dst not in node_map:
+                continue
+            edge_set.add((src, dst, cond))
+        for raw in plan_update.get("new_edges", []):
+            if not isinstance(raw, dict):
+                continue
+            src = str(raw.get("from", "")).strip()
+            dst = str(raw.get("to", "")).strip()
+            cond = str(raw.get("condition", "")).strip()
+            if not src or not dst:
+                continue
+            if src not in node_map or dst not in node_map:
+                continue
+            edge_set.add((src, dst, cond))
+
+        mark_done = {str(x).strip() for x in plan_update.get("mark_done", []) if str(x).strip()}
+        mark_skipped = {str(x).strip() for x in plan_update.get("mark_skipped", []) if str(x).strip()}
+        mark_blocked = {str(x).strip() for x in plan_update.get("mark_blocked", []) if str(x).strip()}
+        for node_id, node in node_map.items():
+            if node_id in mark_done:
+                node["status"] = "done"
+            elif node_id in mark_skipped:
+                node["status"] = "skipped"
+            elif node_id in mark_blocked:
+                node["status"] = "blocked"
+
+        plan["nodes"] = list(node_map.values())
+        plan["edges"] = [
+            {"from": src, "to": dst, "condition": cond}
+            for (src, dst, cond) in sorted(edge_set)
+        ]
+
+    def _resolve_next_current_node(self, *, plan: dict[str, Any], previous_current: str, candidate: str) -> str:
+        node_ids = {str(node.get("id")) for node in plan.get("nodes", []) if isinstance(node, dict)}
+        if not previous_current or previous_current not in node_ids:
+            return candidate if candidate in node_ids else str(plan.get("root_node_id", "open_and_context"))
+
+        allowed_next = self._next_nodes_from_edges(nodes=plan.get("edges", []), current_node_id=previous_current)
+        if not allowed_next:
+            if candidate in node_ids:
+                return candidate
+            return previous_current
+
+        if candidate in allowed_next:
+            return candidate
+
+        # Enforce sequential progression: only direct children of current node are valid.
+        return allowed_next[0]
+
+    def _enforce_status_consistency(self, *, plan: dict[str, Any], current_node_id: str, response_target: str) -> None:
+        nodes = [node for node in plan.get("nodes", []) if isinstance(node, dict)]
+        node_map = {str(node.get("id", "")).strip(): node for node in nodes if str(node.get("id", "")).strip()}
+        if current_node_id not in node_map:
+            return
+
+        reverse_adj: dict[str, set[str]] = {node_id: set() for node_id in node_map}
+        for edge in plan.get("edges", []):
+            if not isinstance(edge, dict):
+                continue
+            src = str(edge.get("from", "")).strip()
+            dst = str(edge.get("to", "")).strip()
+            if src in node_map and dst in node_map:
+                reverse_adj[dst].add(src)
+
+        ancestors: set[str] = set()
+        queue: list[str] = [current_node_id]
+        while queue:
+            nid = queue.pop(0)
+            for parent in reverse_adj.get(nid, set()):
+                if parent in ancestors:
+                    continue
+                ancestors.add(parent)
+                queue.append(parent)
+
+        for node_id, node in node_map.items():
+            if node_id == current_node_id:
+                node["status"] = "in_progress"
+                node["owner"] = "collection_agent" if response_target == "self" else node.get("owner", "customer")
+                continue
+            prior_status = str(node.get("status", "")).strip().lower()
+            if prior_status in {"blocked", "skipped"}:
+                continue
+            if node_id in ancestors:
+                node["status"] = "done"
+            else:
+                node["status"] = "pending"
+
+    def _prune_disconnected_nodes(self, *, plan: dict[str, Any], keep_ids: set[str]) -> None:
+        nodes = [node for node in plan.get("nodes", []) if isinstance(node, dict)]
+        node_map = {str(node.get("id", "")).strip(): node for node in nodes if str(node.get("id", "")).strip()}
+        if not node_map:
+            return
+        root_id = str(plan.get("root_node_id", "")).strip() or next(iter(node_map.keys()))
+        if root_id not in node_map:
+            root_id = next(iter(node_map.keys()))
+            plan["root_node_id"] = root_id
+
+        forward_adj: dict[str, list[str]] = {node_id: [] for node_id in node_map}
+        edges = [edge for edge in plan.get("edges", []) if isinstance(edge, dict)]
+        filtered_edges: list[dict[str, Any]] = []
+        for edge in edges:
+            src = str(edge.get("from", "")).strip()
+            dst = str(edge.get("to", "")).strip()
+            if src not in node_map or dst not in node_map:
+                continue
+            filtered_edges.append({"from": src, "to": dst, "condition": str(edge.get("condition", "")).strip()})
+            forward_adj[src].append(dst)
+
+        reachable: set[str] = set()
+        queue: list[str] = [root_id]
+        while queue:
+            nid = queue.pop(0)
+            if nid in reachable:
+                continue
+            reachable.add(nid)
+            for child in forward_adj.get(nid, []):
+                if child not in reachable:
+                    queue.append(child)
+
+        keep = set(reachable) | {kid for kid in keep_ids if kid in node_map}
+        plan["nodes"] = [node_map[node_id] for node_id in node_map if node_id in keep]
+        plan["edges"] = [edge for edge in filtered_edges if edge["from"] in keep and edge["to"] in keep]
 
     def _infer_current_node_id(
         self,
@@ -498,13 +813,19 @@ class PlanProposalNode(BaseGraphNode):
         response_target: str,
         route: str,
         proposal: dict[str, Any],
+        plan_update: dict[str, Any],
     ) -> str:
+        selected_next = str(plan_update.get("selected_next_node_id", "")).strip()
+        if selected_next:
+            return selected_next
+        current_override = str(plan_update.get("current_node_id", "")).strip()
+        if current_override:
+            return current_override
+
         lowered = user_input.lower()
         proposal_intent = str(proposal.get("intent", "")).strip().lower() if isinstance(proposal, dict) else ""
         if proposal_intent == "conversation_termination" or self._is_conversation_termination(user_input):
             return "resolve_outcome"
-        if response_target == "discount_planning_agent":
-            return "evaluate_assistance"
         if route == "propose":
             return "evaluate_assistance"
         if observed_tool in {"customer_verify"} or "verify" in lowered:
@@ -518,6 +839,8 @@ class PlanProposalNode(BaseGraphNode):
         ):
             return "resolve_outcome"
         if any(token in lowered for token in ["cannot pay", "hardship", "discount", "waiver", "restructure", "settlement"]):
+            return "evaluate_assistance"
+        if response_target == "self":
             return "evaluate_assistance"
         return "collect_payment_intent"
 
@@ -533,3 +856,26 @@ class PlanProposalNode(BaseGraphNode):
             if to:
                 next_nodes.append(to)
         return next_nodes
+
+    @staticmethod
+    def _node_label(plan: dict[str, Any], node_id: str) -> str:
+        for node in plan.get("nodes", []):
+            if isinstance(node, dict) and str(node.get("id", "")) == node_id:
+                return str(node.get("label", node_id)).strip() or node_id
+        return node_id
+
+    @staticmethod
+    def _append_timeline_snapshot(*, plan: dict[str, Any], update: dict[str, Any]) -> None:
+        timeline = plan.get("timeline")
+        entries = list(timeline) if isinstance(timeline, list) else []
+        entries.append(
+            {
+                "at_utc": datetime.now(UTC).isoformat(),
+                "version": int(plan.get("version", 1)),
+                "status": str(plan.get("status", "active")),
+                "current_node_id": str(plan.get("current_node_id", "")),
+                "next_node_ids": list(plan.get("next_node_ids", [])) if isinstance(plan.get("next_node_ids"), list) else [],
+                "update": update,
+            }
+        )
+        plan["timeline"] = entries[-40:]

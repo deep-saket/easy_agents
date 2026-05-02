@@ -6,6 +6,7 @@ Purpose: Implements endpoint-backed llm adapters for the shared llm platform lay
 from __future__ import annotations
 
 import json
+import ssl
 from dataclasses import dataclass, field
 from time import perf_counter
 from typing import Any
@@ -90,12 +91,26 @@ class EndpointLLM(BaseLLM):
             headers=headers,
             method="POST",
         )
-        with request.urlopen(req, timeout=self.timeout_seconds) as response:
+        with request.urlopen(req, timeout=self.timeout_seconds, context=self._build_ssl_context()) as response:
             body = response.read().decode("utf-8")
         try:
             return json.loads(body)
         except json.JSONDecodeError:
             return body
+
+    @staticmethod
+    def _build_ssl_context() -> ssl.SSLContext | None:
+        """Builds SSL context with certifi CA bundle when available.
+
+        Some macOS/Python environments cannot locate system CA roots reliably.
+        Using certifi keeps TLS verification enabled while avoiding local trust-store issues.
+        """
+        try:
+            import certifi  # type: ignore
+
+            return ssl.create_default_context(cafile=certifi.where())
+        except Exception:
+            return None
 
     @classmethod
     def _parse_response_payload(cls, payload: Any) -> LLMGeneration:

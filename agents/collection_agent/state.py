@@ -18,6 +18,7 @@ class CollectionGraphState(AgentState, total=False):
     user_id: str
     case_id: str
     channel: str
+    message_source: str
 
     # Namespaced intent outputs to avoid key overwrite between stages
     relevance_intent: dict[str, Any]

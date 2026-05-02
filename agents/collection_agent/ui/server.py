@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import queue
 import threading
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -66,6 +67,8 @@ class RunTurnRequest(BaseModel):
     session_id: str = Field(default="collection-ui-session")
     soft_cap: int = Field(default=10, ge=1)
     hard_cap: int = Field(default=50, ge=1)
+    timeout_seconds: float = Field(default=20.0, ge=1.0)
+    sender: str = Field(default="customer", description="customer|admin")
 
 
 class SessionStateResponse(BaseModel):
@@ -188,12 +191,44 @@ class CollectionDebugRuntime:
         *,
         event_callback: Callable[[dict[str, Any]], None] | None = None,
     ) -> dict[str, Any]:
+        allow_deterministic_fallback = bool(getattr(self.collection_agent, "allow_deterministic_fallback", False))
+        if self.llm is None and not allow_deterministic_fallback:
+            error_text = (
+                "LLM is not available for this session. "
+                f"Startup error: {self.llm_error or 'unknown'}"
+            )
+            payload = {
+                "session_id": request.session_id,
+                "final_response": error_text,
+                "final_target": "customer",
+                "hops": [],
+                "final_state": {
+                    "error": {
+                        "kind": "llm_unavailable",
+                        "message": error_text,
+                    }
+                },
+                "final_working_memory_state": self._memory_state(session_id=request.session_id),
+                "llm": self._llm_meta(),
+            }
+            self._emit_progress(
+                event_callback,
+                {
+                    "event": "turn_error",
+                    "payload": {"error": error_text},
+                },
+            )
+            return payload
+
         session_id = request.session_id.strip() or "collection-ui-session"
         soft_cap = max(1, int(request.soft_cap))
         hard_cap = max(soft_cap, int(request.hard_cap))
+        timeout_seconds = max(1.0, float(request.timeout_seconds))
 
         current_input = request.message
+        current_sender = str(request.sender).strip().lower() or "customer"
         hops: list[dict[str, Any]] = []
+        started_at = time.monotonic()
         self._emit_progress(
             event_callback,
             {
@@ -203,21 +238,43 @@ class CollectionDebugRuntime:
                     "message": request.message,
                     "soft_cap": soft_cap,
                     "hard_cap": hard_cap,
+                    "timeout_seconds": timeout_seconds,
+                    "sender": current_sender,
                 },
             },
         )
 
         for hop_index in range(1, hard_cap + 1):
+            if (time.monotonic() - started_at) >= timeout_seconds:
+                timeout_response = (
+                    "I am still processing internal steps and do not want to keep you waiting. "
+                    "Please choose one next step: pay now, request arrangement, or schedule follow-up."
+                )
+                self.collection_agent.session_store.load(session_id).set_state(
+                    agent_loop_blocked=True,
+                    agent_loop_count=hop_index,
+                    agent_timeout_triggered=True,
+                )
+                return {
+                    "session_id": session_id,
+                    "final_response": timeout_response,
+                    "final_target": "customer",
+                    "hops": hops,
+                    "final_state": {"timeout": {"seconds": timeout_seconds, "hop": hop_index}},
+                    "final_working_memory_state": self._memory_state(session_id=session_id),
+                    "llm": self._llm_meta(),
+                }
+
             self._emit_progress(
                 event_callback,
                 {
                     "event": "hop_started",
-                    "payload": {"hop": hop_index, "input": current_input},
+                    "payload": {"hop": hop_index, "input": current_input, "sender": current_sender},
                 },
             )
             trace_sink = InMemoryTraceSink(hop_index=hop_index, event_callback=event_callback)
             self.collection_agent.trace_sink = trace_sink
-            state = self.collection_agent.run_turn(current_input, session_id=session_id)
+            state = self.collection_agent.run_turn(current_input, session_id=session_id, sender=current_sender)
             trace = self.collection_agent.last_trace
 
             response = str(state.get("response", "No response generated."))
@@ -262,7 +319,7 @@ class CollectionDebugRuntime:
                 )
                 guard_sink = InMemoryTraceSink(hop_index=hop_index + 1, event_callback=event_callback)
                 self.collection_agent.trace_sink = guard_sink
-                guard_state = self.collection_agent.run_turn("system loop guard", session_id=session_id)
+                guard_state = self.collection_agent.run_turn("system loop guard", session_id=session_id, sender="self")
                 guard_response = str(guard_state.get("response", response))
                 helper_result = self._run_memory_helper_if_requested(session_id=session_id, state=guard_state)
                 guard_payload = {
@@ -296,39 +353,7 @@ class CollectionDebugRuntime:
 
             if target == "self":
                 current_input = response
-                continue
-
-            if target == "discount_planning_agent":
-                handoff_payload = (
-                    state.get("handoff_payload")
-                    if isinstance(state.get("handoff_payload"), dict)
-                    else {
-                        "case_id": str(memory_state.get("active_case_id", "COLL-1001")),
-                        "reason_for_handoff": "Need discount planning recommendation",
-                        "current_plan": memory_state.get("current_plan"),
-                        "hardship_reason": memory_state.get("hardship_reason"),
-                    }
-                )
-                discount_output = self.discount_agent.run(handoff_payload)
-                self.collection_agent.session_store.load(session_id).set_state(
-                    discount_recommendation=discount_output,
-                    agent_loop_count=hop_index,
-                )
-                hop_payload["discount_handoff"] = {
-                    "handoff_payload": _json_safe(handoff_payload),
-                    "discount_output": _json_safe(discount_output),
-                }
-                self._emit_progress(
-                    event_callback,
-                    {
-                        "event": "hop_update",
-                        "payload": hop_payload,
-                    },
-                )
-                current_input = (
-                    "collections emi restructuring recommendation ready for case "
-                    f"{handoff_payload.get('case_id', memory_state.get('active_case_id', 'COLL-1001'))}"
-                )
+                current_sender = "self"
                 continue
 
             return {
@@ -468,6 +493,9 @@ class CollectionDebugRuntime:
                 route = event.get("route")
                 if route is not None:
                     lines.append(f"route selected: {route}")
+                human_message = str(event.get("human_message", "")).strip()
+                if human_message:
+                    lines.append(f"node update: {human_message}")
         return lines
 
     def _llm_meta(self) -> dict[str, Any]:
@@ -578,12 +606,16 @@ def create_router(runtime: CollectionDebugRuntime) -> APIRouter:
         session_id: str = "collection-ui-session",
         soft_cap: int = 10,
         hard_cap: int = 50,
+        timeout_seconds: float = 20.0,
+        sender: str = "customer",
     ) -> StreamingResponse:
         request = RunTurnRequest(
             message=message,
             session_id=session_id,
             soft_cap=soft_cap,
             hard_cap=hard_cap,
+            timeout_seconds=timeout_seconds,
+            sender=sender,
         )
         return runtime.run_turn_stream(request)
 

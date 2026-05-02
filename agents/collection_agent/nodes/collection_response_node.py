@@ -7,8 +7,16 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
+from pydantic import BaseModel
+
+from agents.collection_agent.llm_structured import StructuredOutputRunner
 from src.nodes.response_node import ResponseNode
 from src.nodes.types import AgentState, NodeUpdate
+
+
+class _ResponsePayload(BaseModel):
+    message: str
+    response_target: str = "customer"
 
 
 @dataclass(slots=True)
@@ -28,14 +36,18 @@ class CollectionResponseNode(ResponseNode):
             update = ResponseNode.execute(self, state)
 
         target = str(update.get("response_target", state.get("response_target", self.default_target))).strip().lower()
-        if target not in {"customer", "self", "discount_planning_agent"}:
+        if target == "discount_planning_agent":
+            target = "self"
+        if target not in {"customer", "self"}:
             target = self.default_target
         update["response_target"] = target
         return update
 
     def route(self, state: AgentState) -> str:
         target = str(state.get("response_target", self.default_target)).strip().lower()
-        if target not in {"customer", "self", "discount_planning_agent"}:
+        if target == "discount_planning_agent":
+            return "self"
+        if target not in {"customer", "self"}:
             return self.default_target
         return target
 
@@ -57,6 +69,8 @@ class CollectionResponseNode(ResponseNode):
             if isinstance(proposal.get("conversation_plan"), dict)
             else (state.get("conversation_plan") if isinstance(state.get("conversation_plan"), dict) else {})
         )
+        current_plan_node_id = str(conversation_plan.get("current_node_id", "")).strip() if isinstance(conversation_plan, dict) else ""
+        current_plan_node_label = self._resolve_plan_node_label(conversation_plan, current_plan_node_id)
         facts = self._resolve_case_facts(state=state, proposal=proposal)
         customer_name = facts["customer_name"]
         case_id = facts["case_id"]
@@ -67,16 +81,18 @@ class CollectionResponseNode(ResponseNode):
 
         system_prompt = (
             f"{self.system_prompt or ''}\n"
+            "Your agent name is Alex.\n"
             "You are a bank collections assistant. Convert plan_proposal into the correct target-directed message.\n"
-            "Allowed response_target values: customer, self, discount_planning_agent.\n"
+            "Allowed response_target values: customer, self.\n"
             "Never mention internal terms such as plan_proposal, plan, node, tool, or workflow.\n"
             "Use clear, polite, concise language and ask one concrete next-step question when needed.\n"
             "Never output placeholders such as [insert amount], [name], or [link].\n"
             "If amount context is provided, always include that numeric amount.\n"
             "Only use greeting/opening call introduction when is_opening_turn=true; avoid re-greeting on follow-up turns.\n"
+            "When opening customer conversation, introduce yourself as Alex from collections.\n"
             "When response_target=customer: produce end-customer message only.\n"
             "When response_target=self: produce concise internal execution directive for next planner pass.\n"
-            "When response_target=discount_planning_agent: produce concise specialist handoff note with case context and assistance request."
+            "Return strict JSON only: {\"message\": \"...\", \"response_target\": \"customer|self\"}."
         ).strip()
         user_prompt = (
             f"User input: {user_input}\n"
@@ -86,15 +102,25 @@ class CollectionResponseNode(ResponseNode):
             f"Response target: {response_target}\n"
             f"is_opening_turn: {json.dumps(is_opening_turn)}\n"
             f"Previous agent response (if any): {prior_agent_response}\n"
+            f"Current plan step id: {current_plan_node_id}\n"
+            f"Current plan step label: {current_plan_node_label}\n"
             f"Plan proposal: {json.dumps(proposal, ensure_ascii=True)}\n"
             f"Conversation plan graph: {json.dumps(conversation_plan, ensure_ascii=True)}\n"
             f"Observation: {json.dumps(observation, ensure_ascii=True, default=str)}\n"
-            "Generate only the final target-directed message text."
+            "Generate only structured JSON output."
         )
         try:
-            response = self.llm.generate(system_prompt, user_prompt).strip()
+            payload = StructuredOutputRunner(self.llm, max_retries=2).run(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                schema=_ResponsePayload,
+            )
         except Exception:
             return None
+        response = str(payload.message).strip()
+        response_target_payload = str(payload.response_target).strip().lower()
+        if response_target_payload in {"customer", "self"}:
+            proposal["target"] = response_target_payload
         if not response:
             return None
         return self._post_process_rendered_response(
@@ -102,20 +128,13 @@ class CollectionResponseNode(ResponseNode):
             customer_name=customer_name,
             overdue_amount=overdue_amount,
             is_opening_turn=is_opening_turn,
+            ensure_intro=bool(is_opening_turn and response_target == "customer"),
         )
 
     def _fallback_render_from_proposal(self, *, proposal: dict[str, Any]) -> str:
         target = str(proposal.get("target", "customer")).strip().lower() or "customer"
         if target == "self":
             return "Continue internal planning using latest context and determine next execution step."
-        if target == "discount_planning_agent":
-            context = proposal.get("context") if isinstance(proposal.get("context"), dict) else {}
-            case_id = str(context.get("case_id", "COLL-1001")).strip() or "COLL-1001"
-            overdue = float(context.get("overdue_amount", 0.0) or 0.0)
-            return (
-                f"Need discount planning support for case {case_id} with overdue INR {overdue:.2f}. "
-                "Recommend a compliant concession or EMI restructure option."
-            )
 
         intent = str(proposal.get("intent", "")).strip().lower()
         if intent == "generic_plan":
@@ -133,7 +152,7 @@ class CollectionResponseNode(ResponseNode):
 
             if observed_tool == "case_fetch":
                 return (
-                    f"Hello {name}, for case {case_id}, the current overdue amount is INR {overdue:.2f}. "
+                    f"Hello {name}, this is Alex from collections. For case {case_id}, the current overdue amount is INR {overdue:.2f}. "
                     "Would you like to pay now, request an arrangement, or schedule a follow-up?"
                 )
 
@@ -155,7 +174,7 @@ class CollectionResponseNode(ResponseNode):
             prior_signal = str(ctx.get("prior_signal", "")).strip()
             extra = f" {prior_signal}" if prior_signal else ""
             return (
-                f"Hello {name}, this is the collections team calling regarding case {case_id}. "
+                f"Hello {name}, this is Alex from the collections team calling regarding case {case_id}. "
                 f"Our records show an overdue amount of INR {overdue:.2f}. "
                 "I can help you clear dues now or discuss a suitable repayment arrangement."
                 f"{extra} Are you available to proceed with payment today?"
@@ -207,7 +226,7 @@ class CollectionResponseNode(ResponseNode):
             late = float(snap.get("late_fee", 0.0))
             dpd = int(snap.get("dpd", 0))
             return (
-                f"Hello {customer_name}, this is the collections desk regarding case {case_id}. "
+                f"Hello {customer_name}, this is Alex from the collections desk regarding case {case_id}. "
                 f"Overdue amount is INR {overdue:.2f}, EMI is INR {emi:.2f}, late fee is INR {late:.2f}, "
                 f"and the account is {dpd} days past due. "
                 "Would you like to pay now, request a repayment arrangement, or schedule a follow-up?"
@@ -270,9 +289,23 @@ class CollectionResponseNode(ResponseNode):
         if normalized.endswith("."):
             normalized = normalized[:-1]
         return (
-            f"Here is the next best way to proceed: {normalized}. "
-            "If you agree, I will execute this now."
+            f"{normalized}. "
+            "Please confirm your preferred next step."
         )
+
+    @staticmethod
+    def _resolve_plan_node_label(conversation_plan: dict[str, Any], node_id: str) -> str:
+        if not isinstance(conversation_plan, dict) or not node_id:
+            return ""
+        nodes = conversation_plan.get("nodes")
+        if not isinstance(nodes, list):
+            return ""
+        for node in nodes:
+            if not isinstance(node, dict):
+                continue
+            if str(node.get("id", "")).strip() == node_id:
+                return str(node.get("label", node_id)).strip() or node_id
+        return ""
 
     @staticmethod
     def _resolve_case_facts(*, state: AgentState, proposal: dict[str, Any]) -> dict[str, Any]:
@@ -319,6 +352,7 @@ class CollectionResponseNode(ResponseNode):
         customer_name: str,
         overdue_amount: float,
         is_opening_turn: bool,
+        ensure_intro: bool = False,
     ) -> str:
         rendered = text.strip()
 
@@ -340,5 +374,10 @@ class CollectionResponseNode(ResponseNode):
         if not is_opening_turn:
             rendered = re.sub(r'^["\']?\s*(hello|hi)\s+[^,]{1,60},\s*', "", rendered, flags=re.IGNORECASE).strip()
             rendered = rendered.strip(' "\'')
+        elif ensure_intro and "alex" not in rendered.lower():
+            rendered = (
+                f"Hello {customer_name}, this is Alex from collections. "
+                f"{rendered}"
+            ).strip()
 
         return rendered

@@ -5,6 +5,10 @@ const chatLog = document.getElementById("chatLog");
 const executionChart = document.getElementById("executionChart");
 const executionNarrative = document.getElementById("executionNarrative");
 const thinkingTrace = document.getElementById("thinkingTrace");
+const planTreeView = document.getElementById("planTreeView");
+const planPrevButton = document.getElementById("planPrevButton");
+const planNextButton = document.getElementById("planNextButton");
+const planSnapshotLabel = document.getElementById("planSnapshotLabel");
 const snapshotPicker = document.getElementById("snapshotPicker");
 const stateJson = document.getElementById("stateJson");
 const memoryJson = document.getElementById("memoryJson");
@@ -24,6 +28,9 @@ const viewState = {
   liveHops: [],
   collapsed: false,
   demoUsers: [],
+  planSnapshots: [],
+  planSnapshotIndex: 0,
+  selectedPlanNodeId: null,
 };
 
 function addBubble(role, text) {
@@ -109,6 +116,9 @@ function renderExecutionNarrative(hops) {
       .map((event) => `${event.node_name}: ${formatMs(event.duration_ms)}`);
     const phase = String(hop.conversation_phase || "unknown");
     const nodeList = Array.isArray(hop.node_history) ? hop.node_history : [];
+    const planState = state && typeof state === "object" ? state.conversation_plan : null;
+    const planCurrent = planState && typeof planState === "object" ? String(planState.current_node_id || "") : "";
+    const planVersion = planState && typeof planState === "object" ? Number(planState.version || 1) : null;
 
     lines.push(`Hop ${hop.hop} started.`);
     lines.push(`Path: ${nodeHistory}`);
@@ -117,6 +127,9 @@ function renderExecutionNarrative(hops) {
     if (nodeList.includes("tool_execution")) lines.push("Executing tool calls selected by planner.");
     if (nodeList.includes("relevant_response") || nodeList.includes("irrelevant_response")) {
       lines.push("Constructing final response package.");
+    }
+    if (planCurrent) {
+      lines.push(`Plan tree: v${planVersion} at node=${planCurrent}`);
     }
     lines.push(`Plan: ${planSummary}`);
     if (toolReason) lines.push(toolReason);
@@ -158,6 +171,329 @@ function renderThinking(hops) {
     thinkingTrace.appendChild(p);
   }
   thinkingTrace.scrollTop = thinkingTrace.scrollHeight;
+}
+
+function resolveConversationPlan(state) {
+  if (!state || typeof state !== "object") return null;
+  if (state.conversation_plan && typeof state.conversation_plan === "object") {
+    return state.conversation_plan;
+  }
+  if (state.plan_proposal && typeof state.plan_proposal === "object") {
+    const embedded = state.plan_proposal.conversation_plan;
+    if (embedded && typeof embedded === "object") return embedded;
+  }
+  return null;
+}
+
+function extractPlanSnapshots(hops, finalState) {
+  const snapshots = [];
+  for (const hop of hops || []) {
+    const state = hop && typeof hop === "object" ? hop.state || {} : {};
+    const plan = resolveConversationPlan(state);
+    if (!plan || typeof plan !== "object") continue;
+    snapshots.push({
+      id: `hop-${hop.hop}`,
+      label: `Hop ${hop.hop}`,
+      plan,
+      response_target: String(hop.response_target || ""),
+    });
+  }
+  const finalPlan = resolveConversationPlan(finalState);
+  if (finalPlan && typeof finalPlan === "object") {
+    snapshots.push({
+      id: "final",
+      label: "Final",
+      plan: finalPlan,
+      response_target: String(finalState.response_target || ""),
+    });
+  }
+  return snapshots;
+}
+
+function normalizeStatus(value) {
+  const status = String(value || "pending").trim().toLowerCase();
+  if (["in_progress", "pending", "done", "skipped", "blocked"].includes(status)) return status;
+  return "pending";
+}
+
+function statusColors(status, isCurrent = false) {
+  const normalized = normalizeStatus(status);
+  const palette = {
+    in_progress: { fill: "#e6f0ff", stroke: "#0d66d0" },
+    pending: { fill: "#fff6e8", stroke: "#be7c00" },
+    done: { fill: "#e7f8ef", stroke: "#0d8a52" },
+    skipped: { fill: "#f3f4f7", stroke: "#6b7280" },
+    blocked: { fill: "#ffe8e8", stroke: "#bf2d2d" },
+  };
+  const base = palette[normalized] || palette.pending;
+  if (!isCurrent) return base;
+  return { fill: base.fill, stroke: "#084d9a" };
+}
+
+function nodeStatusClass(status) {
+  const normalized = normalizeStatus(status);
+  return normalized.replace("_", "-");
+}
+
+function wrapLabel(text, maxChars = 28) {
+  const source = String(text || "").trim();
+  if (!source) return [""];
+  const words = source.split(/\s+/);
+  const lines = [];
+  let current = "";
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (candidate.length <= maxChars) {
+      current = candidate;
+      continue;
+    }
+    if (current) lines.push(current);
+    current = word;
+  }
+  if (current) lines.push(current);
+  return lines.slice(0, 2);
+}
+
+function buildPlanGraphData(plan) {
+  if (!plan || typeof plan !== "object") return null;
+  const nodes = Array.isArray(plan.nodes) ? plan.nodes.filter((node) => node && typeof node === "object") : [];
+  if (!nodes.length) return null;
+
+  const nodeById = new Map();
+  const children = new Map();
+  const incoming = new Map();
+  for (const node of nodes) {
+    const nodeId = String(node.id || "").trim();
+    if (!nodeId) continue;
+    nodeById.set(nodeId, node);
+    children.set(nodeId, []);
+    incoming.set(nodeId, 0);
+  }
+
+  const edgesRaw = Array.isArray(plan.edges) ? plan.edges.filter((edge) => edge && typeof edge === "object") : [];
+  const edges = [];
+  for (const edge of edgesRaw) {
+    const from = String(edge.from || "").trim();
+    const to = String(edge.to || "").trim();
+    const condition = String(edge.condition || "").trim();
+    if (!from || !to || !nodeById.has(from) || !nodeById.has(to)) continue;
+    children.get(from).push({ to, condition });
+    incoming.set(to, (incoming.get(to) || 0) + 1);
+    edges.push({ from, to, condition });
+  }
+
+  let root = String(plan.root_node_id || "").trim();
+  if (!root || !nodeById.has(root)) {
+    root = [...incoming.entries()].find((entry) => entry[1] === 0)?.[0] || String(nodes[0].id || "");
+  }
+
+  const levels = new Map();
+  const visited = new Set();
+  const queue = [{ nodeId: root, depth: 0 }];
+  while (queue.length) {
+    const current = queue.shift();
+    if (!current) break;
+    const { nodeId, depth } = current;
+    if (!nodeById.has(nodeId) || visited.has(nodeId)) continue;
+    visited.add(nodeId);
+    if (!levels.has(depth)) levels.set(depth, []);
+    levels.get(depth).push(nodeId);
+    const kids = children.get(nodeId) || [];
+    for (const child of kids) queue.push({ nodeId: child.to, depth: depth + 1 });
+  }
+
+  const remaining = [...nodeById.keys()].filter((nodeId) => !visited.has(nodeId));
+  if (remaining.length) {
+    const nextDepth = levels.size ? Math.max(...levels.keys()) + 1 : 0;
+    levels.set(nextDepth, remaining);
+  }
+
+  return {
+    root,
+    edges,
+    nodeById,
+    levels,
+    currentNodeId: String(plan.current_node_id || "").trim(),
+  };
+}
+
+function renderPlanTreeGraph(plan) {
+  const graph = buildPlanGraphData(plan);
+  if (!graph) {
+    const empty = document.createElement("div");
+    empty.className = "plan-tree-empty";
+    empty.textContent = "No plan graph available for this snapshot.";
+    planTreeView.appendChild(empty);
+    return;
+  }
+
+  const { nodeById, levels, edges, currentNodeId } = graph;
+  const nodeWidth = 230;
+  const nodeHeight = 64;
+  const levelGap = 285;
+  const rowGap = 94;
+  const marginX = 32;
+  const marginY = 24;
+  const positions = new Map();
+  let maxRows = 1;
+
+  const depthKeys = [...levels.keys()].sort((a, b) => a - b);
+  for (const depth of depthKeys) {
+    const ids = levels.get(depth) || [];
+    maxRows = Math.max(maxRows, ids.length || 1);
+    ids.forEach((nodeId, idx) => {
+      const x = marginX + depth * levelGap;
+      const y = marginY + idx * rowGap;
+      positions.set(nodeId, { x, y });
+    });
+  }
+
+  const width = Math.max(760, marginX * 2 + depthKeys.length * levelGap + nodeWidth);
+  const height = Math.max(240, marginY * 2 + maxRows * rowGap + nodeHeight);
+  const svgNs = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(svgNs, "svg");
+  svg.setAttribute("width", String(width));
+  svg.setAttribute("height", String(height));
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  svg.classList.add("plan-tree-canvas");
+
+  const defs = document.createElementNS(svgNs, "defs");
+  const marker = document.createElementNS(svgNs, "marker");
+  marker.setAttribute("id", "arrowhead");
+  marker.setAttribute("markerWidth", "10");
+  marker.setAttribute("markerHeight", "7");
+  marker.setAttribute("refX", "8");
+  marker.setAttribute("refY", "3.5");
+  marker.setAttribute("orient", "auto");
+  const arrow = document.createElementNS(svgNs, "path");
+  arrow.setAttribute("d", "M0,0 L10,3.5 L0,7 z");
+  arrow.setAttribute("fill", "#9bb0c8");
+  marker.appendChild(arrow);
+  defs.appendChild(marker);
+  svg.appendChild(defs);
+
+  for (const edge of edges) {
+    const fromPos = positions.get(edge.from);
+    const toPos = positions.get(edge.to);
+    if (!fromPos || !toPos) continue;
+    const x1 = fromPos.x + nodeWidth;
+    const y1 = fromPos.y + nodeHeight / 2;
+    const x2 = toPos.x;
+    const y2 = toPos.y + nodeHeight / 2;
+    const midX = x1 + (x2 - x1) * 0.45;
+    const path = document.createElementNS(svgNs, "path");
+    path.setAttribute("d", `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`);
+    path.setAttribute("class", "plan-tree-edge");
+    path.setAttribute("marker-end", "url(#arrowhead)");
+    svg.appendChild(path);
+
+    if (edge.condition) {
+      const text = document.createElementNS(svgNs, "text");
+      text.setAttribute("x", String((x1 + x2) / 2));
+      text.setAttribute("y", String((y1 + y2) / 2 - 4));
+      text.setAttribute("text-anchor", "middle");
+      text.setAttribute("class", "plan-tree-edge-label");
+      text.textContent = edge.condition;
+      svg.appendChild(text);
+    }
+  }
+
+  const selectedNodeId = viewState.selectedPlanNodeId || currentNodeId || "";
+  for (const [nodeId, position] of positions.entries()) {
+    const node = nodeById.get(nodeId);
+    if (!node) continue;
+    const status = normalizeStatus(node.status);
+    const isCurrent = nodeId === currentNodeId;
+    const isSelected = nodeId === selectedNodeId;
+    const colors = statusColors(status, isCurrent || isSelected);
+
+    const group = document.createElementNS(svgNs, "g");
+    group.setAttribute(
+      "class",
+      `plan-tree-node ${isCurrent ? "current" : ""} ${isSelected ? "selected" : ""}`,
+    );
+    group.setAttribute("transform", `translate(${position.x}, ${position.y})`);
+
+    const rect = document.createElementNS(svgNs, "rect");
+    rect.setAttribute("width", String(nodeWidth));
+    rect.setAttribute("height", String(nodeHeight));
+    rect.setAttribute("rx", "10");
+    rect.setAttribute("fill", colors.fill);
+    rect.setAttribute("stroke", colors.stroke);
+    group.appendChild(rect);
+
+    const labelLines = wrapLabel(node.label || nodeId);
+    labelLines.forEach((line, idx) => {
+      const text = document.createElementNS(svgNs, "text");
+      text.setAttribute("x", "10");
+      text.setAttribute("y", String(20 + idx * 14));
+      text.textContent = line;
+      group.appendChild(text);
+    });
+
+    const meta = document.createElementNS(svgNs, "text");
+    meta.setAttribute("x", "10");
+    meta.setAttribute("y", "54");
+    meta.setAttribute("class", "node-meta");
+    meta.textContent = `${status} | ${String(node.owner || "collection_agent")}`;
+    group.appendChild(meta);
+
+    group.addEventListener("click", () => {
+      viewState.selectedPlanNodeId = nodeId;
+      renderPlanTree();
+    });
+    svg.appendChild(group);
+  }
+
+  planTreeView.appendChild(svg);
+}
+
+function renderPlanTree() {
+  if (!planTreeView || !planSnapshotLabel || !planPrevButton || !planNextButton) {
+    return;
+  }
+  const snapshots = viewState.planSnapshots || [];
+  if (!snapshots.length) {
+    planSnapshotLabel.textContent = "No plan snapshots";
+    planTreeView.textContent = "No plan generated yet.";
+    viewState.selectedPlanNodeId = null;
+    planPrevButton.disabled = true;
+    planNextButton.disabled = true;
+    return;
+  }
+
+  if (viewState.planSnapshotIndex < 0) viewState.planSnapshotIndex = 0;
+  if (viewState.planSnapshotIndex >= snapshots.length) viewState.planSnapshotIndex = snapshots.length - 1;
+
+  const selected = snapshots[viewState.planSnapshotIndex];
+  const plan = selected.plan || {};
+  const version = Number(plan.version || 1);
+  const status = String(plan.status || "active");
+  const currentNodeId = String(plan.current_node_id || "");
+  planSnapshotLabel.textContent =
+    `${selected.label} (${viewState.planSnapshotIndex + 1}/${snapshots.length}) | ` +
+    `v${version} | status=${status} | current=${currentNodeId || "-"}`;
+
+  planTreeView.innerHTML = "";
+  const planNodes = Array.isArray(plan.nodes) ? plan.nodes : [];
+  const planNodeIds = new Set(planNodes.map((node) => String((node && node.id) || "")));
+  if (!viewState.selectedPlanNodeId || !planNodeIds.has(String(viewState.selectedPlanNodeId))) {
+    viewState.selectedPlanNodeId = currentNodeId || null;
+  }
+  const legend = document.createElement("div");
+  legend.className = "plan-tree-legend";
+  legend.innerHTML = `
+    <span class="legend-item"><span class="legend-dot in-progress"></span>In Progress</span>
+    <span class="legend-item"><span class="legend-dot pending"></span>Pending</span>
+    <span class="legend-item"><span class="legend-dot done"></span>Done</span>
+    <span class="legend-item"><span class="legend-dot blocked"></span>Blocked</span>
+    <span class="legend-item"><span class="legend-dot skipped"></span>Skipped</span>
+  `;
+  planTreeView.appendChild(legend);
+  renderPlanTreeGraph(plan);
+
+  planPrevButton.disabled = viewState.planSnapshotIndex <= 0;
+  planNextButton.disabled = viewState.planSnapshotIndex >= snapshots.length - 1;
 }
 
 function renderSnapshots(hops, finalState, finalMemory) {
@@ -248,19 +584,40 @@ function computeStateDiff(prevState, nextState) {
   return { added, removed, changed };
 }
 
+function deepMerge(target, patch) {
+  const base = target && typeof target === "object" ? target : {};
+  const incoming = patch && typeof patch === "object" ? patch : {};
+  const out = Array.isArray(base) ? [...base] : { ...base };
+  for (const [key, value] of Object.entries(incoming)) {
+    if (
+      value &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      out[key] &&
+      typeof out[key] === "object" &&
+      !Array.isArray(out[key])
+    ) {
+      out[key] = deepMerge(out[key], value);
+    } else {
+      out[key] = value;
+    }
+  }
+  return out;
+}
+
 function extractNodeEntries(hops) {
   const entries = [];
   let seq = 0;
-  let prevState = {};
   for (const hop of hops || []) {
     const events = Array.isArray(hop.events) ? hop.events : [];
+    let priorNodeState = {};
     for (let i = 0; i < events.length; i += 1) {
       const event = events[i] || {};
       if (event.event !== "node_started") continue;
 
       seq += 1;
       const nodeName = String(event.node_name || "unknown");
-      const nodeState = event.state && typeof event.state === "object" ? event.state : {};
+      const beforeState = event.state && typeof event.state === "object" ? event.state : {};
       let nodeOutput = {};
       for (let j = i + 1; j < events.length; j += 1) {
         const candidate = events[j] || {};
@@ -270,17 +627,22 @@ function extractNodeEntries(hops) {
         }
       }
 
-      const diff = computeStateDiff(prevState, nodeState);
+      const update = nodeOutput.state_update && typeof nodeOutput.state_update === "object" ? nodeOutput.state_update : {};
+      const afterState = deepMerge(beforeState, update);
+      const diff = computeStateDiff(priorNodeState, afterState);
       entries.push({
         id: `node-${seq}`,
         label: `${seq}. ${nodeName}`,
         hop: hop.hop,
         nodeName,
-        state: nodeState,
+        state_before: beforeState,
+        state_after: afterState,
+        state_update: update,
         output: nodeOutput,
+        humanMessage: String(nodeOutput.human_message || "").trim(),
         diff,
       });
-      prevState = nodeState;
+      priorNodeState = afterState;
     }
   }
   return entries;
@@ -293,7 +655,15 @@ function renderSelectedNodeEntry() {
     nodeDiffJson.textContent = "{}";
     return;
   }
-  nodeOutputJson.textContent = JSON.stringify(selected.output || {}, null, 2);
+  nodeOutputJson.textContent = JSON.stringify(
+    {
+      human_message: selected.humanMessage || null,
+      state_update: selected.state_update || {},
+      raw_event: selected.output || {},
+    },
+    null,
+    2,
+  );
   nodeDiffJson.textContent = JSON.stringify(selected.diff || {}, null, 2);
 }
 
@@ -317,7 +687,8 @@ function renderNodeExplorer(hops) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = `node-entry ${entry.id === viewState.selectedNodeId ? "active" : ""}`;
-    button.textContent = `Hop ${entry.hop} | ${entry.label}`;
+    const suffix = entry.humanMessage ? ` - ${entry.humanMessage}` : "";
+    button.textContent = `Hop ${entry.hop} | ${entry.label}${suffix}`;
     button.addEventListener("click", () => {
       viewState.selectedNodeId = entry.id;
       renderNodeExplorer(hops);
@@ -353,6 +724,9 @@ function renderTurnPayload(payload) {
   renderExecutionChart(payload.hops || []);
   renderExecutionNarrative(payload.hops || []);
   renderThinking(payload.hops || []);
+  viewState.planSnapshots = extractPlanSnapshots(payload.hops || [], payload.final_state || {});
+  viewState.planSnapshotIndex = Math.max(0, viewState.planSnapshots.length - 1);
+  renderPlanTree();
   renderNodeExplorer(payload.hops || []);
   renderSnapshots(
     payload.hops || [],
@@ -393,6 +767,9 @@ function refreshLivePanels() {
   renderExecutionChart(viewState.liveHops);
   renderExecutionNarrative(viewState.liveHops);
   renderThinking(viewState.liveHops);
+  viewState.planSnapshots = extractPlanSnapshots(viewState.liveHops, {});
+  viewState.planSnapshotIndex = Math.max(0, viewState.planSnapshots.length - 1);
+  renderPlanTree();
   renderNodeExplorer(viewState.liveHops);
   renderSnapshots(viewState.liveHops, {}, {});
 }
@@ -586,9 +963,27 @@ collapseButton.addEventListener("click", () => {
   collapseButton.textContent = viewState.collapsed ? "Expand" : "Collapse";
 });
 
+if (planPrevButton) {
+  planPrevButton.addEventListener("click", () => {
+    viewState.planSnapshotIndex = Math.max(0, viewState.planSnapshotIndex - 1);
+    renderPlanTree();
+  });
+}
+
+if (planNextButton) {
+  planNextButton.addEventListener("click", () => {
+    viewState.planSnapshotIndex = Math.min(
+      Math.max(0, viewState.planSnapshots.length - 1),
+      viewState.planSnapshotIndex + 1,
+    );
+    renderPlanTree();
+  });
+}
+
 renderExecutionChart([]);
 renderExecutionNarrative([]);
 renderThinking([]);
+renderPlanTree();
 renderNodeExplorer([]);
 renderSnapshots([], {}, {});
 loadDemoUsers();

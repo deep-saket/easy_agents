@@ -25,10 +25,12 @@ body {
   display: grid;
   grid-template-columns: 1fr 420px;
   min-height: 100vh;
+  align-items: start;
 }
 
 .main-pane {
   padding: 1.25rem;
+  min-width: 0;
 }
 
 .topbar {
@@ -123,10 +125,12 @@ button {
   margin-top: 1rem;
   display: grid;
   gap: 1rem;
+  min-width: 0;
 }
 
 .panel {
   padding: 0.85rem;
+  min-width: 0;
 }
 
 .llm-status {
@@ -233,12 +237,155 @@ button {
   margin: 0 0 0.2rem;
 }
 
+.plan-tree-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+
+.plan-tree-controls button {
+  min-width: 78px;
+}
+
+#planSnapshotLabel {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.plan-tree-view {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  padding: 0.5rem;
+  max-height: 320px;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: auto;
+}
+
+.plan-tree-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-bottom: 0.45rem;
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+
+.legend-dot.in-progress {
+  background: #e6f0ff;
+  border-color: #0d66d0;
+}
+
+.legend-dot.pending {
+  background: #fff6e8;
+  border-color: #be7c00;
+}
+
+.legend-dot.done {
+  background: #e7f8ef;
+  border-color: #0d8a52;
+}
+
+.legend-dot.skipped {
+  background: #f3f4f7;
+  border-color: #6b7280;
+}
+
+.legend-dot.blocked {
+  background: #ffe8e8;
+  border-color: #bf2d2d;
+}
+
+.plan-tree-canvas {
+  min-height: 220px;
+  display: block;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: linear-gradient(180deg, #f9fbff 0%, #ffffff 55%);
+}
+
+.plan-tree-empty {
+  font-family: "IBM Plex Mono", "Consolas", monospace;
+  font-size: 0.82rem;
+  color: var(--muted);
+  padding: 0.35rem 0.2rem;
+}
+
+.plan-tree-node {
+  cursor: pointer;
+}
+
+.plan-tree-node rect {
+  stroke-width: 1.2;
+}
+
+.plan-tree-node.current rect {
+  stroke-width: 2.2;
+  filter: drop-shadow(0 2px 4px rgba(13, 102, 208, 0.25));
+}
+
+.plan-tree-node text {
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  font-size: 11px;
+  fill: #15243a;
+  pointer-events: none;
+}
+
+.plan-tree-node .node-meta {
+  font-size: 10px;
+  fill: #4b5b6c;
+}
+
+.plan-tree-edge {
+  stroke: #9bb0c8;
+  stroke-width: 1.35;
+  fill: none;
+}
+
+.plan-tree-edge-label {
+  font-family: "IBM Plex Mono", "Consolas", monospace;
+  font-size: 9px;
+  fill: #607a96;
+}
+
+.plan-tree-line {
+  white-space: pre;
+  color: #1a2d4c;
+}
+
+.plan-tree-line.current {
+  background: #e6f0ff;
+  border-left: 3px solid var(--accent);
+  padding-left: 0.35rem;
+  border-radius: 6px;
+  color: #0d2340;
+  font-weight: 600;
+}
+
 .state-pane {
   border-left: 1px solid var(--border);
   background: #f8fbff;
-  position: relative;
+  position: sticky;
+  top: 0;
   transition: width 0.24s ease;
   width: 420px;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .state-pane-content {
@@ -294,6 +441,7 @@ button {
 
 .app-shell.collapsed .state-pane {
   width: 32px;
+  overflow: visible;
 }
 
 .app-shell.collapsed .state-pane-content {
@@ -319,6 +467,10 @@ button {
     width: auto;
     border-left: 0;
     border-top: 1px solid var(--border);
+    position: relative;
+    top: auto;
+    height: auto;
+    overflow: visible;
   }
 
   .collapse-button,

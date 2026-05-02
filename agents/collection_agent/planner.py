@@ -9,8 +9,20 @@ from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any
 
+from pydantic import BaseModel, Field
+
+from agents.collection_agent.llm_structured import StructuredOutputRunner
 from agents.collection_agent.tools.common import followup_decision_from_observation, observation_to_response
 from src.nodes.planner_node import PlannerNode
+
+
+class _PlannerDecisionPayload(BaseModel):
+    intent: str = Field(default="unknown")
+    tool_name: str | None = None
+    arguments: dict[str, Any] = Field(default_factory=dict)
+    respond_text: str | None = None
+    mode_update: str | None = None
+    reason: str | None = None
 
 
 @dataclass(slots=True)
@@ -20,6 +32,8 @@ class CollectionPlanner(PlannerNode):
     llm: Any | None = None
     intent_system_prompt: str | None = None
     intent_user_prompt: str | None = None
+    require_llm: bool = True
+    allow_rule_fallback: bool = False
 
     def plan(
         self,
@@ -37,6 +51,9 @@ class CollectionPlanner(PlannerNode):
         lowered = text.lower()
         state = dict(getattr(memory, "state", {})) if memory is not None else {}
         mode = str(state.get("mode", "strict_collections"))
+
+        if self.require_llm and self.llm is None:
+            raise RuntimeError("CollectionPlanner requires an active LLM; rule fallback is disabled.")
 
         if observation:
             obs = (
@@ -59,6 +76,9 @@ class CollectionPlanner(PlannerNode):
         )
         if llm_decision is not None:
             return llm_decision
+
+        if not self.allow_rule_fallback:
+            raise RuntimeError("CollectionPlanner LLM decision unavailable; deterministic planner fallback is disabled.")
 
         return self._rule_fallback(user_input=text, lowered=lowered, mode=mode, memory=memory, state=state)
 
@@ -85,10 +105,11 @@ class CollectionPlanner(PlannerNode):
                 state=state,
                 available_tools=available_tools,
             )
-            raw = self.llm.generate(system_prompt, user_prompt).strip()
-            payload = self._parse_json_payload(raw)
-            if not payload:
-                return None
+            payload = StructuredOutputRunner(self.llm, max_retries=2).run(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                schema=_PlannerDecisionPayload,
+            ).model_dump(mode="json")
 
             intent = str(payload.get("intent", "")).strip().lower()
             tool_name = payload.get("tool_name")
@@ -197,17 +218,6 @@ class CollectionPlanner(PlannerNode):
         for key, value in values.items():
             rendered = rendered.replace(f"{{{key}}}", value)
         return rendered
-
-    @staticmethod
-    def _parse_json_payload(raw: str) -> dict[str, Any] | None:
-        match = re.search(r"\{.*\}", raw, re.DOTALL)
-        if not match:
-            return None
-        try:
-            payload = json.loads(match.group(0))
-        except json.JSONDecodeError:
-            return None
-        return payload if isinstance(payload, dict) else None
 
     def _rule_fallback(self, *, user_input: str, lowered: str, mode: str, memory: Any | None, state: dict[str, Any]) -> Any:
         if self._is_off_topic(lowered):

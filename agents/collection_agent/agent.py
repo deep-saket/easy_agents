@@ -7,6 +7,7 @@ import json
 import re
 import threading
 from pathlib import Path
+import time
 from typing import Any, ClassVar
 from uuid import uuid4
 
@@ -579,7 +580,7 @@ class CollectionAgent(BaseAgent):
 
         return f"{node_name}: node executed."
 
-    def run_turn(self, user_input: str, session_id: str | None = None) -> AgentState:
+    def run_turn(self, user_input: str, session_id: str | None = None, sender: str = "customer") -> AgentState:
         if self.llm is None and not self.allow_deterministic_fallback:
             raise RuntimeError(
                 "CollectionAgent requires an active LLM. "
@@ -592,6 +593,9 @@ class CollectionAgent(BaseAgent):
             memory = self.session_store.load(session_key)
             if "mode" not in memory.state:
                 memory.set_state(mode="strict_collections", active_channel="sms", active_case_id="COLL-1001")
+            admin_state = self._maybe_handle_admin_message(user_input=user_input, sender=sender, memory=memory, session_key=session_key)
+            if admin_state is not None:
+                return admin_state
             turn_index = int(memory.state.get("turn_index", 0))
             self._sync_user_and_memory_context(memory=memory, user_input=user_input)
             user_id = str(memory.state.get("active_user_id", "")).strip()
@@ -614,6 +618,7 @@ class CollectionAgent(BaseAgent):
                             "user_id": user_id,
                             "case_id": case_id,
                             "channel": channel,
+                            "message_source": sender,
                             "memory_targets": [{"type": "working", "enabled": True, "limit": 8}],
                             "observation": None,
                             "node_history": [],
@@ -646,15 +651,17 @@ class CollectionAgent(BaseAgent):
         finally:
             session_lock.release()
 
-    def run(self, user_input: str, session_id: str | None = None) -> str:
-        state = self.run_turn(user_input=user_input, session_id=session_id)
+    def run(self, user_input: str, session_id: str | None = None, sender: str = "customer") -> str:
+        state = self.run_turn(user_input=user_input, session_id=session_id, sender=sender)
         return str(state.get("response", "No response generated."))
 
     def _finalize_output_state(self, state: AgentState) -> AgentState:
         """Guarantees output contract keys for downstream orchestration."""
         output = dict(state)
         response_target = str(output.get("response_target", "customer")).strip().lower()
-        if response_target not in {"customer", "self", "discount_planning_agent"}:
+        if response_target == "discount_planning_agent":
+            response_target = "self"
+        if response_target not in {"customer", "self"}:
             response_target = "customer"
         output["response_target"] = response_target
 
@@ -670,6 +677,72 @@ class CollectionAgent(BaseAgent):
                 fallback_outline = str(plan.get("plan_outline", "")).strip() if plan else ""
                 output["response"] = decision_text or fallback_outline or "No response generated."
         return output
+
+    def _maybe_handle_admin_message(
+        self,
+        *,
+        user_input: str,
+        sender: str,
+        memory: Any,
+        session_key: str,
+    ) -> AgentState | None:
+        lowered = user_input.lower().strip()
+        sender_norm = str(sender).strip().lower()
+        is_admin = sender_norm == "admin" or lowered.startswith("admin:") or "initialize" in lowered
+        if not is_admin:
+            return None
+
+        extracted_customer = re.search(r"(CUST-\d+)", user_input, re.IGNORECASE)
+        extracted_case = re.search(r"(COLL-\d+)", user_input, re.IGNORECASE)
+        extracted_channel = re.search(r"\b(voice|sms|email|whatsapp)\b", user_input, re.IGNORECASE)
+
+        customer_id = extracted_customer.group(1).upper() if extracted_customer else str(memory.state.get("active_user_id", "")).upper()
+        case_id = extracted_case.group(1).upper() if extracted_case else str(memory.state.get("active_case_id", "COLL-1001")).upper()
+        channel = extracted_channel.group(1).lower() if extracted_channel else str(memory.state.get("active_channel", "voice")).lower()
+
+        if customer_id and not extracted_case:
+            case_row = self.data_store.get_case(customer_id=customer_id)
+            if isinstance(case_row, dict) and case_row.get("case_id"):
+                case_id = str(case_row["case_id"]).upper()
+
+        memory.set_state(
+            mode="strict_collections",
+            active_user_id=customer_id or memory.state.get("active_user_id"),
+            active_case_id=case_id or memory.state.get("active_case_id", "COLL-1001"),
+            active_channel=channel or memory.state.get("active_channel", "voice"),
+            agent_loop_blocked=False,
+            agent_loop_count=0,
+            active_conversation_plan={},
+            last_admin_message=user_input,
+        )
+        self._hydrate_case_context(memory=memory)
+
+        self.last_trace = ExecutionTrace(agent_name=self.agent_name, session_id=session_key, user_input=user_input)
+        self.last_trace.finish(status="completed")
+        response = (
+            "Admin initialization applied. "
+            f"Session is set for customer {str(memory.state.get('active_user_id', 'unknown'))}, "
+            f"case {str(memory.state.get('active_case_id', 'unknown'))}, channel {str(memory.state.get('active_channel', 'voice'))}. "
+            "You can now continue as customer."
+        )
+        return {
+            "session_id": session_key,
+            "turn_id": str(uuid4()),
+            "user_input": user_input,
+            "message_source": "admin",
+            "response": response,
+            "response_target": "customer",
+            "route": "continue",
+            "conversation_phase": "admin_initialization",
+            "node_history": ["admin_initialization"],
+            "previous_node": "START",
+            "next_node": "END",
+            "steps": 0,
+            "user_id": str(memory.state.get("active_user_id", "")),
+            "case_id": str(memory.state.get("active_case_id", "")),
+            "channel": str(memory.state.get("active_channel", "voice")),
+            "timestamp_ms": int(time.time() * 1000),
+        }
 
     def _persist_trace(self, trace: ExecutionTrace) -> None:
         target_dir = self.trace_output_dir
