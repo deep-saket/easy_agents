@@ -212,6 +212,23 @@ button {
   line-height: 1.45;
 }
 
+.execution-narrative {
+  max-height: 300px;
+  overflow: auto;
+  font-family: "IBM Plex Mono", "Consolas", monospace;
+  background: #0a1320;
+  color: #dbe9ff;
+  border-radius: 10px;
+  padding: 0.75rem;
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.narrative-line {
+  margin: 0 0 0.22rem;
+  white-space: pre-wrap;
+}
+
 .trace-line {
   margin: 0 0 0.2rem;
 }
@@ -250,6 +267,25 @@ button {
   overflow: auto;
   font-family: "IBM Plex Mono", "Consolas", monospace;
   font-size: 0.82rem;
+}
+
+.nodes-explored {
+  display: grid;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+
+.node-entry {
+  text-align: left;
+  background: #fff;
+  color: var(--text);
+  border-color: var(--border);
+  padding: 0.45rem 0.55rem;
+}
+
+.node-entry.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
 }
 
 .app-shell.collapsed {

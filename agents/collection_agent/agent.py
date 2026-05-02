@@ -398,7 +398,8 @@ class CollectionAgent(BaseAgent):
 
     def _wrap_node(self, node_name: str, fn: Any) -> Any:
         def _wrapped(state: CollectionGraphState) -> CollectionGraphState:
-            with trace_node(node_name):
+            trace_state = {k: v for k, v in state.items() if k != "memory"}
+            with trace_node(node_name, state=trace_state):
                 result = fn(state)
             if isinstance(result, dict):
                 history = list(state.get("node_history", []))
@@ -424,6 +425,7 @@ class CollectionAgent(BaseAgent):
         memory = self.session_store.load(session_key)
         if "mode" not in memory.state:
             memory.set_state(mode="strict_collections", active_channel="sms", active_case_id="COLL-1001")
+        turn_index = int(memory.state.get("turn_index", 0))
         self._sync_user_and_memory_context(memory=memory, user_input=user_input)
         user_id = str(memory.state.get("active_user_id", "")).strip()
         case_id = str(memory.state.get("active_case_id", "COLL-1001")).strip()
@@ -446,9 +448,16 @@ class CollectionAgent(BaseAgent):
                         "conversation_phase": "turn_started",
                         "tool_errors": [],
                         "steps": 0,
+                        "turn_index": turn_index,
                     }
                 )
                 state = self._finalize_output_state(state)
+                memory.set_state(
+                    turn_index=turn_index + 1,
+                    last_user_input=user_input,
+                    last_agent_response=str(state.get("response", "")).strip(),
+                    last_response_target=str(state.get("response_target", "customer")).strip().lower() or "customer",
+                )
                 trace.finish(status="completed")
         except Exception as exc:
             trace.finish(status="failed", error=str(exc))
@@ -510,6 +519,7 @@ class CollectionAgent(BaseAgent):
         user_id = self._resolve_user_id(memory_state=dict(memory.state), user_input=user_input)
         if user_id:
             memory.set_state(active_user_id=user_id)
+        self._hydrate_case_context(memory=memory)
         global_context = self.memory_repository.get_global_memory_context(limit=6) if self.memory_repository else {}
         user_context = (
             self.memory_repository.get_user_memory_context(user_id) if self.memory_repository and user_id else None
@@ -518,6 +528,40 @@ class CollectionAgent(BaseAgent):
             global_key_event_memory=global_context,
             user_key_event_memory=(user_context or {}),
         )
+
+    def _hydrate_case_context(self, *, memory: Any) -> None:
+        memory_state = dict(memory.state)
+        active_case_id = str(memory_state.get("active_case_id", "")).strip()
+        active_user_id = str(memory_state.get("active_user_id", "")).strip()
+
+        case_row = self.data_store.get_case(case_id=active_case_id) if active_case_id else None
+        if not case_row and active_user_id:
+            case_row = self.data_store.get_case(customer_id=active_user_id)
+
+        customer_id = active_user_id
+        if isinstance(case_row, dict):
+            customer_id = str(case_row.get("customer_id", customer_id)).strip()
+            memory.set_state(
+                active_case_id=str(case_row.get("case_id", active_case_id or "COLL-1001")).strip().upper(),
+                active_overdue_amount=float(case_row.get("overdue_amount", 0.0) or 0.0),
+                active_emi_amount=float(case_row.get("emi_amount", 0.0) or 0.0),
+                active_late_fee=float(case_row.get("late_fee", 0.0) or 0.0),
+                active_dpd=int(case_row.get("dpd", 0) or 0),
+                active_loan_id=str(case_row.get("loan_id", "")).strip(),
+            )
+            if customer_id:
+                memory.set_state(active_user_id=customer_id)
+
+        if customer_id:
+            customer_row = self.data_store.get_customer(customer_id)
+            if isinstance(customer_row, dict):
+                memory.set_state(
+                    active_customer_name=str(customer_row.get("name", memory_state.get("active_customer_name", "Customer")))
+                    .strip()
+                    or "Customer",
+                    active_customer_phone=str(customer_row.get("phone", "")).strip(),
+                    active_customer_email=str(customer_row.get("email", "")).strip(),
+                )
 
     def _resolve_user_id(self, *, memory_state: dict[str, Any], user_input: str) -> str | None:
         from_state = memory_state.get("active_user_id") or memory_state.get("user_id")

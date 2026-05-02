@@ -7,12 +7,15 @@ thinking events, and graph-state snapshots.
 from __future__ import annotations
 
 import json
+import queue
+import threading
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from fastapi import APIRouter, FastAPI
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -31,11 +34,29 @@ STATIC_DIR = Path(__file__).resolve().parent
 class InMemoryTraceSink:
     """Captures per-turn trace events for the debug UI."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        hop_index: int | None = None,
+        event_callback: Callable[[dict[str, Any]], None] | None = None,
+    ) -> None:
         self.events: list[dict[str, Any]] = []
+        self.hop_index = hop_index
+        self.event_callback = event_callback
 
     def emit(self, event: dict[str, Any]) -> None:
-        self.events.append(_json_safe(event))
+        safe_event = _json_safe(event)
+        self.events.append(safe_event)
+        if callable(self.event_callback):
+            self.event_callback(
+                {
+                    "event": "trace_event",
+                    "payload": {
+                        "hop": self.hop_index,
+                        "trace_event": safe_event,
+                    },
+                }
+            )
 
 
 class RunTurnRequest(BaseModel):
@@ -161,16 +182,40 @@ class CollectionDebugRuntime:
             "turn": turn,
         }
 
-    def run_turn(self, request: RunTurnRequest) -> dict[str, Any]:
+    def run_turn(
+        self,
+        request: RunTurnRequest,
+        *,
+        event_callback: Callable[[dict[str, Any]], None] | None = None,
+    ) -> dict[str, Any]:
         session_id = request.session_id.strip() or "collection-ui-session"
         soft_cap = max(1, int(request.soft_cap))
         hard_cap = max(soft_cap, int(request.hard_cap))
 
         current_input = request.message
         hops: list[dict[str, Any]] = []
+        self._emit_progress(
+            event_callback,
+            {
+                "event": "turn_started",
+                "payload": {
+                    "session_id": session_id,
+                    "message": request.message,
+                    "soft_cap": soft_cap,
+                    "hard_cap": hard_cap,
+                },
+            },
+        )
 
         for hop_index in range(1, hard_cap + 1):
-            trace_sink = InMemoryTraceSink()
+            self._emit_progress(
+                event_callback,
+                {
+                    "event": "hop_started",
+                    "payload": {"hop": hop_index, "input": current_input},
+                },
+            )
+            trace_sink = InMemoryTraceSink(hop_index=hop_index, event_callback=event_callback)
             self.collection_agent.trace_sink = trace_sink
             state = self.collection_agent.run_turn(current_input, session_id=session_id)
             trace = self.collection_agent.last_trace
@@ -184,6 +229,7 @@ class CollectionDebugRuntime:
                 "input": current_input,
                 "response": response,
                 "response_target": target,
+                "elapsed_ms": self._trace_elapsed_ms(trace),
                 "node_history": _json_safe(state.get("node_history", [])),
                 "conversation_phase": str(state.get("conversation_phase", "")),
                 "thinking": self._thinking_lines(trace_sink.events),
@@ -193,6 +239,7 @@ class CollectionDebugRuntime:
                 "working_memory_state": memory_state,
             }
             hops.append(hop_payload)
+            self._emit_progress(event_callback, {"event": "hop_update", "payload": hop_payload})
 
             if target == "customer":
                 helper_result = self._run_memory_helper_if_requested(session_id=session_id, state=state)
@@ -213,7 +260,7 @@ class CollectionDebugRuntime:
                     agent_loop_blocked=True,
                     agent_loop_count=hop_index,
                 )
-                guard_sink = InMemoryTraceSink()
+                guard_sink = InMemoryTraceSink(hop_index=hop_index + 1, event_callback=event_callback)
                 self.collection_agent.trace_sink = guard_sink
                 guard_state = self.collection_agent.run_turn("system loop guard", session_id=session_id)
                 guard_response = str(guard_state.get("response", response))
@@ -223,6 +270,7 @@ class CollectionDebugRuntime:
                     "input": "system loop guard",
                     "response": guard_response,
                     "response_target": str(guard_state.get("response_target", "customer")),
+                    "elapsed_ms": self._trace_elapsed_ms(self.collection_agent.last_trace),
                     "node_history": _json_safe(guard_state.get("node_history", [])),
                     "conversation_phase": str(guard_state.get("conversation_phase", "")),
                     "thinking": self._thinking_lines(guard_sink.events),
@@ -235,6 +283,7 @@ class CollectionDebugRuntime:
                     "memory_helper": _json_safe(helper_result) if helper_result is not None else None,
                 }
                 hops.append(guard_payload)
+                self._emit_progress(event_callback, {"event": "hop_update", "payload": guard_payload})
                 return {
                     "session_id": session_id,
                     "final_response": guard_response,
@@ -269,6 +318,13 @@ class CollectionDebugRuntime:
                     "handoff_payload": _json_safe(handoff_payload),
                     "discount_output": _json_safe(discount_output),
                 }
+                self._emit_progress(
+                    event_callback,
+                    {
+                        "event": "hop_update",
+                        "payload": hop_payload,
+                    },
+                )
                 current_input = (
                     "collections emi restructuring recommendation ready for case "
                     f"{handoff_payload.get('case_id', memory_state.get('active_case_id', 'COLL-1001'))}"
@@ -295,6 +351,47 @@ class CollectionDebugRuntime:
             "final_working_memory_state": self._memory_state(session_id=session_id),
             "llm": self._llm_meta(),
         }
+
+    def run_turn_stream(self, request: RunTurnRequest) -> StreamingResponse:
+        sentinel = object()
+        events: queue.Queue[object] = queue.Queue()
+
+        def publish(payload: dict[str, Any]) -> None:
+            events.put(_json_safe(payload))
+
+        def worker() -> None:
+            try:
+                result = self.run_turn(request, event_callback=publish)
+                publish({"event": "turn_complete", "payload": result})
+            except Exception as exc:  # pragma: no cover - runtime stream error path
+                publish({"event": "turn_error", "payload": {"error": str(exc)}})
+            finally:
+                events.put(sentinel)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+        def stream() -> Any:
+            yield self._sse("stream_open", {"session_id": request.session_id})
+            while True:
+                item = events.get()
+                if item is sentinel:
+                    break
+                if not isinstance(item, dict):
+                    continue
+                event_name = str(item.get("event", "message"))
+                payload = item.get("payload", {})
+                yield self._sse(event_name, payload)
+            yield self._sse("stream_close", {"session_id": request.session_id})
+
+        return StreamingResponse(
+            stream(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
+        )
 
     def session_state(self, session_id: str) -> SessionStateResponse:
         sid = session_id.strip() or "collection-ui-session"
@@ -385,6 +482,28 @@ class CollectionDebugRuntime:
             "startup_error": self.llm_error,
         }
 
+    @staticmethod
+    def _trace_elapsed_ms(trace: Any | None) -> float | None:
+        if trace is None:
+            return None
+        started = getattr(trace, "started_at", None)
+        finished = getattr(trace, "finished_at", None)
+        if not isinstance(started, datetime) or not isinstance(finished, datetime):
+            return None
+        return round((finished - started).total_seconds() * 1000, 3)
+
+    @staticmethod
+    def _emit_progress(
+        callback: Callable[[dict[str, Any]], None] | None,
+        payload: dict[str, Any],
+    ) -> None:
+        if callable(callback):
+            callback(payload)
+
+    @staticmethod
+    def _sse(event_name: str, payload: dict[str, Any]) -> str:
+        return f"event: {event_name}\ndata: {json.dumps(_json_safe(payload), ensure_ascii=True)}\n\n"
+
 
 def _json_safe(value: Any) -> Any:
     if value is None or isinstance(value, (str, int, float, bool)):
@@ -452,6 +571,21 @@ def create_router(runtime: CollectionDebugRuntime) -> APIRouter:
     @router.post("/run-turn")
     async def run_turn(body: RunTurnRequest) -> dict[str, Any]:
         return runtime.run_turn(body)
+
+    @router.get("/run-turn-stream")
+    async def run_turn_stream(
+        message: str,
+        session_id: str = "collection-ui-session",
+        soft_cap: int = 10,
+        hard_cap: int = 50,
+    ) -> StreamingResponse:
+        request = RunTurnRequest(
+            message=message,
+            session_id=session_id,
+            soft_cap=soft_cap,
+            hard_cap=hard_cap,
+        )
+        return runtime.run_turn_stream(request)
 
     @router.get("/session/{session_id}")
     async def session_state(session_id: str) -> SessionStateResponse:
