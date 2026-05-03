@@ -53,7 +53,12 @@ class CollectionPlanner(PlannerNode):
         mode = str(state.get("mode", "strict_collections"))
 
         if self.require_llm and self.llm is None:
-            raise RuntimeError("CollectionPlanner requires an active LLM; rule fallback is disabled.")
+            if self.allow_rule_fallback:
+                return self._rule_fallback(user_input=text, lowered=lowered, mode=mode, memory=memory, state=state)
+            return self._respond(
+                "I am temporarily unable to run advanced planning right now. "
+                "Please share your case ID, or tell me if you want to pay now, request assistance, or schedule follow-up."
+            )
 
         if observation:
             obs = (
@@ -78,7 +83,10 @@ class CollectionPlanner(PlannerNode):
             return llm_decision
 
         if not self.allow_rule_fallback:
-            raise RuntimeError("CollectionPlanner LLM decision unavailable; deterministic planner fallback is disabled.")
+            return self._respond(
+                "I am temporarily unable to complete that planning step right now. "
+                "Please confirm one next step: pay now, request arrangement, or schedule follow-up."
+            )
 
         return self._rule_fallback(user_input=text, lowered=lowered, mode=mode, memory=memory, state=state)
 

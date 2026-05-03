@@ -7,15 +7,15 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass
 from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
 
-@dataclass(slots=True)
 class StructuredOutputError(RuntimeError):
     """Raised when a structured LLM response cannot be validated."""
+
+    pass
 
 
 class StructuredOutputRunner:
