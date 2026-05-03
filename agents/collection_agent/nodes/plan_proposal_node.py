@@ -455,7 +455,11 @@ class PlanProposalNode(BaseGraphNode):
             "new_nodes (array of {id,label,owner,status}), new_edges (array of {from,to,condition}), "
             "remove_node_ids, mark_done, mark_skipped, mark_blocked, status\n"
             "Use operation=insert or branch when user direction changes. "
-            "Use remove_node_ids for obsolete path pruning."
+            "Use remove_node_ids for obsolete path pruning.\n"
+            "Critical marker rules:\n"
+            "- Each node advances only when predecessor node markers are done or skipped.\n"
+            "- Before selecting a child node, mark the current node done or skipped explicitly.\n"
+            "- Use mark_blocked when a node cannot proceed and requires retry or alternate path."
         )
         try:
             payload = StructuredOutputRunner(self.llm, max_retries=2).run(
@@ -550,9 +554,16 @@ class PlanProposalNode(BaseGraphNode):
         plan.setdefault("objective", "Drive compliant collections conversation toward payment resolution.")
         plan.setdefault("plan_id", f"plan-{str(memory_state.get('active_case_id', 'COLL-1001')).strip().upper()}")
         plan.setdefault("root_node_id", "open_and_context")
+        plan.setdefault("step_markers", {})
 
         previous_current = str(plan.get("current_node_id", "")) or str(plan.get("root_node_id", "open_and_context"))
         plan_update = proposal.get("plan_tree_update") if isinstance(proposal.get("plan_tree_update"), dict) else {}
+        proposal_context = proposal.get("context") if isinstance(proposal.get("context"), dict) else {}
+        observed_output = (
+            proposal_context.get("observed_tool_output")
+            if isinstance(proposal_context.get("observed_tool_output"), dict)
+            else {}
+        )
         inferred_next = self._infer_current_node_id(
             user_input=user_input,
             observed_tool=observed_tool,
@@ -562,9 +573,31 @@ class PlanProposalNode(BaseGraphNode):
             plan_update=plan_update,
         )
         self._apply_plan_tree_update(plan=plan, plan_update=plan_update)
-        next_current = self._resolve_next_current_node(plan=plan, previous_current=previous_current, candidate=inferred_next)
+        markers = self._init_or_reconcile_step_markers(plan=plan)
+        self._apply_step_marker_updates(
+            plan=plan,
+            plan_update=plan_update,
+            previous_current=previous_current,
+            candidate=inferred_next,
+            user_input=user_input,
+            observed_tool=observed_tool,
+            observed_output=(observed_output if isinstance(observed_output, dict) else {}),
+        )
+        markers = self._init_or_reconcile_step_markers(plan=plan)
+        next_current = self._resolve_next_current_node(
+            plan=plan,
+            previous_current=previous_current,
+            candidate=inferred_next,
+            markers=markers,
+        )
         self._prune_disconnected_nodes(plan=plan, keep_ids={next_current})
-        self._enforce_status_consistency(plan=plan, current_node_id=next_current, response_target=response_target)
+        self._enforce_status_consistency(
+            plan=plan,
+            current_node_id=next_current,
+            response_target=response_target,
+            markers=markers,
+        )
+        markers = self._init_or_reconcile_step_markers(plan=plan)
 
         lowered = user_input.lower()
         should_revise = (
@@ -714,60 +747,312 @@ class PlanProposalNode(BaseGraphNode):
             for (src, dst, cond) in sorted(edge_set)
         ]
 
-    def _resolve_next_current_node(self, *, plan: dict[str, Any], previous_current: str, candidate: str) -> str:
+    def _resolve_next_current_node(
+        self,
+        *,
+        plan: dict[str, Any],
+        previous_current: str,
+        candidate: str,
+        markers: dict[str, Any],
+    ) -> str:
         node_ids = {str(node.get("id")) for node in plan.get("nodes", []) if isinstance(node, dict)}
-        if not previous_current or previous_current not in node_ids:
-            return candidate if candidate in node_ids else str(plan.get("root_node_id", "open_and_context"))
+        parent_map = self._parent_map(nodes=plan.get("edges", []))
 
+        def nearest_unlocked(node_id: str) -> str:
+            cursor = node_id
+            visited: set[str] = set()
+            while cursor and cursor not in visited:
+                visited.add(cursor)
+                if cursor in node_ids and self._is_node_unlocked(
+                    plan=plan,
+                    node_id=cursor,
+                    markers=markers,
+                ):
+                    return cursor
+                cursor = parent_map.get(cursor, "")
+            root_candidate = str(plan.get("root_node_id", "open_and_context"))
+            return root_candidate if root_candidate in node_ids else node_id
+
+        if not previous_current or previous_current not in node_ids:
+            root = str(plan.get("root_node_id", "open_and_context"))
+            if candidate in node_ids and self._is_node_unlocked(plan=plan, node_id=candidate, markers=markers):
+                return candidate
+            return root if root in node_ids else candidate
+
+        previous_current = nearest_unlocked(previous_current)
         allowed_next = self._next_nodes_from_edges(nodes=plan.get("edges", []), current_node_id=previous_current)
         if not allowed_next:
-            if candidate in node_ids:
+            if candidate in node_ids and self._is_node_unlocked(plan=plan, node_id=candidate, markers=markers):
                 return candidate
             return previous_current
 
-        if candidate in allowed_next:
+        if candidate in allowed_next and self._is_node_unlocked(plan=plan, node_id=candidate, markers=markers):
             return candidate
 
-        # Enforce sequential progression: only direct children of current node are valid.
-        return allowed_next[0]
+        # Enforce sequential progression with marker gates.
+        for node_id in allowed_next:
+            if self._is_node_unlocked(plan=plan, node_id=node_id, markers=markers):
+                return node_id
+        return previous_current
 
-    def _enforce_status_consistency(self, *, plan: dict[str, Any], current_node_id: str, response_target: str) -> None:
+    @staticmethod
+    def _parent_map(*, nodes: list[Any]) -> dict[str, str]:
+        parent_map: dict[str, str] = {}
+        for edge in nodes:
+            if not isinstance(edge, dict):
+                continue
+            src = str(edge.get("from", "")).strip()
+            dst = str(edge.get("to", "")).strip()
+            if not src or not dst:
+                continue
+            if dst not in parent_map:
+                parent_map[dst] = src
+        return parent_map
+
+    def _enforce_status_consistency(
+        self,
+        *,
+        plan: dict[str, Any],
+        current_node_id: str,
+        response_target: str,
+        markers: dict[str, Any],
+    ) -> None:
         nodes = [node for node in plan.get("nodes", []) if isinstance(node, dict)]
         node_map = {str(node.get("id", "")).strip(): node for node in nodes if str(node.get("id", "")).strip()}
         if current_node_id not in node_map:
             return
 
-        reverse_adj: dict[str, set[str]] = {node_id: set() for node_id in node_map}
+        for node_id, node in node_map.items():
+            marker_state = self._marker_state(markers=markers, node_id=node_id)
+            if node_id == current_node_id:
+                if marker_state in {"done", "skipped", "blocked"}:
+                    node["status"] = marker_state
+                else:
+                    node["status"] = "in_progress"
+                    node["owner"] = "collection_agent" if response_target == "self" else node.get("owner", "customer")
+                continue
+            if marker_state in {"done", "skipped", "blocked"}:
+                node["status"] = marker_state
+            else:
+                node["status"] = "pending"
+
+    @staticmethod
+    def _marker_state(*, markers: dict[str, Any], node_id: str) -> str:
+        raw = markers.get(node_id)
+        if isinstance(raw, dict):
+            state = str(raw.get("state", "pending")).strip().lower()
+        else:
+            state = str(raw or "pending").strip().lower()
+        if state in {"done", "skipped", "blocked", "pending"}:
+            return state
+        return "pending"
+
+    def _init_or_reconcile_step_markers(self, *, plan: dict[str, Any]) -> dict[str, Any]:
+        existing = plan.get("step_markers") if isinstance(plan.get("step_markers"), dict) else {}
+        markers: dict[str, Any] = dict(existing)
+        has_existing_markers = bool(existing)
+        root_id = str(plan.get("root_node_id", "open_and_context")).strip() or "open_and_context"
+        now = datetime.now(UTC).isoformat()
+
+        node_ids: set[str] = set()
+        for node in plan.get("nodes", []):
+            if not isinstance(node, dict):
+                continue
+            node_id = str(node.get("id", "")).strip()
+            if not node_id:
+                continue
+            node_ids.add(node_id)
+            status = str(node.get("status", "pending")).strip().lower()
+            previous = markers.get(node_id) if isinstance(markers.get(node_id), dict) else {}
+            previous_state = str(previous.get("state", "pending")).strip().lower()
+            if previous_state not in {"done", "skipped", "blocked", "pending"}:
+                previous_state = "pending"
+
+            if previous_state in {"done", "skipped", "blocked"}:
+                state = previous_state
+            elif (not has_existing_markers) and status in {"done", "skipped", "blocked"} and node_id == root_id:
+                # Bootstrap only the root marker from status for legacy sessions.
+                state = status
+            elif node_id == root_id and not existing:
+                state = "done"
+            else:
+                state = "pending"
+
+            markers[node_id] = {
+                "state": state,
+                "updated_at": str(previous.get("updated_at", now)),
+                "source": str(previous.get("source", "reconciler")),
+                "reason": str(previous.get("reason", "")),
+            }
+
+        for marker_id in list(markers.keys()):
+            if marker_id not in node_ids:
+                markers.pop(marker_id, None)
+
+        plan["step_markers"] = markers
+        return markers
+
+    def _apply_step_marker_updates(
+        self,
+        *,
+        plan: dict[str, Any],
+        plan_update: dict[str, Any],
+        previous_current: str,
+        candidate: str,
+        user_input: str,
+        observed_tool: str,
+        observed_output: dict[str, Any],
+    ) -> None:
+        markers = plan.get("step_markers") if isinstance(plan.get("step_markers"), dict) else {}
+        now = datetime.now(UTC).isoformat()
+        if not isinstance(plan_update, dict):
+            plan["step_markers"] = markers
+            return
+
+        mark_done = {str(x).strip() for x in plan_update.get("mark_done", []) if str(x).strip()}
+        mark_skipped = {str(x).strip() for x in plan_update.get("mark_skipped", []) if str(x).strip()}
+        mark_blocked = {str(x).strip() for x in plan_update.get("mark_blocked", []) if str(x).strip()}
+
+        def set_state(node_id: str, state: str, reason: str) -> None:
+            prior = markers.get(node_id) if isinstance(markers.get(node_id), dict) else {}
+            markers[node_id] = {
+                "state": state,
+                "updated_at": now,
+                "source": "plan_tree_update",
+                "reason": reason or str(prior.get("reason", "")),
+            }
+
+        for node_id in sorted(mark_done):
+            if self._can_accept_done_marker(
+                plan=plan,
+                node_id=node_id,
+                user_input=user_input,
+                observed_tool=observed_tool,
+                observed_output=observed_output,
+            ):
+                set_state(node_id, "done", "mark_done")
+        for node_id in sorted(mark_skipped):
+            set_state(node_id, "skipped", "mark_skipped")
+        for node_id in sorted(mark_blocked):
+            set_state(node_id, "blocked", "mark_blocked")
+
+        if (
+            previous_current
+            and candidate
+            and candidate != previous_current
+            and self._marker_state(markers=markers, node_id=previous_current) == "pending"
+        ):
+            # Require explicit completion/skip marker before moving from previous step.
+            set_state(previous_current, "pending", "awaiting_completion_or_skip_marker")
+
+        plan["step_markers"] = markers
+
+    @staticmethod
+    def _node_owner(*, plan: dict[str, Any], node_id: str) -> str:
+        for node in plan.get("nodes", []):
+            if not isinstance(node, dict):
+                continue
+            if str(node.get("id", "")).strip() != node_id:
+                continue
+            owner = str(node.get("owner", "collection_agent")).strip().lower()
+            return owner or "collection_agent"
+        return "collection_agent"
+
+    @staticmethod
+    def _node_label_by_id(*, plan: dict[str, Any], node_id: str) -> str:
+        for node in plan.get("nodes", []):
+            if not isinstance(node, dict):
+                continue
+            if str(node.get("id", "")).strip() != node_id:
+                continue
+            return str(node.get("label", node_id)).strip() or node_id
+        return node_id
+
+    @staticmethod
+    def _tokenize(text: str) -> set[str]:
+        tokens = re.findall(r"[a-z0-9]+", str(text).lower())
+        stop = {
+            "and",
+            "or",
+            "the",
+            "a",
+            "an",
+            "to",
+            "of",
+            "for",
+            "with",
+            "customer",
+            "collection",
+            "agent",
+            "call",
+            "context",
+            "details",
+            "outcome",
+            "finalize",
+        }
+        return {token for token in tokens if token and token not in stop}
+
+    def _tool_matches_node(self, *, node_id: str, node_label: str, observed_tool: str) -> bool:
+        tool_tokens = self._tokenize(observed_tool)
+        if not tool_tokens:
+            return False
+        node_tokens = self._tokenize(node_id) | self._tokenize(node_label)
+        if not node_tokens:
+            return False
+        return bool(tool_tokens.intersection(node_tokens))
+
+    def _can_accept_done_marker(
+        self,
+        *,
+        plan: dict[str, Any],
+        node_id: str,
+        user_input: str,
+        observed_tool: str,
+        observed_output: dict[str, Any],
+    ) -> bool:
+        owner = self._node_owner(plan=plan, node_id=node_id)
+        if node_id == str(plan.get("root_node_id", "open_and_context")).strip():
+            return True
+        if node_id == "verify_identity":
+            # Identity can only be completed after an explicit successful
+            # verification tool result.
+            if observed_tool != "customer_verify":
+                return False
+            verify_status = str(observed_output.get("status", "")).strip().lower()
+            return verify_status == "verified"
+        if observed_tool:
+            tool_status = str(observed_output.get("status", "")).strip().lower()
+            if tool_status in {"failed", "locked", "error", "rejected", "denied", "invalid"}:
+                return False
+            owner = self._node_owner(plan=plan, node_id=node_id)
+            if owner in {"customer", "borrower"}:
+                label = self._node_label_by_id(plan=plan, node_id=node_id)
+                return self._tool_matches_node(node_id=node_id, node_label=label, observed_tool=observed_tool)
+            return True
+        lowered = user_input.lower()
+        if any(token in lowered for token in ["skip", "skipped", "defer", "later"]):
+            return True
+        if owner in {"customer", "borrower"}:
+            # Customer-owned steps must be grounded in an observed tool result.
+            return False
+        return True
+
+    def _is_node_unlocked(self, *, plan: dict[str, Any], node_id: str, markers: dict[str, Any]) -> bool:
+        parents: list[str] = []
         for edge in plan.get("edges", []):
             if not isinstance(edge, dict):
                 continue
             src = str(edge.get("from", "")).strip()
             dst = str(edge.get("to", "")).strip()
-            if src in node_map and dst in node_map:
-                reverse_adj[dst].add(src)
-
-        ancestors: set[str] = set()
-        queue: list[str] = [current_node_id]
-        while queue:
-            nid = queue.pop(0)
-            for parent in reverse_adj.get(nid, set()):
-                if parent in ancestors:
-                    continue
-                ancestors.add(parent)
-                queue.append(parent)
-
-        for node_id, node in node_map.items():
-            if node_id == current_node_id:
-                node["status"] = "in_progress"
-                node["owner"] = "collection_agent" if response_target == "self" else node.get("owner", "customer")
-                continue
-            prior_status = str(node.get("status", "")).strip().lower()
-            if prior_status in {"blocked", "skipped"}:
-                continue
-            if node_id in ancestors:
-                node["status"] = "done"
-            else:
-                node["status"] = "pending"
+            if dst == node_id and src:
+                parents.append(src)
+        if not parents:
+            return True
+        for parent_id in parents:
+            parent_state = self._marker_state(markers=markers, node_id=parent_id)
+            if parent_state not in {"done", "skipped"}:
+                return False
+        return True
 
     def _prune_disconnected_nodes(self, *, plan: dict[str, Any], keep_ids: set[str]) -> None:
         nodes = [node for node in plan.get("nodes", []) if isinstance(node, dict)]
@@ -847,14 +1132,16 @@ class PlanProposalNode(BaseGraphNode):
     @staticmethod
     def _next_nodes_from_edges(*, nodes: list[Any], current_node_id: str) -> list[str]:
         next_nodes: list[str] = []
+        seen: set[str] = set()
         for edge in nodes:
             if not isinstance(edge, dict):
                 continue
             if str(edge.get("from", "")) != current_node_id:
                 continue
             to = str(edge.get("to", "")).strip()
-            if to:
+            if to and to not in seen:
                 next_nodes.append(to)
+                seen.add(to)
         return next_nodes
 
     @staticmethod

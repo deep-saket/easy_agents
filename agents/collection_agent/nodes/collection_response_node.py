@@ -52,6 +52,25 @@ class CollectionResponseNode(ResponseNode):
         return target
 
     def _render_from_proposal(self, *, state: AgentState, proposal: dict[str, Any]) -> str:
+        memory = state.get("memory")
+        memory_state = dict(getattr(memory, "state", {})) if memory is not None else {}
+        response_target = str(proposal.get("target", state.get("response_target", "customer"))).strip().lower() or "customer"
+        conversation_plan = (
+            proposal.get("conversation_plan")
+            if isinstance(proposal.get("conversation_plan"), dict)
+            else (state.get("conversation_plan") if isinstance(state.get("conversation_plan"), dict) else {})
+        )
+        facts = self._resolve_case_facts(state=state, proposal=proposal)
+        verification_guard = self._build_verification_guard_response(
+            state=state,
+            memory_state=memory_state,
+            response_target=response_target,
+            conversation_plan=conversation_plan,
+            customer_name=str(facts.get("customer_name", "Customer")).strip() or "Customer",
+        )
+        if verification_guard:
+            return verification_guard
+
         if self.llm is not None:
             llm_response = self._llm_render_from_proposal(state=state, proposal=proposal)
             if llm_response:
@@ -129,6 +148,57 @@ class CollectionResponseNode(ResponseNode):
             overdue_amount=overdue_amount,
             is_opening_turn=is_opening_turn,
             ensure_intro=bool(is_opening_turn and response_target == "customer"),
+        )
+
+    def _build_verification_guard_response(
+        self,
+        *,
+        state: AgentState,
+        memory_state: dict[str, Any],
+        response_target: str,
+        conversation_plan: dict[str, Any],
+        customer_name: str,
+    ) -> str | None:
+        if response_target != "customer":
+            return None
+        current_node_id = str(conversation_plan.get("current_node_id", "")).strip()
+        if current_node_id != "verify_identity":
+            return None
+        if bool(memory_state.get("identity_verified", False)):
+            return None
+
+        collected = memory_state.get("verification_collected") if isinstance(memory_state.get("verification_collected"), dict) else {}
+        required = memory_state.get("active_verification_required_fields")
+        required_fields = [str(x).strip() for x in required if str(x).strip()] if isinstance(required, list) else []
+
+        missing_labels: list[str] = []
+        name_confirmed = bool(collected.get("name_confirmed"))
+        if not name_confirmed:
+            missing_labels.append("your full name")
+        for field in required_fields:
+            if field in {"name", "name_confirmed"}:
+                continue
+            if collected.get(field):
+                continue
+            missing_labels.append(self._verification_field_label(field))
+
+        if not missing_labels:
+            # We have raw details but not a successful verification event yet.
+            return (
+                "Thank you. I still need one successful verification check before sharing dues details. "
+                "Please confirm your date of birth and registered ZIP/pincode."
+            )
+
+        if name_confirmed:
+            prefix_name = customer_name if customer_name else "there"
+            return (
+                f"Thank you, {prefix_name}. To complete verification, please also share "
+                f"{self._join_human_list(missing_labels)}."
+            )
+
+        return (
+            "To complete verification before I explain dues, please share "
+            f"{self._join_human_list(missing_labels)}."
         )
 
     def _fallback_render_from_proposal(self, *, proposal: dict[str, Any]) -> str:
@@ -292,6 +362,27 @@ class CollectionResponseNode(ResponseNode):
             f"{normalized}. "
             "Please confirm your preferred next step."
         )
+
+    @staticmethod
+    def _verification_field_label(field_name: str) -> str:
+        key = str(field_name).strip().lower()
+        mapping = {
+            "dob": "your date of birth (YYYY-MM-DD)",
+            "last4_pan": "the last 4 characters of your PAN",
+            "zip": "your registered ZIP/pincode",
+        }
+        return mapping.get(key, key.replace("_", " "))
+
+    @staticmethod
+    def _join_human_list(items: list[str]) -> str:
+        values = [str(item).strip() for item in items if str(item).strip()]
+        if not values:
+            return "the required verification details"
+        if len(values) == 1:
+            return values[0]
+        if len(values) == 2:
+            return f"{values[0]} and {values[1]}"
+        return f"{', '.join(values[:-1])}, and {values[-1]}"
 
     @staticmethod
     def _resolve_plan_node_label(conversation_plan: dict[str, Any], node_id: str) -> str:

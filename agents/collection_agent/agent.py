@@ -46,6 +46,7 @@ from src.nodes.react_node import ReactNode
 from src.nodes.tool_execution_node import ToolExecutionNode
 from src.nodes.types import AgentState
 from src.platform_logging.tracing import ExecutionTrace, emit_trace_event, trace_node, trace_turn
+from src.schemas.messages import ConversationMessage
 from src.tools.executor import ToolExecutor
 from src.tools.registry import ToolRegistry
 
@@ -587,6 +588,7 @@ class CollectionAgent(BaseAgent):
                 "Deterministic classification fallback is disabled."
             )
         session_key = session_id or "collection-demo-session"
+        sender_norm = str(sender).strip().lower() or "customer"
         session_lock = self._get_session_lock(session_key)
         session_lock.acquire()
         try:
@@ -597,7 +599,16 @@ class CollectionAgent(BaseAgent):
             if admin_state is not None:
                 return admin_state
             turn_index = int(memory.state.get("turn_index", 0))
+            if self._should_log_customer_input(user_input=user_input, sender=sender_norm):
+                self.repository.add_conversation_message(
+                    ConversationMessage(
+                        session_id=session_key,
+                        role=sender_norm,
+                        content=user_input.strip(),
+                    )
+                )
             self._sync_user_and_memory_context(memory=memory, user_input=user_input)
+            self._capture_verification_evidence(memory=memory, user_input=user_input)
             user_id = str(memory.state.get("active_user_id", "")).strip()
             case_id = str(memory.state.get("active_case_id", "COLL-1001")).strip()
             channel = str(memory.state.get("active_channel", "sms")).strip()
@@ -630,6 +641,7 @@ class CollectionAgent(BaseAgent):
                         }
                     )
                     state = self._finalize_output_state(state)
+                    self._apply_post_turn_verification_state(memory=memory, state=state)
                     memory_updates: dict[str, Any] = {
                         "turn_index": turn_index + 1,
                         "last_user_input": user_input,
@@ -639,6 +651,16 @@ class CollectionAgent(BaseAgent):
                     if isinstance(state.get("conversation_plan"), dict):
                         memory_updates["active_conversation_plan"] = dict(state["conversation_plan"])
                     memory.set_state(**memory_updates)
+                    if str(state.get("response_target", "customer")).strip().lower() == "customer":
+                        response_text = str(state.get("response", "")).strip()
+                        if response_text:
+                            self.repository.add_conversation_message(
+                                ConversationMessage(
+                                    session_id=session_key,
+                                    role="agent",
+                                    content=response_text,
+                                )
+                            )
                     trace.finish(status="completed")
             except Exception as exc:
                 trace.finish(status="failed", error=str(exc))
@@ -654,6 +676,20 @@ class CollectionAgent(BaseAgent):
     def run(self, user_input: str, session_id: str | None = None, sender: str = "customer") -> str:
         state = self.run_turn(user_input=user_input, session_id=session_id, sender=sender)
         return str(state.get("response", "No response generated."))
+
+    @staticmethod
+    def _should_log_customer_input(*, user_input: str, sender: str) -> bool:
+        if sender in {"self", "system"}:
+            return False
+        text = str(user_input).strip()
+        if not text:
+            return False
+        lowered = text.lower()
+        if lowered.startswith("system loop guard") or lowered.startswith("system hard loop guard"):
+            return False
+        if lowered.startswith("start outbound collections call now."):
+            return False
+        return True
 
     def _finalize_output_state(self, state: AgentState) -> AgentState:
         """Guarantees output contract keys for downstream orchestration."""
@@ -713,6 +749,8 @@ class CollectionAgent(BaseAgent):
             agent_loop_blocked=False,
             agent_loop_count=0,
             active_conversation_plan={},
+            identity_verified=False,
+            verification_collected={},
             last_admin_message=user_input,
         )
         self._hydrate_case_context(memory=memory)
@@ -806,12 +844,14 @@ class CollectionAgent(BaseAgent):
         if customer_id:
             customer_row = self.data_store.get_customer(customer_id)
             if isinstance(customer_row, dict):
+                challenge = customer_row.get("challenge") if isinstance(customer_row.get("challenge"), dict) else {}
                 memory.set_state(
                     active_customer_name=str(customer_row.get("name", memory_state.get("active_customer_name", "Customer")))
                     .strip()
                     or "Customer",
                     active_customer_phone=str(customer_row.get("phone", "")).strip(),
                     active_customer_email=str(customer_row.get("email", "")).strip(),
+                    active_verification_required_fields=sorted(str(key).strip() for key in challenge.keys() if str(key).strip()),
                 )
 
     def _resolve_user_id(self, *, memory_state: dict[str, Any], user_input: str) -> str | None:
@@ -838,6 +878,76 @@ class CollectionAgent(BaseAgent):
                 lock = threading.Lock()
                 self._session_locks[session_key] = lock
         return lock
+
+    def _capture_verification_evidence(self, *, memory: Any, user_input: str) -> None:
+        text = str(user_input or "").strip()
+        if not text:
+            return
+        memory_state = dict(getattr(memory, "state", {}))
+        collected = dict(memory_state.get("verification_collected", {}))
+        lowered = text.lower()
+
+        name_match = re.search(r"\b(?:my name is|i am|this is)\s+([a-zA-Z][a-zA-Z\s'.-]{1,80})", text, re.IGNORECASE)
+        if name_match:
+            collected["name"] = re.sub(r"\s+", " ", name_match.group(1)).strip()
+
+        dob_match = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", text)
+        if dob_match:
+            collected["dob"] = dob_match.group(1)
+
+        zip_match = re.search(r"\b(?:zip|pincode|pin)\s*[:\-]?\s*(\d{6})\b", lowered)
+        if zip_match:
+            collected["zip"] = zip_match.group(1)
+
+        pan_last4_match = re.search(
+            r"\b(?:last\s*4|last\s*four|ending)\b[^a-zA-Z0-9]{0,10}([a-zA-Z0-9]{4})\b",
+            text,
+            re.IGNORECASE,
+        )
+        if pan_last4_match:
+            collected["last4_pan"] = pan_last4_match.group(1).upper()
+        else:
+            standalone_4 = re.fullmatch(r"[a-zA-Z0-9]{4}", text.replace(" ", ""))
+            if standalone_4:
+                collected["last4_pan"] = standalone_4.group(0).upper()
+
+        active_name = str(memory_state.get("active_customer_name", "")).strip().lower()
+        provided_name = str(collected.get("name", "")).strip().lower()
+        if active_name and provided_name and active_name == provided_name:
+            collected["name_confirmed"] = True
+
+        if collected != dict(memory_state.get("verification_collected", {})):
+            memory.set_state(verification_collected=collected)
+
+    def _apply_post_turn_verification_state(self, *, memory: Any, state: AgentState) -> None:
+        observation = state.get("observation")
+        if not isinstance(observation, dict):
+            return
+        tool_phase = observation.get("tool_phase") if isinstance(observation.get("tool_phase"), dict) else observation
+        if not isinstance(tool_phase, dict):
+            return
+        if str(tool_phase.get("tool_name", "")).strip() != "customer_verify":
+            return
+
+        output = tool_phase.get("output") if isinstance(tool_phase.get("output"), dict) else {}
+        status = str(output.get("status", "")).strip().lower()
+        required_fields_raw = output.get("required_fields")
+        required_fields = (
+            [str(x).strip() for x in required_fields_raw if str(x).strip()]
+            if isinstance(required_fields_raw, list)
+            else []
+        )
+        updates: dict[str, Any] = {}
+        if required_fields:
+            updates["active_verification_required_fields"] = sorted(set(required_fields))
+        if status == "verified":
+            updates["identity_verified"] = True
+        elif status in {"failed", "locked"}:
+            updates["identity_verified"] = False
+            if isinstance(output.get("failed_attempts"), int):
+                updates["verification_failed_attempts"] = int(output["failed_attempts"])
+        if updates:
+            memory.set_state(**updates)
 
     @staticmethod
     def _phase_for_node(node_name: str) -> str:

@@ -36,11 +36,14 @@ intent:
     }
     Use:
     - intent=relevant for collections, loan dues, EMI, payment, repayment plans, verification, hardship/waiver/restructure, case status, follow-up.
+    - In an active collections session, treat identity or verification replies (for example name/account confirmation) as relevant even if they do not mention collections keywords.
+    - If the previous agent message asked for verification or payment details, short replies from the customer are still relevant.
     - intent=irrelevant for all other domains.
     - intent=empty when the input has no meaningful text.
   relevance_user_prompt: |
     User input: {user_input}
     Intent labels: {intent_labels}
+    Use the attached conversation context block to judge relevance in-session.
     Return strict JSON only.
   pre_plan_system_prompt: |
     You are a routing classifier for a collections agent.
