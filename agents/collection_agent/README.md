@@ -11,6 +11,44 @@ Main customer-facing collections agent.
   - optional `additional_targets` (for example `collection_memory_helper_agent`)
 - Outer orchestration loop in `main.py` decides who gets that response next.
 
+## Collection Graph State Contract
+
+Collection agent now uses a dedicated state schema (`agents/collection_agent/state.py`) layered on top of the shared framework state.
+
+### Collection-specific keys
+
+| Key | Purpose | First writer |
+| --- | --- | --- |
+| `user_id` | Active customer id for this turn | `CollectionAgent.run_turn` |
+| `case_id` | Active case id for this turn | `CollectionAgent.run_turn` |
+| `channel` | Active communication channel | `CollectionAgent.run_turn` |
+| `relevance_intent` | Output of relevance gate | `relevance_intent` node |
+| `pre_plan_intent` | Output of pre-plan router | `pre_plan_intent` node |
+| `execution_path_intent` | Output of execution path router | `execution_path_intent` node |
+| `post_memory_plan_intent` | Output of post-memory router | `post_memory_plan_intent` node |
+| `node_history` | Per-turn node traversal list | wrapper in `CollectionAgent._wrap_node` |
+| `previous_node` | Last executed node before current node | wrapper in `CollectionAgent._wrap_node` |
+| `next_node` | Routed next node (or possible next nodes if route unresolved) | wrapper in `CollectionAgent._wrap_node` |
+| `conversation_phase` | Current processing phase label | wrapper in `CollectionAgent._wrap_node` |
+| `tool_errors` | Structured tool failure records | reserved (future hardening) |
+| `response_metadata` | Extra response controls/labels | reserved (future hardening) |
+
+### Cross-node update ownership (active today)
+
+| State key(s) | Updated by |
+| --- | --- |
+| `relevance_intent`, `intent` | `relevance_intent` node (`CollectionIntentNode`) |
+| `pre_plan_intent`, `intent` | `pre_plan_intent` node (`CollectionIntentNode`) |
+| `execution_path_intent`, `intent` | `execution_path_intent` node (`CollectionIntentNode`) |
+| `post_memory_plan_intent`, `intent` | `post_memory_plan_intent` node (`CollectionIntentNode`) |
+| `memory_context`, `memory_retrievals` | `memory_retrieve` node |
+| `decision`, `steps` | `react` node |
+| `observation` | `tool_execution` node, then merged in `reflect` |
+| `route`, `response_target`, `handoff_payload`, `additional_targets`, `memory_helper_trigger` | `plan_proposal` node |
+| `reflection_feedback`, `reflection_complete` | `reflect` node |
+| `response`, `response_target` normalization | `relevant_response` / `irrelevant_response` nodes |
+| `node_history`, `previous_node`, `next_node`, `conversation_phase` | Node wrapper in `CollectionAgent._wrap_node` |
+
 ## Graph (single-pass)
 
 ```mermaid

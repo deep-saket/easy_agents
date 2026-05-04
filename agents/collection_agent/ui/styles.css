@@ -169,10 +169,107 @@ button {
 
 .demo-user-actions {
   margin-top: 0.45rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
 }
 
 .demo-user-actions button {
   width: 100%;
+}
+
+.call-panel {
+  margin-bottom: 1rem;
+}
+
+.call-help {
+  margin: 0 0 0.55rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.call-status-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--muted);
+  margin-bottom: 0.55rem;
+}
+
+.call-pulse {
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  background: #7d8795;
+  box-shadow: 0 0 0 0 rgba(125, 135, 149, 0.42);
+}
+
+.call-pulse.active {
+  background: #0d8a52;
+  animation: pulseCall 1.2s infinite;
+}
+
+.call-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.7rem;
+}
+
+.call-open-link {
+  display: inline-block;
+  padding: 0.55rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  text-decoration: none;
+}
+
+.call-open-link.disabled {
+  pointer-events: none;
+  opacity: 0.45;
+}
+
+.call-transcript-wrap h3 {
+  margin: 0 0 0.45rem;
+}
+
+.call-transcript {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #0e1725;
+  color: #d7e4fb;
+  padding: 0.65rem;
+  font-family: "IBM Plex Mono", "Consolas", monospace;
+  font-size: 0.82rem;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.call-line {
+  margin: 0 0 0.35rem;
+  white-space: pre-wrap;
+}
+
+.call-line.customer {
+  color: #ffd59a;
+}
+
+.call-line.agent {
+  color: #b7f7d3;
+}
+
+@keyframes pulseCall {
+  0% {
+    box-shadow: 0 0 0 0 rgba(13, 138, 82, 0.42);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(13, 138, 82, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(13, 138, 82, 0);
+  }
 }
 
 .panel h2,

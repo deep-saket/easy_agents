@@ -22,5 +22,21 @@
     "to_channel": "voice",
     "reason": "customer_requested",
     "carried_context_summary": "sms:not_reached"
+  },
+  {
+    "switch_id": "CHSW-CC8A2A644F",
+    "case_id": "COLL-1001",
+    "from_channel": "sms",
+    "to_channel": "voice",
+    "reason": "customer_requested",
+    "carried_context_summary": "sms:not_reached; sms:not_reached"
+  },
+  {
+    "switch_id": "CHSW-CE2D6BD5B9",
+    "case_id": "COLL-1001",
+    "from_channel": "sms",
+    "to_channel": "voice",
+    "reason": "customer_requested",
+    "carried_context_summary": "sms:not_reached; sms:not_reached"
   }
 ]

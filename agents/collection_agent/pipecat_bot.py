@@ -19,7 +19,7 @@ from agents.collection_agent.tools.data_store import CollectionDataStore
 from agents.collection_memory_helper_agent.agent import CollectionMemoryHelperAgent
 from agents.collection_memory_helper_agent.repository import CollectionMemoryRepository
 from agents.discount_planning_agent.agent import DiscountPlanningAgent
-from src.interfaces import PipecatRunnerConfig, build_runner_bot, build_transport_params, run_pipecat_main
+from src.interfaces import PipecatRunnerConfig, build_runner_bot, run_pipecat_main
 
 BASE_DIR = Path(__file__).resolve().parent
 CONFIG_PATH = BASE_DIR / "config.yml"
@@ -54,6 +54,7 @@ class CollectionVoiceOrchestrator:
             initial_input=text,
             soft_cap=self._soft_cap,
             hard_cap=self._hard_cap,
+            timeout_seconds=20.0,
             trace_readable=False,
         )
 
@@ -107,8 +108,8 @@ async def _run_bot(transport: Any, runner_args: Any) -> None:
     from pipecat.pipeline.runner import PipelineRunner
     from pipecat.pipeline.task import PipelineParams, PipelineTask
     from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
-    from pipecat.services.openai.stt import OpenAISTTService
-    from pipecat.services.openai.tts import OpenAITTSService
+    from pipecat.services.nvidia.stt import NvidiaSTTService
+    from pipecat.services.nvidia.tts import NvidiaTTSService
 
     orchestrator, runtime_cfg, config = _build_runtime()
 
@@ -137,22 +138,23 @@ async def _run_bot(transport: Any, runner_args: Any) -> None:
 
             await self.push_frame(frame, direction)
 
-    openai_api_key = os.getenv("OPENAI_API_KEY")
-    if not openai_api_key:
-        raise ValueError("OPENAI_API_KEY is required for Pipecat Collection bot.")
+    nvidia_api_key = os.getenv("NVIDIA_API_KEY", "").strip()
+    if not nvidia_api_key:
+        raise ValueError("NVIDIA_API_KEY is required for Pipecat Collection bot.")
 
-    stt_model = str((config.get("voice_runtime") or {}).get("stt_model", "gpt-4o-mini-transcribe"))
-    tts_model = str((config.get("voice_runtime") or {}).get("tts_model", "gpt-4o-mini-tts"))
-    tts_voice = str((config.get("voice_runtime") or {}).get("tts_voice", "alloy"))
-
-    stt = OpenAISTTService(api_key=openai_api_key, model=stt_model)
-    tts = OpenAITTSService(api_key=openai_api_key, model=tts_model, voice=tts_voice)
+    stt = NvidiaSTTService(api_key=nvidia_api_key)
+    tts = NvidiaTTSService(api_key=nvidia_api_key)
 
     runner_body = getattr(runner_args, "body", None)
+    env_session_id = str(os.getenv("COLLECTION_VOICE_SESSION_ID", "")).strip()
     if isinstance(runner_body, dict):
-        session_id = str(runner_body.get("session_id", "")).strip() or "voice-session"
+        session_id = str(runner_body.get("session_id", "")).strip() or env_session_id or "voice-session"
     else:
-        session_id = "voice-session"
+        session_id = env_session_id or "voice-session"
+    greeting_text = (
+        str(os.getenv("COLLECTION_VOICE_GREETING", "")).strip()
+        or "Hello. This is Alex from the collections team. How can I help you today?"
+    )
 
     pipeline = Pipeline(
         [
@@ -178,7 +180,7 @@ async def _run_bot(transport: Any, runner_args: Any) -> None:
         @transport.event_handler("on_client_connected")
         async def _on_client_connected(transport_obj: Any, client: Any) -> None:
             del transport_obj, client
-            await task.queue_frame(TTSSpeakFrame("Hello. This is the collections assistant. How can I help you today?"))
+            await task.queue_frame(TTSSpeakFrame(greeting_text))
     except Exception:
         # Some transports may not expose this callback consistently.
         pass
@@ -189,7 +191,24 @@ async def _run_bot(transport: Any, runner_args: Any) -> None:
 
 def _build_bot() -> Any:
     runtime_cfg = _load_runtime_cfg()
-    transport_params = build_transport_params(vad_enabled=runtime_cfg.vad_enabled)
+    from pipecat.transports.base_transport import TransportParams
+
+    vad_analyzer = None
+    if runtime_cfg.vad_enabled:
+        try:
+            from pipecat.audio.vad.silero import SileroVADAnalyzer
+
+            vad_analyzer = SileroVADAnalyzer()
+        except Exception:
+            vad_analyzer = None
+
+    transport_params = {
+        "webrtc": lambda: TransportParams(
+            audio_in_enabled=True,
+            audio_out_enabled=True,
+            vad_analyzer=vad_analyzer,
+        )
+    }
     return build_runner_bot(run_bot=_run_bot, transport_params=transport_params)
 
 

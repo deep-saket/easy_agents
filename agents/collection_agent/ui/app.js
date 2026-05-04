@@ -20,6 +20,11 @@ const appShell = document.getElementById("appShell");
 const sessionIdInput = document.getElementById("sessionId");
 const demoUsersEl = document.getElementById("demoUsers");
 const llmStatusEl = document.getElementById("llmStatus");
+const callPulseEl = document.getElementById("callPulse");
+const callStatusTextEl = document.getElementById("callStatusText");
+const callOpenLinkEl = document.getElementById("callOpenLink");
+const callStopButton = document.getElementById("callStopButton");
+const callTranscriptEl = document.getElementById("callTranscript");
 
 const viewState = {
   snapshots: [],
@@ -31,6 +36,10 @@ const viewState = {
   planSnapshots: [],
   planSnapshotIndex: 0,
   selectedPlanNodeId: null,
+  transcriptPoller: null,
+  liveStatePoller: null,
+  callSessionId: "",
+  callActive: false,
 };
 
 function addBubble(role, text) {
@@ -720,6 +729,220 @@ function updateLlmStatus(llmMeta) {
   llmStatusEl.textContent = `LLM status: active via ${provider} / ${model}`;
 }
 
+function setCallStatus(voiceMeta) {
+  const active = Boolean(voiceMeta && voiceMeta.active);
+  viewState.callActive = active;
+  if (callPulseEl) {
+    callPulseEl.classList.toggle("active", active);
+  }
+  if (callStatusTextEl) {
+    if (!voiceMeta) {
+      callStatusTextEl.textContent = "No active call runtime.";
+    } else if (active) {
+      callStatusTextEl.textContent = `Call runtime active | user=${voiceMeta.user_code} | session=${voiceMeta.session_id} | port=${voiceMeta.port}`;
+    } else {
+      callStatusTextEl.textContent = "No active call runtime.";
+    }
+  }
+  if (callOpenLinkEl) {
+    const url = voiceMeta && voiceMeta.client_url ? String(voiceMeta.client_url) : "";
+    if (active && url) {
+      callOpenLinkEl.href = url;
+      callOpenLinkEl.classList.remove("disabled");
+    } else {
+      callOpenLinkEl.href = "#";
+      callOpenLinkEl.classList.add("disabled");
+    }
+  }
+}
+
+function buildLiveFinalState(conversationState, sessionId) {
+  const raw = conversationState && typeof conversationState === "object" ? conversationState : {};
+  const plan = raw.active_conversation_plan && typeof raw.active_conversation_plan === "object"
+    ? raw.active_conversation_plan
+    : null;
+  return {
+    session_id: sessionId,
+    response: String(raw.last_agent_response || ""),
+    response_target: String(raw.last_response_target || "customer"),
+    conversation_phase: "voice_call_live",
+    conversation_plan: plan || undefined,
+    active_conversation_plan: plan || undefined,
+    ...raw,
+  };
+}
+
+function buildLiveHopsFromTrace(tracePayload, finalState, workingMemoryState) {
+  if (!tracePayload || typeof tracePayload !== "object") return [];
+  const summary = tracePayload.summary && typeof tracePayload.summary === "object" ? tracePayload.summary : {};
+  const nodeHistory = Array.isArray(summary.node_hits) ? summary.node_hits : [];
+  const nodes = Array.isArray(tracePayload.nodes) ? tracePayload.nodes : [];
+  const toolCalls = Array.isArray(tracePayload.tool_calls) ? tracePayload.tool_calls : [];
+  const events = [];
+  for (const node of nodes) {
+    events.push({
+      event: "node_finished",
+      node_name: String(node.node_name || "unknown"),
+      status: String(node.status || "completed"),
+      duration_ms: typeof node.duration_ms === "number" ? node.duration_ms : null,
+    });
+  }
+  for (const tool of toolCalls) {
+    events.push({
+      event: "tool_call",
+      tool_name: String(tool.tool_name || "unknown_tool"),
+      status: String(tool.status || "completed"),
+      duration_ms: typeof tool.duration_ms === "number" ? tool.duration_ms : null,
+    });
+  }
+  const thinking = [
+    `trace: ${String(tracePayload.trace_id || "-")}`,
+    `status: ${String(tracePayload.status || "unknown")}`,
+    `nodes: ${nodeHistory.join(" -> ") || "(none)"}`,
+  ];
+  return [
+    {
+      hop: 1,
+      input: String(tracePayload.user_input || ""),
+      response: String(finalState.response || ""),
+      response_target: String(finalState.response_target || "customer"),
+      elapsed_ms: null,
+      node_history: nodeHistory,
+      conversation_phase: "voice_call_live",
+      thinking,
+      events,
+      trace_summary: summary,
+      state: finalState,
+      working_memory_state: workingMemoryState || {},
+    },
+  ];
+}
+
+function renderCallTranscript(messages) {
+  if (!callTranscriptEl) return;
+  callTranscriptEl.innerHTML = "";
+  if (!Array.isArray(messages) || !messages.length) {
+    callTranscriptEl.textContent = "No transcript yet.";
+    return;
+  }
+  for (const message of messages) {
+    const role = String(message.role || "unknown");
+    const content = String(message.content || "").trim();
+    if (!content) continue;
+    const line = document.createElement("div");
+    line.className = `call-line ${role}`;
+    line.textContent = `${role}: ${content}`;
+    callTranscriptEl.appendChild(line);
+  }
+  callTranscriptEl.scrollTop = callTranscriptEl.scrollHeight;
+}
+
+async function refreshCallTranscript(sessionId) {
+  const sid = String(sessionId || "").trim();
+  if (!sid) return;
+  try {
+    const response = await fetch(`/api/session/${encodeURIComponent(sid)}/messages?limit=120`);
+    if (!response.ok) return;
+    const payload = await response.json();
+    renderCallTranscript(payload.messages || []);
+  } catch (_error) {
+    // Keep polling resilient without interrupting main UI flow.
+  }
+}
+
+function startTranscriptPolling(sessionId) {
+  const sid = String(sessionId || "").trim();
+  if (!sid) return;
+  viewState.callSessionId = sid;
+  if (viewState.transcriptPoller) {
+    window.clearInterval(viewState.transcriptPoller);
+    viewState.transcriptPoller = null;
+  }
+  refreshCallTranscript(sid);
+  viewState.transcriptPoller = window.setInterval(() => {
+    refreshCallTranscript(sid);
+  }, 1500);
+}
+
+function stopTranscriptPolling() {
+  if (viewState.transcriptPoller) {
+    window.clearInterval(viewState.transcriptPoller);
+    viewState.transcriptPoller = null;
+  }
+}
+
+function stopLiveStatePolling() {
+  if (viewState.liveStatePoller) {
+    window.clearInterval(viewState.liveStatePoller);
+    viewState.liveStatePoller = null;
+  }
+}
+
+async function refreshCallLiveState(sessionId) {
+  const sid = String(sessionId || "").trim();
+  if (!sid) return;
+  try {
+    const [sessionResponse, traceResponse] = await Promise.all([
+      fetch(`/api/session/${encodeURIComponent(sid)}`),
+      fetch(`/api/session/${encodeURIComponent(sid)}/latest-trace`),
+    ]);
+    if (!sessionResponse.ok) return;
+
+    const sessionPayload = await sessionResponse.json();
+    const tracePayload = traceResponse.ok ? await traceResponse.json() : { trace: null };
+    const finalState = buildLiveFinalState(sessionPayload.conversation_state || {}, sid);
+    const finalMemory = sessionPayload.working_memory_state || {};
+    const liveHops = buildLiveHopsFromTrace(tracePayload.trace, finalState, finalMemory);
+
+    if (liveHops.length) {
+      renderExecutionChart(liveHops);
+      renderExecutionNarrative(liveHops);
+      renderThinking(liveHops);
+      renderNodeExplorer(liveHops);
+      viewState.planSnapshots = extractPlanSnapshots(liveHops, finalState);
+    } else {
+      renderExecutionChart([]);
+      renderExecutionNarrative([]);
+      renderThinking([]);
+      renderNodeExplorer([]);
+      viewState.planSnapshots = extractPlanSnapshots([], finalState);
+    }
+    viewState.planSnapshotIndex = Math.max(0, viewState.planSnapshots.length - 1);
+    renderPlanTree();
+    renderSnapshots(liveHops, finalState, finalMemory);
+  } catch (_error) {
+    // Keep live polling resilient.
+  }
+}
+
+function startLiveStatePolling(sessionId) {
+  const sid = String(sessionId || "").trim();
+  if (!sid) return;
+  stopLiveStatePolling();
+  refreshCallLiveState(sid);
+  viewState.liveStatePoller = window.setInterval(() => {
+    refreshCallLiveState(sid);
+  }, 1500);
+}
+
+async function refreshVoiceStatus() {
+  try {
+    const response = await fetch("/api/voice/status");
+    if (!response.ok) return;
+    const payload = await response.json();
+    setCallStatus(payload);
+    if (payload && payload.active && payload.session_id) {
+      startTranscriptPolling(String(payload.session_id));
+      startLiveStatePolling(String(payload.session_id));
+    } else if (!payload || !payload.active) {
+      stopTranscriptPolling();
+      stopLiveStatePolling();
+    }
+  } catch (_error) {
+    // Ignore transient poll errors.
+  }
+}
+
 function renderTurnPayload(payload) {
   renderExecutionChart(payload.hops || []);
   renderExecutionNarrative(payload.hops || []);
@@ -882,12 +1105,15 @@ function renderDemoUsers(users) {
       <p class="demo-user-meta"><strong>PAN last4:</strong> ${customer.last4_pan}</p>
       <p class="demo-user-meta"><strong>Overdue:</strong> ${caseInfo.overdue_amount} | <strong>EMI:</strong> ${caseInfo.emi_amount}</p>
       <div class="demo-user-actions">
-        <button type="button" data-user-code="${entry.user_code}">Start As ${entry.display_name}</button>
+        <button type="button" data-action="chat" data-user-code="${entry.user_code}">Start Chat</button>
+        <button type="button" data-action="call" data-user-code="${entry.user_code}">Start Call</button>
       </div>
     `;
 
-    const button = card.querySelector("button");
-    button.addEventListener("click", () => startDemoConversation(entry));
+    const chatButton = card.querySelector("button[data-action='chat']");
+    const callButton = card.querySelector("button[data-action='call']");
+    chatButton.addEventListener("click", () => startDemoConversation(entry));
+    callButton.addEventListener("click", () => startDemoCall(entry));
     demoUsersEl.appendChild(card);
   }
 }
@@ -947,6 +1173,74 @@ async function startDemoConversation(userEntry) {
   }
 }
 
+async function startDemoCall(userEntry) {
+  const sessionId = `collection-${userEntry.user_code}`;
+  sessionIdInput.value = sessionId;
+  setBusy(true);
+
+  try {
+    const response = await fetch("/api/start-call", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_code: userEntry.user_code,
+        session_id: sessionId,
+        transport: "webrtc",
+        port: 8788,
+      }),
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || `HTTP ${response.status}`);
+    }
+    const payload = await response.json();
+    if (payload.error) throw new Error(payload.error);
+
+    addBubble(
+      "system",
+      `Started call mode for ${userEntry.display_name} | session=${sessionId}`,
+    );
+    if (payload.turn && payload.turn.final_response) {
+      addBubble("agent", String(payload.turn.final_response));
+      renderTurnPayload(payload.turn);
+    }
+
+    const voice = payload.voice || {};
+    setCallStatus(voice);
+    if (voice.active && voice.session_id) {
+      startTranscriptPolling(String(voice.session_id));
+    }
+    if (voice.client_url) {
+      addBubble("system", `Open call client: ${String(voice.client_url)}`);
+    }
+  } catch (error) {
+    addBubble("agent", `Error starting call mode: ${String(error)}`);
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function stopVoiceCall() {
+  try {
+    const response = await fetch("/api/voice/stop", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ force: false }),
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || `HTTP ${response.status}`);
+    }
+    const payload = await response.json();
+    setCallStatus(payload);
+    stopTranscriptPolling();
+    stopLiveStatePolling();
+    addBubble("system", "Stopped call runtime.");
+  } catch (error) {
+    addBubble("agent", `Error stopping call runtime: ${String(error)}`);
+  }
+}
+
 chatForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const message = messageInput.value.trim();
@@ -980,6 +1274,12 @@ if (planNextButton) {
   });
 }
 
+if (callStopButton) {
+  callStopButton.addEventListener("click", async () => {
+    await stopVoiceCall();
+  });
+}
+
 renderExecutionChart([]);
 renderExecutionNarrative([]);
 renderThinking([]);
@@ -987,3 +1287,5 @@ renderPlanTree();
 renderNodeExplorer([]);
 renderSnapshots([], {}, {});
 loadDemoUsers();
+refreshVoiceStatus();
+window.setInterval(refreshVoiceStatus, 5000);

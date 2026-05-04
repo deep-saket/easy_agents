@@ -7,7 +7,10 @@ thinking events, and graph-state snapshots.
 from __future__ import annotations
 
 import json
+import os
 import queue
+import subprocess
+import sys
 import threading
 import time
 from dataclasses import dataclass
@@ -88,6 +91,155 @@ class StartConversationRequest(BaseModel):
     hard_cap: int = Field(default=50, ge=1)
 
 
+class StartVoiceCallRequest(BaseModel):
+    """Starts Pipecat voice runtime and returns client URL for call mode."""
+
+    user_code: str = Field(min_length=1, description="One of: user_a, user_b, user_c")
+    session_id: str | None = Field(default=None)
+    port: int = Field(default=8788, ge=1024, le=65535)
+    transport: str = Field(default="webrtc")
+    soft_cap: int = Field(default=10, ge=1)
+    hard_cap: int = Field(default=50, ge=1)
+
+
+class StopVoiceCallRequest(BaseModel):
+    """Stops active Pipecat voice runtime for the UI."""
+
+    force: bool = Field(default=False)
+
+
+@dataclass(slots=True)
+class VoiceProcessState:
+    """Tracks active Pipecat process metadata."""
+
+    process: subprocess.Popen[Any]
+    user_code: str
+    session_id: str
+    transport: str
+    port: int
+    client_url: str
+    log_path: str
+    started_at: float
+    log_handle: Any
+
+
+class CollectionVoiceProcessManager:
+    """Starts/stops Pipecat bot process used by collection UI call mode."""
+
+    def __init__(self, *, repo_root: Path, base_dir: Path) -> None:
+        self._repo_root = repo_root
+        self._base_dir = base_dir
+        self._lock = threading.Lock()
+        self._state: VoiceProcessState | None = None
+        self._log_dir = self._base_dir / "runtime" / "voice"
+        self._log_dir.mkdir(parents=True, exist_ok=True)
+
+    def start(
+        self,
+        *,
+        user_code: str,
+        session_id: str,
+        greeting: str,
+        port: int = 8788,
+        transport: str = "webrtc",
+    ) -> dict[str, Any]:
+        with self._lock:
+            self._stop_locked(force=True)
+            safe_session = "".join(ch if ch.isalnum() or ch in {"-", "_"} else "_" for ch in session_id)
+            log_path = self._log_dir / f"pipecat_{safe_session}.log"
+            log_handle = log_path.open("a", encoding="utf-8")
+
+            env = os.environ.copy()
+            env["COLLECTION_VOICE_SESSION_ID"] = session_id
+            env["COLLECTION_VOICE_USER_CODE"] = user_code
+            env["COLLECTION_VOICE_GREETING"] = greeting
+            cmd = [
+                sys.executable,
+                "-m",
+                "agents.collection_agent.pipecat_bot",
+                "-t",
+                transport,
+                "--port",
+                str(port),
+            ]
+            process = subprocess.Popen(
+                cmd,
+                cwd=str(self._repo_root),
+                env=env,
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
+            client_url = f"http://127.0.0.1:{port}/client/"
+            self._state = VoiceProcessState(
+                process=process,
+                user_code=user_code,
+                session_id=session_id,
+                transport=transport,
+                port=port,
+                client_url=client_url,
+                log_path=str(log_path),
+                started_at=time.time(),
+                log_handle=log_handle,
+            )
+            return self._status_payload_locked()
+
+    def stop(self, *, force: bool = False) -> dict[str, Any]:
+        with self._lock:
+            self._stop_locked(force=force)
+            return self._status_payload_locked()
+
+    def status(self) -> dict[str, Any]:
+        with self._lock:
+            return self._status_payload_locked()
+
+    def _stop_locked(self, *, force: bool) -> None:
+        state = self._state
+        if state is None:
+            return
+        process = state.process
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=3.0 if force else 8.0)
+            except Exception:
+                process.kill()
+                process.wait(timeout=3.0)
+        try:
+            state.log_handle.close()
+        except Exception:
+            pass
+        self._state = None
+
+    def _status_payload_locked(self) -> dict[str, Any]:
+        state = self._state
+        if state is None:
+            return {
+                "active": False,
+                "session_id": None,
+                "user_code": None,
+                "transport": None,
+                "port": None,
+                "client_url": None,
+                "log_path": None,
+                "pid": None,
+            }
+        process = state.process
+        running = process.poll() is None
+        return {
+            "active": running,
+            "session_id": state.session_id,
+            "user_code": state.user_code,
+            "transport": state.transport,
+            "port": state.port,
+            "client_url": state.client_url,
+            "log_path": state.log_path,
+            "pid": process.pid,
+            "started_at": state.started_at,
+            "exit_code": process.poll(),
+        }
+
+
 @dataclass(slots=True)
 class CollectionDebugRuntime:
     """Owns runtime agents and executes hop-by-hop internal routing."""
@@ -99,6 +251,7 @@ class CollectionDebugRuntime:
     collection_agent: CollectionAgent
     discount_agent: DiscountPlanningAgent
     memory_helper_agent: CollectionMemoryHelperAgent
+    voice_manager: CollectionVoiceProcessManager
     demo_users: list[dict[str, Any]]
 
     @classmethod
@@ -127,6 +280,9 @@ class CollectionDebugRuntime:
         discount_agent = DiscountPlanningAgent(llm=llm)
         memory_helper_agent = CollectionMemoryHelperAgent(repository=memory_repo, llm=llm)
 
+        repo_root = Path(__file__).resolve().parents[3]
+        voice_manager = CollectionVoiceProcessManager(repo_root=repo_root, base_dir=base_dir)
+
         return cls(
             base_dir=base_dir,
             config_path=config_path,
@@ -135,6 +291,7 @@ class CollectionDebugRuntime:
             collection_agent=collection_agent,
             discount_agent=discount_agent,
             memory_helper_agent=memory_helper_agent,
+            voice_manager=voice_manager,
             demo_users=demo_users,
         )
 
@@ -376,6 +533,72 @@ class CollectionDebugRuntime:
             "final_working_memory_state": self._memory_state(session_id=session_id),
             "llm": self._llm_meta(),
         }
+
+    def start_voice_call(self, request: StartVoiceCallRequest) -> dict[str, Any]:
+        user_code = request.user_code.strip().lower()
+        matched = next((item for item in self.demo_users if item.get("user_code") == user_code), None)
+        if matched is None:
+            raise ValueError(f"Unknown user_code={user_code}. Use one of: user_a, user_b, user_c")
+        requested_session = request.session_id.strip() if isinstance(request.session_id, str) else ""
+        session_id = requested_session or f"collection-{user_code}"
+
+        start_payload = self.start_conversation(
+            StartConversationRequest(
+                user_code=user_code,
+                session_id=session_id,
+                soft_cap=request.soft_cap,
+                hard_cap=request.hard_cap,
+            )
+        )
+        opener = str(((start_payload.get("turn") or {}).get("final_response")) or "").strip()
+        greeting = opener or "Hello. This is Alex from the collections team. How can I help you today?"
+        voice = self.voice_manager.start(
+            user_code=user_code,
+            session_id=session_id,
+            greeting=greeting,
+            port=int(request.port),
+            transport=str(request.transport).strip().lower() or "webrtc",
+        )
+        return {
+            "session_id": session_id,
+            "user": _json_safe(matched),
+            "turn": start_payload.get("turn"),
+            "voice": voice,
+        }
+
+    def stop_voice_call(self, *, force: bool = False) -> dict[str, Any]:
+        return self.voice_manager.stop(force=force)
+
+    def voice_status(self) -> dict[str, Any]:
+        return self.voice_manager.status()
+
+    def conversation_messages(self, session_id: str, *, limit: int = 120) -> list[dict[str, Any]]:
+        sid = session_id.strip() or "collection-ui-session"
+        safe_limit = max(1, int(limit))
+        messages = self.collection_agent.repository.list_conversation_messages(sid)
+        window = messages[-safe_limit:]
+        return [_json_safe(message.model_dump(mode="json")) for message in window]
+
+    def latest_trace_for_session(self, session_id: str) -> dict[str, Any] | None:
+        sid = session_id.strip()
+        if not sid:
+            return None
+        trace_dir = self.base_dir / "runtime" / "traces"
+        if not trace_dir.exists():
+            return None
+
+        candidates = sorted(trace_dir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+        for path in candidates[:300]:
+            if path.name == "latest_trace.json":
+                continue
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            if str(payload.get("session_id", "")).strip() != sid:
+                continue
+            return _json_safe(payload)
+        return None
 
     def run_turn_stream(self, request: RunTurnRequest) -> StreamingResponse:
         sentinel = object()
@@ -634,6 +857,35 @@ def create_router(runtime: CollectionDebugRuntime) -> APIRouter:
         except ValueError as exc:
             return {"error": str(exc), "users": runtime.list_demo_users()}
 
+    @router.post("/start-call")
+    async def start_call(body: StartVoiceCallRequest) -> dict[str, Any]:
+        try:
+            return runtime.start_voice_call(body)
+        except ValueError as exc:
+            return {"error": str(exc), "users": runtime.list_demo_users()}
+
+    @router.get("/voice/status")
+    async def voice_status() -> dict[str, Any]:
+        return runtime.voice_status()
+
+    @router.post("/voice/stop")
+    async def stop_voice(body: StopVoiceCallRequest) -> dict[str, Any]:
+        return runtime.stop_voice_call(force=bool(body.force))
+
+    @router.get("/session/{session_id}/messages")
+    async def session_messages(session_id: str, limit: int = 120) -> dict[str, Any]:
+        return {
+            "session_id": session_id,
+            "messages": runtime.conversation_messages(session_id=session_id, limit=limit),
+        }
+
+    @router.get("/session/{session_id}/latest-trace")
+    async def session_latest_trace(session_id: str) -> dict[str, Any]:
+        return {
+            "session_id": session_id,
+            "trace": runtime.latest_trace_for_session(session_id=session_id),
+        }
+
     return router
 
 
@@ -652,6 +904,10 @@ def create_app(base_dir: Path | None = None) -> FastAPI:
     @app.get("/health")
     async def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.on_event("shutdown")
+    async def _shutdown_voice_runtime() -> None:
+        runtime.stop_voice_call(force=True)
 
     return app
 

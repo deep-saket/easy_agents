@@ -433,7 +433,8 @@ class PlanProposalNode(BaseGraphNode):
             "Produce strict JSON only. "
             "Output should propose/update a branching conversation plan tree and choose the current/next node. "
             "Allowed `target`: customer or self. "
-            "No placeholders. Keep plan_outline concise and action-oriented."
+            "No placeholders. Keep plan_outline concise and action-oriented. "
+            "Never advance identity verification steps without verification evidence."
         )
         user_prompt = (
             f"User input: {user_input}\n"
@@ -445,6 +446,7 @@ class PlanProposalNode(BaseGraphNode):
             f"Observation tool: {obs_tool}\n"
             f"Observation output JSON: {json.dumps(obs_output, ensure_ascii=True, default=str)}\n"
             f"Customer context JSON: {json.dumps({'case_id': str(memory_state.get('active_case_id', 'COLL-1001')), 'customer_name': str(memory_state.get('active_customer_name', 'Customer')).strip() or 'Customer', 'overdue_amount': float(memory_state.get('active_overdue_amount', 0.0) or 0.0)}, ensure_ascii=True)}\n"
+            f"Verification context JSON: {json.dumps({'identity_verified': bool(memory_state.get('identity_verified', False)), 'verification_collected': memory_state.get('verification_collected', {}), 'required_fields': memory_state.get('active_verification_required_fields', [])}, ensure_ascii=True, default=str)}\n"
             "Return JSON with keys:\n"
             "- target: customer|self\n"
             "- intent: short snake_case intent\n"
@@ -459,7 +461,9 @@ class PlanProposalNode(BaseGraphNode):
             "Critical marker rules:\n"
             "- Each node advances only when predecessor node markers are done or skipped.\n"
             "- Before selecting a child node, mark the current node done or skipped explicitly.\n"
-            "- Use mark_blocked when a node cannot proceed and requires retry or alternate path."
+            "- Use mark_blocked when a node cannot proceed and requires retry or alternate path.\n"
+            "- If current/next step is verify_identity and identity_verified=false, do not mark verify_identity done.\n"
+            "- During verification stage, plan should request only missing verification fields, not full reset."
         )
         try:
             payload = StructuredOutputRunner(self.llm, max_retries=2).run(
@@ -582,6 +586,7 @@ class PlanProposalNode(BaseGraphNode):
             user_input=user_input,
             observed_tool=observed_tool,
             observed_output=(observed_output if isinstance(observed_output, dict) else {}),
+            memory_identity_verified=bool(memory_state.get("identity_verified", False)),
         )
         markers = self._init_or_reconcile_step_markers(plan=plan)
         next_current = self._resolve_next_current_node(
@@ -902,6 +907,7 @@ class PlanProposalNode(BaseGraphNode):
         user_input: str,
         observed_tool: str,
         observed_output: dict[str, Any],
+        memory_identity_verified: bool,
     ) -> None:
         markers = plan.get("step_markers") if isinstance(plan.get("step_markers"), dict) else {}
         now = datetime.now(UTC).isoformat()
@@ -929,12 +935,18 @@ class PlanProposalNode(BaseGraphNode):
                 user_input=user_input,
                 observed_tool=observed_tool,
                 observed_output=observed_output,
+                memory_identity_verified=memory_identity_verified,
             ):
                 set_state(node_id, "done", "mark_done")
         for node_id in sorted(mark_skipped):
             set_state(node_id, "skipped", "mark_skipped")
         for node_id in sorted(mark_blocked):
             set_state(node_id, "blocked", "mark_blocked")
+
+        if memory_identity_verified:
+            # Deterministic safety: if identity is already verified in memory state,
+            # keep the marker aligned even when the model omits mark_done.
+            set_state("verify_identity", "done", "memory_identity_verified")
 
         if (
             previous_current
@@ -1009,13 +1021,16 @@ class PlanProposalNode(BaseGraphNode):
         user_input: str,
         observed_tool: str,
         observed_output: dict[str, Any],
+        memory_identity_verified: bool,
     ) -> bool:
         owner = self._node_owner(plan=plan, node_id=node_id)
         if node_id == str(plan.get("root_node_id", "open_and_context")).strip():
             return True
         if node_id == "verify_identity":
             # Identity can only be completed after an explicit successful
-            # verification tool result.
+            # verification state.
+            if memory_identity_verified:
+                return True
             if observed_tool != "customer_verify":
                 return False
             verify_status = str(observed_output.get("status", "")).strip().lower()

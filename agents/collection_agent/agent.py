@@ -609,6 +609,7 @@ class CollectionAgent(BaseAgent):
                 )
             self._sync_user_and_memory_context(memory=memory, user_input=user_input)
             self._capture_verification_evidence(memory=memory, user_input=user_input)
+            self._reconcile_verification_from_collected(memory=memory)
             user_id = str(memory.state.get("active_user_id", "")).strip()
             case_id = str(memory.state.get("active_case_id", "COLL-1001")).strip()
             channel = str(memory.state.get("active_channel", "sms")).strip()
@@ -895,12 +896,16 @@ class CollectionAgent(BaseAgent):
         if dob_match:
             collected["dob"] = dob_match.group(1)
 
-        zip_match = re.search(r"\b(?:zip|pincode|pin)\s*[:\-]?\s*(\d{6})\b", lowered)
+        zip_match = re.search(
+            r"\b(?:zip(?:\s*code)?|pincode|pin(?:\s*code)?)\b[\s:,\-]*(?:is\s+)?(\d{6})\b",
+            lowered,
+            re.IGNORECASE,
+        )
         if zip_match:
             collected["zip"] = zip_match.group(1)
 
         pan_last4_match = re.search(
-            r"\b(?:last\s*4|last\s*four|ending)\b[^a-zA-Z0-9]{0,10}([a-zA-Z0-9]{4})\b",
+            r"\b(?:last\s*4|last\s*four|ending)\b.{0,30}?\b([a-zA-Z0-9]{4})\b",
             text,
             re.IGNORECASE,
         )
@@ -918,6 +923,48 @@ class CollectionAgent(BaseAgent):
 
         if collected != dict(memory_state.get("verification_collected", {})):
             memory.set_state(verification_collected=collected)
+
+    def _reconcile_verification_from_collected(self, *, memory: Any) -> None:
+        memory_state = dict(getattr(memory, "state", {}))
+        customer_id = str(memory_state.get("active_user_id", "")).strip()
+        if not customer_id:
+            return
+        customer_row = self.data_store.get_customer(customer_id)
+        if not isinstance(customer_row, dict):
+            return
+        challenge = customer_row.get("challenge") if isinstance(customer_row.get("challenge"), dict) else {}
+        if not challenge:
+            return
+
+        collected = (
+            dict(memory_state.get("verification_collected", {}))
+            if isinstance(memory_state.get("verification_collected"), dict)
+            else {}
+        )
+        required_fields = sorted(str(key).strip() for key in challenge.keys() if str(key).strip())
+        updates: dict[str, Any] = {"active_verification_required_fields": required_fields}
+
+        expected_name = str(customer_row.get("name", "")).strip().lower()
+        provided_name = str(collected.get("name", "")).strip().lower()
+        if expected_name and provided_name and expected_name == provided_name:
+            collected["name_confirmed"] = True
+        elif provided_name:
+            collected["name_confirmed"] = False
+
+        missing_required = [field for field in required_fields if not str(collected.get(field, "")).strip()]
+        if missing_required:
+            updates["identity_verified"] = False
+            updates["verification_collected"] = collected
+            memory.set_state(**updates)
+            return
+
+        expected = {key: str(value).strip().lower() for key, value in challenge.items()}
+        provided = {key: str(collected.get(key, "")).strip().lower() for key in expected}
+        matched = all(provided.get(key) == expected.get(key) for key in expected)
+        updates["identity_verified"] = bool(matched)
+        updates["verification_collected"] = collected
+        updates["verification_last_status"] = "verified" if matched else "failed"
+        memory.set_state(**updates)
 
     def _apply_post_turn_verification_state(self, *, memory: Any, state: AgentState) -> None:
         observation = state.get("observation")

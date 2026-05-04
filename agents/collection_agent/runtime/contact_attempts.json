@@ -16,5 +16,14 @@
     "status": "not_reached",
     "notes": null,
     "created_at": "2026-04-30T21:15:10.697817+00:00"
+  },
+  {
+    "attempt_id": "ATT-70959F21A4",
+    "case_id": "COLL-1001",
+    "channel": "voice",
+    "template_id": null,
+    "status": "reached",
+    "notes": null,
+    "created_at": "2026-05-01T17:17:04.925014+00:00"
   }
 ]

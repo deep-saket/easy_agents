@@ -26,6 +26,23 @@
           <div id="demoUsers" class="demo-users"></div>
         </section>
 
+        <section class="panel call-panel">
+          <h2>Call Mode</h2>
+          <p class="call-help">Call mode starts a live voice runtime for the selected demo user. Chat mode remains text-only.</p>
+          <div class="call-status-row">
+            <span id="callPulse" class="call-pulse" aria-hidden="true"></span>
+            <span id="callStatusText">No active call runtime.</span>
+          </div>
+          <div class="call-actions">
+            <a id="callOpenLink" class="call-open-link disabled" href="#" target="_blank" rel="noopener">Open Call Window</a>
+            <button type="button" id="callStopButton">Stop Voice Runtime</button>
+          </div>
+          <div class="call-transcript-wrap">
+            <h3>Call Transcript</h3>
+            <div id="callTranscript" class="call-transcript"></div>
+          </div>
+        </section>
+
         <section class="chat-section">
           <div id="chatLog" class="chat-log"></div>
           <form id="chatForm" class="chat-form">

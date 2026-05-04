@@ -14,9 +14,10 @@ llm:
   max_new_tokens: 500
   temperature: 0.1
 voice_runtime:
-  stt_model: gpt-4o-mini-transcribe
-  tts_model: gpt-4o-mini-tts
-  tts_voice: alloy
+  provider: nvidia
+  stt_model: nvidia_default
+  tts_model: nvidia_default
+  tts_voice: nvidia_default
   pipecat:
     enabled: true
     vad_enabled: true

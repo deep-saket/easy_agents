@@ -1,1 +1,18 @@
-[]
+[
+  {
+    "payment_id": "PBPH-61A9D66D13",
+    "case_id": "COLL-1001",
+    "requested_amount": 6000.0,
+    "collected_amount": 6000.0,
+    "status": "success",
+    "receipt_reference": "RCT-A6C8645C"
+  },
+  {
+    "payment_id": "PBPH-CF5A49BE5D",
+    "case_id": "COLL-1001",
+    "requested_amount": 6000.0,
+    "collected_amount": 6000.0,
+    "status": "success",
+    "receipt_reference": "RCT-747CD833"
+  }
+]

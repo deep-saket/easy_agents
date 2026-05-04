@@ -1528,5 +1528,1638 @@
     "status": "completed",
     "error": null,
     "created_at": "2026-05-01T11:50:52.817858Z"
+  },
+  {
+    "id": "924ea78d-cc96-48e1-a75f-c7d178a7eba5",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "amount": 1001.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1001",
+          "customer_id": "CUST-2001",
+          "loan_id": "LOAN-3001",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 47,
+          "emi_amount": 12500.0,
+          "overdue_amount": 12500.0,
+          "late_fee": 850.0,
+          "status": "open",
+          "risk_band": "medium"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-01T12:20:37.776211Z"
+  },
+  {
+    "id": "53a231f3-8f08-41d3-b074-cc5ea59365c2",
+    "tool_name": "customer_verify",
+    "input_payload": {
+      "challenge_answers": "{\"dob\":\"1991-08-19",
+      "case_id": "COLL-1001",
+      "amount": 1001.0
+    },
+    "output_payload": null,
+    "status": "failed",
+    "error": "1 validation error for CustomerVerifyInput\nchallenge_answers\n  Input should be a valid dictionary [type=dict_type, input_value='{\"dob\":\"1991-08-19', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/dict_type",
+    "created_at": "2026-05-01T12:20:37.793698Z"
+  },
+  {
+    "id": "5fce072f-6797-479b-808d-9fc3e076d597",
+    "tool_name": "channel_switch",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "amount": 1001.0,
+      "from_channel": "sms",
+      "to_channel": "voice"
+    },
+    "output_payload": {
+      "switch_id": "CHSW-CC8A2A644F",
+      "case_id": "COLL-1001",
+      "from_channel": "sms",
+      "to_channel": "voice",
+      "reason": "customer_requested",
+      "carried_context_summary": "sms:not_reached; sms:not_reached"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-01T12:20:51.308102Z"
+  },
+  {
+    "id": "6531318f-6309-4d30-94a6-52902f86669b",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "amount": 1001.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1001",
+          "customer_id": "CUST-2001",
+          "loan_id": "LOAN-3001",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 47,
+          "emi_amount": 12500.0,
+          "overdue_amount": 12500.0,
+          "late_fee": 850.0,
+          "status": "open",
+          "risk_band": "medium"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-01T12:27:57.208340Z"
+  },
+  {
+    "id": "c2fc1ecd-7e58-48cd-adc3-7e11472aa47d",
+    "tool_name": "channel_switch",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "amount": 1001.0,
+      "from_channel": "sms",
+      "to_channel": "voice"
+    },
+    "output_payload": {
+      "switch_id": "CHSW-CE2D6BD5B9",
+      "case_id": "COLL-1001",
+      "from_channel": "sms",
+      "to_channel": "voice",
+      "reason": "customer_requested",
+      "carried_context_summary": "sms:not_reached; sms:not_reached"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-01T12:27:57.211526Z"
+  },
+  {
+    "id": "03a9e0b5-141a-4f8a-989d-997bd5ff2862",
+    "tool_name": "dues_explain_build",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "amount": 1001.0,
+      "locale": "en-IN"
+    },
+    "output_payload": {
+      "case_id": "COLL-1001",
+      "customer_id": "CUST-2001",
+      "total_due": 13350.0,
+      "explanation": "Your loan account has 47 days past due. Overdue EMI amount is INR 12500.00, late fee is INR 850.00. Total amount due now is INR 13350.00."
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-01T12:27:57.214208Z"
+  },
+  {
+    "id": "84604bb8-fbd3-4038-9873-9d730d99cfe8",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "amount": 1001.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1001",
+          "customer_id": "CUST-2001",
+          "loan_id": "LOAN-3001",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 47,
+          "emi_amount": 12500.0,
+          "overdue_amount": 12500.0,
+          "late_fee": 850.0,
+          "status": "open",
+          "risk_band": "medium"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-01T12:37:06.511328Z"
+  },
+  {
+    "id": "f2a62f05-be3f-4fe0-82fb-0e17bff60ed2",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "Customer": "Aditi",
+      "customer_id": "CUST-2001",
+      "case_id": "COLL-1001",
+      "overdue_amount": 12500,
+      "amount": 2001.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1001",
+          "customer_id": "CUST-2001",
+          "loan_id": "LOAN-3001",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 47,
+          "emi_amount": 12500.0,
+          "overdue_amount": 12500.0,
+          "late_fee": 850.0,
+          "status": "open",
+          "risk_band": "medium"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-01T15:31:02.844404Z"
+  },
+  {
+    "id": "55dc0e10-233a-40ef-afa3-24844c0013c6",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "Customer": "Aditi",
+      "customer_id": "CUST-2001",
+      "case_id": "COLL-1001",
+      "overdue_amount": 12500,
+      "amount": 2001.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1001",
+          "customer_id": "CUST-2001",
+          "loan_id": "LOAN-3001",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 47,
+          "emi_amount": 12500.0,
+          "overdue_amount": 12500.0,
+          "late_fee": 850.0,
+          "status": "open",
+          "risk_band": "medium"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-01T15:32:35.523472Z"
+  },
+  {
+    "id": "83f0898a-295b-48d2-a1aa-7c52690f91d3",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "Customer": "Aditi",
+      "customer_id": "CUST-2001",
+      "case_id": "COLL-1001",
+      "overdue_amount": 12500,
+      "amount": 2001.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1001",
+          "customer_id": "CUST-2001",
+          "loan_id": "LOAN-3001",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 47,
+          "emi_amount": 12500.0,
+          "overdue_amount": 12500.0,
+          "late_fee": 850.0,
+          "status": "open",
+          "risk_band": "medium"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-01T15:33:10.822242Z"
+  },
+  {
+    "id": "c8d6283e-d343-4eaf-9e41-a4711060c24a",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "Customer": "Aditi",
+      "customer_id": "CUST-2001",
+      "case_id": "COLL-1001",
+      "overdue_amount": 12500,
+      "amount": 2001.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1001",
+          "customer_id": "CUST-2001",
+          "loan_id": "LOAN-3001",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 47,
+          "emi_amount": 12500.0,
+          "overdue_amount": 12500.0,
+          "late_fee": 850.0,
+          "status": "open",
+          "risk_band": "medium"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-01T15:37:00.906951Z"
+  },
+  {
+    "id": "438630ff-9c11-4498-a7fd-7eb00f84f1d0",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "Customer": "Aditi",
+      "customer_id": "CUST-2001",
+      "case_id": "COLL-1001",
+      "overdue_amount": 12500,
+      "amount": 2001.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1001",
+          "customer_id": "CUST-2001",
+          "loan_id": "LOAN-3001",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 47,
+          "emi_amount": 12500.0,
+          "overdue_amount": 12500.0,
+          "late_fee": 850.0,
+          "status": "open",
+          "risk_band": "medium"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-01T15:38:17.246078Z"
+  },
+  {
+    "id": "ef24bb77-85a0-4241-8216-d4b439c5f783",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "Customer": "Aditi",
+      "customer_id": "CUST-2001",
+      "case_id": "COLL-1001",
+      "overdue_amount": 12500,
+      "amount": 2001.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1001",
+          "customer_id": "CUST-2001",
+          "loan_id": "LOAN-3001",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 47,
+          "emi_amount": 12500.0,
+          "overdue_amount": 12500.0,
+          "late_fee": 850.0,
+          "status": "open",
+          "risk_band": "medium"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-01T16:07:36.596790Z"
+  },
+  {
+    "id": "78a020e9-023b-4a8b-84ed-d7aa5323ead1",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "Customer": "Aditi",
+      "customer_id": "CUST-2001",
+      "case_id": "COLL-1001",
+      "overdue_amount": 12500,
+      "amount": 2001.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1001",
+          "customer_id": "CUST-2001",
+          "loan_id": "LOAN-3001",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 47,
+          "emi_amount": 12500.0,
+          "overdue_amount": 12500.0,
+          "late_fee": 850.0,
+          "status": "open",
+          "risk_band": "medium"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-01T16:08:24.724640Z"
+  },
+  {
+    "id": "4d48a661-7374-4e00-b9eb-89044354a7bb",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "Customer": "Aditi",
+      "customer_id": "CUST-2001",
+      "case_id": "COLL-1001",
+      "overdue_amount": 12500,
+      "amount": 2001.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1001",
+          "customer_id": "CUST-2001",
+          "loan_id": "LOAN-3001",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 47,
+          "emi_amount": 12500.0,
+          "overdue_amount": 12500.0,
+          "late_fee": 850.0,
+          "status": "open",
+          "risk_band": "medium"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-01T16:08:45.401620Z"
+  },
+  {
+    "id": "88600ff8-a509-40e6-b6b8-3b36dd58402c",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "Customer": "Aditi",
+      "customer_id": "CUST-2001",
+      "case_id": "COLL-1001",
+      "overdue_amount": 12500,
+      "amount": 2001.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1001",
+          "customer_id": "CUST-2001",
+          "loan_id": "LOAN-3001",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 47,
+          "emi_amount": 12500.0,
+          "overdue_amount": 12500.0,
+          "late_fee": 850.0,
+          "status": "open",
+          "risk_band": "medium"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-01T16:11:39.291541Z"
+  },
+  {
+    "id": "dfe4b939-641b-4289-bd38-ab5c3e933780",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "Customer": "Aditi",
+      "customer_id": "CUST-2001",
+      "case_id": "COLL-1001",
+      "overdue_amount": 12500,
+      "amount": 2001.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1001",
+          "customer_id": "CUST-2001",
+          "loan_id": "LOAN-3001",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 47,
+          "emi_amount": 12500.0,
+          "overdue_amount": 12500.0,
+          "late_fee": 850.0,
+          "status": "open",
+          "risk_band": "medium"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-01T16:12:14.079001Z"
+  },
+  {
+    "id": "52794611-aab3-402c-93eb-17bb2fe5a18e",
+    "tool_name": "dues_explain_build",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "locale": "en-IN"
+    },
+    "output_payload": {
+      "case_id": "COLL-1001",
+      "customer_id": "CUST-2001",
+      "total_due": 13350.0,
+      "explanation": "Your loan account has 47 days past due. Overdue EMI amount is INR 12500.00, late fee is INR 850.00. Total amount due now is INR 13350.00."
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-01T16:16:40.821715Z"
+  },
+  {
+    "id": "0f0782e1-cb45-480c-8837-3d189e066fe3",
+    "tool_name": "dues_explain_build",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "locale": "en-IN"
+    },
+    "output_payload": {
+      "case_id": "COLL-1001",
+      "customer_id": "CUST-2001",
+      "total_due": 13350.0,
+      "explanation": "Your loan account has 47 days past due. Overdue EMI amount is INR 12500.00, late fee is INR 850.00. Total amount due now is INR 13350.00."
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-01T16:17:16.700377Z"
+  },
+  {
+    "id": "6fbd0a7d-9fa8-4750-8e4e-fe89994ecd3c",
+    "tool_name": "dues_explain_build",
+    "input_payload": {
+      "Customer": "Aditi",
+      "customer_id": "CUST-2001",
+      "case_id": "COLL-1001",
+      "overdue_amount": 12500,
+      "amount": 2001.0,
+      "locale": "en-IN"
+    },
+    "output_payload": {
+      "case_id": "COLL-1001",
+      "customer_id": "CUST-2001",
+      "total_due": 13350.0,
+      "explanation": "Your loan account has 47 days past due. Overdue EMI amount is INR 12500.00, late fee is INR 850.00. Total amount due now is INR 13350.00."
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-01T16:55:50.503489Z"
+  },
+  {
+    "id": "c4c42b7b-9456-4c94-bc1e-95840bb7ecd0",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "Customer": "Aditi",
+      "customer_id": "CUST-2001",
+      "case_id": "COLL-1001",
+      "overdue_amount": 12500,
+      "amount": 2001.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1001",
+          "customer_id": "CUST-2001",
+          "loan_id": "LOAN-3001",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 47,
+          "emi_amount": 12500.0,
+          "overdue_amount": 12500.0,
+          "late_fee": 850.0,
+          "status": "open",
+          "risk_band": "medium"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-01T16:55:56.903386Z"
+  },
+  {
+    "id": "0d857f0c-1dab-4624-99d9-4d0e4dc90e62",
+    "tool_name": "dues_explain_build",
+    "input_payload": {
+      "Customer": "Aditi",
+      "customer_id": "CUST-2001",
+      "case_id": "COLL-1001",
+      "overdue_amount": 12500,
+      "amount": 2001.0,
+      "locale": "en-IN"
+    },
+    "output_payload": {
+      "case_id": "COLL-1001",
+      "customer_id": "CUST-2001",
+      "total_due": 13350.0,
+      "explanation": "Your loan account has 47 days past due. Overdue EMI amount is INR 12500.00, late fee is INR 850.00. Total amount due now is INR 13350.00."
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-01T17:09:37.321101Z"
+  },
+  {
+    "id": "2311c497-c920-41dc-a1e3-26c8d32b68b5",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "Customer": "Aditi",
+      "customer_id": "CUST-2001",
+      "case_id": "COLL-1001",
+      "overdue_amount": 12500,
+      "amount": 2001.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1001",
+          "customer_id": "CUST-2001",
+          "loan_id": "LOAN-3001",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 47,
+          "emi_amount": 12500.0,
+          "overdue_amount": 12500.0,
+          "late_fee": 850.0,
+          "status": "open",
+          "risk_band": "medium"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-01T17:15:50.180058Z"
+  },
+  {
+    "id": "357f2f69-f679-4ebb-910d-e78088de099c",
+    "tool_name": "contact_attempt",
+    "input_payload": {
+      "Customer": "Aditi",
+      "customer_id": "CUST-2001",
+      "case_id": "COLL-1001",
+      "overdue_amount": 12500,
+      "amount": 2001.0,
+      "channel": "voice",
+      "reached": true
+    },
+    "output_payload": {
+      "attempt_id": "ATT-70959F21A4",
+      "case_id": "COLL-1001",
+      "channel": "voice",
+      "status": "reached",
+      "created_at": "2026-05-01T17:17:04.925014Z"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-01T17:17:04.924967Z"
+  },
+  {
+    "id": "f723254a-af1e-440a-a7b1-cc01c006b79e",
+    "tool_name": "payment_link_create",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "amount": "total_due",
+      "channel": "voice"
+    },
+    "output_payload": null,
+    "status": "failed",
+    "error": "2 validation errors for PaymentLinkCreateInput\namount\n  Input should be a valid number, unable to parse string as a number [type=float_parsing, input_value='total_due', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/float_parsing\nchannel\n  Input should be 'whatsapp', 'email' or 'sms' [type=literal_error, input_value='voice', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error",
+    "created_at": "2026-05-01T18:31:47.405242Z"
+  },
+  {
+    "id": "90da6279-79b1-4602-9069-c8396c85736e",
+    "tool_name": "dues_explain_build",
+    "input_payload": {
+      "Customer": "Rohan",
+      "customer_id": "CUST-2002",
+      "case_id": "COLL-1002",
+      "overdue_amount": 37800,
+      "amount": 2002.0,
+      "locale": "en-IN"
+    },
+    "output_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "total_due": 39700.0,
+      "explanation": "Your loan account has 73 days past due. Overdue EMI amount is INR 37800.00, late fee is INR 1900.00. Total amount due now is INR 39700.00."
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-01T18:33:02.717024Z"
+  },
+  {
+    "id": "845d3f7f-065c-44a9-b4ac-e467046745bf",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "Customer": "Aditi",
+      "customer_id": "CUST-2001",
+      "case_id": "COLL-1001",
+      "overdue_amount": 12500,
+      "amount": 2001.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1001",
+          "customer_id": "CUST-2001",
+          "loan_id": "LOAN-3001",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 47,
+          "emi_amount": 12500.0,
+          "overdue_amount": 12500.0,
+          "late_fee": 850.0,
+          "status": "open",
+          "risk_band": "medium"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-02T03:11:11.543728Z"
+  },
+  {
+    "id": "d6f61a61-aeb0-406c-ac38-d15c925af6fc",
+    "tool_name": "pay_by_phone_collect",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "amount": 6000.0,
+      "consent_confirmed": true,
+      "simulate_status": "success"
+    },
+    "output_payload": {
+      "payment_id": "PBPH-61A9D66D13",
+      "case_id": "COLL-1001",
+      "collected_amount": 6000.0,
+      "status": "success",
+      "receipt_reference": "RCT-A6C8645C"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-02T03:11:11.555701Z"
+  },
+  {
+    "id": "1ac83933-9280-443a-a874-f01dc6f30ded",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "Customer": "Aditi",
+      "customer_id": "CUST-2001",
+      "case_id": "COLL-1001",
+      "overdue_amount": 12500,
+      "amount": 2001.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1001",
+          "customer_id": "CUST-2001",
+          "loan_id": "LOAN-3001",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 47,
+          "emi_amount": 12500.0,
+          "overdue_amount": 12500.0,
+          "late_fee": 850.0,
+          "status": "open",
+          "risk_band": "medium"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-02T03:17:18.878427Z"
+  },
+  {
+    "id": "360bb3b5-9285-4a2d-8529-45d1ed7ed106",
+    "tool_name": "pay_by_phone_collect",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "amount": 6000.0,
+      "consent_confirmed": true,
+      "simulate_status": "success"
+    },
+    "output_payload": {
+      "payment_id": "PBPH-CF5A49BE5D",
+      "case_id": "COLL-1001",
+      "collected_amount": 6000.0,
+      "status": "success",
+      "receipt_reference": "RCT-747CD833"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-02T03:17:18.890611Z"
+  },
+  {
+    "id": "6127dc60-b864-4fcd-ba3a-f7715ab80ace",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "Customer": "Aditi",
+      "customer_id": "CUST-2001",
+      "case_id": "COLL-1001",
+      "overdue_amount": 12500,
+      "amount": 2001.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1001",
+          "customer_id": "CUST-2001",
+          "loan_id": "LOAN-3001",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 47,
+          "emi_amount": 12500.0,
+          "overdue_amount": 12500.0,
+          "late_fee": 850.0,
+          "status": "open",
+          "risk_band": "medium"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-02T03:24:12.388220Z"
+  },
+  {
+    "id": "a31f51d4-d490-400a-8b94-9d570d4a5c2a",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "Customer": "Aditi",
+      "customer_id": "CUST-2001",
+      "case_id": "COLL-1001",
+      "overdue_amount": 12500,
+      "amount": 2001.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1001",
+          "customer_id": "CUST-2001",
+          "loan_id": "LOAN-3001",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 47,
+          "emi_amount": 12500.0,
+          "overdue_amount": 12500.0,
+          "late_fee": 850.0,
+          "status": "open",
+          "risk_band": "medium"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-02T03:31:34.785169Z"
+  },
+  {
+    "id": "61f4d617-2c8d-464e-9e8a-ce8136ac45ae",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "amount": 1001.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1001",
+          "customer_id": "CUST-2001",
+          "loan_id": "LOAN-3001",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 47,
+          "emi_amount": 12500.0,
+          "overdue_amount": 12500.0,
+          "late_fee": 850.0,
+          "status": "open",
+          "risk_band": "medium"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-02T03:39:19.402952Z"
+  },
+  {
+    "id": "0899af33-f321-448f-9fd3-a41b507e9ddb",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "Customer": "Aditi",
+      "customer_id": "CUST-2001",
+      "case_id": "COLL-1001",
+      "overdue_amount": 12500,
+      "amount": 2001.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1001",
+          "customer_id": "CUST-2001",
+          "loan_id": "LOAN-3001",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 47,
+          "emi_amount": 12500.0,
+          "overdue_amount": 12500.0,
+          "late_fee": 850.0,
+          "status": "open",
+          "risk_band": "medium"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-02T03:50:02.254646Z"
+  },
+  {
+    "id": "b8f37270-f8b6-45e6-a65e-47668140a477",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "Customer": "Rohan",
+      "customer_id": "CUST-2002",
+      "case_id": "COLL-1002",
+      "overdue_amount": 37800,
+      "amount": 2002.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1002",
+          "customer_id": "CUST-2002",
+          "loan_id": "LOAN-3002",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 73,
+          "emi_amount": 18900.0,
+          "overdue_amount": 37800.0,
+          "late_fee": 1900.0,
+          "status": "open",
+          "risk_band": "high"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-02T03:50:22.084311Z"
+  },
+  {
+    "id": "81005e22-85ba-4026-87cb-71aee300f9cc",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "amount": 1001.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1001",
+          "customer_id": "CUST-2001",
+          "loan_id": "LOAN-3001",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 47,
+          "emi_amount": 12500.0,
+          "overdue_amount": 12500.0,
+          "late_fee": 850.0,
+          "status": "open",
+          "risk_band": "medium"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-02T04:13:02.852585Z"
+  },
+  {
+    "id": "d0b4e453-f4af-455b-b262-6e426ec460c2",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "amount": 2001.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1001",
+          "customer_id": "CUST-2001",
+          "loan_id": "LOAN-3001",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 47,
+          "emi_amount": 12500.0,
+          "overdue_amount": 12500.0,
+          "late_fee": 850.0,
+          "status": "open",
+          "risk_band": "medium"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-02T04:16:56.081259Z"
+  },
+  {
+    "id": "d1a45ae6-0be3-4e8c-a995-1d2506786f28",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "amount": 2001.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1001",
+          "customer_id": "CUST-2001",
+          "loan_id": "LOAN-3001",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 47,
+          "emi_amount": 12500.0,
+          "overdue_amount": 12500.0,
+          "late_fee": 850.0,
+          "status": "open",
+          "risk_band": "medium"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-02T04:27:04.849865Z"
+  },
+  {
+    "id": "3e4295eb-8964-44f4-9a74-68dd4b7ff7e4",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "amount": 1001.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1001",
+          "customer_id": "CUST-2001",
+          "loan_id": "LOAN-3001",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 47,
+          "emi_amount": 12500.0,
+          "overdue_amount": 12500.0,
+          "late_fee": 850.0,
+          "status": "open",
+          "risk_band": "medium"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-02T04:27:04.865460Z"
+  },
+  {
+    "id": "918680ed-a834-4fb8-b312-a968bddd70c3",
+    "tool_name": "offer_eligibility",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "hardship_flag": true
+    },
+    "output_payload": {
+      "case_id": "COLL-1001",
+      "allowed": true,
+      "offer_type": "waiver",
+      "approved_waiver_pct": 8.0,
+      "reason_codes": [
+        "hardship_waiver_rule"
+      ],
+      "recommended_next": "present_offer"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-02T04:27:04.868540Z"
+  },
+  {
+    "id": "1c1a18c3-fae2-4892-bbef-e6a3e1cd8b08",
+    "tool_name": "offer_eligibility",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "amount": 1001.0,
+      "hardship_flag": true
+    },
+    "output_payload": {
+      "case_id": "COLL-1001",
+      "allowed": true,
+      "offer_type": "waiver",
+      "approved_waiver_pct": 8.0,
+      "reason_codes": [
+        "hardship_waiver_rule"
+      ],
+      "recommended_next": "present_offer"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-02T04:27:04.886141Z"
+  },
+  {
+    "id": "6b441f23-3676-4ad6-84fb-75f85aae2cc1",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "amount": 2001.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1001",
+          "customer_id": "CUST-2001",
+          "loan_id": "LOAN-3001",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 47,
+          "emi_amount": 12500.0,
+          "overdue_amount": 12500.0,
+          "late_fee": 850.0,
+          "status": "open",
+          "risk_band": "medium"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-02T04:27:39.257962Z"
+  },
+  {
+    "id": "b35f3f2d-02c9-4738-a133-41e2c142c365",
+    "tool_name": "offer_eligibility",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "hardship_flag": true
+    },
+    "output_payload": {
+      "case_id": "COLL-1001",
+      "allowed": true,
+      "offer_type": "waiver",
+      "approved_waiver_pct": 8.0,
+      "reason_codes": [
+        "hardship_waiver_rule"
+      ],
+      "recommended_next": "present_offer"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-02T04:27:39.277232Z"
+  },
+  {
+    "id": "e94cb950-9cb4-4571-a567-fc0e8e051042",
+    "tool_name": "case_fetch",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "amount": 1001.0,
+      "limit": 20
+    },
+    "output_payload": {
+      "total": 1,
+      "cases": [
+        {
+          "case_id": "COLL-1001",
+          "customer_id": "CUST-2001",
+          "loan_id": "LOAN-3001",
+          "portfolio_id": "PORT-RETAIL-A",
+          "product": "personal_loan",
+          "dpd": 47,
+          "emi_amount": 12500.0,
+          "overdue_amount": 12500.0,
+          "late_fee": 850.0,
+          "status": "open",
+          "risk_band": "medium"
+        }
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-02T04:27:54.548976Z"
+  },
+  {
+    "id": "47d50f1a-733a-4ed8-81cb-b80201ffd3f2",
+    "tool_name": "dues_explain_build",
+    "input_payload": {
+      "Customer": "Aditi",
+      "customer_id": "CUST-2001",
+      "case_id": "COLL-1001",
+      "overdue_amount": 12500,
+      "amount": 2001.0,
+      "locale": "en-IN"
+    },
+    "output_payload": {
+      "case_id": "COLL-1001",
+      "customer_id": "CUST-2001",
+      "total_due": 13350.0,
+      "explanation": "Your loan account has 47 days past due. Overdue EMI amount is INR 12500.00, late fee is INR 850.00. Total amount due now is INR 13350.00."
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-02T04:41:19.221178Z"
+  },
+  {
+    "id": "7f1376ee-4cda-44a3-a3c2-8bff652b3092",
+    "tool_name": "customer_verify",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "amount": 1001.0,
+      "customer_id": "CUST-2001",
+      "challenge_answers": {}
+    },
+    "output_payload": {
+      "customer_id": "CUST-2001",
+      "status": "failed",
+      "failed_attempts": 1,
+      "required_fields": [
+        "dob",
+        "last4_pan",
+        "zip"
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-02T04:49:14.107461Z"
+  },
+  {
+    "id": "4a749fe2-da0c-4175-ad42-43287159130b",
+    "tool_name": "dues_explain_build",
+    "input_payload": {
+      "Customer": "Aditi",
+      "customer_id": "CUST-2001",
+      "case_id": "COLL-1001",
+      "overdue_amount": 12500,
+      "amount": 2001.0,
+      "locale": "en-IN"
+    },
+    "output_payload": {
+      "case_id": "COLL-1001",
+      "customer_id": "CUST-2001",
+      "total_due": 13350.0,
+      "explanation": "Your loan account has 47 days past due. Overdue EMI amount is INR 12500.00, late fee is INR 850.00. Total amount due now is INR 13350.00."
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-02T07:36:14.385398Z"
+  },
+  {
+    "id": "47a80406-d52a-4992-9774-658e9534d37b",
+    "tool_name": "dues_explain_build",
+    "input_payload": {
+      "Customer": "Aditi",
+      "customer_id": "CUST-2001",
+      "case_id": "COLL-1001",
+      "overdue_amount": 12500,
+      "amount": 2001.0,
+      "locale": "en-IN"
+    },
+    "output_payload": {
+      "case_id": "COLL-1001",
+      "customer_id": "CUST-2001",
+      "total_due": 13350.0,
+      "explanation": "Your loan account has 47 days past due. Overdue EMI amount is INR 12500.00, late fee is INR 850.00. Total amount due now is INR 13350.00."
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-02T07:51:50.806875Z"
+  },
+  {
+    "id": "bd20c224-efd5-43f7-bb21-67355a31dac8",
+    "tool_name": "dues_explain_build",
+    "input_payload": {
+      "Customer": "Aditi",
+      "customer_id": "CUST-2001",
+      "case_id": "COLL-1001",
+      "overdue_amount": 12500,
+      "amount": 2001.0,
+      "locale": "en-IN"
+    },
+    "output_payload": {
+      "case_id": "COLL-1001",
+      "customer_id": "CUST-2001",
+      "total_due": 13350.0,
+      "explanation": "Your loan account has 47 days past due. Overdue EMI amount is INR 12500.00, late fee is INR 850.00. Total amount due now is INR 13350.00."
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-02T07:53:24.097721Z"
+  },
+  {
+    "id": "6d994bab-5d40-46cc-8222-13d6a34ee7e4",
+    "tool_name": "dues_explain_build",
+    "input_payload": {
+      "Customer": "Aditi",
+      "customer_id": "CUST-2001",
+      "case_id": "COLL-1001",
+      "overdue_amount": 12500,
+      "amount": 2001.0,
+      "locale": "en-IN"
+    },
+    "output_payload": {
+      "case_id": "COLL-1001",
+      "customer_id": "CUST-2001",
+      "total_due": 13350.0,
+      "explanation": "Your loan account has 47 days past due. Overdue EMI amount is INR 12500.00, late fee is INR 850.00. Total amount due now is INR 13350.00."
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-02T10:36:14.994417Z"
+  },
+  {
+    "id": "a4ca0e98-acc0-45ce-babb-9285f1e4d46c",
+    "tool_name": "dues_explain_build",
+    "input_payload": {
+      "Customer": "Aditi",
+      "customer_id": "CUST-2001",
+      "case_id": "COLL-1001",
+      "overdue_amount": 12500,
+      "amount": 2001.0,
+      "locale": "en-IN"
+    },
+    "output_payload": {
+      "case_id": "COLL-1001",
+      "customer_id": "CUST-2001",
+      "total_due": 13350.0,
+      "explanation": "Your loan account has 47 days past due. Overdue EMI amount is INR 12500.00, late fee is INR 850.00. Total amount due now is INR 13350.00."
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-02T16:54:43.446197Z"
+  },
+  {
+    "id": "fc89fc5e-46a1-4a6c-b61f-a858f269e0ad",
+    "tool_name": "dues_explain_build",
+    "input_payload": {
+      "Customer": "Aditi",
+      "customer_id": "CUST-2001",
+      "case_id": "COLL-1001",
+      "overdue_amount": 12500,
+      "amount": 2001.0,
+      "locale": "en-IN"
+    },
+    "output_payload": {
+      "case_id": "COLL-1001",
+      "customer_id": "CUST-2001",
+      "total_due": 13350.0,
+      "explanation": "Your loan account has 47 days past due. Overdue EMI amount is INR 12500.00, late fee is INR 850.00. Total amount due now is INR 13350.00."
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-02T16:56:38.329285Z"
+  },
+  {
+    "id": "9279a9a0-2ec8-49f6-9f9d-92e80b722a24",
+    "tool_name": "dues_explain_build",
+    "input_payload": {
+      "Customer": "Aditi",
+      "customer_id": "CUST-2001",
+      "case_id": "COLL-1001",
+      "overdue_amount": 12500,
+      "amount": 2001.0,
+      "locale": "en-IN"
+    },
+    "output_payload": {
+      "case_id": "COLL-1001",
+      "customer_id": "CUST-2001",
+      "total_due": 13350.0,
+      "explanation": "Your loan account has 47 days past due. Overdue EMI amount is INR 12500.00, late fee is INR 850.00. Total amount due now is INR 13350.00."
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-02T16:59:00.579839Z"
+  },
+  {
+    "id": "1876ffc9-bc7d-4eec-be03-8aa686c13ce0",
+    "tool_name": "dues_explain_build",
+    "input_payload": {
+      "Customer": "Aditi",
+      "customer_id": "CUST-2001",
+      "case_id": "COLL-1001",
+      "overdue_amount": 12500,
+      "amount": 2001.0,
+      "locale": "en-IN"
+    },
+    "output_payload": {
+      "case_id": "COLL-1001",
+      "customer_id": "CUST-2001",
+      "total_due": 13350.0,
+      "explanation": "Your loan account has 47 days past due. Overdue EMI amount is INR 12500.00, late fee is INR 850.00. Total amount due now is INR 13350.00."
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-02T20:24:35.661191Z"
+  },
+  {
+    "id": "26bc3cce-d724-476b-a834-e72d6f5041ce",
+    "tool_name": "dues_explain_build",
+    "input_payload": {
+      "Customer": "Aditi",
+      "customer_id": "CUST-2001",
+      "case_id": "COLL-1001",
+      "overdue_amount": 12500,
+      "amount": 2001.0,
+      "locale": "en-IN"
+    },
+    "output_payload": {
+      "case_id": "COLL-1001",
+      "customer_id": "CUST-2001",
+      "total_due": 13350.0,
+      "explanation": "Your loan account has 47 days past due. Overdue EMI amount is INR 12500.00, late fee is INR 850.00. Total amount due now is INR 13350.00."
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-02T20:25:19.262740Z"
+  },
+  {
+    "id": "47a10fce-2889-4d51-872b-83c467b6bdda",
+    "tool_name": "dues_explain_build",
+    "input_payload": {
+      "Customer": "Aditi",
+      "customer_id": "CUST-2001",
+      "case_id": "COLL-1001",
+      "overdue_amount": 12500,
+      "amount": 2001.0,
+      "locale": "en-IN"
+    },
+    "output_payload": {
+      "case_id": "COLL-1001",
+      "customer_id": "CUST-2001",
+      "total_due": 13350.0,
+      "explanation": "Your loan account has 47 days past due. Overdue EMI amount is INR 12500.00, late fee is INR 850.00. Total amount due now is INR 13350.00."
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-02T20:26:43.185176Z"
+  },
+  {
+    "id": "d74e2d2f-583d-47e7-9db2-b800f0a6547e",
+    "tool_name": "dues_explain_build",
+    "input_payload": {
+      "Customer": "Aditi",
+      "customer_id": "CUST-2001",
+      "case_id": "COLL-1001",
+      "overdue_amount": 12500,
+      "amount": 2001.0,
+      "locale": "en-IN"
+    },
+    "output_payload": {
+      "case_id": "COLL-1001",
+      "customer_id": "CUST-2001",
+      "total_due": 13350.0,
+      "explanation": "Your loan account has 47 days past due. Overdue EMI amount is INR 12500.00, late fee is INR 850.00. Total amount due now is INR 13350.00."
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-02T20:29:13.357818Z"
+  },
+  {
+    "id": "fd6e54dc-bf4e-4660-a6b5-b2185134c7df",
+    "tool_name": "dues_explain_build",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "locale": "en-IN"
+    },
+    "output_payload": {
+      "case_id": "COLL-1001",
+      "customer_id": "CUST-2001",
+      "total_due": 13350.0,
+      "explanation": "Your loan account has 47 days past due. Overdue EMI amount is INR 12500.00, late fee is INR 850.00. Total amount due now is INR 13350.00."
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-03T08:59:04.847048Z"
+  },
+  {
+    "id": "1657cb33-6a36-40e6-974e-d596863a7446",
+    "tool_name": "dues_explain_build",
+    "input_payload": {
+      "Customer": "Aditi",
+      "customer_id": "CUST-2001",
+      "case_id": "COLL-1001",
+      "overdue_amount": 12500,
+      "amount": 2001.0,
+      "locale": "en-IN"
+    },
+    "output_payload": {
+      "case_id": "COLL-1001",
+      "customer_id": "CUST-2001",
+      "total_due": 13350.0,
+      "explanation": "Your loan account has 47 days past due. Overdue EMI amount is INR 12500.00, late fee is INR 850.00. Total amount due now is INR 13350.00."
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-03T15:40:36.674971Z"
+  },
+  {
+    "id": "b17cec0d-d861-4bef-8b4a-62807c7e0599",
+    "tool_name": "dues_explain_build",
+    "input_payload": {
+      "Customer": "Aditi",
+      "customer_id": "CUST-2001",
+      "case_id": "COLL-1001",
+      "overdue_amount": 12500,
+      "amount": 2001.0,
+      "locale": "en-IN"
+    },
+    "output_payload": {
+      "case_id": "COLL-1001",
+      "customer_id": "CUST-2001",
+      "total_due": 13350.0,
+      "explanation": "Your loan account has 47 days past due. Overdue EMI amount is INR 12500.00, late fee is INR 850.00. Total amount due now is INR 13350.00."
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-03T16:16:13.671502Z"
+  },
+  {
+    "id": "9b76678e-882c-4e2b-9675-ece953957bde",
+    "tool_name": "dues_explain_build",
+    "input_payload": {
+      "Customer": "Aditi",
+      "customer_id": "CUST-2001",
+      "case_id": "COLL-1001",
+      "overdue_amount": 12500,
+      "amount": 2001.0,
+      "locale": "en-IN"
+    },
+    "output_payload": {
+      "case_id": "COLL-1001",
+      "customer_id": "CUST-2001",
+      "total_due": 13350.0,
+      "explanation": "Your loan account has 47 days past due. Overdue EMI amount is INR 12500.00, late fee is INR 850.00. Total amount due now is INR 13350.00."
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-03T18:20:00.860282Z"
+  },
+  {
+    "id": "b7887cd6-5b8b-485c-939d-9bf8a4993ffa",
+    "tool_name": "dues_explain_build",
+    "input_payload": {
+      "Customer": "Aditi",
+      "customer_id": "CUST-2001",
+      "case_id": "COLL-1001",
+      "overdue_amount": 12500,
+      "amount": 2001.0,
+      "locale": "en-IN"
+    },
+    "output_payload": {
+      "case_id": "COLL-1001",
+      "customer_id": "CUST-2001",
+      "total_due": 13350.0,
+      "explanation": "Your loan account has 47 days past due. Overdue EMI amount is INR 12500.00, late fee is INR 850.00. Total amount due now is INR 13350.00."
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-03T18:24:10.881433Z"
+  },
+  {
+    "id": "a5f6be3e-fc42-4ab3-ab38-03fe3d1a0182",
+    "tool_name": "customer_verify",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "customer_id": "CUST-2001",
+      "challenge_answers": {
+        "full_name": "Aditi Sharma",
+        "dob": "",
+        "last4_pan": "",
+        "zip": ""
+      }
+    },
+    "output_payload": {
+      "customer_id": "CUST-2001",
+      "status": "failed",
+      "failed_attempts": 2,
+      "required_fields": [
+        "dob",
+        "last4_pan",
+        "zip"
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-03T19:21:16.277415Z"
+  },
+  {
+    "id": "15690091-3b8c-43e5-bad7-da14c22a4e27",
+    "tool_name": "customer_verify",
+    "input_payload": {
+      "amount": 4.0,
+      "case_id": "COLL-1001",
+      "customer_id": "CUST-2001",
+      "challenge_answers": {
+        "last4_pan": "AF4K",
+        "zip": "560102"
+      }
+    },
+    "output_payload": {
+      "customer_id": "CUST-2001",
+      "status": "failed",
+      "failed_attempts": 3,
+      "required_fields": [
+        "dob",
+        "last4_pan",
+        "zip"
+      ]
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-05-04T04:57:12.550976Z"
   }
 ]
