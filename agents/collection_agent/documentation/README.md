@@ -8,6 +8,7 @@ This folder contains detailed engineering documentation for the Collection Agent
 - `Node_Reference.md` — node-by-node technical contract and routing behavior
 - `Tool_Reference.md` — tool contracts, argument expectations, outputs, and failure semantics
 - `Sample_Conversations.md` — demo-ready conversation transcripts
+- `Nemo_Guardrails_Implementation_Plan.md` — planned NeMo Guardrails design, integration points, rollout steps, and acceptance criteria
 - `CollectionAgent_Engineering_Book.txt` — plain-text export used to generate PDF
 - `CollectionAgent_Engineering_Book.pdf` — PDF export for presentation/review
 
