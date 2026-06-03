@@ -5,6 +5,7 @@ This directory contains the project documentation for `easy_agents`.
 ## Sections
 
 - [Framework Overview](./architecture/framework-overview.md)
+- [Conversation Management Architecture](./architecture/conversation-management.md)
 - [Memory Architecture](./architecture/memory-architecture.md)
 - [Memory Vector Index Plan](./plans/memory-vector-index-plan.md)
 - [Refactor Fix Plan](./plans/refactor-fix-plan.md)
@@ -20,3 +21,4 @@ This directory contains the project documentation for `easy_agents`.
 - [Brainstorming Agent](./agents/brainstorming-agent.md)
 - [Coding Agent](./agents/coding-agent.md)
 - [Orchestrator Agent](./agents/orchestrator-agent.md)
+- [Conversation Manager Agent](./agents/conversation-manager.md)

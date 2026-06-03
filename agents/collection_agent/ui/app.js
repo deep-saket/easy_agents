@@ -41,6 +41,15 @@ const viewState = {
   liveStatePoller: null,
   callSessionId: "",
   callActive: false,
+  pendingOperations: 0,
+  activeStreamSource: null,
+  activeStreamToken: 0,
+  requestSequence: 0,
+  suppressedResponseCount: 0,
+  lastDeliveredResponse: "",
+  lastFinalState: {},
+  lastFinalMemory: {},
+  lastConversationManagerState: {},
 };
 
 function addBubble(role, text) {
@@ -600,6 +609,11 @@ function renderSnapshots(hops, finalState, finalMemory) {
   renderSelectedSnapshot();
 }
 
+function rememberFinalState(finalState, finalMemory) {
+  viewState.lastFinalState = finalState && typeof finalState === "object" ? finalState : {};
+  viewState.lastFinalMemory = finalMemory && typeof finalMemory === "object" ? finalMemory : {};
+}
+
 function renderSelectedSnapshot() {
   const selected = viewState.snapshots.find((item) => item.id === snapshotPicker.value);
   if (!selected) {
@@ -868,8 +882,14 @@ function renderNodeExplorer(hops) {
 }
 
 function setBusy(isBusy) {
-  sendButton.disabled = isBusy;
-  sendButton.textContent = isBusy ? "Running..." : "Run Turn";
+  if (isBusy) {
+    viewState.pendingOperations += 1;
+  } else {
+    viewState.pendingOperations = Math.max(0, viewState.pendingOperations - 1);
+  }
+  const active = viewState.pendingOperations > 0;
+  sendButton.disabled = false;
+  sendButton.textContent = active ? "Run Turn (active...)" : "Run Turn";
 }
 
 function updateLlmStatus(llmMeta) {
@@ -1103,6 +1123,7 @@ async function refreshVoiceStatus() {
 }
 
 function renderTurnPayload(payload) {
+  rememberFinalState(payload.final_state || {}, payload.final_working_memory_state || {});
   renderExecutionChart(payload.hops || []);
   renderExecutionNarrative(payload.hops || []);
   renderThinking(payload.hops || []);
@@ -1113,8 +1134,8 @@ function renderTurnPayload(payload) {
   renderNodeExplorer(payload.hops || []);
   renderSnapshots(
     payload.hops || [],
-    payload.final_state || {},
-    payload.final_working_memory_state || {},
+    viewState.lastFinalState,
+    viewState.lastFinalMemory,
   );
   updateLlmStatus(payload.llm || null);
 }
@@ -1177,11 +1198,12 @@ function refreshLivePanels() {
   }
   renderPlanTree();
   renderNodeExplorer(viewState.liveHops);
-  renderSnapshots(viewState.liveHops, {}, {});
+  renderSnapshots(viewState.liveHops, viewState.lastFinalState, viewState.lastFinalMemory);
 }
 
 async function runUserTurn(message) {
   const sessionId = sessionIdInput.value.trim() || "collection-ui-session";
+  const streamToken = ++viewState.requestSequence;
   addBubble("user", message);
   setBusy(true);
   viewState.liveHops = [];
@@ -1194,10 +1216,34 @@ async function runUserTurn(message) {
       soft_cap: "10",
       hard_cap: "50",
     });
+    if (viewState.activeStreamSource) {
+      try {
+        viewState.activeStreamSource._closedByClient = true;
+        viewState.activeStreamSource.close();
+      } catch (error) {
+        console.debug("failed to close prior stream", error);
+      }
+      addBubble("system", "Latest input received. Superseding the previous pending response.");
+    }
     const source = new EventSource(`/api/run-turn-stream?${params.toString()}`);
+    viewState.activeStreamSource = source;
+    viewState.activeStreamToken = streamToken;
     let finished = false;
+    let closedManually = false;
+
+    const isCurrentStream = () => viewState.activeStreamToken === streamToken;
+    const finalize = () => {
+      if (finished) return;
+      finished = true;
+      if (isCurrentStream()) {
+        viewState.activeStreamSource = null;
+      }
+      setBusy(false);
+      resolve();
+    };
 
     source.addEventListener("hop_started", (evt) => {
+      if (!isCurrentStream()) return;
       const payload = JSON.parse(evt.data || "{}");
       const hop = Number(payload.hop || 0);
       if (hop > 0) {
@@ -1207,6 +1253,7 @@ async function runUserTurn(message) {
     });
 
     source.addEventListener("trace_event", (evt) => {
+      if (!isCurrentStream()) return;
       const payload = JSON.parse(evt.data || "{}");
       const hop = Number(payload.hop || 0);
       const traceEvent = payload.trace_event || {};
@@ -1218,6 +1265,7 @@ async function runUserTurn(message) {
     });
 
     source.addEventListener("hop_update", (evt) => {
+      if (!isCurrentStream()) return;
       const payload = JSON.parse(evt.data || "{}");
       const hop = Number(payload.hop || 0);
       if (hop > 0) {
@@ -1233,40 +1281,54 @@ async function runUserTurn(message) {
     });
 
     source.addEventListener("turn_complete", (evt) => {
+      closedManually = Boolean(source._closedByClient);
       const payload = JSON.parse(evt.data || "{}");
-      finished = true;
       source.close();
-      addBubble("agent", payload.final_response || "No response generated.");
+      if (!isCurrentStream()) {
+        finalize();
+        return;
+      }
+      const manager = payload.conversation_manager || {};
+      if (manager.response_suppressed) {
+        viewState.suppressedResponseCount += 1;
+        viewState.lastConversationManagerState = manager;
+        addBubble("system", "Suppressed a stale response from an older request.");
+        finalize();
+        return;
+      }
+      const responseText = payload.final_response || "No response generated.";
+      viewState.lastDeliveredResponse = String(responseText);
+      viewState.lastConversationManagerState = manager;
+      addBubble("agent", responseText);
       renderTurnPayload(payload);
       syncPlanTimelineFromSession(String(payload.session_id || sessionId));
-      setBusy(false);
-      resolve();
+      finalize();
     });
 
     source.addEventListener("turn_error", (evt) => {
+      closedManually = Boolean(source._closedByClient);
       const payload = JSON.parse(evt.data || "{}");
-      finished = true;
       source.close();
-      addBubble("agent", `Error: ${String(payload.error || "Unknown error")}`);
-      setBusy(false);
-      resolve();
+      if (isCurrentStream()) {
+        addBubble("agent", `Error: ${String(payload.error || "Unknown error")}`);
+      }
+      finalize();
     });
 
     source.addEventListener("stream_close", () => {
-      if (!finished) {
-        source.close();
-        setBusy(false);
-        resolve();
-      }
+      closedManually = Boolean(source._closedByClient);
+      if (closedManually) return;
+      source.close();
+      finalize();
     });
 
     source.onerror = () => {
-      if (!finished) {
+      closedManually = Boolean(source._closedByClient);
+      if (!finished && !closedManually && isCurrentStream()) {
         source.close();
         addBubble("agent", "Error: live stream disconnected.");
-        setBusy(false);
-        resolve();
       }
+      finalize();
     };
   });
 }
@@ -1487,7 +1549,7 @@ chatForm.addEventListener("submit", async (event) => {
   const message = messageInput.value.trim();
   if (!message) return;
   messageInput.value = "";
-  await runUserTurn(message);
+  void runUserTurn(message);
 });
 
 snapshotPicker.addEventListener("change", renderSelectedSnapshot);

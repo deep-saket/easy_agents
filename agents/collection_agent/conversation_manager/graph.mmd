@@ -1,0 +1,7 @@
+flowchart TD
+  C["Customer"] --> CM["ConversationManagerAgent"]
+  CM --> CA["CollectionAgent"]
+  CA --> DP["DiscountPlanningAgent"]
+  DP --> CA
+  CA --> CM
+  CM --> C

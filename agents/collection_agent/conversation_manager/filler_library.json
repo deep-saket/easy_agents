@@ -1,0 +1,17 @@
+{
+  "short_wait": [
+    "One moment please.",
+    "Let me quickly check that.",
+    "Just a second while I review that."
+  ],
+  "medium_wait": [
+    "I'm reviewing the available options.",
+    "Please stay on the line while I check that.",
+    "I'm still looking into the details for you."
+  ],
+  "long_wait": [
+    "Thank you for your patience.",
+    "This is taking slightly longer than expected.",
+    "I'm still reviewing the available arrangements."
+  ]
+}
