@@ -13,6 +13,7 @@ from typing import Any
 
 from agents.collection_agent.conversation_manager.ConversationManagerAgent import ConversationManagerAgent
 from agents.collection_agent.conversation_manager.ConversationManagerConfig import ConversationManagerConfig
+from src.interfaces import PipecatNotInstalledError, ensure_pipecat_available
 
 
 @dataclass(slots=True)
@@ -50,6 +51,14 @@ class ConversationManagerVoiceProcessManager:
         port: int = 8788,
         transport: str = "webrtc",
     ) -> dict[str, Any]:
+        try:
+            ensure_pipecat_available()
+        except PipecatNotInstalledError as exc:
+            raise RuntimeError(
+                "Voice runtime is unavailable because Pipecat is not installed. "
+                "Install it with: pip install \".[voice-realtime]\""
+            ) from exc
+
         with self._lock:
             self._stop_locked(force=True)
             safe_session = "".join(ch if ch.isalnum() or ch in {"-", "_"} else "_" for ch in session_id)
@@ -89,6 +98,18 @@ class ConversationManagerVoiceProcessManager:
                 started_at=time.time(),
                 log_handle=log_handle,
             )
+            # Fail fast when the child process exits immediately, so the UI gets
+            # a real startup error instead of a dead voice session with only a log file.
+            time.sleep(0.75)
+            if process.poll() is not None:
+                try:
+                    log_handle.flush()
+                except Exception:
+                    pass
+                snippet = self._tail_log(log_path)
+                self._stop_locked(force=True)
+                detail = f" Voice runtime log tail:\n{snippet}" if snippet else ""
+                raise RuntimeError(f"Voice runtime failed to start.{detail}")
             return self._status_payload_locked()
 
     def stop(self, *, force: bool = False) -> dict[str, Any]:
@@ -144,6 +165,15 @@ class ConversationManagerVoiceProcessManager:
             "started_at": state.started_at,
             "exit_code": state.process.poll(),
         }
+
+    @staticmethod
+    def _tail_log(log_path: Path, *, max_lines: int = 40) -> str:
+        try:
+            lines = log_path.read_text(encoding="utf-8").splitlines()
+        except Exception:
+            return ""
+        tail = lines[-max_lines:]
+        return "\n".join(tail).strip()
 
 
 class ConversationManagedRuntime:
@@ -215,6 +245,13 @@ class ConversationManagedRuntime:
 
     def latest_trace_for_session(self, session_id: str) -> Any:
         return self.manager.latest_trace_for_session(session_id)
+
+    def conversation_manager_debug(self, session_id: str, *, limit: int = 30) -> dict[str, Any]:
+        return {
+            "session_id": session_id,
+            "state": self.manager.debug_state(session_id),
+            "logs": self.manager.recent_logs(session_id, limit=limit),
+        }
 
     def start_voice_call(self, request: Any) -> dict[str, Any]:
         from agents.collection_agent.ui.server import StartConversationRequest

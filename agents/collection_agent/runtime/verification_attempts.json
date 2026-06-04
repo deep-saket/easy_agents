@@ -954,5 +954,45 @@
     "field": "phone",
     "status": "verified",
     "created_at": "2026-05-30T19:20:14.144693+00:00"
+  },
+  {
+    "attempt_id": "VER-E5D9E43CA9",
+    "customer_id": "CUST-2001",
+    "case_id": "COLL-1001",
+    "field": "dob",
+    "status": "verified",
+    "created_at": "2026-06-01T21:03:35.437461+00:00"
+  },
+  {
+    "attempt_id": "VER-4CB1914E8B",
+    "customer_id": "CUST-2001",
+    "case_id": "COLL-1001",
+    "field": "phone",
+    "status": "verified",
+    "created_at": "2026-06-01T21:03:35.511449+00:00"
+  },
+  {
+    "attempt_id": "VER-FC6ACADAFA",
+    "customer_id": "CUST-2001",
+    "case_id": "COLL-1001",
+    "field": "dob",
+    "status": "verified",
+    "created_at": "2026-06-03T18:28:16.222636+00:00"
+  },
+  {
+    "attempt_id": "VER-738C264F20",
+    "customer_id": "CUST-2001",
+    "case_id": "COLL-1001",
+    "field": "phone",
+    "status": "verified",
+    "created_at": "2026-06-03T18:31:36.943684+00:00"
+  },
+  {
+    "attempt_id": "VER-9E7EF94D87",
+    "customer_id": "CUST-2001",
+    "case_id": "COLL-1001",
+    "field": "dob",
+    "status": "verified",
+    "created_at": "2026-06-03T19:01:18.172699+00:00"
   }
 ]

@@ -79,31 +79,58 @@
       <aside class="state-pane" id="statePane">
         <button class="collapse-button" id="collapseButton" type="button">Collapse</button>
         <div class="state-pane-content">
-          <h2>Graph State Inspector</h2>
-          <label for="snapshotPicker">Snapshot</label>
-          <select id="snapshotPicker"></select>
+          <section class="inspector-section">
+            <h2>Conversation Inspector</h2>
 
-          <h3>State</h3>
-          <pre id="stateJson" class="json-view"></pre>
+            <h3>Conversation Manager State</h3>
+            <pre id="conversationManagerJson" class="json-view"></pre>
 
-          <h3>Working Memory</h3>
-          <pre id="memoryJson" class="json-view"></pre>
+            <h3>Conversation Manager Logs</h3>
+            <pre id="conversationManagerLogsJson" class="json-view"></pre>
 
-          <h3>Nodes Explored</h3>
-          <div id="nodesExplored" class="nodes-explored"></div>
+            <h3>Conversation Nodes Explored</h3>
+            <div id="conversationNodesExplored" class="nodes-explored"></div>
 
-          <h3>Node Prompt / Response</h3>
-          <pre id="nodePromptJson" class="json-view"></pre>
+            <h3>Conversation Node Prompt / Response</h3>
+            <pre id="conversationNodePromptJson" class="json-view"></pre>
 
-          <h3>Node Output</h3>
-          <pre id="nodeOutputJson" class="json-view"></pre>
+            <h3>Conversation Node State</h3>
+            <pre id="conversationNodeStateJson" class="json-view"></pre>
 
-          <h3>State Diff</h3>
-          <pre id="nodeDiffJson" class="json-view"></pre>
+            <h3>Conversation Node Output</h3>
+            <pre id="conversationNodeOutputJson" class="json-view"></pre>
+
+            <h3>Conversation State Diff</h3>
+            <pre id="conversationNodeDiffJson" class="json-view"></pre>
+          </section>
+
+          <section class="inspector-section">
+            <h2>Collection Agent Inspector</h2>
+            <label for="snapshotPicker">Snapshot</label>
+            <select id="snapshotPicker"></select>
+
+            <h3>State</h3>
+            <pre id="stateJson" class="json-view"></pre>
+
+            <h3>Working Memory</h3>
+            <pre id="memoryJson" class="json-view"></pre>
+
+            <h3>Nodes Explored</h3>
+            <div id="nodesExplored" class="nodes-explored"></div>
+
+            <h3>Node Prompt / Response</h3>
+            <pre id="nodePromptJson" class="json-view"></pre>
+
+            <h3>Node Output</h3>
+            <pre id="nodeOutputJson" class="json-view"></pre>
+
+            <h3>State Diff</h3>
+            <pre id="nodeDiffJson" class="json-view"></pre>
+          </section>
         </div>
       </aside>
     </div>
 
-    <script src="/static/app.js?v=20260518-reflect-fix1" type="module"></script>
+    <script src="/static/app.js?v=20260604-conversation-inspector-compact" type="module"></script>
   </body>
 </html>

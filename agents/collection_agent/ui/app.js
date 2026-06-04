@@ -12,6 +12,13 @@ const planSnapshotLabel = document.getElementById("planSnapshotLabel");
 const snapshotPicker = document.getElementById("snapshotPicker");
 const stateJson = document.getElementById("stateJson");
 const memoryJson = document.getElementById("memoryJson");
+const conversationManagerJson = document.getElementById("conversationManagerJson");
+const conversationManagerLogsJson = document.getElementById("conversationManagerLogsJson");
+const conversationNodesExplored = document.getElementById("conversationNodesExplored");
+const conversationNodePromptJson = document.getElementById("conversationNodePromptJson");
+const conversationNodeStateJson = document.getElementById("conversationNodeStateJson");
+const conversationNodeOutputJson = document.getElementById("conversationNodeOutputJson");
+const conversationNodeDiffJson = document.getElementById("conversationNodeDiffJson");
 const nodesExplored = document.getElementById("nodesExplored");
 const nodePromptJson = document.getElementById("nodePromptJson");
 const nodeOutputJson = document.getElementById("nodeOutputJson");
@@ -30,7 +37,9 @@ const callTranscriptEl = document.getElementById("callTranscript");
 const viewState = {
   snapshots: [],
   nodeEntries: [],
+  conversationNodeEntries: [],
   selectedNodeId: null,
+  selectedConversationNodeId: null,
   liveHops: [],
   collapsed: false,
   demoUsers: [],
@@ -50,6 +59,7 @@ const viewState = {
   lastFinalState: {},
   lastFinalMemory: {},
   lastConversationManagerState: {},
+  lastConversationManagerLogs: [],
 };
 
 function addBubble(role, text) {
@@ -609,6 +619,22 @@ function renderSnapshots(hops, finalState, finalMemory) {
   renderSelectedSnapshot();
 }
 
+function renderConversationManagerDebug(state, logs) {
+  const safeState = state && typeof state === "object" ? state : {};
+  const safeLogs = Array.isArray(logs) ? logs : [];
+  conversationManagerJson.textContent = JSON.stringify(safeState, null, 2);
+  conversationManagerLogsJson.textContent = JSON.stringify(safeLogs, null, 2);
+  renderConversationNodeExplorer();
+}
+
+function clearConversationManagerDebug() {
+  viewState.lastConversationManagerState = {};
+  viewState.lastConversationManagerLogs = [];
+  viewState.conversationNodeEntries = [];
+  viewState.selectedConversationNodeId = null;
+  renderConversationManagerDebug({}, []);
+}
+
 function rememberFinalState(finalState, finalMemory) {
   viewState.lastFinalState = finalState && typeof finalState === "object" ? finalState : {};
   viewState.lastFinalMemory = finalMemory && typeof finalMemory === "object" ? finalMemory : {};
@@ -619,10 +645,12 @@ function renderSelectedSnapshot() {
   if (!selected) {
     stateJson.textContent = "{}";
     memoryJson.textContent = "{}";
+    renderConversationManagerDebug(viewState.lastConversationManagerState, viewState.lastConversationManagerLogs);
     return;
   }
   stateJson.textContent = JSON.stringify(selected.state, null, 2);
   memoryJson.textContent = JSON.stringify(selected.memory, null, 2);
+  renderConversationManagerDebug(viewState.lastConversationManagerState, viewState.lastConversationManagerLogs);
 }
 
 function flattenState(input, prefix = "", out = {}) {
@@ -694,6 +722,76 @@ function deepMerge(target, patch) {
     }
   }
   return out;
+}
+
+function summarizeConversationNode(log) {
+  const requestId = String(log.request_id || "-").trim();
+  const status = String(log.active_task_status || log.delivery_status || "unknown").trim();
+  const tags = [];
+  if (log.interruption_detected) tags.push("interruption");
+  if (log.replayed_from_buffer) tags.push("replay");
+  if (Number(log.filler_count || 0) > 0) tags.push(`fillers=${Number(log.filler_count || 0)}`);
+  if (log.response_suppressed) tags.push("suppressed");
+  if (log.delivery_status) tags.push(`delivery=${String(log.delivery_status).trim()}`);
+  const suffix = tags.length ? ` | ${tags.join(" | ")}` : "";
+  return `${requestId} | ${status}${suffix}`;
+}
+
+function conversationHumanMessage(log) {
+  if (log.replayed_from_buffer) return "Replayed buffered response";
+  if (log.interruption_detected) return "Superseded prior request";
+  if (log.response_suppressed) return "Stored and suppressed stale response";
+  const count = Number(log.filler_count || 0);
+  if (count > 0) return `Emitted ${count} filler message(s)`;
+  if (typeof log.delivery_status === "string" && log.delivery_status.trim()) return log.delivery_status.trim();
+  return String(log.active_task_status || "").trim();
+}
+
+function extractConversationNodeEntries(managerState, managerLogs) {
+  const logs = Array.isArray(managerLogs) ? managerLogs : [];
+  const entries = [];
+  let priorState = {};
+  let seq = 0;
+
+  for (const log of logs) {
+    if (!log || typeof log !== "object") continue;
+    seq += 1;
+    const stateAfter = deepMerge(priorState, log);
+    const diff = computeStateDiff(priorState, stateAfter);
+    entries.push({
+      id: `conversation-node-${seq}`,
+      label: `${seq}. request`,
+      component: "conversation_request",
+      state_before: priorState,
+      state_after: stateAfter,
+      state_update: log,
+      output: {
+        component: "conversation_request",
+        raw_log: log,
+      },
+      humanMessage: conversationHumanMessage(log),
+      diff,
+      summary: summarizeConversationNode(log),
+    });
+    priorState = stateAfter;
+  }
+
+  if (!entries.length && managerState && typeof managerState === "object" && Object.keys(managerState).length) {
+    entries.push({
+      id: "conversation-node-empty",
+      label: "1. conversation_state",
+      component: "conversation_state",
+      state_before: {},
+      state_after: managerState,
+      state_update: managerState,
+      output: { component: "conversation_state", raw_log: null },
+      humanMessage: "No logs yet; showing current conversation-manager state",
+      diff: computeStateDiff({}, managerState),
+      summary: "current state",
+    });
+  }
+
+  return entries;
 }
 
 function extractNodeEntries(hops) {
@@ -827,6 +925,20 @@ function extractNodePromptResponse(entry) {
   };
 }
 
+function extractConversationNodePromptResponse(entry) {
+  const log = entry && entry.output && typeof entry.output === "object" ? entry.output.raw_log || {} : {};
+  const delivery = log && typeof log.delivery === "object" ? log.delivery : {};
+  return {
+    component: String(entry.component || "unknown"),
+    request_id: log.request_id || null,
+    customer_input: log.customer_input || null,
+    interruption_handoff: log.interruption_handoff || null,
+    downstream_customer_input: log.downstream_customer_input || null,
+    response: delivery.message_text || null,
+    delivery_status: log.delivery_status || null,
+  };
+}
+
 function renderSelectedNodeEntry() {
   const selected = viewState.nodeEntries.find((entry) => entry.id === viewState.selectedNodeId);
   if (!selected) {
@@ -846,6 +958,29 @@ function renderSelectedNodeEntry() {
     2,
   );
   nodeDiffJson.textContent = JSON.stringify(selected.diff || {}, null, 2);
+}
+
+function renderSelectedConversationNodeEntry() {
+  const selected = viewState.conversationNodeEntries.find((entry) => entry.id === viewState.selectedConversationNodeId);
+  if (!selected) {
+    conversationNodePromptJson.textContent = "{}";
+    conversationNodeStateJson.textContent = "{}";
+    conversationNodeOutputJson.textContent = "{}";
+    conversationNodeDiffJson.textContent = "{}";
+    return;
+  }
+  conversationNodePromptJson.textContent = JSON.stringify(extractConversationNodePromptResponse(selected), null, 2);
+  conversationNodeStateJson.textContent = JSON.stringify(selected.state_after || {}, null, 2);
+  conversationNodeOutputJson.textContent = JSON.stringify(
+    {
+      human_message: selected.humanMessage || null,
+      state_update: selected.state_update || {},
+      raw_event: selected.output || {},
+    },
+    null,
+    2,
+  );
+  conversationNodeDiffJson.textContent = JSON.stringify(selected.diff || {}, null, 2);
 }
 
 function renderNodeExplorer(hops) {
@@ -879,6 +1014,46 @@ function renderNodeExplorer(hops) {
   }
 
   renderSelectedNodeEntry();
+}
+
+function renderConversationNodeExplorer() {
+  const entries = extractConversationNodeEntries(
+    viewState.lastConversationManagerState,
+    viewState.lastConversationManagerLogs,
+  );
+  viewState.conversationNodeEntries = entries;
+  conversationNodesExplored.innerHTML = "";
+
+  if (!entries.length) {
+    conversationNodesExplored.textContent = "No conversation-manager nodes explored yet.";
+    conversationNodePromptJson.textContent = "{}";
+    conversationNodeStateJson.textContent = "{}";
+    conversationNodeOutputJson.textContent = "{}";
+    conversationNodeDiffJson.textContent = "{}";
+    return;
+  }
+
+  if (
+    !viewState.selectedConversationNodeId ||
+    !entries.some((entry) => entry.id === viewState.selectedConversationNodeId)
+  ) {
+    viewState.selectedConversationNodeId = entries[entries.length - 1].id;
+  }
+
+  for (const entry of entries) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `node-entry ${entry.id === viewState.selectedConversationNodeId ? "active" : ""}`;
+    const suffix = entry.humanMessage ? ` - ${entry.humanMessage}` : "";
+    button.textContent = `${entry.label} | ${entry.summary}${suffix}`;
+    button.addEventListener("click", () => {
+      viewState.selectedConversationNodeId = entry.id;
+      renderConversationNodeExplorer();
+    });
+    conversationNodesExplored.appendChild(button);
+  }
+
+  renderSelectedConversationNodeEntry();
 }
 
 function setBusy(isBusy) {
@@ -1061,16 +1236,20 @@ async function refreshCallLiveState(sessionId) {
   const sid = String(sessionId || "").trim();
   if (!sid) return;
   try {
-    const [sessionResponse, traceResponse] = await Promise.all([
+    const [sessionResponse, traceResponse, managerResponse] = await Promise.all([
       fetch(`/api/session/${encodeURIComponent(sid)}`),
       fetch(`/api/session/${encodeURIComponent(sid)}/latest-trace`),
+      fetch(`/api/session/${encodeURIComponent(sid)}/conversation-manager?limit=30`),
     ]);
     if (!sessionResponse.ok) return;
 
     const sessionPayload = await sessionResponse.json();
     const tracePayload = traceResponse.ok ? await traceResponse.json() : { trace: null };
+    const managerPayload = managerResponse.ok ? await managerResponse.json() : { state: null, logs: [] };
     const finalState = buildLiveFinalState(sessionPayload.conversation_state || {}, sid);
     const finalMemory = sessionPayload.working_memory_state || {};
+    viewState.lastConversationManagerState = managerPayload.state || sessionPayload.conversation_manager || {};
+    viewState.lastConversationManagerLogs = Array.isArray(managerPayload.logs) ? managerPayload.logs : [];
     const liveHops = buildLiveHopsFromTrace(tracePayload.trace, finalState, finalMemory);
 
     if (liveHops.length) {
@@ -1124,6 +1303,10 @@ async function refreshVoiceStatus() {
 
 function renderTurnPayload(payload) {
   rememberFinalState(payload.final_state || {}, payload.final_working_memory_state || {});
+  viewState.lastConversationManagerState =
+    payload.conversation_manager && typeof payload.conversation_manager === "object"
+      ? payload.conversation_manager
+      : viewState.lastConversationManagerState;
   renderExecutionChart(payload.hops || []);
   renderExecutionNarrative(payload.hops || []);
   renderThinking(payload.hops || []);
@@ -1144,9 +1327,16 @@ async function syncPlanTimelineFromSession(sessionId) {
   const sid = String(sessionId || "").trim();
   if (!sid) return;
   try {
-    const response = await fetch(`/api/session/${encodeURIComponent(sid)}`);
+    const [response, managerResponse] = await Promise.all([
+      fetch(`/api/session/${encodeURIComponent(sid)}`),
+      fetch(`/api/session/${encodeURIComponent(sid)}/conversation-manager?limit=30`),
+    ]);
     if (!response.ok) return;
     const payload = await response.json();
+    const managerPayload = managerResponse.ok ? await managerResponse.json() : { state: null, logs: [] };
+    viewState.lastConversationManagerState = managerPayload.state || payload.conversation_manager || {};
+    viewState.lastConversationManagerLogs = Array.isArray(managerPayload.logs) ? managerPayload.logs : [];
+    renderConversationManagerDebug(viewState.lastConversationManagerState, viewState.lastConversationManagerLogs);
     const conversationState = payload && typeof payload === "object" ? payload.conversation_state || {} : {};
     const plan = resolveConversationPlan(conversationState);
     if (!plan || typeof plan !== "object") return;
@@ -1207,6 +1397,7 @@ async function runUserTurn(message) {
   addBubble("user", message);
   setBusy(true);
   viewState.liveHops = [];
+  startLiveStatePolling(sessionId);
   refreshLivePanels();
 
   await new Promise((resolve) => {
@@ -1237,6 +1428,9 @@ async function runUserTurn(message) {
       finished = true;
       if (isCurrentStream()) {
         viewState.activeStreamSource = null;
+      }
+      if (!viewState.callActive) {
+        stopLiveStatePolling();
       }
       setBusy(false);
       resolve();
@@ -1388,6 +1582,7 @@ async function startDemoConversation(userEntry) {
   setBusy(true);
   viewState.planSnapshots = [];
   viewState.planSnapshotIndex = 0;
+  clearConversationManagerDebug();
 
   try {
     const response = await fetch("/api/start-conversation", {
@@ -1455,6 +1650,7 @@ async function resetDemoConversation(userEntry) {
       viewState.snapshotMap = new Map();
       viewState.planSnapshots = [];
       viewState.planSnapshotIndex = 0;
+      clearConversationManagerDebug();
       messagesEl.innerHTML = "";
       renderSnapshots([], {}, {});
       renderPlanTree();
@@ -1588,6 +1784,7 @@ renderExecutionNarrative([]);
 renderThinking([]);
 renderPlanTree();
 renderNodeExplorer([]);
+clearConversationManagerDebug();
 renderSnapshots([], {}, {});
 loadDemoUsers();
 refreshVoiceStatus();

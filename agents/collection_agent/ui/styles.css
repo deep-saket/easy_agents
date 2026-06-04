@@ -278,6 +278,12 @@ button {
   margin: 0 0 0.6rem;
 }
 
+.inspector-section + .inspector-section {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
 .execution-chart {
   display: grid;
   gap: 0.55rem;

@@ -117,9 +117,12 @@ def test_latest_input_wins_suppresses_stale_response(tmp_path: Path) -> None:
     stale = results[0]
     assert stale["conversation_manager"]["response_suppressed"] is True
     assert stale["final_response"] == ""
-    assert latest["final_response"] == "handled: second"
+    assert "Latest customer message: second" in latest["conversation_manager"]["downstream_customer_input"]
+    assert latest["final_response"].startswith("handled: The customer interrupted while the previous turn was still processing.")
     debug = manager.debug_state("s3")
     assert debug["suppressed_response_count"] >= 1
+    assert debug["interrupted_request_id"] is None
+    assert debug["interrupted_customer_input"] is None
 
 
 def test_repeat_request_replays_buffer_without_recomputing(tmp_path: Path) -> None:
@@ -143,6 +146,25 @@ def test_new_business_input_recomputes_collection_agent(tmp_path: Path) -> None:
     manager.run_turn(SimpleNamespace(message="Actually I can pay today", session_id="s5"))
 
     assert runtime.calls == ["tell me", "Actually I can pay today"]
+
+
+def test_interrupted_input_is_retained_and_forwarded_to_latest_turn(tmp_path: Path) -> None:
+    runtime = _FakeRuntime(delay_seconds=0.08)
+    manager = ConversationManagerAgent(config=_config(tmp_path), downstream_runtime=runtime)
+
+    def first_turn() -> None:
+        manager.run_turn(SimpleNamespace(message="I cannot pay right now", session_id="s5c"))
+
+    thread = threading.Thread(target=first_turn, daemon=True)
+    thread.start()
+    time.sleep(0.02)
+    latest = manager.run_turn(SimpleNamespace(message="Actually I can pay 3000 today", session_id="s5c"))
+    thread.join()
+
+    assert "Previous interrupted customer message: I cannot pay right now" in runtime.calls[-1]
+    assert "Latest customer message: Actually I can pay 3000 today" in runtime.calls[-1]
+    assert latest["conversation_manager"]["interruption_handoff"]["previous_input"] == "I cannot pay right now"
+    assert latest["conversation_manager"]["interruption_handoff"]["current_input"] == "Actually I can pay 3000 today"
 
 
 def test_reset_clears_replay_buffer(tmp_path: Path) -> None:

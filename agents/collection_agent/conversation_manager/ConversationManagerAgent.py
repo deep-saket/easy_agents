@@ -9,6 +9,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Callable
 
 from agents.collection_agent.conversation_manager.BargeInHandler import BargeInHandler
@@ -46,6 +47,9 @@ class _SessionControlState:
     last_delivered_message_id: str | None = None
     active_cancel_event: threading.Event | None = None
     suppressed_response_count: int = 0
+    interrupted_request_id: str | None = None
+    interrupted_customer_input: str | None = None
+    interruption_handoff: dict[str, Any] | None = None
 
 
 class ConversationManagerAgent:
@@ -113,6 +117,36 @@ class ConversationManagerAgent:
     def latest_trace_for_session(self, session_id: str) -> Any:
         return self.downstream_runtime.latest_trace_for_session(session_id=session_id)
 
+    def recent_logs(self, session_id: str, *, limit: int = 30) -> list[dict[str, Any]]:
+        """Returns recent conversation-manager log entries for a session."""
+
+        safe_limit = max(1, min(int(limit), 200))
+        if not self._log_path.exists():
+            return []
+        try:
+            lines = self._log_path.read_text(encoding="utf-8").splitlines()
+        except Exception:
+            return []
+
+        matches: list[dict[str, Any]] = []
+        for raw in reversed(lines):
+            line = raw.strip()
+            if not line:
+                continue
+            try:
+                payload = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(payload, dict):
+                continue
+            if str(payload.get("conversation_id", "")).strip() != session_id:
+                continue
+            matches.append(payload)
+            if len(matches) >= safe_limit:
+                break
+        matches.reverse()
+        return matches
+
     def voice_status(self) -> Any:
         return self.downstream_runtime.voice_status()
 
@@ -153,6 +187,7 @@ class ConversationManagerAgent:
                 self._write_log(payload["conversation_manager"])
                 return payload
 
+        interruption_handoff: dict[str, Any] | None = None
         with self._lock:
             session = self._session_state_for(session_id)
             if (
@@ -163,6 +198,15 @@ class ConversationManagerAgent:
             ):
                 superseded_request_id = session.active_request_id
                 session.superseded_request_ids.append(superseded_request_id)
+                previous_input = str(session.active_customer_input or "").strip()
+                session.interrupted_request_id = superseded_request_id
+                session.interrupted_customer_input = previous_input or None
+                interruption_handoff = {
+                    "previous_request_id": superseded_request_id,
+                    "previous_input": previous_input,
+                    "current_input": customer_input,
+                }
+                session.interruption_handoff = dict(interruption_handoff)
                 if session.active_cancel_event is not None:
                     session.active_cancel_event.set()
                 interruption_details = self._barge_in_handler.handle_text_supersede(
@@ -175,6 +219,11 @@ class ConversationManagerAgent:
             session.latest_customer_input_id = customer_input_id
             session.pending_response = None
             session.active_cancel_event = cancel_event
+
+        downstream_request = self._build_interruption_aware_request(
+            request=request,
+            interruption_handoff=interruption_handoff,
+        )
 
         def wrapped_callback(payload: dict[str, Any]) -> None:
             if cancel_event.is_set():
@@ -194,7 +243,7 @@ class ConversationManagerAgent:
             customer_input_id=customer_input_id,
             cancel_event=cancel_event,
             event_callback=wrapped_callback,
-            work=lambda: self._invoke_downstream_run_turn(request, wrapped_callback),
+            work=lambda: self._invoke_downstream_run_turn(downstream_request, wrapped_callback),
         )
         payload = execution.result if isinstance(execution.result, dict) else {}
         response_text = str(payload.get("final_response", "")).strip()
@@ -229,6 +278,7 @@ class ConversationManagerAgent:
             {
                 "request_id": request_id,
                 "customer_input_id": customer_input_id,
+                "customer_input": customer_input,
                 "active_request_id": self.debug_state(session_id)["active_request_id"],
                 "latest_customer_input_id": self.debug_state(session_id)["latest_customer_input_id"],
                 "superseded_request_ids": self.debug_state(session_id)["superseded_request_ids"],
@@ -238,6 +288,8 @@ class ConversationManagerAgent:
                 "interruption_type": None if interruption_details is None else interruption_details["interruption_type"],
                 "superseded_request_id": superseded_request_id,
                 "response_suppressed": is_superseded,
+                "interruption_handoff": interruption_handoff,
+                "downstream_customer_input": str(getattr(downstream_request, "message", "")).strip(),
             }
         )
 
@@ -286,6 +338,9 @@ class ConversationManagerAgent:
                 session = self._session_state_for(session_id)
                 session.last_delivered_response_id = response_id
                 session.last_delivered_message_id = message_id
+                session.interrupted_request_id = None
+                session.interrupted_customer_input = None
+                session.interruption_handoff = None
             conversation_manager.update(
                 {
                     "response_delivered": True,
@@ -462,6 +517,11 @@ class ConversationManagerAgent:
                 "pending_response": dict(session.pending_response) if isinstance(session.pending_response, dict) else None,
                 "last_delivered_response_id": session.last_delivered_response_id,
                 "suppressed_response_count": session.suppressed_response_count,
+                "interrupted_request_id": session.interrupted_request_id,
+                "interrupted_customer_input": session.interrupted_customer_input,
+                "interruption_handoff": (
+                    dict(session.interruption_handoff) if isinstance(session.interruption_handoff, dict) else None
+                ),
                 "buffered_responses": self._response_buffer.all_for_session(session_id),
             }
 
@@ -541,6 +601,7 @@ class ConversationManagerAgent:
             "conversation_id": session_id,
             "request_id": request_id,
             "customer_input_id": customer_input_id,
+            "customer_input": getattr(replay, "message_text", None),
             "wait_duration_ms": 0.0,
             "filler_messages_sent": [],
             "filler_categories": [],
@@ -605,6 +666,44 @@ class ConversationManagerAgent:
             self._session_states.pop(session_id, None)
         self._response_buffer.clear_session(session_id)
         self._delivery_tracker.clear_session(session_id)
+
+    @staticmethod
+    def _compose_interruption_message(*, previous_input: str, current_input: str) -> str:
+        prior = previous_input.strip()
+        current = current_input.strip()
+        if not prior or not current:
+            return current or prior
+        return (
+            "The customer interrupted while the previous turn was still processing.\n"
+            f"Previous interrupted customer message: {prior}\n"
+            f"Latest customer message: {current}\n"
+            "Use the latest message as authoritative, but keep the interrupted message as immediate context."
+        )
+
+    def _build_interruption_aware_request(
+        self,
+        *,
+        request: Any,
+        interruption_handoff: dict[str, Any] | None,
+    ) -> Any:
+        if not interruption_handoff:
+            return request
+        previous_input = str(interruption_handoff.get("previous_input", "")).strip()
+        current_input = str(interruption_handoff.get("current_input", "")).strip()
+        merged_message = self._compose_interruption_message(
+            previous_input=previous_input,
+            current_input=current_input,
+        )
+        payload = dict(vars(request)) if hasattr(request, "__dict__") else {}
+        if not payload:
+            payload = {
+                "session_id": getattr(request, "session_id", ""),
+                "message": getattr(request, "message", ""),
+            }
+        payload["message"] = merged_message
+        payload["original_message"] = current_input
+        payload["interruption_handoff"] = dict(interruption_handoff)
+        return SimpleNamespace(**payload)
 
     def _next_id(self, prefix: str) -> str:
         with self._lock:

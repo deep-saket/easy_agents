@@ -1664,29 +1664,6 @@
       "created_at": "2026-05-30T09:35:53.351846Z"
     }
   ],
-  "collection-user_a": [
-    {
-      "id": "f6bb8826-c3d6-47d9-9287-7c41fb0c8ca1",
-      "session_id": "collection-user_a",
-      "role": "customer",
-      "content": "Hi Alex!! This is Aditi",
-      "created_at": "2026-05-30T09:42:16.941914Z"
-    },
-    {
-      "id": "9048d776-fb03-4eea-b72b-efb33113ade7",
-      "session_id": "collection-user_a",
-      "role": "agent",
-      "content": "Hi Aditi, to proceed, could you please provide your date of birth and phone number?",
-      "created_at": "2026-05-30T09:43:33.173272Z"
-    },
-    {
-      "id": "94a9200e-ceb9-41d7-90c6-8c2856afe3e9",
-      "session_id": "collection-user_a",
-      "role": "customer",
-      "content": "My DoB ius 1991-08-19",
-      "created_at": "2026-05-30T09:43:45.337675Z"
-    }
-  ],
   "collection-user_a-cli": [
     {
       "id": "82222e2b-905c-4521-818d-ad220c9ee02d",
@@ -1750,6 +1727,36 @@
       "role": "customer",
       "content": "I can not give more than 6000",
       "created_at": "2026-05-30T19:30:29.914939Z"
+    }
+  ],
+  "e2e-pay_now-1780347651": [
+    {
+      "id": "4079e9d7-4b34-43da-bc26-57afc5b3bbba",
+      "session_id": "e2e-pay_now-1780347651",
+      "role": "customer",
+      "content": "Yes this is Aditi.",
+      "created_at": "2026-06-01T21:00:51.694356Z"
+    },
+    {
+      "id": "81f4be19-ce1e-4530-9378-c638280b517c",
+      "session_id": "e2e-pay_now-1780347651",
+      "role": "agent",
+      "content": "Please confirm the required verification details.",
+      "created_at": "2026-06-01T21:02:37.961611Z"
+    },
+    {
+      "id": "9d18cfe7-91fa-4ac8-bdf8-e3d38a3be13e",
+      "session_id": "e2e-pay_now-1780347651",
+      "role": "customer",
+      "content": "My phone number is 9900001001 and date of birth is 1991-08-19",
+      "created_at": "2026-06-01T21:02:37.968339Z"
+    },
+    {
+      "id": "a1b7fe66-ac80-4c10-996c-746ab9e72517",
+      "session_id": "e2e-pay_now-1780347651",
+      "role": "agent",
+      "content": "Thank you, Aditi. Your account is overdue by \u20b912,500. We'll explain the dues in detail. To confirm, your overdue amount is \u20b912,500. Would you like to discuss a payment plan to settle this amount?",
+      "created_at": "2026-06-01T21:08:39.272000Z"
     }
   ]
 }

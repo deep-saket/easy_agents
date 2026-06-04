@@ -5,7 +5,11 @@ from types import SimpleNamespace
 
 from agents.collection_agent.conversation_manager.ConversationManagerAgent import ConversationManagerAgent
 from agents.collection_agent.conversation_manager.ConversationManagerConfig import ConversationManagerConfig
-from agents.collection_agent.conversation_manager.runtime import ConversationManagedRuntime
+from agents.collection_agent.conversation_manager.runtime import (
+    ConversationManagedRuntime,
+    ConversationManagerVoiceProcessManager,
+)
+from src.interfaces import PipecatNotInstalledError
 
 
 class _FakeCollectionRuntime:
@@ -62,3 +66,27 @@ def test_runtime_wraps_downstream_without_touching_collection_sources(tmp_path: 
     result = runtime.run_turn(SimpleNamespace(message="hello", session_id="abc"))
     assert result["final_response"] == "reply"
     assert "conversation_manager" in result
+
+
+def test_voice_start_fails_fast_when_pipecat_missing(tmp_path: Path, monkeypatch) -> None:
+    def _raise_missing() -> None:
+        raise PipecatNotInstalledError("missing")
+
+    monkeypatch.setattr(
+        "agents.collection_agent.conversation_manager.runtime.ensure_pipecat_available",
+        _raise_missing,
+    )
+    manager = ConversationManagerVoiceProcessManager(
+        repo_root=Path("/Users/saketm10/Projects/openclaw_agents"),
+        base_dir=tmp_path,
+    )
+    try:
+        manager.start(
+            user_code="user_a",
+            session_id="voice-missing",
+            greeting="hello",
+        )
+    except RuntimeError as exc:
+        assert "Pipecat is not installed" in str(exc)
+    else:  # pragma: no cover - defensive failure path
+        raise AssertionError("Expected voice start to fail when Pipecat is unavailable")

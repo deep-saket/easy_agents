@@ -1,39 +1,337 @@
 {
-  "trace_id": "0212d8a3-d8fb-457b-8a71-87c555539e8c",
+  "trace_id": "97a88f4f-b088-4173-aab2-53210b758235",
   "agent_name": "collection_agent",
-  "session_id": "collection-user_a-cli",
-  "user_input": "Discount recommendation ready. Continue and respond to customer.",
-  "status": "failed",
-  "started_at": "2026-05-30T19:33:09.160145+00:00",
-  "finished_at": "2026-05-30T19:33:09.587751+00:00",
-  "error": "CollectionIntentNode was rate-limited by provider and rate-limit fallback is disabled. Underlying error: Structured output failed after retries: Error code: 429 - {'error': {'message': 'Rate limit reached for model `llama-3.1-8b-instant` in organization `org_01krxc483gf5n9q22k1b727fhs` service tier `on_demand` on tokens per day (TPD): Limit 500000, Used 499676, Requested 1192. Please try again in 2m29.9904s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}",
+  "session_id": "collection-user_a",
+  "user_input": "My DoB ius 1991-08-19",
+  "status": "completed",
+  "started_at": "2026-06-03T19:00:55.565260+00:00",
+  "finished_at": "2026-06-03T19:03:38.734559+00:00",
+  "error": null,
   "summary": {
-    "trace_id": "0212d8a3-d8fb-457b-8a71-87c555539e8c",
+    "trace_id": "97a88f4f-b088-4173-aab2-53210b758235",
     "agent_name": "collection_agent",
-    "session_id": "collection-user_a-cli",
-    "status": "failed",
+    "session_id": "collection-user_a",
+    "status": "completed",
     "node_hits": [
-      "relevance_intent"
+      "relevance_intent",
+      "entity_extract",
+      "negotiation_classification",
+      "pre_plan_intent",
+      "execution_path_intent",
+      "verification_react",
+      "tool_execution",
+      "verification_react",
+      "post_verification_intent",
+      "plan_proposal_state",
+      "plan_proposal_graph",
+      "plan_proposal_directive",
+      "reflect",
+      "plan_proposal_state",
+      "plan_proposal_graph",
+      "plan_proposal_directive",
+      "reflect",
+      "relevant_response"
     ],
-    "node_count": 1,
-    "llm_call_count": 0,
-    "tool_call_count": 0,
-    "models": [],
+    "node_count": 18,
+    "llm_call_count": 11,
+    "tool_call_count": 1,
+    "models": [
+      "llama-3.1-8b-instant"
+    ],
     "prompt_tokens": 0,
     "completion_tokens": 0,
     "total_tokens": 0,
-    "error": "CollectionIntentNode was rate-limited by provider and rate-limit fallback is disabled. Underlying error: Structured output failed after retries: Error code: 429 - {'error': {'message': 'Rate limit reached for model `llama-3.1-8b-instant` in organization `org_01krxc483gf5n9q22k1b727fhs` service tier `on_demand` on tokens per day (TPD): Limit 500000, Used 499676, Requested 1192. Please try again in 2m29.9904s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}"
+    "error": null
   },
   "nodes": [
     {
       "node_name": "relevance_intent",
-      "status": "failed",
-      "started_at": "2026-05-30T19:33:09.160520+00:00",
-      "finished_at": "2026-05-30T19:33:09.587561+00:00",
-      "duration_ms": 427.041,
-      "error": "CollectionIntentNode was rate-limited by provider and rate-limit fallback is disabled. Underlying error: Structured output failed after retries: Error code: 429 - {'error': {'message': 'Rate limit reached for model `llama-3.1-8b-instant` in organization `org_01krxc483gf5n9q22k1b727fhs` service tier `on_demand` on tokens per day (TPD): Limit 500000, Used 499676, Requested 1192. Please try again in 2m29.9904s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing', 'type': 'tokens', 'code': 'rate_limit_exceeded'}}"
+      "status": "completed",
+      "started_at": "2026-06-03T19:00:55.565727+00:00",
+      "finished_at": "2026-06-03T19:00:55.786428+00:00",
+      "duration_ms": 220.701,
+      "error": null
+    },
+    {
+      "node_name": "entity_extract",
+      "status": "completed",
+      "started_at": "2026-06-03T19:00:55.787741+00:00",
+      "finished_at": "2026-06-03T19:00:56.881785+00:00",
+      "duration_ms": 1094.044,
+      "error": null
+    },
+    {
+      "node_name": "negotiation_classification",
+      "status": "completed",
+      "started_at": "2026-06-03T19:00:56.882127+00:00",
+      "finished_at": "2026-06-03T19:01:18.085244+00:00",
+      "duration_ms": 21203.117,
+      "error": null
+    },
+    {
+      "node_name": "pre_plan_intent",
+      "status": "completed",
+      "started_at": "2026-06-03T19:01:18.085595+00:00",
+      "finished_at": "2026-06-03T19:01:18.112126+00:00",
+      "duration_ms": 26.531,
+      "error": null
+    },
+    {
+      "node_name": "execution_path_intent",
+      "status": "completed",
+      "started_at": "2026-06-03T19:01:18.112499+00:00",
+      "finished_at": "2026-06-03T19:01:18.132455+00:00",
+      "duration_ms": 19.956,
+      "error": null
+    },
+    {
+      "node_name": "verification_react",
+      "status": "completed",
+      "started_at": "2026-06-03T19:01:18.132817+00:00",
+      "finished_at": "2026-06-03T19:01:18.170997+00:00",
+      "duration_ms": 38.18,
+      "error": null
+    },
+    {
+      "node_name": "tool_execution",
+      "status": "completed",
+      "started_at": "2026-06-03T19:01:18.171495+00:00",
+      "finished_at": "2026-06-03T19:01:18.194394+00:00",
+      "duration_ms": 22.899,
+      "error": null
+    },
+    {
+      "node_name": "verification_react",
+      "status": "completed",
+      "started_at": "2026-06-03T19:01:18.212850+00:00",
+      "finished_at": "2026-06-03T19:01:37.844004+00:00",
+      "duration_ms": 19631.154,
+      "error": null
+    },
+    {
+      "node_name": "post_verification_intent",
+      "status": "completed",
+      "started_at": "2026-06-03T19:01:37.845927+00:00",
+      "finished_at": "2026-06-03T19:01:37.880704+00:00",
+      "duration_ms": 34.777,
+      "error": null
+    },
+    {
+      "node_name": "plan_proposal_state",
+      "status": "completed",
+      "started_at": "2026-06-03T19:01:37.882896+00:00",
+      "finished_at": "2026-06-03T19:01:46.755086+00:00",
+      "duration_ms": 8872.19,
+      "error": null
+    },
+    {
+      "node_name": "plan_proposal_graph",
+      "status": "completed",
+      "started_at": "2026-06-03T19:01:46.791262+00:00",
+      "finished_at": "2026-06-03T19:01:46.815520+00:00",
+      "duration_ms": 24.258,
+      "error": null
+    },
+    {
+      "node_name": "plan_proposal_directive",
+      "status": "completed",
+      "started_at": "2026-06-03T19:01:46.816009+00:00",
+      "finished_at": "2026-06-03T19:02:23.751066+00:00",
+      "duration_ms": 36935.057,
+      "error": null
+    },
+    {
+      "node_name": "reflect",
+      "status": "completed",
+      "started_at": "2026-06-03T19:02:23.752356+00:00",
+      "finished_at": "2026-06-03T19:02:31.062427+00:00",
+      "duration_ms": 7310.071,
+      "error": null
+    },
+    {
+      "node_name": "plan_proposal_state",
+      "status": "completed",
+      "started_at": "2026-06-03T19:02:31.064977+00:00",
+      "finished_at": "2026-06-03T19:02:40.135581+00:00",
+      "duration_ms": 9070.604,
+      "error": null
+    },
+    {
+      "node_name": "plan_proposal_graph",
+      "status": "completed",
+      "started_at": "2026-06-03T19:02:40.139987+00:00",
+      "finished_at": "2026-06-03T19:02:40.173452+00:00",
+      "duration_ms": 33.465,
+      "error": null
+    },
+    {
+      "node_name": "plan_proposal_directive",
+      "status": "completed",
+      "started_at": "2026-06-03T19:02:40.174068+00:00",
+      "finished_at": "2026-06-03T19:03:17.541930+00:00",
+      "duration_ms": 37367.862,
+      "error": null
+    },
+    {
+      "node_name": "reflect",
+      "status": "completed",
+      "started_at": "2026-06-03T19:03:17.542488+00:00",
+      "finished_at": "2026-06-03T19:03:26.007879+00:00",
+      "duration_ms": 8465.391,
+      "error": null
+    },
+    {
+      "node_name": "relevant_response",
+      "status": "completed",
+      "started_at": "2026-06-03T19:03:26.009371+00:00",
+      "finished_at": "2026-06-03T19:03:38.709906+00:00",
+      "duration_ms": 12700.535,
+      "error": null
     }
   ],
-  "llm_calls": [],
-  "tool_calls": []
+  "llm_calls": [
+    {
+      "call_id": "895f05d3-a0ce-424e-b324-5c3c59f89172",
+      "node_name": "relevance_intent",
+      "model_name": "llama-3.1-8b-instant",
+      "call_kind": "generate",
+      "prompt_tokens": null,
+      "completion_tokens": null,
+      "total_tokens": null,
+      "started_at": "2026-06-03T19:00:55.786117+00:00",
+      "finished_at": "2026-06-03T19:00:55.786117+00:00",
+      "duration_ms": 202.873
+    },
+    {
+      "call_id": "6b5d78ea-be2e-4fb3-acbf-a1f61e65f1e7",
+      "node_name": "entity_extract",
+      "model_name": "llama-3.1-8b-instant",
+      "call_kind": "generate",
+      "prompt_tokens": null,
+      "completion_tokens": null,
+      "total_tokens": null,
+      "started_at": "2026-06-03T19:00:56.824918+00:00",
+      "finished_at": "2026-06-03T19:00:56.824918+00:00",
+      "duration_ms": 1036.455
+    },
+    {
+      "call_id": "234c72dc-d5ab-4ea2-b33b-b1f49c314341",
+      "node_name": "negotiation_classification",
+      "model_name": "llama-3.1-8b-instant",
+      "call_kind": "generate",
+      "prompt_tokens": null,
+      "completion_tokens": null,
+      "total_tokens": null,
+      "started_at": "2026-06-03T19:01:18.052512+00:00",
+      "finished_at": "2026-06-03T19:01:18.052512+00:00",
+      "duration_ms": 21150.263
+    },
+    {
+      "call_id": "93998e2f-981f-4f06-8dbd-8b9d1a395a56",
+      "node_name": "verification_react",
+      "model_name": "llama-3.1-8b-instant",
+      "call_kind": "generate",
+      "prompt_tokens": null,
+      "completion_tokens": null,
+      "total_tokens": null,
+      "started_at": "2026-06-03T19:01:37.843716+00:00",
+      "finished_at": "2026-06-03T19:01:37.843716+00:00",
+      "duration_ms": 19594.627
+    },
+    {
+      "call_id": "9477c7a7-4f4a-4076-ae9e-0671bd39981c",
+      "node_name": "plan_proposal_state",
+      "model_name": "llama-3.1-8b-instant",
+      "call_kind": "generate",
+      "prompt_tokens": null,
+      "completion_tokens": null,
+      "total_tokens": null,
+      "started_at": "2026-06-03T19:01:46.754489+00:00",
+      "finished_at": "2026-06-03T19:01:46.754489+00:00",
+      "duration_ms": 8847.204
+    },
+    {
+      "call_id": "e0036f55-0abb-48e0-9642-a3a1354e840a",
+      "node_name": "plan_proposal_directive",
+      "model_name": "llama-3.1-8b-instant",
+      "call_kind": "generate",
+      "prompt_tokens": null,
+      "completion_tokens": null,
+      "total_tokens": null,
+      "started_at": "2026-06-03T19:02:23.690642+00:00",
+      "finished_at": "2026-06-03T19:02:23.690642+00:00",
+      "duration_ms": 36854.021
+    },
+    {
+      "call_id": "526597e3-ecfd-4a36-aa36-8382978f091a",
+      "node_name": "reflect",
+      "model_name": "llama-3.1-8b-instant",
+      "call_kind": "generate",
+      "prompt_tokens": null,
+      "completion_tokens": null,
+      "total_tokens": null,
+      "started_at": "2026-06-03T19:02:31.061778+00:00",
+      "finished_at": "2026-06-03T19:02:31.061778+00:00",
+      "duration_ms": 7288.368
+    },
+    {
+      "call_id": "cddc85a5-4756-4811-944a-9080e18a1f68",
+      "node_name": "plan_proposal_state",
+      "model_name": "llama-3.1-8b-instant",
+      "call_kind": "generate",
+      "prompt_tokens": null,
+      "completion_tokens": null,
+      "total_tokens": null,
+      "started_at": "2026-06-03T19:02:40.135065+00:00",
+      "finished_at": "2026-06-03T19:02:40.135065+00:00",
+      "duration_ms": 9043.114
+    },
+    {
+      "call_id": "3d14007b-5327-48b4-b180-0ae177cbd44a",
+      "node_name": "plan_proposal_directive",
+      "model_name": "llama-3.1-8b-instant",
+      "call_kind": "generate",
+      "prompt_tokens": null,
+      "completion_tokens": null,
+      "total_tokens": null,
+      "started_at": "2026-06-03T19:03:17.482418+00:00",
+      "finished_at": "2026-06-03T19:03:17.482418+00:00",
+      "duration_ms": 37284.286
+    },
+    {
+      "call_id": "9c72c9d4-635f-4751-8313-d8b0282e3243",
+      "node_name": "reflect",
+      "model_name": "llama-3.1-8b-instant",
+      "call_kind": "generate",
+      "prompt_tokens": null,
+      "completion_tokens": null,
+      "total_tokens": null,
+      "started_at": "2026-06-03T19:03:26.007586+00:00",
+      "finished_at": "2026-06-03T19:03:26.007586+00:00",
+      "duration_ms": 8444.858
+    },
+    {
+      "call_id": "530b9690-b943-406e-b9b8-94cf271ddaea",
+      "node_name": "relevant_response",
+      "model_name": "llama-3.1-8b-instant",
+      "call_kind": "generate",
+      "prompt_tokens": null,
+      "completion_tokens": null,
+      "total_tokens": null,
+      "started_at": "2026-06-03T19:03:38.675353+00:00",
+      "finished_at": "2026-06-03T19:03:38.675353+00:00",
+      "duration_ms": 12662.486
+    }
+  ],
+  "tool_calls": [
+    {
+      "tool_name": "verify_dob",
+      "node_name": "tool_execution",
+      "status": "completed",
+      "started_at": "2026-06-03T19:01:18.176251+00:00",
+      "finished_at": "2026-06-03T19:01:18.176251+00:00",
+      "duration_ms": 4.559,
+      "error": null
+    }
+  ]
 }

@@ -13,12 +13,19 @@ python -m pip install --upgrade pip
 pip install -e .
 ```
 
-Create/load env vars (minimum for current default config):
+Create/load env vars for whichever backends you actually enable:
 
 ```bash
+# Only needed if you switch the voice runtime to NVIDIA STT/TTS
 NVIDIA_API_KEY=nvapi-...
 NVIDIA_BASE_URL=https://integrate.api.nvidia.com
 ```
+
+Default voice config is local:
+
+- STT: `whisper_local`
+- TTS: `speecht5_local`
+- configured in [agents/collection_agent/config.yml](/Users/saketm10/Projects/openclaw_agents/agents/collection_agent/config.yml)
 
 Load `.env` values in shell:
 

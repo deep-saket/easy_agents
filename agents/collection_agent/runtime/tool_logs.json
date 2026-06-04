@@ -5464,5 +5464,108 @@
     "status": "completed",
     "error": null,
     "created_at": "2026-05-30T19:20:14.144495Z"
+  },
+  {
+    "id": "7b2741a6-a036-4c23-8744-c5407b928cb9",
+    "tool_name": "verify_dob",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "customer_id": "CUST-2001",
+      "dob": "1991-08-19"
+    },
+    "output_payload": {
+      "customer_id": "CUST-2001",
+      "status": "verified",
+      "field": "dob",
+      "failed_attempts": 0
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-01T21:03:35.436935Z"
+  },
+  {
+    "id": "f0cd2a50-998a-4052-b49c-edd15a3afc94",
+    "tool_name": "verify_mobile",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "customer_id": "CUST-2001",
+      "phone": "9900001001"
+    },
+    "output_payload": {
+      "customer_id": "CUST-2001",
+      "status": "verified",
+      "field": "phone",
+      "failed_attempts": 0
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-01T21:03:35.511259Z"
+  },
+  {
+    "id": "a08f8fdc-d266-4fa5-8224-f38320772acd",
+    "tool_name": "verify_dob",
+    "input_payload": {
+      "case_id": null,
+      "customer_id": null,
+      "dob": "1991-08-19"
+    },
+    "output_payload": null,
+    "status": "failed",
+    "error": "Unknown case/customer for DOB verification.",
+    "created_at": "2026-06-01T21:33:14.102155Z"
+  },
+  {
+    "id": "5622f85a-0b74-44cb-b68b-51c9bd92f6b1",
+    "tool_name": "verify_dob",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "customer_id": "CUST-2001",
+      "dob": "1991-08-19"
+    },
+    "output_payload": {
+      "customer_id": "CUST-2001",
+      "status": "verified",
+      "field": "dob",
+      "failed_attempts": 0
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-03T18:28:16.221396Z"
+  },
+  {
+    "id": "38152ca1-0e0e-4d00-857c-21e7260b345f",
+    "tool_name": "verify_mobile",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "customer_id": "CUST-2001",
+      "phone": "919900001001"
+    },
+    "output_payload": {
+      "customer_id": "CUST-2001",
+      "status": "verified",
+      "field": "phone",
+      "failed_attempts": 0
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-03T18:31:36.943217Z"
+  },
+  {
+    "id": "a0d4f997-9d02-462f-b4d6-c20a07e6ace1",
+    "tool_name": "verify_dob",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "customer_id": "CUST-2001",
+      "dob": "1991-08-19"
+    },
+    "output_payload": {
+      "customer_id": "CUST-2001",
+      "status": "verified",
+      "field": "dob",
+      "failed_attempts": 0
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-03T19:01:18.171683Z"
   }
 ]

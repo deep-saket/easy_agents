@@ -986,6 +986,16 @@ def create_router(runtime: Any) -> APIRouter:
             "trace": runtime.latest_trace_for_session(session_id=session_id),
         }
 
+    @router.get("/session/{session_id}/conversation-manager")
+    async def session_conversation_manager(session_id: str, limit: int = 30) -> dict[str, Any]:
+        if hasattr(runtime, "conversation_manager_debug"):
+            return runtime.conversation_manager_debug(session_id=session_id, limit=limit)
+        return {
+            "session_id": session_id,
+            "state": None,
+            "logs": [],
+        }
+
     return router
 
 

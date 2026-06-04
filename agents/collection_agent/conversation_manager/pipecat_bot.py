@@ -12,7 +12,9 @@ from typing import Any
 from agents.collection_agent.pipecat_bot import _build_runtime, _load_runtime_cfg
 from agents.collection_agent.conversation_manager.ConversationManagerAgent import ConversationManagerAgent
 from agents.collection_agent.conversation_manager.ConversationManagerConfig import ConversationManagerConfig
-from src.interfaces import build_runner_bot, build_transport_params, run_pipecat_main
+from speech.pipecat_stt import build_collection_stt_service
+from speech.pipecat_tts import build_collection_tts_service
+from src.interfaces import PipecatNotInstalledError, build_runner_bot, build_transport_params, run_pipecat_main
 
 
 class _VoiceDownstreamRuntime:
@@ -42,9 +44,6 @@ async def _run_bot(transport: Any, runner_args: Any) -> None:
     from pipecat.pipeline.runner import PipelineRunner
     from pipecat.pipeline.task import PipelineParams, PipelineTask
     from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
-    from pipecat.services.nvidia.stt import NvidiaSTTService
-    from pipecat.services.nvidia.tts import NvidiaTTSService
-
     downstream_orchestrator, runtime_cfg, _config = _build_runtime()
     manager = ConversationManagerAgent(
         config=ConversationManagerConfig.default(base_dir=Path(__file__).resolve().parent),
@@ -245,12 +244,15 @@ async def _run_bot(transport: Any, runner_args: Any) -> None:
 
     import os
 
-    nvidia_api_key = os.getenv("NVIDIA_API_KEY", "").strip()
-    if not nvidia_api_key:
-        raise ValueError("NVIDIA_API_KEY is required for Pipecat Conversation Manager bot.")
-
-    stt = NvidiaSTTService(api_key=nvidia_api_key)
-    tts = NvidiaTTSService(api_key=nvidia_api_key)
+    stt = build_collection_stt_service(
+        config=_config,
+        base_dir=Path(__file__).resolve().parents[1],
+    )
+    tts = build_collection_tts_service(
+        config=_config,
+        output_sample_rate=runtime_cfg.audio_out_sample_rate,
+        base_dir=Path(__file__).resolve().parents[1],
+    )
 
     runner_body = getattr(runner_args, "body", None)
     env_session_id = str(os.getenv("COLLECTION_VOICE_SESSION_ID", "")).strip()
@@ -296,11 +298,19 @@ async def _run_bot(transport: Any, runner_args: Any) -> None:
 
 
 runtime_cfg = _load_runtime_cfg()
-bot = build_runner_bot(
-    run_bot=_run_bot,
-    transport_params=build_transport_params(vad_enabled=runtime_cfg.vad_enabled),
-)
+try:
+    bot = build_runner_bot(
+        run_bot=_run_bot,
+        transport_params=build_transport_params(vad_enabled=runtime_cfg.vad_enabled),
+    )
+except PipecatNotInstalledError:
+    bot = None
 
 
 if __name__ == "__main__":
+    if bot is None:
+        bot = build_runner_bot(
+            run_bot=_run_bot,
+            transport_params=build_transport_params(vad_enabled=runtime_cfg.vad_enabled),
+        )
     run_pipecat_main()
