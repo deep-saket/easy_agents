@@ -81,6 +81,7 @@ class SessionStateResponse(BaseModel):
     session_id: str
     conversation_state: dict[str, Any]
     working_memory_state: dict[str, Any]
+    conversation_manager: dict[str, Any] | None = None
 
 
 class StartConversationRequest(BaseModel):
@@ -908,7 +909,7 @@ def _load_demo_users(base_dir: Path) -> list[dict[str, Any]]:
     return result
 
 
-def create_router(runtime: CollectionDebugRuntime) -> APIRouter:
+def create_router(runtime: Any) -> APIRouter:
     router = APIRouter(prefix="/api", tags=["collection_agent_ui"])
 
     @router.post("/run-turn")
@@ -985,12 +986,24 @@ def create_router(runtime: CollectionDebugRuntime) -> APIRouter:
             "trace": runtime.latest_trace_for_session(session_id=session_id),
         }
 
+    @router.get("/session/{session_id}/conversation-manager")
+    async def session_conversation_manager(session_id: str, limit: int = 30) -> dict[str, Any]:
+        if hasattr(runtime, "conversation_manager_debug"):
+            return runtime.conversation_manager_debug(session_id=session_id, limit=limit)
+        return {
+            "session_id": session_id,
+            "state": None,
+            "logs": [],
+        }
+
     return router
 
 
 def create_app(base_dir: Path | None = None) -> FastAPI:
     resolved_base_dir = (base_dir or Path(__file__).resolve().parents[1]).resolve()
-    runtime = CollectionDebugRuntime.create(resolved_base_dir)
+    from agents.collection_agent.conversation_manager.runtime import ConversationManagedRuntime
+
+    runtime = ConversationManagedRuntime.create(base_dir=resolved_base_dir, collection_base_dir=resolved_base_dir)
 
     app = FastAPI(title="Collection Agent Debug UI")
     app.include_router(create_router(runtime))

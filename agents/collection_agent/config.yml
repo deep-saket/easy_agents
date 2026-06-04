@@ -39,10 +39,34 @@ verification:
   # If false, do not call database verify when entities are still incomplete (prevents unnecessary failed attempts).
   fallback_on_insufficient_entities: false
 voice_runtime:
-  provider: nvidia
+  provider: local
+  # STT backends:
+  # - whisper_local: local Faster-Whisper through Pipecat
+  # - nvidia: hosted NVIDIA STT through Pipecat
+  stt_backend: whisper_local
+  # TTS backends:
+  # - speecht5_local: local SpeechT5 + speaker embedding synthesis
+  # - nvidia: hosted NVIDIA TTS through Pipecat
+  tts_backend: speecht5_local
   stt_model: nvidia_default
   tts_model: nvidia_default
   tts_voice: nvidia_default
+  local_stt:
+    model: medium
+    device: auto
+    compute_type: int8
+    language: en
+    no_speech_prob: 0.4
+  local_tts:
+    model_name: microsoft/speecht5_tts
+    vocoder_name: microsoft/speecht5_hifigan
+    model_sample_rate: 16000
+    device: auto
+    speaker_embedding_path: null
+    speaker_embedding_dataset: Matthijs/cmu-arctic-xvectors
+    speaker_embedding_split: validation
+    speaker_embedding_index: 7306
+    speaker_embedding_field: xvector
   pipecat:
     enabled: true
     vad_enabled: true

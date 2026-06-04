@@ -8,7 +8,28 @@ Start here:
 
 - [Documentation Index](./docs/README.md)
 - [Framework Overview](./docs/architecture/framework-overview.md)
+- [Conversation Management Architecture](./docs/architecture/conversation-management.md)
 - [MailMind Overview](./docs/agents/mailmind/overview.md)
+
+## Conversation Manager
+
+Customer-facing collections entrypoints should route through the in-package wrapper at `agents/collection_agent/conversation_manager`, which sits in front of `CollectionAgent` without changing collection business logic:
+
+```mermaid
+flowchart TD
+  C["Customer"] --> CM["ConversationManagerAgent"]
+  CM --> CA["CollectionAgent"]
+  CA --> DP["DiscountPlanningAgent"]
+  DP --> CA
+  CA --> CM
+  CM --> C
+```
+
+Responsibilities are split deliberately:
+
+- `ConversationManagerAgent`: wait messages, fillers, interruption handling, stale-response suppression, response delivery timing
+- `CollectionAgent`: business logic, verification, planning, routing
+- `DiscountPlanningAgent`: hardship and settlement recommendation logic
 
 ## Graph Builder UI
 

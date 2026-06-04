@@ -9,8 +9,8 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from agents.collection_agent.conversation_manager.runtime import ConversationManagedRuntime
 from agents.collection_agent.ui.server import (
-    CollectionDebugRuntime,
     RunTurnRequest,
     StartConversationRequest,
 )
@@ -43,7 +43,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     base_dir = Path(args.base_dir).resolve()
-    runtime = CollectionDebugRuntime.create(base_dir)
+    runtime = ConversationManagedRuntime.create(base_dir=base_dir, collection_base_dir=base_dir)
 
     start_payload = runtime.start_conversation(
         StartConversationRequest(
@@ -110,4 +110,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
