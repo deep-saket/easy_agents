@@ -38,6 +38,9 @@ Conversation Manager reuses the downstream Collection Agent runtime, so it only 
 Create or update `.env` at repo root:
 
 ```bash
+# Only needed if you use remote Ollama Cloud instead of local Ollama.
+OLLAMA_API_KEY=ollama-...
+
 # Only needed if you switch config to llm.provider=openai
 OPENAI_API_KEY=sk-...
 ```
@@ -52,7 +55,8 @@ set +a
 
 Notes:
 
-- Collection Agent currently defaults to `llm.provider: groq` in [agents/collection_agent/config.yml](/Users/saketm10/Projects/openclaw_agents/agents/collection_agent/config.yml).
+- Collection Agent currently defaults to local `llm.provider: ollama` with `gemma4:31b-cloud` in [agents/collection_agent/config.yml](/Users/saketm10/Projects/openclaw_agents/agents/collection_agent/config.yml).
+- Local Ollama requests use the existing OpenAI-compatible route at `http://localhost:11434/v1/chat/completions` and do not require an API key.
 - The default voice path now uses the same local Faster-Whisper + SpeechT5 direction as `deep-saket/smruti`.
 - `NVIDIA_API_KEY` is only required if you switch `voice_runtime.stt_backend` or `voice_runtime.tts_backend` to `nvidia`, or if you switch the main LLM provider to NVIDIA.
 - Voice backend selection is configured in the same collection-agent config file under `voice_runtime`.

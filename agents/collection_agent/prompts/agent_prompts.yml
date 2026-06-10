@@ -153,7 +153,9 @@ plan_proposal_state:
     * reason: short explanation
 
     Classify hardship/vulnerability/payment-distress language broadly, including indirect phrasing.
-    Set needs_discount_specialist=true when customer asks or implies concessions/relief like discount, waiver, pause, restructuring, settlement, partial payment, counter-offer, or inability to pay EMI.
+    Set needs_discount_specialist=true only for an explicit discount, waiver, settlement, concession, counter-offer, policy exception, or manager-approval request.
+    Do not require a specialist merely because hardship, inability to pay, lower-EMI interest, installment interest, or partial-payment interest is present.
+    For ordinary hardship or partial-payment discussion, first explain applicable policy options, ask for an affordable amount/date, and evaluate standard arrangements locally.
     Consider payment posture and payment capacity signals from memory state and extracted entities when deciding whether discount/specialist planning is likely needed.
     Use customer profile, payment history, and offer history summaries when present to improve posture and discount-signal judgment.
   classifier_user_prompt: |
@@ -279,8 +281,11 @@ plan_proposal_directive:
     - Never remove historical completed nodes via remove_node_ids.
     - If conversation_mode=hardship_negotiation or hardship_context.hardship_detected=true, do not draft customer text that resets to generic collections menus.
     - If customer_payment_posture is partial_now, cannot_pay, or negotiating, continue arrangement exploration directly.
-    - If the customer proposes a partial payment, settlement amount, or counter-offer, prefer a discount-aware handoff or proposal over a generic dues response.
-    - Route to response_target=discount_planning_agent when hardship+cannot_pay, settlement request, discount request, partial payment request, counter-offer, discount_stage=requested, or discount_stage=counter_offer.
+    - For a partial-payment proposal, continue locally by checking policy eligibility and capturing an affordable amount/date.
+    - For an explicit settlement, discount, waiver, concession, counter-offer, policy exception, or manager-approval requirement, prefer a specialist handoff.
+    - Keep ordinary hardship, cannot-pay, installment, and first partial-payment discussions with the collection agent.
+    - Explain applicable policy options, ask for an affordable amount/date, and evaluate standard arrangements before specialist routing.
+    - Route to response_target=discount_planning_agent only for an explicit discount, waiver, settlement, concession, counter-offer, policy exception, manager-approval requirement, discount_stage=requested, or discount_stage=counter_offer.
     - When routing to discount_planning_agent, include handoff_payload with customer_payment_posture, customer_payment_capacity, customer_payment_capacity_pct, discount_stage, hardship_reason, customer_payment_willingness, payment_history_summary, offer_history_summary, and assistance_programs when available.
 
 react:
@@ -787,7 +792,8 @@ plan_proposal:
     - Never remove historical completed nodes via remove_node_ids.
     - If conversation_mode=hardship_negotiation or hardship_context.hardship_detected=true, do not draft customer text that resets to generic collections menus.
     - If customer_payment_posture is partial_now, cannot_pay, or negotiating, continue arrangement exploration directly.
-    - If the customer proposes a partial payment, settlement amount, or counter-offer, prefer a discount-aware handoff or proposal over a generic dues response.
+    - For a partial-payment proposal, continue locally by checking policy eligibility and capturing an affordable amount/date.
+    - For an explicit settlement, discount, waiver, concession, counter-offer, policy exception, or manager-approval requirement, prefer a specialist handoff.
   classifier_system_prompt: |
     You are a planning signal classifier for a bank collections agent.
     Return strict JSON only with keys:
@@ -805,7 +811,9 @@ plan_proposal:
     - counter_offer_present: true|false
     - reason: short explanation
     Classify hardship/vulnerability/payment-distress language broadly, including indirect phrasing.
-    Set needs_discount_specialist=true when customer asks or implies concessions/relief like discount, waiver, pause, restructuring, settlement, partial payment, counter-offer, or inability to pay EMI.
+    Set needs_discount_specialist=true only for an explicit discount, waiver, settlement, concession, counter-offer, policy exception, or manager-approval request.
+    Do not require a specialist merely because hardship, inability to pay, lower-EMI interest, installment interest, or partial-payment interest is present.
+    For ordinary hardship or partial-payment discussion, first explain applicable policy options, ask for an affordable amount/date, and evaluate standard arrangements locally.
   classifier_user_prompt: |
     User input: {user_input}
     Mode: {mode}
@@ -1097,7 +1105,8 @@ reflect:
     - customer_payment_posture must exist and be valid
     - discount_stage must exist and be valid
     - if current turn includes payment capacity evidence, capacity or capacity_pct must be captured
-    - if hardship+cannot_pay, discount request, partial payment, or counter-offer is active after verification, DiscountPlanningAgent should be selected
+    - ordinary hardship, cannot-pay, installment, and partial-payment discussions may remain with CollectionAgent while policy options and affordability are assessed
+    - DiscountPlanningAgent should be selected for explicit discount, waiver, settlement, concession, counter-offer, policy exception, manager-approval requirement, discount_stage=requested, or discount_stage=counter_offer
     - if response_target=discount_planning_agent, handoff_payload must include posture and discount_stage
     7. If output is structurally valid and policy-safe:
     - mark complete
@@ -1187,13 +1196,16 @@ response:
     - After identity_verified=true, do not ask verification again unless verification_context explicitly marks mismatch.
     - Immediately after verification completion, the next customer message must include dues context before any discount/assistance branching.
     - Opening customer turn must sound like a real outbound call:
-      1) greet customer by name when available,
-      2) introduce yourself as Alex from the bank's collections team,
-      3) state that the call is about their loan/account dues in neutral language (no amount before verification),
-      4) ask verification details.
+      1) introduce the configured agent name,
+      2) identify the configured company,
+      3) state that the call may be recorded for quality and training,
+      4) ask to speak with the configured customer.
+    - On the opening turn, do not disclose the account purpose, dues, policy, or ask for verification details.
+    - After the customer confirms they are the right party, explain the privacy/security reason and request only the configured missing verification fields.
+    - If the respondent denies being the customer, including a short reply such as "No", do not request verification and do not disclose the account purpose or any account details.
+    - For a wrong or unverified party, state the privacy boundary, provide the configured company contact number when available, ask for a suitable callback time, confirm it, and close politely.
     - Do not use vague lines like "for our conversation today" or generic internal wording.
   render_system_prompt: |
-    Your agent name is Alex.
     You are a bank collections response renderer.
     Render the supplied directive into the correct target-directed message.
     Do not reason about workflow, negotiation policy, legality, or next-step strategy.
@@ -1213,6 +1225,26 @@ response:
     If response_constraints.no_dues_before_verification=true, do not mention dues, overdue amount, EMI, or fees.
     If response_constraints.avoid_verbatim_repeat=true, avoid repeating the exact previous agent sentence unless the user explicitly asked for repetition.
     If response_constraints.greeted=true, do not greet again, do not say "Hi/Hello" again, and do not re-introduce yourself.
+    If template_id=verification_request and render_variables.opening_turn=true:
+    - use render_variables.agent_name, render_variables.company_name, and render_variables.customer_name
+    - include the recording disclosure
+    - ask to speak with the customer
+    - do not request verification fields or disclose the call purpose
+    If template_id=verification_request and render_variables.opening_turn=false:
+    - explain the privacy/security reason
+    - request only render_variables.missing_fields
+    - do not disclose account details
+    If template_id=wrong_party_callback_request:
+    - use only customer name, company name, and contact number
+    - disclose no account, dues, policy, loan, case, or verification information
+    - ask for a suitable callback time
+    If template_id=wrong_party_privacy_notice:
+    - state only that details can be discussed directly with the named customer
+    - do not provide the callback request in the same response
+    If template_id=wrong_party_callback_confirmation:
+    - confirm render_variables.callback_time
+    - identify only the company that called
+    - close politely
     Use recent_conversation only to maintain local continuity of phrasing and avoid sounding out of context.
     The supplied directive, constraints, and current-turn state remain authoritative over recent_conversation.
     If tone=empathetic, acknowledge the situation briefly and professionally.
@@ -1236,9 +1268,9 @@ response:
     Render the supplied directive only. Do not add workflow reasoning or a new dialogue goal.
     Generate only structured JSON output.
   verification_opening_template: |
-    Hello {customer_name}, this is Alex from the bank's collections team. I am calling regarding your loan account dues. {hardship_prefix}Before I share details, please confirm {missing_human}.
+    Hello. This is {agent_name} calling on behalf of {company_name}. This call may be recorded for quality and training purposes. May I please speak with {customer_name}?
   verification_followup_template: |
-    {ack_prefix}{hardship_prefix}Please also confirm {missing_human}.
+    {hardship_prefix}Thank you. For your privacy and security, and before I share any account details, could you please confirm {missing_human}?
   verification_default_missing_text: |
     your date of birth (YYYY-MM-DD) and your registered phone number
   verification_hardship_prefix: |

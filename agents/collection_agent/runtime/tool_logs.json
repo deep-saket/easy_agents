@@ -5567,5 +5567,258 @@
     "status": "completed",
     "error": null,
     "created_at": "2026-06-03T19:01:18.171683Z"
+  },
+  {
+    "id": "df27e398-c05e-4fd6-836b-1104faee5065",
+    "tool_name": "verify_dob",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "customer_id": "CUST-2001",
+      "dob": "1991-08-19"
+    },
+    "output_payload": {
+      "customer_id": "CUST-2001",
+      "status": "verified",
+      "field": "dob",
+      "failed_attempts": 0
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-08T07:25:48.912791Z"
+  },
+  {
+    "id": "f7ec0159-f637-4e80-96f8-8aa57d3e21d9",
+    "tool_name": "verify_mobile",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "customer_id": "CUST-2001",
+      "phone": "9900001001"
+    },
+    "output_payload": {
+      "customer_id": "CUST-2001",
+      "status": "verified",
+      "field": "phone",
+      "failed_attempts": 0
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-08T07:25:49.716786Z"
+  },
+  {
+    "id": "59e6cd4c-966f-459c-a095-1a766b52f5a6",
+    "tool_name": "verify_dob",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "customer_id": "CUST-2001",
+      "dob": "1991-08-19"
+    },
+    "output_payload": {
+      "customer_id": "CUST-2001",
+      "status": "verified",
+      "field": "dob",
+      "failed_attempts": 0
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-08T07:46:12.606194Z"
+  },
+  {
+    "id": "358bc4bc-3861-4a5d-b526-7afd74a6ce1c",
+    "tool_name": "verify_mobile",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "customer_id": "CUST-2001",
+      "phone": "9900001001"
+    },
+    "output_payload": {
+      "customer_id": "CUST-2001",
+      "status": "verified",
+      "field": "phone",
+      "failed_attempts": 0
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-08T07:46:13.133120Z"
+  },
+  {
+    "id": "ddd79209-3bec-4719-a362-ab726eff043a",
+    "tool_name": "human_escalation",
+    "input_payload": {
+      "case_id": "COLL-1001",
+      "reason": "Customer experiencing hardship due to job loss and requesting a payment deferral that exceeds standard policy limits.",
+      "evidence_summary": null
+    },
+    "output_payload": {
+      "escalation_id": "ESC-0327CB06F8",
+      "case_id": "COLL-1001",
+      "queue": "supervisor_review",
+      "priority": "low",
+      "status": "queued"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-08T08:35:45.526190Z"
+  },
+  {
+    "id": "0eddb3cf-0dd1-4046-968a-42c9c2a56541",
+    "tool_name": "verify_dob",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "dob": "1988-04-22"
+    },
+    "output_payload": {
+      "customer_id": "CUST-2002",
+      "status": "verified",
+      "field": "dob",
+      "failed_attempts": 0
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-09T04:02:12.771772Z"
+  },
+  {
+    "id": "d9b14597-21df-4125-bab3-992e298cf98a",
+    "tool_name": "verify_mobile",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "phone": "9900001001"
+    },
+    "output_payload": {
+      "customer_id": "CUST-2002",
+      "status": "failed",
+      "field": "phone",
+      "failed_attempts": 1
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-09T04:02:13.341002Z"
+  },
+  {
+    "id": "5b4fe6e2-05e0-4f38-b6c9-e2cd7cce2dc7",
+    "tool_name": "verify_mobile",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "phone": "9900001002"
+    },
+    "output_payload": {
+      "customer_id": "CUST-2002",
+      "status": "verified",
+      "field": "phone",
+      "failed_attempts": 1
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-09T04:07:35.345538Z"
+  },
+  {
+    "id": "4a95afc9-973f-4157-9e27-dc229bcd6ffa",
+    "tool_name": "verify_dob",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "dob": "1988-04-22"
+    },
+    "output_payload": {
+      "customer_id": "CUST-2002",
+      "status": "verified",
+      "field": "dob",
+      "failed_attempts": 0
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-09T10:45:34.885864Z"
+  },
+  {
+    "id": "0be7c36d-d321-4c22-9dbe-0b43328621d2",
+    "tool_name": "verify_mobile",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "phone": "9900001002"
+    },
+    "output_payload": {
+      "customer_id": "CUST-2002",
+      "status": "verified",
+      "field": "phone",
+      "failed_attempts": 1
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-09T10:45:35.447354Z"
+  },
+  {
+    "id": "2c2a98c8-873e-47fd-94cb-933d68dcc3f7",
+    "tool_name": "verify_dob",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "dob": "1988-04-22"
+    },
+    "output_payload": {
+      "customer_id": "CUST-2002",
+      "status": "verified",
+      "field": "dob",
+      "failed_attempts": 0
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-09T13:14:59.477320Z"
+  },
+  {
+    "id": "3432b063-91a1-4c66-94fc-824c567c5d3c",
+    "tool_name": "verify_mobile",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "phone": "9900001002"
+    },
+    "output_payload": {
+      "customer_id": "CUST-2002",
+      "status": "verified",
+      "field": "phone",
+      "failed_attempts": 1
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-09T13:15:00.137340Z"
+  },
+  {
+    "id": "134043ab-a580-4f6e-898c-32254a882914",
+    "tool_name": "verify_dob",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "dob": "1988-04-22"
+    },
+    "output_payload": {
+      "customer_id": "CUST-2002",
+      "status": "verified",
+      "field": "dob",
+      "failed_attempts": 0
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-10T03:27:32.014934Z"
+  },
+  {
+    "id": "4526780e-ddec-4723-98d0-b05d54e2eb2f",
+    "tool_name": "verify_mobile",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "phone": "9900001002"
+    },
+    "output_payload": {
+      "customer_id": "CUST-2002",
+      "status": "verified",
+      "field": "phone",
+      "failed_attempts": 1
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-10T03:27:32.542918Z"
   }
 ]

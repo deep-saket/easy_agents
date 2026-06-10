@@ -36,6 +36,9 @@ Collection Agent reads API keys from environment variables when the selected bac
 Create or update `.env` at repo root:
 
 ```bash
+# Only needed if you use remote Ollama Cloud instead of local Ollama.
+OLLAMA_API_KEY=ollama-...
+
 # Only needed if you switch config to llm.provider=openai
 OPENAI_API_KEY=sk-...
 ```
@@ -50,8 +53,10 @@ set +a
 
 Notes:
 
-- Current default config uses `llm.provider: groq` in `agents/collection_agent/config.yml`.
+- Current default config uses local `llm.provider: ollama` with `gemma4:31b-cloud` in `agents/collection_agent/config.yml`.
+- Local Ollama requests use the existing OpenAI-compatible route at `http://localhost:11434/v1/chat/completions` and do not require an API key.
 - If `llm.provider=openai`, `OPENAI_API_KEY` becomes required.
+- If `llm.provider=groq`, `GROQ_API_KEY` becomes required.
 - `NVIDIA_API_KEY` is only required if you switch `voice_runtime.stt_backend` or `voice_runtime.tts_backend` to `nvidia`, or if you switch the main LLM provider to NVIDIA.
 
 ### 3) Run Collection Agent (interactive CLI)
@@ -910,6 +915,22 @@ Optional override at runtime:
 
 ```bash
 python agents/collection_agent/main.py --interactive --nvidia-api-key "nvapi-..."
+```
+
+## Ollama Cloud model setup (LLM provider)
+
+Collection agent supports `llm.provider: ollama` by mapping Ollama onto the existing OpenAI-compatible LLM route. The current default model is `gemma4:31b-cloud`.
+
+For local Ollama, no API key is needed. If you use remote Ollama Cloud instead, set:
+
+```bash
+OLLAMA_API_KEY=ollama-...
+```
+
+Optional override at runtime:
+
+```bash
+python agents/collection_agent/main.py --interactive --ollama-api-key "ollama-..."
 ```
 
 ## Key-event memory stores

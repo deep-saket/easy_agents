@@ -1,16 +1,16 @@
 {
-  "trace_id": "97a88f4f-b088-4173-aab2-53210b758235",
+  "trace_id": "8c1dda35-8595-4995-81c5-1a35096e6def",
   "agent_name": "collection_agent",
-  "session_id": "collection-user_a",
-  "user_input": "My DoB ius 1991-08-19",
+  "session_id": "collection-user_b",
+  "user_input": "he is not here now, please try at 5:30pm in evening today",
   "status": "completed",
-  "started_at": "2026-06-03T19:00:55.565260+00:00",
-  "finished_at": "2026-06-03T19:03:38.734559+00:00",
+  "started_at": "2026-06-10T10:03:01.215671+00:00",
+  "finished_at": "2026-06-10T10:03:54.800946+00:00",
   "error": null,
   "summary": {
-    "trace_id": "97a88f4f-b088-4173-aab2-53210b758235",
+    "trace_id": "8c1dda35-8595-4995-81c5-1a35096e6def",
     "agent_name": "collection_agent",
-    "session_id": "collection-user_a",
+    "session_id": "collection-user_b",
     "status": "completed",
     "node_hits": [
       "relevance_intent",
@@ -18,25 +18,19 @@
       "negotiation_classification",
       "pre_plan_intent",
       "execution_path_intent",
-      "verification_react",
-      "tool_execution",
-      "verification_react",
-      "post_verification_intent",
-      "plan_proposal_state",
-      "plan_proposal_graph",
-      "plan_proposal_directive",
-      "reflect",
+      "memory_retrieve",
+      "post_memory_plan_intent",
       "plan_proposal_state",
       "plan_proposal_graph",
       "plan_proposal_directive",
       "reflect",
       "relevant_response"
     ],
-    "node_count": 18,
-    "llm_call_count": 11,
-    "tool_call_count": 1,
+    "node_count": 12,
+    "llm_call_count": 10,
+    "tool_call_count": 0,
     "models": [
-      "llama-3.1-8b-instant"
+      "gemma4:31b-cloud"
     ],
     "prompt_tokens": 0,
     "completion_tokens": 0,
@@ -47,291 +41,221 @@
     {
       "node_name": "relevance_intent",
       "status": "completed",
-      "started_at": "2026-06-03T19:00:55.565727+00:00",
-      "finished_at": "2026-06-03T19:00:55.786428+00:00",
-      "duration_ms": 220.701,
+      "started_at": "2026-06-10T10:03:01.221681+00:00",
+      "finished_at": "2026-06-10T10:03:05.679752+00:00",
+      "duration_ms": 4458.071,
       "error": null
     },
     {
       "node_name": "entity_extract",
       "status": "completed",
-      "started_at": "2026-06-03T19:00:55.787741+00:00",
-      "finished_at": "2026-06-03T19:00:56.881785+00:00",
-      "duration_ms": 1094.044,
+      "started_at": "2026-06-10T10:03:05.681767+00:00",
+      "finished_at": "2026-06-10T10:03:10.368520+00:00",
+      "duration_ms": 4686.753,
       "error": null
     },
     {
       "node_name": "negotiation_classification",
       "status": "completed",
-      "started_at": "2026-06-03T19:00:56.882127+00:00",
-      "finished_at": "2026-06-03T19:01:18.085244+00:00",
-      "duration_ms": 21203.117,
+      "started_at": "2026-06-10T10:03:10.371518+00:00",
+      "finished_at": "2026-06-10T10:03:15.240243+00:00",
+      "duration_ms": 4868.725,
       "error": null
     },
     {
       "node_name": "pre_plan_intent",
       "status": "completed",
-      "started_at": "2026-06-03T19:01:18.085595+00:00",
-      "finished_at": "2026-06-03T19:01:18.112126+00:00",
-      "duration_ms": 26.531,
+      "started_at": "2026-06-10T10:03:15.242241+00:00",
+      "finished_at": "2026-06-10T10:03:19.535456+00:00",
+      "duration_ms": 4293.215,
       "error": null
     },
     {
       "node_name": "execution_path_intent",
       "status": "completed",
-      "started_at": "2026-06-03T19:01:18.112499+00:00",
-      "finished_at": "2026-06-03T19:01:18.132455+00:00",
-      "duration_ms": 19.956,
+      "started_at": "2026-06-10T10:03:19.538470+00:00",
+      "finished_at": "2026-06-10T10:03:24.746459+00:00",
+      "duration_ms": 5207.989,
       "error": null
     },
     {
-      "node_name": "verification_react",
+      "node_name": "memory_retrieve",
       "status": "completed",
-      "started_at": "2026-06-03T19:01:18.132817+00:00",
-      "finished_at": "2026-06-03T19:01:18.170997+00:00",
-      "duration_ms": 38.18,
+      "started_at": "2026-06-10T10:03:24.748461+00:00",
+      "finished_at": "2026-06-10T10:03:24.754456+00:00",
+      "duration_ms": 5.995,
       "error": null
     },
     {
-      "node_name": "tool_execution",
+      "node_name": "post_memory_plan_intent",
       "status": "completed",
-      "started_at": "2026-06-03T19:01:18.171495+00:00",
-      "finished_at": "2026-06-03T19:01:18.194394+00:00",
-      "duration_ms": 22.899,
-      "error": null
-    },
-    {
-      "node_name": "verification_react",
-      "status": "completed",
-      "started_at": "2026-06-03T19:01:18.212850+00:00",
-      "finished_at": "2026-06-03T19:01:37.844004+00:00",
-      "duration_ms": 19631.154,
-      "error": null
-    },
-    {
-      "node_name": "post_verification_intent",
-      "status": "completed",
-      "started_at": "2026-06-03T19:01:37.845927+00:00",
-      "finished_at": "2026-06-03T19:01:37.880704+00:00",
-      "duration_ms": 34.777,
+      "started_at": "2026-06-10T10:03:24.770389+00:00",
+      "finished_at": "2026-06-10T10:03:28.439932+00:00",
+      "duration_ms": 3669.543,
       "error": null
     },
     {
       "node_name": "plan_proposal_state",
       "status": "completed",
-      "started_at": "2026-06-03T19:01:37.882896+00:00",
-      "finished_at": "2026-06-03T19:01:46.755086+00:00",
-      "duration_ms": 8872.19,
+      "started_at": "2026-06-10T10:03:28.441447+00:00",
+      "finished_at": "2026-06-10T10:03:48.891471+00:00",
+      "duration_ms": 20450.024,
       "error": null
     },
     {
       "node_name": "plan_proposal_graph",
       "status": "completed",
-      "started_at": "2026-06-03T19:01:46.791262+00:00",
-      "finished_at": "2026-06-03T19:01:46.815520+00:00",
-      "duration_ms": 24.258,
+      "started_at": "2026-06-10T10:03:48.894098+00:00",
+      "finished_at": "2026-06-10T10:03:49.038213+00:00",
+      "duration_ms": 144.115,
       "error": null
     },
     {
       "node_name": "plan_proposal_directive",
       "status": "completed",
-      "started_at": "2026-06-03T19:01:46.816009+00:00",
-      "finished_at": "2026-06-03T19:02:23.751066+00:00",
-      "duration_ms": 36935.057,
+      "started_at": "2026-06-10T10:03:49.040240+00:00",
+      "finished_at": "2026-06-10T10:03:49.530090+00:00",
+      "duration_ms": 489.85,
       "error": null
     },
     {
       "node_name": "reflect",
       "status": "completed",
-      "started_at": "2026-06-03T19:02:23.752356+00:00",
-      "finished_at": "2026-06-03T19:02:31.062427+00:00",
-      "duration_ms": 7310.071,
-      "error": null
-    },
-    {
-      "node_name": "plan_proposal_state",
-      "status": "completed",
-      "started_at": "2026-06-03T19:02:31.064977+00:00",
-      "finished_at": "2026-06-03T19:02:40.135581+00:00",
-      "duration_ms": 9070.604,
-      "error": null
-    },
-    {
-      "node_name": "plan_proposal_graph",
-      "status": "completed",
-      "started_at": "2026-06-03T19:02:40.139987+00:00",
-      "finished_at": "2026-06-03T19:02:40.173452+00:00",
-      "duration_ms": 33.465,
-      "error": null
-    },
-    {
-      "node_name": "plan_proposal_directive",
-      "status": "completed",
-      "started_at": "2026-06-03T19:02:40.174068+00:00",
-      "finished_at": "2026-06-03T19:03:17.541930+00:00",
-      "duration_ms": 37367.862,
-      "error": null
-    },
-    {
-      "node_name": "reflect",
-      "status": "completed",
-      "started_at": "2026-06-03T19:03:17.542488+00:00",
-      "finished_at": "2026-06-03T19:03:26.007879+00:00",
-      "duration_ms": 8465.391,
+      "started_at": "2026-06-10T10:03:49.533089+00:00",
+      "finished_at": "2026-06-10T10:03:54.526773+00:00",
+      "duration_ms": 4993.684,
       "error": null
     },
     {
       "node_name": "relevant_response",
       "status": "completed",
-      "started_at": "2026-06-03T19:03:26.009371+00:00",
-      "finished_at": "2026-06-03T19:03:38.709906+00:00",
-      "duration_ms": 12700.535,
+      "started_at": "2026-06-10T10:03:54.529773+00:00",
+      "finished_at": "2026-06-10T10:03:54.666166+00:00",
+      "duration_ms": 136.393,
       "error": null
     }
   ],
   "llm_calls": [
     {
-      "call_id": "895f05d3-a0ce-424e-b324-5c3c59f89172",
+      "call_id": "f1d0aa3b-775e-48b0-9f2d-5c47fc418d0c",
       "node_name": "relevance_intent",
-      "model_name": "llama-3.1-8b-instant",
+      "model_name": "gemma4:31b-cloud",
       "call_kind": "generate",
       "prompt_tokens": null,
       "completion_tokens": null,
       "total_tokens": null,
-      "started_at": "2026-06-03T19:00:55.786117+00:00",
-      "finished_at": "2026-06-03T19:00:55.786117+00:00",
-      "duration_ms": 202.873
+      "started_at": "2026-06-10T10:03:05.677391+00:00",
+      "finished_at": "2026-06-10T10:03:05.677391+00:00",
+      "duration_ms": 4329.691
     },
     {
-      "call_id": "6b5d78ea-be2e-4fb3-acbf-a1f61e65f1e7",
+      "call_id": "215a8603-95c9-430c-9e0f-f47a3684e17a",
       "node_name": "entity_extract",
-      "model_name": "llama-3.1-8b-instant",
+      "model_name": "gemma4:31b-cloud",
       "call_kind": "generate",
       "prompt_tokens": null,
       "completion_tokens": null,
       "total_tokens": null,
-      "started_at": "2026-06-03T19:00:56.824918+00:00",
-      "finished_at": "2026-06-03T19:00:56.824918+00:00",
-      "duration_ms": 1036.455
+      "started_at": "2026-06-10T10:03:10.089907+00:00",
+      "finished_at": "2026-06-10T10:03:10.089907+00:00",
+      "duration_ms": 4407.622
     },
     {
-      "call_id": "234c72dc-d5ab-4ea2-b33b-b1f49c314341",
+      "call_id": "ba33ed7b-daaa-4800-90c8-954909067048",
       "node_name": "negotiation_classification",
-      "model_name": "llama-3.1-8b-instant",
+      "model_name": "gemma4:31b-cloud",
       "call_kind": "generate",
       "prompt_tokens": null,
       "completion_tokens": null,
       "total_tokens": null,
-      "started_at": "2026-06-03T19:01:18.052512+00:00",
-      "finished_at": "2026-06-03T19:01:18.052512+00:00",
-      "duration_ms": 21150.263
+      "started_at": "2026-06-10T10:03:15.109837+00:00",
+      "finished_at": "2026-06-10T10:03:15.109837+00:00",
+      "duration_ms": 4612.843
     },
     {
-      "call_id": "93998e2f-981f-4f06-8dbd-8b9d1a395a56",
-      "node_name": "verification_react",
-      "model_name": "llama-3.1-8b-instant",
+      "call_id": "229605a1-e2ad-473c-a08c-d4c9abe60c76",
+      "node_name": "pre_plan_intent",
+      "model_name": "gemma4:31b-cloud",
       "call_kind": "generate",
       "prompt_tokens": null,
       "completion_tokens": null,
       "total_tokens": null,
-      "started_at": "2026-06-03T19:01:37.843716+00:00",
-      "finished_at": "2026-06-03T19:01:37.843716+00:00",
-      "duration_ms": 19594.627
+      "started_at": "2026-06-10T10:03:19.535456+00:00",
+      "finished_at": "2026-06-10T10:03:19.535456+00:00",
+      "duration_ms": 4148.371
     },
     {
-      "call_id": "9477c7a7-4f4a-4076-ae9e-0671bd39981c",
+      "call_id": "f1bbdcbb-6cb7-46dc-aecc-797e48b73783",
+      "node_name": "execution_path_intent",
+      "model_name": "gemma4:31b-cloud",
+      "call_kind": "generate",
+      "prompt_tokens": null,
+      "completion_tokens": null,
+      "total_tokens": null,
+      "started_at": "2026-06-10T10:03:24.745440+00:00",
+      "finished_at": "2026-06-10T10:03:24.745440+00:00",
+      "duration_ms": 5084.813
+    },
+    {
+      "call_id": "ebb8f015-e599-4cce-84ea-58b2d3850034",
+      "node_name": "post_memory_plan_intent",
+      "model_name": "gemma4:31b-cloud",
+      "call_kind": "generate",
+      "prompt_tokens": null,
+      "completion_tokens": null,
+      "total_tokens": null,
+      "started_at": "2026-06-10T10:03:28.439932+00:00",
+      "finished_at": "2026-06-10T10:03:28.439932+00:00",
+      "duration_ms": 3543.51
+    },
+    {
+      "call_id": "08f33545-bc57-41ff-bbb9-388f735237e9",
       "node_name": "plan_proposal_state",
-      "model_name": "llama-3.1-8b-instant",
+      "model_name": "gemma4:31b-cloud",
       "call_kind": "generate",
       "prompt_tokens": null,
       "completion_tokens": null,
       "total_tokens": null,
-      "started_at": "2026-06-03T19:01:46.754489+00:00",
-      "finished_at": "2026-06-03T19:01:46.754489+00:00",
-      "duration_ms": 8847.204
+      "started_at": "2026-06-10T10:03:34.128049+00:00",
+      "finished_at": "2026-06-10T10:03:34.128049+00:00",
+      "duration_ms": 5557.516
     },
     {
-      "call_id": "e0036f55-0abb-48e0-9642-a3a1354e840a",
-      "node_name": "plan_proposal_directive",
-      "model_name": "llama-3.1-8b-instant",
-      "call_kind": "generate",
-      "prompt_tokens": null,
-      "completion_tokens": null,
-      "total_tokens": null,
-      "started_at": "2026-06-03T19:02:23.690642+00:00",
-      "finished_at": "2026-06-03T19:02:23.690642+00:00",
-      "duration_ms": 36854.021
-    },
-    {
-      "call_id": "526597e3-ecfd-4a36-aa36-8382978f091a",
-      "node_name": "reflect",
-      "model_name": "llama-3.1-8b-instant",
-      "call_kind": "generate",
-      "prompt_tokens": null,
-      "completion_tokens": null,
-      "total_tokens": null,
-      "started_at": "2026-06-03T19:02:31.061778+00:00",
-      "finished_at": "2026-06-03T19:02:31.061778+00:00",
-      "duration_ms": 7288.368
-    },
-    {
-      "call_id": "cddc85a5-4756-4811-944a-9080e18a1f68",
+      "call_id": "8dff9337-4728-43ce-adb4-deb1d7010603",
       "node_name": "plan_proposal_state",
-      "model_name": "llama-3.1-8b-instant",
+      "model_name": "gemma4:31b-cloud",
       "call_kind": "generate",
       "prompt_tokens": null,
       "completion_tokens": null,
       "total_tokens": null,
-      "started_at": "2026-06-03T19:02:40.135065+00:00",
-      "finished_at": "2026-06-03T19:02:40.135065+00:00",
-      "duration_ms": 9043.114
+      "started_at": "2026-06-10T10:03:43.773831+00:00",
+      "finished_at": "2026-06-10T10:03:43.773831+00:00",
+      "duration_ms": 9645.06
     },
     {
-      "call_id": "3d14007b-5327-48b4-b180-0ae177cbd44a",
-      "node_name": "plan_proposal_directive",
-      "model_name": "llama-3.1-8b-instant",
+      "call_id": "faf13e19-9eac-4e39-b592-9b962497e097",
+      "node_name": "plan_proposal_state",
+      "model_name": "gemma4:31b-cloud",
       "call_kind": "generate",
       "prompt_tokens": null,
       "completion_tokens": null,
       "total_tokens": null,
-      "started_at": "2026-06-03T19:03:17.482418+00:00",
-      "finished_at": "2026-06-03T19:03:17.482418+00:00",
-      "duration_ms": 37284.286
+      "started_at": "2026-06-10T10:03:48.890312+00:00",
+      "finished_at": "2026-06-10T10:03:48.890312+00:00",
+      "duration_ms": 5116.781
     },
     {
-      "call_id": "9c72c9d4-635f-4751-8313-d8b0282e3243",
+      "call_id": "832283e8-73d9-433e-9416-425b8effb7b0",
       "node_name": "reflect",
-      "model_name": "llama-3.1-8b-instant",
+      "model_name": "gemma4:31b-cloud",
       "call_kind": "generate",
       "prompt_tokens": null,
       "completion_tokens": null,
       "total_tokens": null,
-      "started_at": "2026-06-03T19:03:26.007586+00:00",
-      "finished_at": "2026-06-03T19:03:26.007586+00:00",
-      "duration_ms": 8444.858
-    },
-    {
-      "call_id": "530b9690-b943-406e-b9b8-94cf271ddaea",
-      "node_name": "relevant_response",
-      "model_name": "llama-3.1-8b-instant",
-      "call_kind": "generate",
-      "prompt_tokens": null,
-      "completion_tokens": null,
-      "total_tokens": null,
-      "started_at": "2026-06-03T19:03:38.675353+00:00",
-      "finished_at": "2026-06-03T19:03:38.675353+00:00",
-      "duration_ms": 12662.486
+      "started_at": "2026-06-10T10:03:54.526773+00:00",
+      "finished_at": "2026-06-10T10:03:54.526773+00:00",
+      "duration_ms": 4854.982
     }
   ],
-  "tool_calls": [
-    {
-      "tool_name": "verify_dob",
-      "node_name": "tool_execution",
-      "status": "completed",
-      "started_at": "2026-06-03T19:01:18.176251+00:00",
-      "finished_at": "2026-06-03T19:01:18.176251+00:00",
-      "duration_ms": 4.559,
-      "error": null
-    }
-  ]
+  "tool_calls": []
 }

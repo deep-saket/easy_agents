@@ -209,6 +209,40 @@ def test_collection_reflect_node_flags_missing_discount_specialist_route() -> No
     assert update["retry_target"] == "none"
 
 
+def test_collection_reflect_node_allows_standard_hardship_discussion_to_remain_local() -> None:
+    node = CollectionReflectNode(
+        llm=FakeLLM('{"reason":"looks valid","is_complete":true,"failure_type":"none"}'),
+        system_prompt="validate",
+        user_prompt="User input: {user_input}\nObservation: {observation}\nDecision: {decision}",
+    )
+
+    state = _build_state(
+        identity_verified=True,
+        plan_proposal={
+            "target": "customer",
+            "intent": "assess_affordability",
+            "draft_response": "The standard options include a partial payment. What amount or date works for you?",
+            "next_actions": ["collect_affordable_amount"],
+            "plan_tree_update": {"operation": "advance", "selected_next_node_id": "evaluate_assistance"},
+        },
+        conversation_plan={"current_node_id": "evaluate_assistance"},
+    )
+    state["user_input"] = "Yes, a payment arrangement would help."
+    state["customer_payment_posture"] = "cannot_pay"
+    state["discount_stage"] = "none"
+    state["hardship_context"] = {
+        "hardship_detected": True,
+        "hardship_reason": "job_loss",
+        "confidence": 1.0,
+    }
+    state["plan_signals"] = {"needs_discount_specialist": False}
+
+    update = node.execute(state)
+
+    assert update["failure_type"] == "none"
+    assert update["reflection_complete"] is True
+
+
 def test_collection_reflect_node_flags_invalid_discount_handoff_payload() -> None:
     node = CollectionReflectNode(
         llm=FakeLLM('{"reason":"looks valid","is_complete":true,"failure_type":"none"}'),

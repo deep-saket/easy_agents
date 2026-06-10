@@ -51,16 +51,12 @@ def needs_discount_specialist(text: str) -> bool:
         "discount",
         "waiver",
         "concession",
-        "benefit",
-        "lower emi",
-        "reduce emi",
         "settlement",
         "settle for",
-        "partial payment",
-        "part payment",
         "counter offer",
         "counter-offer",
-        "work something out",
+        "exception",
+        "manager approval",
     ]
     return any(keyword in lowered for keyword in keywords)
 
@@ -173,6 +169,71 @@ def is_conversation_termination(text: str) -> bool:
     return lowered in {"bye", "goodbye", "end call", "stop calling"} or any(
         phrase in lowered for phrase in ["call me later", "not interested anymore"]
     )
+
+
+def is_right_party_denial(text: str, *, awaiting_confirmation: bool) -> bool:
+    lowered = re.sub(r"\s+", " ", str(text or "").strip().lower())
+    if not lowered:
+        return False
+    if awaiting_confirmation and lowered in {"no", "nope", "nah"}:
+        return True
+    denial_phrases = [
+        "not me",
+        "i am not",
+        "i'm not",
+        "wrong person",
+        "wrong number",
+        "they are not here",
+        "they're not here",
+        "he is not here",
+        "he's not here",
+        "she is not here",
+        "she's not here",
+        "not available",
+        "can i take a message",
+        "i can take a message",
+    ]
+    return any(phrase in lowered for phrase in denial_phrases)
+
+
+def looks_like_callback_time(text: str) -> bool:
+    lowered = re.sub(r"\s+", " ", str(text or "").strip().lower())
+    if not lowered or lowered in {"no", "nope", "not sure", "don't know", "do not know"}:
+        return False
+    temporal_terms = [
+        "today",
+        "tomorrow",
+        "morning",
+        "afternoon",
+        "evening",
+        "tonight",
+        "later",
+        "weekend",
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday",
+        "next week",
+        "after ",
+        "before ",
+        "around ",
+    ]
+    return any(term in lowered for term in temporal_terms) or bool(
+        re.search(r"\b(?:at\s*)?\d{1,2}(?::\d{2})?\s*(?:am|pm|a\.m\.|p\.m\.)?\b", lowered)
+    )
+
+
+def normalize_callback_time(text: str) -> str:
+    value = re.sub(r"\s+", " ", str(text or "").strip())
+    value = re.sub(
+        r"(?i)^(?:please\s+)?(?:try|call|reach)(?:\s+(?:again|back|him|her|them))*\s+",
+        "",
+        value,
+    ).strip(" .")
+    return value or str(text or "").strip()
 
 
 def is_provider_rate_limit_error(error_text: str) -> bool:

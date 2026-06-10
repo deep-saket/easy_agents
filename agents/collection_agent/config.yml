@@ -11,9 +11,11 @@ paths:
   runtime_dir: ./runtime
 llm:
   enabled: true
-  provider: groq
-  model_name: llama-3.1-8b-instant
-  max_new_tokens: 500
+  provider: ollama
+  model_name: gemma4:31b-cloud
+  base_url: http://localhost:11434
+  api_path: /v1/chat/completions
+  max_new_tokens: 2000
   temperature: 0.1
 verification:
   # Fields expected from customer for successful verification.

@@ -56,6 +56,9 @@ class CollectionGraphState(AgentState, total=False):
     verified_dob: bool
     verified_mobile: bool
     identity_verified: bool
+    right_party_status: str
+    wrong_party_callback_stage: str | None
+    wrong_party_callback_time: str | None
     conversation_mode: str
     negotiation_stage: str
     customer_payment_posture: str

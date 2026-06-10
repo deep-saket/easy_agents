@@ -512,12 +512,19 @@ class CollectionReflectNode(ReflectNode):
         lowered = str(user_input or "").lower()
         direct_discount_request = any(
             token in lowered
-            for token in ["discount", "settlement", "waiver", "counter-offer", "counter offer", "partial payment"]
+            for token in [
+                "discount",
+                "settlement",
+                "waiver",
+                "concession",
+                "counter-offer",
+                "counter offer",
+                "manager approval",
+                "exception",
+            ]
         )
         return bool(plan_signals.get("needs_discount_specialist")) or direct_discount_request or (
             discount_stage in {"requested", "counter_offer"}
-            or customer_payment_posture == "partial_now"
-            or (hardship_active and customer_payment_posture == "cannot_pay")
         )
 
     @staticmethod

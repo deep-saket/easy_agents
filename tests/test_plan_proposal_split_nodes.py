@@ -4,6 +4,7 @@ from agents.collection_agent.agent import CollectionAgent
 from agents.collection_agent.nodes.plan_proposal_directive_node import PlanProposalDirectiveNode
 from agents.collection_agent.nodes.plan_proposal_graph_node import PlanProposalGraphNode
 from agents.collection_agent.nodes.plan_proposal_state_node import PlanProposalStateNode
+from agents.collection_agent.nodes.plan_proposal_utils import is_right_party_denial
 from src.nodes.base import BaseGraphNode
 from src.memory.types import WorkingMemory
 
@@ -111,6 +112,122 @@ def test_plan_proposal_graph_node_keeps_identity_gate_in_plan_tree() -> None:
     assert graph_update["plan_tree_context"]["current_node_id"] == "verify_identity"
 
 
+def test_plan_proposal_graph_marks_case_context_done_after_advancing_past_root() -> None:
+    memory = _memory(
+        {
+            "mode": "strict_collections",
+            "active_case_id": "COLL-1001",
+            "active_user_id": "USER-1",
+            "active_customer_name": "Aditi",
+            "active_overdue_amount": 1200.0,
+            "active_verification_required_fields": ["dob", "phone"],
+            "verification_missing_fields": [],
+            "verification_verified_fields": ["dob", "phone"],
+            "identity_verified": True,
+        }
+    )
+    state = _base_state(memory, user_input="hello")
+    state_node = PlanProposalStateNode(llm=None, strict_llm_mode=False)
+    graph_node = PlanProposalGraphNode(llm=None, strict_llm_mode=False)
+
+    state_update = state_node.execute(state)
+    graph_update = graph_node.execute({**state, **state_update})
+
+    plan = graph_update["conversation_plan"]
+    nodes = {node["id"]: node for node in plan["nodes"]}
+    assert plan["current_node_id"] == "explain_dues"
+    assert plan["step_markers"]["open_and_context"]["state"] == "done"
+    assert nodes["open_and_context"]["status"] == "done"
+
+
+def test_bare_no_is_detected_as_right_party_denial_only_during_confirmation() -> None:
+    assert is_right_party_denial("No", awaiting_confirmation=True) is True
+    assert is_right_party_denial("No", awaiting_confirmation=False) is False
+
+
+def test_wrong_party_callback_flow_reaches_explicit_closing_node() -> None:
+    memory = _memory(
+        {
+            "mode": "strict_collections",
+            "active_case_id": "COLL-1002",
+            "active_user_id": "CUST-2002",
+            "active_customer_name": "Rohan Gupta",
+            "active_overdue_amount": 37800.0,
+            "active_verification_required_fields": ["dob", "phone"],
+            "verification_missing_fields": ["dob", "phone"],
+            "identity_verified": False,
+            "right_party_status": "awaiting_confirmation",
+        }
+    )
+    state_node = PlanProposalStateNode(llm=None, strict_llm_mode=False)
+    graph_node = PlanProposalGraphNode(llm=None, strict_llm_mode=False)
+    directive_node = PlanProposalDirectiveNode(llm=None, strict_llm_mode=False)
+
+    first_state = _base_state(memory, user_input="No")
+    first_state_update = state_node.execute(first_state)
+    first_graph_update = graph_node.execute({**first_state, **first_state_update})
+    first_directive_update = directive_node.execute(
+        {**first_state, **first_state_update, **first_graph_update}
+    )
+
+    first_directive = first_directive_update["plan_proposal"]["response_directive"]
+    first_plan = first_graph_update["conversation_plan"]
+    assert first_directive["conversation_objective"] == "wrong_party_privacy_notice"
+    assert first_plan["current_node_id"] == "wrong_party_callback"
+    assert first_plan["step_markers"]["verify_identity"]["state"] == "skipped"
+    assert first_plan["step_markers"]["explain_dues"]["state"] == "skipped"
+    assert first_plan["step_markers"]["collect_payment_intent"]["state"] == "skipped"
+    assert first_plan["step_markers"]["evaluate_assistance"]["state"] == "skipped"
+    assert first_plan["step_markers"]["resolve_outcome"]["state"] == "skipped"
+    first_nodes = {node["id"]: node for node in first_plan["nodes"]}
+    assert first_nodes["wrong_party_callback"]["status"] == "in_progress"
+    assert first_nodes["explain_dues"]["status"] == "skipped"
+    assert memory.state["right_party_status"] == "wrong_party"
+    assert memory.state["wrong_party_callback_stage"] == "privacy_notice_given"
+
+    second_state = _base_state(
+        memory,
+        user_input="They're not here right now. Can I take a message? What's it about?",
+    )
+    second_state_update = state_node.execute(second_state)
+    second_graph_update = graph_node.execute({**second_state, **second_state_update})
+    second_directive_update = directive_node.execute(
+        {**second_state, **second_state_update, **second_graph_update}
+    )
+    second_directive = second_directive_update["plan_proposal"]["response_directive"]
+    assert second_directive["conversation_objective"] == "wrong_party_callback_request"
+    assert memory.state["wrong_party_callback_stage"] == "awaiting_callback"
+
+    third_state = _base_state(memory, user_input="Try this evening")
+    third_state_update = state_node.execute(third_state)
+    third_graph_update = graph_node.execute({**third_state, **third_state_update})
+    third_directive_update = directive_node.execute(
+        {**third_state, **third_state_update, **third_graph_update}
+    )
+
+    plan = third_graph_update["conversation_plan"]
+    third_directive = third_directive_update["plan_proposal"]["response_directive"]
+    assert plan["current_node_id"] == "close_conversation"
+    assert plan["status"] == "completed"
+    assert plan["step_markers"]["verify_identity"]["state"] == "skipped"
+    assert plan["step_markers"]["wrong_party_callback"]["state"] == "done"
+    assert third_directive["conversation_objective"] == "wrong_party_callback_confirmation"
+    assert memory.state["wrong_party_callback_time"] == "this evening"
+
+    retry_state = _base_state(memory, user_input="Try this evening")
+    retry_state_update = state_node.execute(retry_state)
+    retry_graph_update = graph_node.execute({**retry_state, **retry_state_update})
+    retry_directive_update = directive_node.execute(
+        {**retry_state, **retry_state_update, **retry_graph_update}
+    )
+
+    retry_plan = retry_graph_update["conversation_plan"]
+    retry_directive = retry_directive_update["plan_proposal"]["response_directive"]
+    assert retry_plan["current_node_id"] == "close_conversation"
+    assert retry_plan["status"] == "completed"
+    assert retry_directive["conversation_objective"] == "wrong_party_callback_confirmation"
+
+
 def test_plan_proposal_directive_node_returns_response_directive() -> None:
     _, _, directive_update = _run_split_chain(
         {
@@ -160,10 +277,12 @@ def test_plan_proposal_directive_uses_hardship_arrangement_directive() -> None:
     )
 
     directive = directive_update["plan_proposal"]["response_directive"]
+    assert directive_update["response_target"] == "customer"
     assert directive["conversation_objective"] == "assess_affordability"
     assert directive["dialogue_action"] == "ask_affordable_amount"
+    assert "explain_applicable_policy_options" in directive["required_response_elements"]
     assert "ask_pay_now_or_arrangement" in directive["forbidden_dialogue_actions"]
-    assert "monthly amount" in directive["customer_facing_goal"].lower()
+    assert "amount or payment date" in directive["customer_facing_goal"].lower()
 
 
 def test_plan_proposal_directive_discount_handoff_remains_intact() -> None:
@@ -195,7 +314,7 @@ def test_plan_proposal_directive_discount_handoff_remains_intact() -> None:
     assert directive_update["handoff_payload"]["case_id"] == "COLL-1001"
 
 
-def test_plan_proposal_directive_routes_partial_payment_to_discount_planning() -> None:
+def test_plan_proposal_directive_routes_explicit_settlement_to_discount_planning() -> None:
     _, _, directive_update = _run_split_chain(
         {
             "mode": "strict_collections",
@@ -220,6 +339,70 @@ def test_plan_proposal_directive_routes_partial_payment_to_discount_planning() -
     assert directive_update["handoff_payload"]["customer_payment_capacity"] == 2000.0
     assert directive_update["handoff_payload"]["discount_stage"] == "requested"
     assert directive_update["handoff_payload"]["customer_payment_posture"] == "partial_now"
+
+
+def test_plan_proposal_directive_keeps_standard_partial_payment_local() -> None:
+    _, _, directive_update = _run_split_chain(
+        {
+            "mode": "strict_collections",
+            "active_case_id": "COLL-1002",
+            "active_user_id": "USER-2",
+            "active_customer_name": "Rohan",
+            "active_overdue_amount": 37800.0,
+            "identity_verified": True,
+            "conversation_mode": "hardship_negotiation",
+            "negotiation_stage": "assessing_capacity",
+            "customer_payment_posture": "partial_now",
+            "customer_payment_capacity": 5000.0,
+            "discount_stage": "none",
+            "discount_requested": False,
+            "hardship_context": {
+                "hardship_detected": True,
+                "hardship_reason": "job_loss",
+                "confidence": 1.0,
+            },
+            "response_mode": "empathetic",
+            "active_dialogue_owner": "plan_proposal",
+        },
+        user_input="I can manage 5000 this month.",
+    )
+
+    directive = directive_update["plan_proposal"]["response_directive"]
+    assert directive_update["response_target"] == "customer"
+    assert directive["conversation_objective"] in {"assess_affordability", "present_arrangement_options"}
+    assert directive_update.get("handoff_payload") is None
+
+
+def test_plan_proposal_directive_does_not_rehandoff_generic_hardship_acceptance() -> None:
+    _, _, directive_update = _run_split_chain(
+        {
+            "mode": "hardship_negotiation",
+            "active_case_id": "COLL-1002",
+            "active_user_id": "CUST-2002",
+            "active_customer_name": "Rohan",
+            "active_overdue_amount": 37800.0,
+            "identity_verified": True,
+            "conversation_mode": "hardship_negotiation",
+            "negotiation_stage": "negotiating_plan",
+            "customer_payment_posture": "negotiating",
+            "customer_payment_posture_history": ["cannot_pay", "negotiating"],
+            "discount_stage": "offered",
+            "discount_requested": True,
+            "discount_offered": True,
+            "counter_offer_present": False,
+            "hardship_context": {
+                "hardship_detected": True,
+                "hardship_reason": "job_loss",
+                "confidence": 1.0,
+            },
+            "response_mode": "empathetic",
+            "active_dialogue_owner": "plan_proposal",
+        },
+        user_input="Yes, that would really help.",
+    )
+
+    assert directive_update["response_target"] == "customer"
+    assert directive_update.get("handoff_payload") is None
 
 
 def test_plan_proposal_directive_termination_remains_intact() -> None:

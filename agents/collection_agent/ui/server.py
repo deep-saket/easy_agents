@@ -348,24 +348,34 @@ class CollectionDebugRuntime:
             f"Customer={matched['customer']['name']} "
             f"customer_id={matched['customer']['customer_id']} "
             f"case_id={matched['case']['case_id']} "
-            f"overdue_amount={matched['case']['overdue_amount']} "
-            "Generate the first call pitch by introducing yourself and requesting identity verification only. "
-            "Do not disclose overdue amount, dues details, or payment options before verification."
+            "Generate the opening disclosure and ask to speak with the customer. "
+            "Do not disclose the call purpose, account details, dues, payment options, or request verification details yet."
         )
 
         # Keep demo initialization deterministic and fast. The opening pitch is
         # rendered statically here; subsequent turns use full agent execution.
+        customer_variables = (
+            matched["customer"].get("variables", {})
+            if isinstance(matched["customer"].get("variables"), dict)
+            else {}
+        )
+        agent_name = str(
+            customer_variables.get("[AGENT_NAME]", matched["case"].get("assigned_agent", "Collections representative"))
+        ).strip() or "Collections representative"
+        company_name = str(customer_variables.get("[COMPANY_NAME]", "the bank")).strip() or "the bank"
         opener_message = (
-            f"Hello {str(matched['customer']['name'])}, this is Alex from the bank's collections team. "
-            "I am calling regarding your loan account dues. "
-            "Before I share details, please confirm your date of birth (YYYY-MM-DD) "
-            "and your registered phone number."
+            f"Hello. This is {agent_name} calling on behalf of {company_name}. "
+            "This call may be recorded for quality and training purposes. "
+            f"May I please speak with {str(matched['customer']['name'])}?"
         )
         memory.set_state(
             last_agent_response=opener_message,
             last_response_target="customer",
             turn_index=1,
             greeted=True,
+            right_party_status="awaiting_confirmation",
+            wrong_party_callback_stage=None,
+            wrong_party_callback_time=None,
         )
         turn = {
             "session_id": session_id,
@@ -890,6 +900,11 @@ def _load_demo_users(base_dir: Path) -> list[dict[str, Any]]:
                     "name": str(customer.get("name", "")),
                     "phone": str(customer.get("phone", "")),
                     "email": str(customer.get("email", "")),
+                    "variables": (
+                        dict(customer.get("variables", {}))
+                        if isinstance(customer.get("variables"), dict)
+                        else {}
+                    ),
                     "dob": str(challenge.get("dob", "")),
                     "zip": str(challenge.get("zip", "")),
                     "last4_pan": str(challenge.get("last4_pan", "")),
@@ -903,6 +918,7 @@ def _load_demo_users(base_dir: Path) -> list[dict[str, Any]]:
                     "overdue_amount": case_row.get("overdue_amount"),
                     "late_fee": case_row.get("late_fee"),
                     "risk_band": str(case_row.get("risk_band", "")),
+                    "assigned_agent": str(case_row.get("assigned_agent", "")),
                 },
             }
         )

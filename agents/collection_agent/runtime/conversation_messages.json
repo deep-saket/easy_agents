@@ -1,13 +1,4 @@
 {
-  "collection-user_b": [
-    {
-      "id": "4b6ec763-c8f0-45e0-889f-23548eb55c81",
-      "session_id": "collection-user_b",
-      "role": "agent",
-      "content": "this is a call from the collections department regarding your overdue amount of 37800. Can you please let me know when we can expect the payment?",
-      "created_at": "2026-05-02T20:49:30.640213Z"
-    }
-  ],
   "plan-status-test-a": [
     {
       "id": "05e80188-1170-4255-ac89-32e667557bae",
@@ -1757,6 +1748,36 @@
       "role": "agent",
       "content": "Thank you, Aditi. Your account is overdue by \u20b912,500. We'll explain the dues in detail. To confirm, your overdue amount is \u20b912,500. Would you like to discuss a payment plan to settle this amount?",
       "created_at": "2026-06-01T21:08:39.272000Z"
+    }
+  ],
+  "collection-user_b": [
+    {
+      "id": "393c4d00-c1f1-440f-9ef2-5ea9c8eaaddd",
+      "session_id": "collection-user_b",
+      "role": "customer",
+      "content": "no",
+      "created_at": "2026-06-10T09:07:20.687442Z"
+    },
+    {
+      "id": "1fefa9d8-a79d-40dd-be5f-264a93056057",
+      "session_id": "collection-user_b",
+      "role": "agent",
+      "content": "Thank you. For privacy reasons, I can only discuss this directly with Rohan Gupta. I am unable to share any details with anyone else.",
+      "created_at": "2026-06-10T09:07:57.086652Z"
+    },
+    {
+      "id": "bc3e647d-9f0a-493a-9886-597065ee99ce",
+      "session_id": "collection-user_b",
+      "role": "customer",
+      "content": "he is not here now, please try at 5:30pm in evening today",
+      "created_at": "2026-06-10T10:03:00.407624Z"
+    },
+    {
+      "id": "4923f463-15aa-4834-bce7-324c8c4f3771",
+      "session_id": "collection-user_b",
+      "role": "agent",
+      "content": "Thank you. I will try to reach Rohan Gupta he is not here now, please try at 5:30pm in evening today. Please let them know that EasySecure Financial Services called. Thank you for your help, and have a good day. Goodbye.",
+      "created_at": "2026-06-10T10:03:54.793945Z"
     }
   ]
 }

@@ -22,6 +22,17 @@
     "preferred_language": "en",
     "preferred_channel": "phone",
     "vulnerable_customer": false,
+    "variables": {
+      "[AGENT_NAME]": "Alex",
+      "[COMPANY_NAME]": "EasySecure Financial Services",
+      "[CUSTOMER_NAME]": "Rohan Gupta",
+      "[POLICY_NUMBER]": "LOAN-3002",
+      "[AMOUNT]": "37800.00",
+      "[DUE_DATE]": "2026-06-10",
+      "[REF_NUMBER]": "COLL-1002",
+      "[CONTACT_NUMBER]": "+91-1800-555-2002",
+      "[PAYMENT_LINK]": "https://payments.easysecure.example/COLL-1002"
+    },
     "challenge": {
       "dob": "1988-04-22",
       "phone": "9900001002",

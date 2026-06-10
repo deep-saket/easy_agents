@@ -17,7 +17,10 @@ from agents.collection_agent.nodes.plan_proposal_utils import (
     fresh_debug_state,
     get_existing_conversation_plan,
     is_provider_rate_limit_error,
+    is_right_party_denial,
     json_compact,
+    looks_like_callback_time,
+    normalize_callback_time,
     node_label,
     overlay_negotiation_state_from_graph,
     overlay_verification_state_from_graph,
@@ -75,6 +78,8 @@ class PlanProposalDirectiveNode(BaseGraphNode):
         )
         plan_signals = state.get("plan_signals") if isinstance(state.get("plan_signals"), dict) else {}
         identity_verified = bool(memory_state.get("identity_verified", False))
+        right_party_status = str(memory_state.get("right_party_status", "")).strip().lower()
+        wrong_party_callback_stage = str(memory_state.get("wrong_party_callback_stage", "")).strip().lower()
 
         def with_debug(update: NodeUpdate) -> NodeUpdate:
             update.setdefault("prompt", self.last_debug.get("prompt"))
@@ -146,6 +151,170 @@ class PlanProposalDirectiveNode(BaseGraphNode):
                 },
             })
 
+        awaiting_right_party = right_party_status in {"", "awaiting_confirmation"}
+        if not identity_verified and is_right_party_denial(
+            user_input,
+            awaiting_confirmation=awaiting_right_party,
+        ):
+            normalized_input = re.sub(r"\s+", " ", user_input.strip().lower())
+            bare_denial = normalized_input in {"no", "nope", "nah"}
+            callback_time = normalize_callback_time(user_input) if looks_like_callback_time(user_input) else ""
+            callback_stage = (
+                "completed"
+                if callback_time
+                else "privacy_notice_given"
+                if bare_denial
+                else "awaiting_callback"
+            )
+            if memory is not None:
+                memory.set_state(
+                    right_party_status="wrong_party",
+                    wrong_party_callback_stage=callback_stage,
+                    wrong_party_callback_time=callback_time or None,
+                )
+            objective = (
+                "wrong_party_callback_confirmation"
+                if callback_time
+                else "wrong_party_privacy_notice"
+                if bare_denial
+                else "wrong_party_callback_request"
+            )
+            return with_plan({
+                "route": "continue",
+                "response_target": "customer",
+                "right_party_status": "wrong_party",
+                "wrong_party_callback_stage": callback_stage,
+                "plan_proposal": {
+                    "target": "customer",
+                    "intent": objective,
+                    "conversation_objective": objective,
+                    "dialogue_action": objective,
+                    "response_mode": "compliance",
+                    "customer_facing_goal": "Protect customer privacy and arrange a callback without disclosing account information.",
+                    "plan_origin": "wrong_party",
+                    "plan_tree_update": {
+                        "operation": "branch",
+                        "selected_next_node_id": (
+                            "close_conversation" if callback_time else "wrong_party_callback"
+                        ),
+                        "mark_skipped": ["verify_identity"],
+                        "mark_done": (["wrong_party_callback"] if callback_time else []),
+                        "status": ("completed" if callback_time else "active"),
+                    },
+                },
+            })
+
+        if not identity_verified and right_party_status == "wrong_party":
+            if (
+                wrong_party_callback_stage == "completed"
+                and str(memory_state.get("wrong_party_callback_time", "")).strip()
+            ):
+                callback_time = str(memory_state.get("wrong_party_callback_time", "")).strip()
+                return with_plan({
+                    "route": "continue",
+                    "response_target": "customer",
+                    "right_party_status": "wrong_party",
+                    "wrong_party_callback_stage": "completed",
+                    "plan_proposal": {
+                        "target": "customer",
+                        "intent": "wrong_party_callback_confirmation",
+                        "conversation_objective": "wrong_party_callback_confirmation",
+                        "dialogue_action": "wrong_party_callback_confirmation",
+                        "response_mode": "compliance",
+                        "customer_facing_goal": "Confirm the callback and close respectfully without disclosing account information.",
+                        "plan_origin": "wrong_party_callback_completed",
+                        "plan_tree_update": {
+                            "operation": "complete",
+                            "selected_next_node_id": "close_conversation",
+                            "mark_skipped": ["verify_identity"],
+                            "mark_done": ["wrong_party_callback"],
+                            "status": "completed",
+                        },
+                    },
+                    "additional_targets": ["collection_memory_helper_agent"],
+                    "memory_helper_trigger": {
+                        "reason": "wrong_party_callback_scheduled",
+                        "callback_time": callback_time,
+                    },
+                })
+            if wrong_party_callback_stage == "awaiting_callback" and looks_like_callback_time(user_input):
+                callback_time = normalize_callback_time(user_input)
+                if memory is not None:
+                    memory.set_state(
+                        wrong_party_callback_stage="completed",
+                        wrong_party_callback_time=callback_time,
+                    )
+                return with_plan({
+                    "route": "continue",
+                    "response_target": "customer",
+                    "right_party_status": "wrong_party",
+                    "wrong_party_callback_stage": "completed",
+                    "plan_proposal": {
+                        "target": "customer",
+                        "intent": "wrong_party_callback_confirmation",
+                        "conversation_objective": "wrong_party_callback_confirmation",
+                        "dialogue_action": "wrong_party_callback_confirmation",
+                        "response_mode": "compliance",
+                        "customer_facing_goal": "Confirm the callback and close respectfully without disclosing account information.",
+                        "plan_origin": "wrong_party_callback",
+                        "plan_tree_update": {
+                            "operation": "complete",
+                            "selected_next_node_id": "close_conversation",
+                            "mark_skipped": ["verify_identity"],
+                            "mark_done": ["wrong_party_callback"],
+                            "status": "completed",
+                        },
+                    },
+                    "additional_targets": ["collection_memory_helper_agent"],
+                    "memory_helper_trigger": {
+                        "reason": "wrong_party_callback_scheduled",
+                        "callback_time": callback_time,
+                    },
+                })
+            if wrong_party_callback_stage == "privacy_notice_given":
+                if memory is not None:
+                    memory.set_state(wrong_party_callback_stage="awaiting_callback")
+                return with_plan({
+                    "route": "continue",
+                    "response_target": "customer",
+                    "right_party_status": "wrong_party",
+                    "wrong_party_callback_stage": "awaiting_callback",
+                    "plan_proposal": {
+                        "target": "customer",
+                        "intent": "wrong_party_callback_request",
+                        "conversation_objective": "wrong_party_callback_request",
+                        "dialogue_action": "wrong_party_callback_request",
+                        "response_mode": "compliance",
+                        "customer_facing_goal": "Provide a privacy-safe message, contact number, and request a callback time.",
+                        "plan_origin": "wrong_party_followup",
+                        "plan_tree_update": {
+                            "operation": "branch",
+                            "selected_next_node_id": "wrong_party_callback",
+                            "mark_skipped": ["verify_identity"],
+                        },
+                    },
+                })
+            return with_plan({
+                "route": "continue",
+                "response_target": "customer",
+                "right_party_status": "wrong_party",
+                "wrong_party_callback_stage": "awaiting_callback",
+                "plan_proposal": {
+                    "target": "customer",
+                    "intent": "wrong_party_callback_request",
+                    "conversation_objective": "wrong_party_callback_request",
+                    "dialogue_action": "wrong_party_callback_request",
+                    "response_mode": "compliance",
+                    "customer_facing_goal": "Restate the privacy boundary and request a suitable callback time.",
+                    "plan_origin": "wrong_party",
+                    "plan_tree_update": {
+                        "operation": "branch",
+                        "selected_next_node_id": "wrong_party_callback",
+                        "mark_skipped": ["verify_identity"],
+                    },
+                },
+            })
+
         if self._is_conversation_termination(user_input):
             return with_plan({
                 "route": "continue",
@@ -158,7 +327,8 @@ class PlanProposalDirectiveNode(BaseGraphNode):
                     "plan_tree_update": {
                         "operation": "complete",
                         "status": "completed",
-                        "selected_next_node_id": "resolve_outcome",
+                        "selected_next_node_id": "close_conversation",
+                        "mark_done": ["resolve_outcome"],
                     },
                 },
                 "additional_targets": ["collection_memory_helper_agent"],
@@ -197,18 +367,12 @@ class PlanProposalDirectiveNode(BaseGraphNode):
         case_id = str(memory_state.get("active_case_id", "COLL-1001"))
         customer_payment_posture = str(memory_state.get("customer_payment_posture", "unknown")).strip().lower() or "unknown"
         discount_stage = str(memory_state.get("discount_stage", "none")).strip().lower() or "none"
-        hardship_active = bool(
-            isinstance(memory_state.get("hardship_context"), dict)
-            and memory_state.get("hardship_context", {}).get("hardship_detected", False)
-        )
         partial_capacity = memory_state.get("customer_payment_capacity")
         partial_capacity_pct = memory_state.get("customer_payment_capacity_pct")
         route_to_discount_planning = bool(plan_signals.get("needs_discount_specialist")) or (
             identity_verified
             and (
                 discount_stage in {"requested", "counter_offer"}
-                or customer_payment_posture in {"partial_now"}
-                or (hardship_active and customer_payment_posture == "cannot_pay")
                 or bool(memory_state.get("counter_offer_present", False))
             )
             and bool(case_id)
@@ -957,7 +1121,17 @@ class PlanProposalDirectiveNode(BaseGraphNode):
 
         # Guardrail: while identity is incomplete, keep customer proposal pinned
         # to verification path and prevent unrelated plan branches.
-        if (not identity_verified) and current_node_id in {"verify_identity", ""}:
+        privacy_safe_intents = {
+            "wrong_party_privacy_notice",
+            "wrong_party_callback_request",
+            "wrong_party_callback_confirmation",
+            "conversation_termination",
+        }
+        if (
+            (not identity_verified)
+            and current_node_id in {"verify_identity", ""}
+            and intent not in privacy_safe_intents
+        ):
             aligned["intent"] = "verify_identity"
             aligned["plan_outline"] = "Request only remaining verification fields to complete identity verification."
             aligned["next_actions"] = ["verify_identity"]
@@ -1039,8 +1213,27 @@ class PlanProposalDirectiveNode(BaseGraphNode):
         route: str,
         response_target: str,
     ) -> dict[str, Any]:
-        del state, plan, proposal, plan_signals, route
-        objective, action, mode = self._infer_response_objective(memory_state=memory_state, response_target=response_target)
+        del state, plan_signals, route
+        explicit_objective = str(proposal.get("conversation_objective", "")).strip().lower()
+        current_node_id = str(plan.get("current_node_id", "")).strip().lower()
+        if explicit_objective in {
+            "wrong_party_privacy_notice",
+            "wrong_party_callback_request",
+            "wrong_party_callback_confirmation",
+            "close_conversation",
+        }:
+            objective = explicit_objective
+            action = str(proposal.get("dialogue_action", explicit_objective)).strip().lower() or explicit_objective
+            mode = str(proposal.get("response_mode", "compliance")).strip().lower() or "compliance"
+        elif current_node_id == "close_conversation":
+            objective = "close_conversation"
+            action = "close_conversation"
+            mode = "informational"
+        else:
+            objective, action, mode = self._infer_response_objective(
+                memory_state=memory_state,
+                response_target=response_target,
+            )
         if response_target == "discount_planning_agent":
             objective = "handoff_to_offer_agent"
             action = "handoff"
@@ -1108,8 +1301,15 @@ class PlanProposalDirectiveNode(BaseGraphNode):
     def _required_response_elements_for_objective(*, objective: str) -> list[str]:
         mapping = {
             "collect_verification": ["ask_only_missing_verification_fields"],
+            "wrong_party_privacy_notice": ["state_privacy_boundary"],
+            "wrong_party_callback_request": ["state_privacy_boundary", "request_callback_time"],
+            "wrong_party_callback_confirmation": ["confirm_callback_time", "close_conversation"],
             "explain_dues": ["mention_due_amount", "ask_next_step"],
-            "assess_affordability": ["acknowledge_hardship", "ask_affordable_amount"],
+            "assess_affordability": [
+                "acknowledge_hardship",
+                "explain_applicable_policy_options",
+                "ask_affordable_amount",
+            ],
             "present_arrangement_options": ["discuss_arrangement", "ask_next_step"],
             "negotiate_installment": ["ask_affordable_amount", "discuss_arrangement"],
             "confirm_commitment": ["ask_commitment_date", "confirm_amount_or_date"],
@@ -1123,6 +1323,21 @@ class PlanProposalDirectiveNode(BaseGraphNode):
     def _forbidden_dialogue_actions_for_objective(*, objective: str) -> list[str]:
         mapping = {
             "collect_verification": ["disclose_dues_before_verification", "restart_collections_menu", "mention_internal_processing"],
+            "wrong_party_privacy_notice": [
+                "disclose_account_details",
+                "request_verification_from_third_party",
+                "mention_dues_or_policy_number",
+            ],
+            "wrong_party_callback_request": [
+                "disclose_account_details",
+                "request_verification_from_third_party",
+                "mention_dues_or_policy_number",
+            ],
+            "wrong_party_callback_confirmation": [
+                "disclose_account_details",
+                "request_verification_from_third_party",
+                "mention_dues_or_policy_number",
+            ],
             "explain_dues": ["disclose_dues_before_verification", "mention_internal_processing"],
             "assess_affordability": ["restart_collections_menu", "ask_pay_now_or_arrangement", "mention_internal_processing"],
             "present_arrangement_options": ["restart_collections_menu", "ask_pay_now_or_arrangement", "mention_internal_processing"],
@@ -1138,6 +1353,9 @@ class PlanProposalDirectiveNode(BaseGraphNode):
     def _allowed_dialogue_actions_for_objective(*, objective: str) -> list[str]:
         mapping = {
             "collect_verification": ["ask_verification"],
+            "wrong_party_privacy_notice": ["state_privacy_boundary"],
+            "wrong_party_callback_request": ["state_privacy_boundary", "request_callback_time"],
+            "wrong_party_callback_confirmation": ["confirm_callback_time", "close_conversation"],
             "explain_dues": ["present_due_amount", "ask_next_step"],
             "assess_affordability": ["acknowledge_hardship", "ask_affordable_amount"],
             "present_arrangement_options": ["present_offer", "discuss_arrangement"],
@@ -1154,8 +1372,13 @@ class PlanProposalDirectiveNode(BaseGraphNode):
         name = str(memory_state.get("active_customer_name", "Customer")).strip() or "Customer"
         goals = {
             "collect_verification": "Ask only for the missing verification details needed to continue securely.",
+            "wrong_party_privacy_notice": "State that details can only be discussed directly with the customer.",
+            "wrong_party_callback_request": "Protect privacy, provide the company callback number, and ask for a suitable callback time.",
+            "wrong_party_callback_confirmation": "Confirm the callback time and close the call respectfully.",
             "explain_dues": "Explain the overdue amount clearly and ask the next useful payment question.",
-            "assess_affordability": "Ask what monthly amount is realistically manageable after hardship disclosure.",
+            "assess_affordability": (
+                "Explain the standard policy options that apply, then ask what amount or payment date is realistically manageable."
+            ),
             "present_arrangement_options": "Continue arrangement discussion with practical repayment options.",
             "negotiate_installment": "Refine the repayment arrangement toward a manageable installment.",
             "confirm_commitment": "Confirm the amount and payment date the customer can commit to.",

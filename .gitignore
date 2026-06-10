@@ -16,3 +16,4 @@ tests/*.executed.ipynb
 tests/voice_transcript.json
 tests/youtube_audio.wav
 tests/youtube_downloaded_audio.m4a
+agents/collection_agent/runtime/traces/

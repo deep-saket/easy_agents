@@ -65,6 +65,7 @@ def build_parser(defaults: dict[str, Any]) -> argparse.ArgumentParser:
     parser.add_argument("--openai-api-key", default=None, help="Override OPENAI_API_KEY for this run")
     parser.add_argument("--nvidia-api-key", default=None, help="Override NVIDIA_API_KEY for this run")
     parser.add_argument("--groq-api-key", default=None, help="Override GROQ_API_KEY for this run")
+    parser.add_argument("--ollama-api-key", default=None, help="Override OLLAMA_API_KEY for this run")
     parser.add_argument("--disable-llm", action="store_true", help="Disable LLM usage and run deterministic planner fallback")
     parser.add_argument("--trace-jsonl", default=None, help="Optional JSONL event trace output path")
     parser.add_argument("--trace-stdout-json", action="store_true", help="Emit real-time trace events to stdout as JSON lines")
@@ -95,6 +96,7 @@ def build_llm(
     cli_openai_api_key: str | None = None,
     cli_nvidia_api_key: str | None = None,
     cli_groq_api_key: str | None = None,
+    cli_ollama_api_key: str | None = None,
     force_disable: bool = False,
 ) -> Any | None:
     llm_cfg = dict(config.get("llm", {})) if isinstance(config.get("llm"), dict) else {}
@@ -150,8 +152,30 @@ def build_llm(
             temperature=temperature,
         )
 
+    if provider == "ollama":
+        api_key = cli_ollama_api_key or os.getenv("OLLAMA_API_KEY")
+        base_url = str(llm_cfg.get("base_url") or os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"))
+        api_path = str(llm_cfg.get("api_path") or os.getenv("OLLAMA_API_PATH", "/v1/chat/completions"))
+        is_local_ollama = base_url.rstrip("/").lower() in {
+            "http://localhost:11434",
+            "http://127.0.0.1:11434",
+        }
+        if not api_key and not is_local_ollama:
+            raise ValueError(
+                "OLLAMA_API_KEY is required for remote llm.provider=ollama. "
+                "Pass --ollama-api-key, export OLLAMA_API_KEY, or use local Ollama at http://localhost:11434."
+            )
+        return LLMFactory.build_openai_compatible_llm(
+            base_url,
+            model_name=model_name,
+            api_key=api_key,
+            api_path=api_path,
+            max_new_tokens=max_new_tokens,
+            temperature=temperature,
+        )
+
     raise ValueError(
-        f"Collection Agent supports llm.provider values: openai, nvidia, groq. Got: {provider}"
+        f"Collection Agent supports llm.provider values: openai, nvidia, groq, ollama. Got: {provider}"
     )
 
 
@@ -394,6 +418,7 @@ def main() -> None:
         cli_openai_api_key=args.openai_api_key,
         cli_nvidia_api_key=args.nvidia_api_key,
         cli_groq_api_key=args.groq_api_key,
+        cli_ollama_api_key=args.ollama_api_key,
         force_disable=args.disable_llm,
     )
     trace_sink = build_trace_sink(args, base_dir, config)

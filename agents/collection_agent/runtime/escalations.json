@@ -1,1 +1,12 @@
-[]
+[
+  {
+    "escalation_id": "ESC-0327CB06F8",
+    "case_id": "COLL-1001",
+    "reason": "Customer experiencing hardship due to job loss and requesting a payment deferral that exceeds standard policy limits.",
+    "evidence_summary": null,
+    "queue": "supervisor_review",
+    "priority": "low",
+    "status": "queued",
+    "created_at": "2026-06-08T08:35:45.527093+00:00"
+  }
+]

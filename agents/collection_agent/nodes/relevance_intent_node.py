@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from agents.collection_agent.nodes.collection_intent_node import CollectionIntentNode
+from agents.collection_agent.nodes.plan_proposal_utils import is_right_party_denial
 from src.nodes.types import AgentState
 
 
@@ -121,7 +122,24 @@ class RelevanceIntentNode(CollectionIntentNode):
         state: AgentState,
         context: dict[str, Any],
     ) -> dict[str, Any] | None:
-        # No relevance pre-rule; allow classifier + relevance guard flow.
+        memory_state = self._get_memory_state(state)
+        right_party_status = str(memory_state.get("right_party_status", "")).strip().lower()
+        user_input = str(state.get("user_input", ""))
+        if right_party_status == "wrong_party":
+            return {
+                "intent": "relevant",
+                "confidence": 1.0,
+                "reason": "Wrong-party callback flow is active.",
+            }
+        if is_right_party_denial(
+            user_input,
+            awaiting_confirmation=right_party_status in {"", "awaiting_confirmation"},
+        ):
+            return {
+                "intent": "relevant",
+                "confidence": 1.0,
+                "reason": "Right-party denial continues the active opening flow.",
+            }
         return None
 
     def _apply_node_specific_intent_override(

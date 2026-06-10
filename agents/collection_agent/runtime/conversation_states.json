@@ -3660,212 +3660,6 @@
     "last_agent_response": "Here is the next best way to proceed: Verify account context, provide concise dues explanation, collect payment intent, and capture commitment or follow-up details. If you agree, I will execute this now.",
     "last_response_target": "customer"
   },
-  "collection-user_b": {
-    "mode": "strict_collections",
-    "active_channel": "voice",
-    "active_case_id": "COLL-1002",
-    "active_user_id": "CUST-2002",
-    "active_customer_name": "Rohan Gupta",
-    "agent_loop_blocked": false,
-    "agent_loop_count": 0,
-    "active_overdue_amount": 37800.0,
-    "active_emi_amount": 18900.0,
-    "active_late_fee": 1900.0,
-    "active_dpd": 73,
-    "active_loan_id": "LOAN-3002",
-    "active_customer_phone": "+919900001002",
-    "active_customer_email": "rohan.gupta@example.com",
-    "global_key_event_memory": {
-      "updated_at": "2026-05-01T11:50:52.746207+00:00",
-      "event_counters": {
-        "conversation_outcome::successful": 3,
-        "conversation_outcome::unsuccessful": 3
-      },
-      "successful_cues": [
-        {
-          "cue_id": "collect-payment-link-after-dues-clarity",
-          "cue": "When user asks to pay now, send payment link right after dues explanation.",
-          "count": 3,
-          "last_seen": "2026-05-01T00:00:00+00:00",
-          "sample_signals": [
-            "payment_intent: customer asked for immediate payment link"
-          ],
-          "sample_user_ids": [
-            "CUST-2001",
-            "CUST-2005"
-          ]
-        }
-      ],
-      "unsuccessful_cues": [
-        {
-          "cue_id": "avoid-hard-push-before-hardship-ack",
-          "cue": "Hard push fails when hardship is not acknowledged before options are discussed.",
-          "count": 2,
-          "last_seen": "2026-05-01T00:00:00+00:00",
-          "sample_signals": [
-            "hardship_signal: cannot pay this month due to job loss"
-          ],
-          "sample_user_ids": [
-            "CUST-2002"
-          ]
-        },
-        {
-          "cue_id": "user-asked-for-discount/waiver-style-assistance.",
-          "cue": "User asked for discount/waiver style assistance.",
-          "count": 1,
-          "last_seen": "2026-05-01T11:50:52.746202+00:00",
-          "sample_signals": [
-            "user: I need lower EMI | agent: I can propose discount plan | user: Bye"
-          ],
-          "sample_user_ids": [
-            "CUST-2001"
-          ]
-        }
-      ]
-    },
-    "user_key_event_memory": {
-      "user_id": "CUST-2002",
-      "profile": {
-        "case_ids": [
-          "COLL-1002"
-        ],
-        "preferred_channel": "voice",
-        "risk_band": "high"
-      },
-      "latest_summary": "User cited temporary hardship and asked for lower EMI options before committing.",
-      "procedural_key_points": [
-        "Lead with hardship acknowledgement before proposing collections action.",
-        "Evaluate discount/restructure options before requesting immediate payment."
-      ],
-      "follow_up_considerations": [
-        "Begin next call with revised EMI options and promise capture path."
-      ],
-      "last_outcome": "unsuccessful",
-      "last_case_id": "COLL-1002"
-    },
-    "last_tool_used": "case_fetch",
-    "turn_index": 2,
-    "last_user_input": "Start outbound collections call now. Customer=Rohan Gupta customer_id=CUST-2002 case_id=COLL-1002 overdue_amount=37800 Generate the first call pitch introducing dues and asking for payment intent.",
-    "last_agent_response": "this is a call from the collections department regarding your overdue amount of 37800. Can you please let me know when we can expect the payment?",
-    "last_response_target": "customer",
-    "node_llms": {
-      "intent": "meta/llama-3.1-70b-instruct",
-      "plan_proposal": "meta/llama-3.1-70b-instruct",
-      "reflect": "meta/llama-3.1-70b-instruct"
-    },
-    "active_conversation_plan": {
-      "plan_id": "plan-COLL-1002",
-      "version": 2,
-      "status": "active",
-      "mode": "strict_collections",
-      "objective": "Move borrower conversation to payment, promise-to-pay, or compliant follow-up.",
-      "root_node_id": "open_and_context",
-      "current_node_id": "verify_identity",
-      "previous_node_id": "open_and_context",
-      "next_node_ids": [
-        "explain_dues"
-      ],
-      "nodes": [
-        {
-          "id": "open_and_context",
-          "label": "Open call and establish case context",
-          "owner": "collection_agent",
-          "status": "done"
-        },
-        {
-          "id": "verify_identity",
-          "label": "Verify customer identity",
-          "owner": "customer",
-          "status": "in_progress"
-        },
-        {
-          "id": "explain_dues",
-          "label": "Explain dues and policy options",
-          "owner": "customer",
-          "status": "pending"
-        },
-        {
-          "id": "collect_payment_intent",
-          "label": "Collect payment intent",
-          "owner": "customer",
-          "status": "pending"
-        },
-        {
-          "id": "evaluate_assistance",
-          "label": "Evaluate discount/restructure assistance",
-          "owner": "collection_agent",
-          "status": "pending"
-        },
-        {
-          "id": "resolve_outcome",
-          "label": "Finalize payment, promise, or follow-up",
-          "owner": "customer",
-          "status": "pending"
-        }
-      ],
-      "edges": [
-        {
-          "from": "collect_payment_intent",
-          "to": "evaluate_assistance",
-          "condition": "cannot_pay_full"
-        },
-        {
-          "from": "collect_payment_intent",
-          "to": "resolve_outcome",
-          "condition": "pay_now"
-        },
-        {
-          "from": "evaluate_assistance",
-          "to": "resolve_outcome",
-          "condition": "assistance_ready"
-        },
-        {
-          "from": "explain_dues",
-          "to": "collect_payment_intent",
-          "condition": "dues_explained"
-        },
-        {
-          "from": "open_and_context",
-          "to": "verify_identity",
-          "condition": "case_context_ready"
-        },
-        {
-          "from": "verify_identity",
-          "to": "explain_dues",
-          "condition": "identity_verified"
-        }
-      ],
-      "timeline": [
-        {
-          "at_utc": "2026-05-02T20:49:27.378767+00:00",
-          "version": 2,
-          "status": "active",
-          "current_node_id": "verify_identity",
-          "next_node_ids": [
-            "explain_dues"
-          ],
-          "update": {
-            "origin": "pre_plan_intent",
-            "route": "continue",
-            "response_target": "customer",
-            "previous_node_id": "open_and_context",
-            "current_node_id": "verify_identity",
-            "plan_outline": "Verify account context, provide concise dues explanation, collect payment intent, and capture commitment or follow-up details.",
-            "operation": "insert"
-          }
-        }
-      ],
-      "revision_log": [
-        {
-          "revision": 2,
-          "reason": "context shift: target=customer, route=continue, origin=pre_plan_intent",
-          "at_utc": "2026-05-02T20:49:27.378710+00:00"
-        }
-      ],
-      "updated_from": "pre_plan_intent",
-      "last_response_target": "customer"
-    }
-  },
   "llm-status-check": {
     "mode": "strict_collections",
     "active_channel": "sms",
@@ -42373,17 +42167,947 @@
     "turn_index": 1,
     "greeted": true
   },
-  "collection-user_a": {
+  "collection-user_b": {
     "mode": "strict_collections",
     "active_channel": "voice",
-    "active_case_id": "COLL-1001",
-    "active_user_id": "CUST-2001",
-    "active_customer_name": "Aditi Sharma",
+    "active_case_id": "COLL-1002",
+    "active_user_id": "CUST-2002",
+    "active_customer_name": "Rohan Gupta",
     "agent_loop_blocked": false,
     "agent_loop_count": 0,
-    "last_agent_response": "Hello Aditi Sharma, this is Alex from the bank's collections team. I am calling regarding your loan account dues. Before I share details, please confirm your date of birth (YYYY-MM-DD) and your registered phone number.",
+    "last_agent_response": "Thank you. I will try to reach Rohan Gupta he is not here now, please try at 5:30pm in evening today. Please let them know that EasySecure Financial Services called. Thank you for your help, and have a good day. Goodbye.",
     "last_response_target": "customer",
-    "turn_index": 1,
-    "greeted": true
+    "turn_index": 3,
+    "greeted": true,
+    "right_party_status": "wrong_party",
+    "wrong_party_callback_stage": "completed",
+    "wrong_party_callback_time": "he is not here now, please try at 5:30pm in evening today",
+    "conversation_mode": "verification",
+    "negotiation_stage": "none",
+    "customer_payment_posture": "unknown",
+    "customer_payment_posture_history": [],
+    "customer_payment_capacity": null,
+    "customer_payment_capacity_pct": null,
+    "discount_stage": "none",
+    "customer_payment_willingness": 0.5,
+    "hardship_context": {
+      "hardship_detected": false,
+      "hardship_reason": null,
+      "confidence": 0.0
+    },
+    "discount_requested": false,
+    "discount_offered": false,
+    "discount_accepted": false,
+    "discount_rejected": false,
+    "counter_offer_present": false,
+    "response_mode": "compliance",
+    "active_dialogue_owner": "verification",
+    "customer_profile": {
+      "customer_id": "CUST-2002",
+      "employment_type": "self_employed",
+      "customer_segment": "mass_affluent",
+      "risk_score": 0.62,
+      "tenure_years": 3,
+      "previous_hardship_count": 2,
+      "previous_settlement_count": 1,
+      "previous_broken_promises": 3,
+      "preferred_language": "en",
+      "preferred_channel": "phone",
+      "vulnerable_customer": false
+    },
+    "customer_profile_summary": {
+      "employment_type": "self_employed",
+      "customer_segment": "mass_affluent",
+      "risk_score": 0.62,
+      "tenure_years": 3,
+      "previous_hardship_count": 2,
+      "previous_settlement_count": 1,
+      "previous_broken_promises": 3,
+      "preferred_language": "en",
+      "preferred_channel": "phone",
+      "vulnerable_customer": false
+    },
+    "payment_history": {
+      "customer_id": "CUST-2002",
+      "payments": [
+        {
+          "date": "2026-01-15",
+          "amount": 18900
+        },
+        {
+          "date": "2025-12-15",
+          "amount": 9000
+        }
+      ]
+    },
+    "payment_history_summary": {
+      "payment_count": 2,
+      "total_paid": 27900.0,
+      "last_payment_date": "2025-12-15",
+      "last_payment_amount": 9000.0
+    },
+    "offer_history": {
+      "case_id": "COLL-1002",
+      "offers": [
+        {
+          "offer_pct": 0,
+          "status": "rejected"
+        }
+      ]
+    },
+    "offer_history_summary": {
+      "offer_count": 1,
+      "rejected_count": 1,
+      "accepted_count": 0,
+      "counter_offer_count": 0,
+      "last_offer_status": "rejected",
+      "last_offer_pct": 0,
+      "previous_discount_offers": [
+        {
+          "offer_pct": 0,
+          "status": "rejected"
+        }
+      ]
+    },
+    "assistance_programs": [
+      {
+        "program_id": "HARDSHIP_001",
+        "eligible_products": [
+          "personal_loan"
+        ],
+        "hardship_reasons": [
+          "job_loss",
+          "medical_emergency",
+          "reduced_income"
+        ],
+        "max_discount_pct": 10,
+        "max_installments": 6,
+        "requires_manager_approval": true
+      },
+      {
+        "program_id": "SETTLEMENT_003",
+        "eligible_products": [
+          "personal_loan",
+          "business_loan",
+          "home_loan"
+        ],
+        "hardship_reasons": [
+          "job_loss",
+          "salary_delay",
+          "cashflow_issue",
+          "reduced_income"
+        ],
+        "max_discount_pct": 15,
+        "max_installments": 4,
+        "requires_manager_approval": true
+      }
+    ],
+    "active_collection_context": {
+      "customer": {
+        "customer_id": "CUST-2002",
+        "name": "Rohan Gupta",
+        "phone": "+919900001002",
+        "email": "rohan.gupta@example.com",
+        "preferred_language": "en",
+        "preferred_channel": "phone",
+        "vulnerable_customer": false,
+        "variables": {
+          "[AGENT_NAME]": "Alex",
+          "[COMPANY_NAME]": "EasySecure Financial Services",
+          "[CUSTOMER_NAME]": "Rohan Gupta",
+          "[POLICY_NUMBER]": "LOAN-3002",
+          "[AMOUNT]": "37800.00",
+          "[DUE_DATE]": "2026-06-10",
+          "[REF_NUMBER]": "COLL-1002",
+          "[CONTACT_NUMBER]": "+91-1800-555-2002",
+          "[PAYMENT_LINK]": "https://payments.easysecure.example/COLL-1002"
+        },
+        "challenge": {
+          "dob": "1988-04-22",
+          "phone": "9900001002",
+          "last4_pan": "QP9T",
+          "zip": "400067"
+        }
+      },
+      "case": {
+        "case_id": "COLL-1002",
+        "customer_id": "CUST-2002",
+        "loan_id": "LOAN-3002",
+        "portfolio_id": "PORT-RETAIL-A",
+        "product": "personal_loan",
+        "dpd": 73,
+        "emi_amount": 18900,
+        "overdue_amount": 37800,
+        "late_fee": 1900,
+        "status": "open",
+        "risk_band": "high",
+        "assigned_agent": "Alex",
+        "last_contact_date": "2026-05-19",
+        "contact_attempts": 5,
+        "promise_to_pay_date": null,
+        "promise_to_pay_amount": null
+      },
+      "policy": {
+        "loan_id": "LOAN-3002",
+        "product": "personal_loan",
+        "max_promise_days": 5,
+        "waiver_allowed": false,
+        "max_waiver_pct": 0,
+        "restructure_allowed": true,
+        "allow_partial_payment": true,
+        "min_partial_payment_pct": 20,
+        "allow_counter_offer": true,
+        "max_counter_offer_rounds": 3,
+        "requires_hardship_for_discount": true,
+        "notes": "High DPD accounts only eligible for restructure review."
+      },
+      "customer_profile": {
+        "customer_id": "CUST-2002",
+        "employment_type": "self_employed",
+        "customer_segment": "mass_affluent",
+        "risk_score": 0.62,
+        "tenure_years": 3,
+        "previous_hardship_count": 2,
+        "previous_settlement_count": 1,
+        "previous_broken_promises": 3,
+        "preferred_language": "en",
+        "preferred_channel": "phone",
+        "vulnerable_customer": false
+      },
+      "payment_history": {
+        "customer_id": "CUST-2002",
+        "payments": [
+          {
+            "date": "2026-01-15",
+            "amount": 18900
+          },
+          {
+            "date": "2025-12-15",
+            "amount": 9000
+          }
+        ]
+      },
+      "offer_history": {
+        "case_id": "COLL-1002",
+        "offers": [
+          {
+            "offer_pct": 0,
+            "status": "rejected"
+          }
+        ]
+      },
+      "assistance_programs": [
+        {
+          "program_id": "HARDSHIP_001",
+          "eligible_products": [
+            "personal_loan"
+          ],
+          "hardship_reasons": [
+            "job_loss",
+            "medical_emergency",
+            "reduced_income"
+          ],
+          "max_discount_pct": 10,
+          "max_installments": 6,
+          "requires_manager_approval": true
+        },
+        {
+          "program_id": "SETTLEMENT_003",
+          "eligible_products": [
+            "personal_loan",
+            "business_loan",
+            "home_loan"
+          ],
+          "hardship_reasons": [
+            "job_loss",
+            "salary_delay",
+            "cashflow_issue",
+            "reduced_income"
+          ],
+          "max_discount_pct": 15,
+          "max_installments": 4,
+          "requires_manager_approval": true
+        }
+      ]
+    },
+    "active_overdue_amount": 37800.0,
+    "active_emi_amount": 18900.0,
+    "active_late_fee": 1900.0,
+    "active_dpd": 73,
+    "active_loan_id": "LOAN-3002",
+    "active_customer_phone": "+919900001002",
+    "active_customer_email": "rohan.gupta@example.com",
+    "active_verification_required_fields": [
+      "dob",
+      "phone"
+    ],
+    "active_verification_challenge": {
+      "dob": "1988-04-22",
+      "phone": "9900001002"
+    },
+    "global_key_event_memory": {
+      "updated_at": "2026-05-01T11:50:52.746207+00:00",
+      "event_counters": {
+        "conversation_outcome::successful": 3,
+        "conversation_outcome::unsuccessful": 3
+      },
+      "successful_cues": [
+        {
+          "cue_id": "collect-payment-link-after-dues-clarity",
+          "cue": "When user asks to pay now, send payment link right after dues explanation.",
+          "count": 3,
+          "last_seen": "2026-05-01T00:00:00+00:00",
+          "sample_signals": [
+            "payment_intent: customer asked for immediate payment link"
+          ],
+          "sample_user_ids": [
+            "CUST-2001",
+            "CUST-2005"
+          ]
+        }
+      ],
+      "unsuccessful_cues": [
+        {
+          "cue_id": "avoid-hard-push-before-hardship-ack",
+          "cue": "Hard push fails when hardship is not acknowledged before options are discussed.",
+          "count": 2,
+          "last_seen": "2026-05-01T00:00:00+00:00",
+          "sample_signals": [
+            "hardship_signal: cannot pay this month due to job loss"
+          ],
+          "sample_user_ids": [
+            "CUST-2002"
+          ]
+        },
+        {
+          "cue_id": "user-asked-for-discount/waiver-style-assistance.",
+          "cue": "User asked for discount/waiver style assistance.",
+          "count": 1,
+          "last_seen": "2026-05-01T11:50:52.746202+00:00",
+          "sample_signals": [
+            "user: I need lower EMI | agent: I can propose discount plan | user: Bye"
+          ],
+          "sample_user_ids": [
+            "CUST-2001"
+          ]
+        }
+      ]
+    },
+    "user_key_event_memory": {
+      "user_id": "CUST-2002",
+      "profile": {
+        "case_ids": [
+          "COLL-1002"
+        ],
+        "preferred_channel": "voice",
+        "risk_band": "unknown"
+      },
+      "latest_summary": "customer: no | agent: Thank you. For privacy reasons, I can only discuss this directly with Rohan Gupta. I am unable to share any details with anyone else. | customer: They're not here right now. Can I take a message? What's it about? | agent: I am unable to share what the call is about, but please let Rohan Gupta know that EasySecure Financial Services called and would like to speak with them. They can also reach EasySecure Financial Services at +91-1800-555-2002 at their convenience. When would be a good time to try again? | customer: try this evening | agent: Thank you. I will try to reach Rohan Gupta this evening. Please let them know that EasySecure Financial Services called. Thank you for your help, and have a good day. Goodbye.",
+      "procedural_key_points": [
+        "Lead with hardship acknowledgement before proposing collections action.",
+        "Evaluate discount/restructure options before requesting immediate payment."
+      ],
+      "follow_up_considerations": [
+        "Begin next turn with dues summary and one clear next action."
+      ],
+      "last_outcome": "neutral",
+      "last_case_id": "COLL-1002"
+    },
+    "node_llms": {
+      "intent": "gemma4:31b-cloud",
+      "negotiation_classification": "gemma4:31b-cloud",
+      "plan_proposal_state": "gemma4:31b-cloud",
+      "plan_proposal_directive": "gemma4:31b-cloud",
+      "reflect": "gemma4:31b-cloud"
+    },
+    "verification_entities": {},
+    "verification_collected": {},
+    "hardship_reason": null,
+    "active_conversation_plan": {
+      "plan_id": "plan-COLL-1002",
+      "version": 1,
+      "status": "active",
+      "mode": "strict_collections",
+      "objective": "Move borrower conversation to payment, promise-to-pay, or compliant follow-up.",
+      "root_node_id": "open_and_context",
+      "current_node_id": "wrong_party_callback",
+      "previous_node_id": "wrong_party_callback",
+      "next_node_ids": [
+        "close_conversation"
+      ],
+      "nodes": [
+        {
+          "id": "open_and_context",
+          "label": "Initialize case context",
+          "owner": "collection_agent",
+          "status": "done"
+        },
+        {
+          "id": "verify_identity",
+          "label": "Verify customer identity",
+          "owner": "customer",
+          "status": "skipped"
+        },
+        {
+          "id": "wrong_party_callback",
+          "label": "Arrange privacy-safe callback",
+          "owner": "collection_agent",
+          "status": "in_progress"
+        },
+        {
+          "id": "explain_dues",
+          "label": "Explain dues and policy options",
+          "owner": "customer",
+          "status": "skipped"
+        },
+        {
+          "id": "collect_payment_intent",
+          "label": "Collect payment intent",
+          "owner": "customer",
+          "status": "skipped"
+        },
+        {
+          "id": "evaluate_assistance",
+          "label": "Evaluate discount/restructure assistance",
+          "owner": "collection_agent",
+          "status": "skipped"
+        },
+        {
+          "id": "resolve_outcome",
+          "label": "Finalize payment, promise, or follow-up",
+          "owner": "customer",
+          "status": "skipped"
+        },
+        {
+          "id": "close_conversation",
+          "label": "Close conversation",
+          "owner": "collection_agent",
+          "status": "pending"
+        }
+      ],
+      "edges": [
+        {
+          "from": "open_and_context",
+          "to": "verify_identity",
+          "condition": "case_context_ready"
+        },
+        {
+          "from": "verify_identity",
+          "to": "explain_dues",
+          "condition": "identity_verified"
+        },
+        {
+          "from": "verify_identity",
+          "to": "wrong_party_callback",
+          "condition": "wrong_party_detected"
+        },
+        {
+          "from": "explain_dues",
+          "to": "collect_payment_intent",
+          "condition": "dues_explained"
+        },
+        {
+          "from": "collect_payment_intent",
+          "to": "resolve_outcome",
+          "condition": "pay_now"
+        },
+        {
+          "from": "collect_payment_intent",
+          "to": "evaluate_assistance",
+          "condition": "cannot_pay_full"
+        },
+        {
+          "from": "evaluate_assistance",
+          "to": "resolve_outcome",
+          "condition": "assistance_ready"
+        },
+        {
+          "from": "wrong_party_callback",
+          "to": "close_conversation",
+          "condition": "callback_confirmed"
+        },
+        {
+          "from": "resolve_outcome",
+          "to": "close_conversation",
+          "condition": "outcome_confirmed"
+        }
+      ],
+      "timeline": [
+        {
+          "at_utc": "2026-06-10T09:07:51.294395+00:00",
+          "version": 1,
+          "status": "active",
+          "current_node_id": "wrong_party_callback",
+          "next_node_ids": [
+            "close_conversation"
+          ],
+          "update": {
+            "origin": "react",
+            "route": "continue",
+            "response_target": "customer",
+            "previous_node_id": "open_and_context",
+            "current_node_id": "wrong_party_callback",
+            "plan_outline": "",
+            "operation": "advance"
+          }
+        },
+        {
+          "at_utc": "2026-06-10T10:03:48.898993+00:00",
+          "version": 1,
+          "status": "active",
+          "current_node_id": "wrong_party_callback",
+          "next_node_ids": [
+            "close_conversation"
+          ],
+          "update": {
+            "origin": "react",
+            "route": "continue",
+            "response_target": "customer",
+            "previous_node_id": "wrong_party_callback",
+            "current_node_id": "wrong_party_callback",
+            "plan_outline": "",
+            "operation": "advance"
+          }
+        }
+      ],
+      "revision_log": [],
+      "updated_from": "react",
+      "last_response_target": "customer",
+      "step_markers": {
+        "open_and_context": {
+          "state": "done",
+          "updated_at": "2026-06-10T09:07:51.294395+00:00",
+          "source": "plan_tree_update",
+          "reason": "case_context_ready_transition"
+        },
+        "verify_identity": {
+          "state": "skipped",
+          "updated_at": "2026-06-10T10:03:48.898993+00:00",
+          "source": "wrong_party_guard",
+          "reason": "wrong_party_detected_no_verification_allowed"
+        },
+        "wrong_party_callback": {
+          "state": "pending",
+          "updated_at": "2026-06-10T09:07:51.294395+00:00",
+          "source": "reconciler",
+          "reason": ""
+        },
+        "explain_dues": {
+          "state": "skipped",
+          "updated_at": "2026-06-10T10:03:48.898993+00:00",
+          "source": "wrong_party_guard",
+          "reason": "wrong_party_branch_prevents_account_disclosure"
+        },
+        "collect_payment_intent": {
+          "state": "skipped",
+          "updated_at": "2026-06-10T10:03:48.898993+00:00",
+          "source": "wrong_party_guard",
+          "reason": "wrong_party_branch_prevents_account_disclosure"
+        },
+        "evaluate_assistance": {
+          "state": "skipped",
+          "updated_at": "2026-06-10T10:03:48.898993+00:00",
+          "source": "wrong_party_guard",
+          "reason": "wrong_party_branch_prevents_account_disclosure"
+        },
+        "resolve_outcome": {
+          "state": "skipped",
+          "updated_at": "2026-06-10T10:03:48.898993+00:00",
+          "source": "wrong_party_guard",
+          "reason": "wrong_party_branch_prevents_account_disclosure"
+        },
+        "close_conversation": {
+          "state": "pending",
+          "updated_at": "2026-06-10T09:07:51.294395+00:00",
+          "source": "reconciler",
+          "reason": ""
+        }
+      },
+      "timeline_snapshots": [
+        {
+          "at_utc": "2026-06-10T09:07:51.294395+00:00",
+          "version": 1,
+          "status": "active",
+          "current_node_id": "wrong_party_callback",
+          "update": {
+            "origin": "react",
+            "route": "continue",
+            "response_target": "customer",
+            "previous_node_id": "open_and_context",
+            "current_node_id": "wrong_party_callback",
+            "plan_outline": "",
+            "operation": "advance"
+          },
+          "plan": {
+            "plan_id": "plan-COLL-1002",
+            "version": 1,
+            "status": "active",
+            "mode": "strict_collections",
+            "objective": "Move borrower conversation to payment, promise-to-pay, or compliant follow-up.",
+            "root_node_id": "open_and_context",
+            "current_node_id": "wrong_party_callback",
+            "previous_node_id": "open_and_context",
+            "next_node_ids": [
+              "close_conversation"
+            ],
+            "nodes": [
+              {
+                "id": "open_and_context",
+                "label": "Initialize case context",
+                "owner": "collection_agent",
+                "status": "done"
+              },
+              {
+                "id": "verify_identity",
+                "label": "Verify customer identity",
+                "owner": "customer",
+                "status": "skipped"
+              },
+              {
+                "id": "wrong_party_callback",
+                "label": "Arrange privacy-safe callback",
+                "owner": "collection_agent",
+                "status": "in_progress"
+              },
+              {
+                "id": "explain_dues",
+                "label": "Explain dues and policy options",
+                "owner": "customer",
+                "status": "skipped"
+              },
+              {
+                "id": "collect_payment_intent",
+                "label": "Collect payment intent",
+                "owner": "customer",
+                "status": "skipped"
+              },
+              {
+                "id": "evaluate_assistance",
+                "label": "Evaluate discount/restructure assistance",
+                "owner": "collection_agent",
+                "status": "skipped"
+              },
+              {
+                "id": "resolve_outcome",
+                "label": "Finalize payment, promise, or follow-up",
+                "owner": "customer",
+                "status": "skipped"
+              },
+              {
+                "id": "close_conversation",
+                "label": "Close conversation",
+                "owner": "collection_agent",
+                "status": "pending"
+              }
+            ],
+            "edges": [
+              {
+                "from": "open_and_context",
+                "to": "verify_identity",
+                "condition": "case_context_ready"
+              },
+              {
+                "from": "verify_identity",
+                "to": "explain_dues",
+                "condition": "identity_verified"
+              },
+              {
+                "from": "verify_identity",
+                "to": "wrong_party_callback",
+                "condition": "wrong_party_detected"
+              },
+              {
+                "from": "explain_dues",
+                "to": "collect_payment_intent",
+                "condition": "dues_explained"
+              },
+              {
+                "from": "collect_payment_intent",
+                "to": "resolve_outcome",
+                "condition": "pay_now"
+              },
+              {
+                "from": "collect_payment_intent",
+                "to": "evaluate_assistance",
+                "condition": "cannot_pay_full"
+              },
+              {
+                "from": "evaluate_assistance",
+                "to": "resolve_outcome",
+                "condition": "assistance_ready"
+              },
+              {
+                "from": "wrong_party_callback",
+                "to": "close_conversation",
+                "condition": "callback_confirmed"
+              },
+              {
+                "from": "resolve_outcome",
+                "to": "close_conversation",
+                "condition": "outcome_confirmed"
+              }
+            ],
+            "step_markers": {
+              "open_and_context": {
+                "state": "done",
+                "updated_at": "2026-06-10T09:07:51.294395+00:00",
+                "source": "plan_tree_update",
+                "reason": "case_context_ready_transition"
+              },
+              "verify_identity": {
+                "state": "skipped",
+                "updated_at": "2026-06-10T09:07:51.294395+00:00",
+                "source": "wrong_party_guard",
+                "reason": "wrong_party_detected_no_verification_allowed"
+              },
+              "wrong_party_callback": {
+                "state": "pending",
+                "updated_at": "2026-06-10T09:07:51.294395+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "explain_dues": {
+                "state": "skipped",
+                "updated_at": "2026-06-10T09:07:51.294395+00:00",
+                "source": "wrong_party_guard",
+                "reason": "wrong_party_branch_prevents_account_disclosure"
+              },
+              "collect_payment_intent": {
+                "state": "skipped",
+                "updated_at": "2026-06-10T09:07:51.294395+00:00",
+                "source": "wrong_party_guard",
+                "reason": "wrong_party_branch_prevents_account_disclosure"
+              },
+              "evaluate_assistance": {
+                "state": "skipped",
+                "updated_at": "2026-06-10T09:07:51.294395+00:00",
+                "source": "wrong_party_guard",
+                "reason": "wrong_party_branch_prevents_account_disclosure"
+              },
+              "resolve_outcome": {
+                "state": "skipped",
+                "updated_at": "2026-06-10T09:07:51.294395+00:00",
+                "source": "wrong_party_guard",
+                "reason": "wrong_party_branch_prevents_account_disclosure"
+              },
+              "close_conversation": {
+                "state": "pending",
+                "updated_at": "2026-06-10T09:07:51.294395+00:00",
+                "source": "reconciler",
+                "reason": ""
+              }
+            },
+            "updated_from": "react",
+            "last_response_target": "customer"
+          }
+        },
+        {
+          "at_utc": "2026-06-10T10:03:48.898993+00:00",
+          "version": 1,
+          "status": "active",
+          "current_node_id": "wrong_party_callback",
+          "update": {
+            "origin": "react",
+            "route": "continue",
+            "response_target": "customer",
+            "previous_node_id": "wrong_party_callback",
+            "current_node_id": "wrong_party_callback",
+            "plan_outline": "",
+            "operation": "advance"
+          },
+          "plan": {
+            "plan_id": "plan-COLL-1002",
+            "version": 1,
+            "status": "active",
+            "mode": "strict_collections",
+            "objective": "Move borrower conversation to payment, promise-to-pay, or compliant follow-up.",
+            "root_node_id": "open_and_context",
+            "current_node_id": "wrong_party_callback",
+            "previous_node_id": "wrong_party_callback",
+            "next_node_ids": [
+              "close_conversation"
+            ],
+            "nodes": [
+              {
+                "id": "open_and_context",
+                "label": "Initialize case context",
+                "owner": "collection_agent",
+                "status": "done"
+              },
+              {
+                "id": "verify_identity",
+                "label": "Verify customer identity",
+                "owner": "customer",
+                "status": "skipped"
+              },
+              {
+                "id": "wrong_party_callback",
+                "label": "Arrange privacy-safe callback",
+                "owner": "collection_agent",
+                "status": "in_progress"
+              },
+              {
+                "id": "explain_dues",
+                "label": "Explain dues and policy options",
+                "owner": "customer",
+                "status": "skipped"
+              },
+              {
+                "id": "collect_payment_intent",
+                "label": "Collect payment intent",
+                "owner": "customer",
+                "status": "skipped"
+              },
+              {
+                "id": "evaluate_assistance",
+                "label": "Evaluate discount/restructure assistance",
+                "owner": "collection_agent",
+                "status": "skipped"
+              },
+              {
+                "id": "resolve_outcome",
+                "label": "Finalize payment, promise, or follow-up",
+                "owner": "customer",
+                "status": "skipped"
+              },
+              {
+                "id": "close_conversation",
+                "label": "Close conversation",
+                "owner": "collection_agent",
+                "status": "pending"
+              }
+            ],
+            "edges": [
+              {
+                "from": "open_and_context",
+                "to": "verify_identity",
+                "condition": "case_context_ready"
+              },
+              {
+                "from": "verify_identity",
+                "to": "explain_dues",
+                "condition": "identity_verified"
+              },
+              {
+                "from": "verify_identity",
+                "to": "wrong_party_callback",
+                "condition": "wrong_party_detected"
+              },
+              {
+                "from": "explain_dues",
+                "to": "collect_payment_intent",
+                "condition": "dues_explained"
+              },
+              {
+                "from": "collect_payment_intent",
+                "to": "resolve_outcome",
+                "condition": "pay_now"
+              },
+              {
+                "from": "collect_payment_intent",
+                "to": "evaluate_assistance",
+                "condition": "cannot_pay_full"
+              },
+              {
+                "from": "evaluate_assistance",
+                "to": "resolve_outcome",
+                "condition": "assistance_ready"
+              },
+              {
+                "from": "wrong_party_callback",
+                "to": "close_conversation",
+                "condition": "callback_confirmed"
+              },
+              {
+                "from": "resolve_outcome",
+                "to": "close_conversation",
+                "condition": "outcome_confirmed"
+              }
+            ],
+            "step_markers": {
+              "open_and_context": {
+                "state": "done",
+                "updated_at": "2026-06-10T09:07:51.294395+00:00",
+                "source": "plan_tree_update",
+                "reason": "case_context_ready_transition"
+              },
+              "verify_identity": {
+                "state": "skipped",
+                "updated_at": "2026-06-10T10:03:48.898993+00:00",
+                "source": "wrong_party_guard",
+                "reason": "wrong_party_detected_no_verification_allowed"
+              },
+              "wrong_party_callback": {
+                "state": "pending",
+                "updated_at": "2026-06-10T09:07:51.294395+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "explain_dues": {
+                "state": "skipped",
+                "updated_at": "2026-06-10T10:03:48.898993+00:00",
+                "source": "wrong_party_guard",
+                "reason": "wrong_party_branch_prevents_account_disclosure"
+              },
+              "collect_payment_intent": {
+                "state": "skipped",
+                "updated_at": "2026-06-10T10:03:48.898993+00:00",
+                "source": "wrong_party_guard",
+                "reason": "wrong_party_branch_prevents_account_disclosure"
+              },
+              "evaluate_assistance": {
+                "state": "skipped",
+                "updated_at": "2026-06-10T10:03:48.898993+00:00",
+                "source": "wrong_party_guard",
+                "reason": "wrong_party_branch_prevents_account_disclosure"
+              },
+              "resolve_outcome": {
+                "state": "skipped",
+                "updated_at": "2026-06-10T10:03:48.898993+00:00",
+                "source": "wrong_party_guard",
+                "reason": "wrong_party_branch_prevents_account_disclosure"
+              },
+              "close_conversation": {
+                "state": "pending",
+                "updated_at": "2026-06-10T09:07:51.294395+00:00",
+                "source": "reconciler",
+                "reason": ""
+              }
+            },
+            "updated_from": "react",
+            "last_response_target": "customer"
+          }
+        }
+      ]
+    },
+    "conversation_history": [
+      {
+        "role": "customer",
+        "content": "no"
+      },
+      {
+        "role": "agent",
+        "content": "Thank you. For privacy reasons, I can only discuss this directly with Rohan Gupta. I am unable to share any details with anyone else."
+      },
+      {
+        "role": "customer",
+        "content": "he is not here now, please try at 5:30pm in evening today"
+      },
+      {
+        "role": "agent",
+        "content": "Thank you. I will try to reach Rohan Gupta he is not here now, please try at 5:30pm in evening today. Please let them know that EasySecure Financial Services called. Thank you for your help, and have a good day. Goodbye."
+      }
+    ],
+    "last_user_input": "he is not here now, please try at 5:30pm in evening today",
+    "extracted_entities": {
+      "callback_time": "5:30pm today"
+    },
+    "extracted_entities_turn": {
+      "callback_time": "5:30pm today"
+    },
+    "extracted_entity_descriptions": {
+      "callback_time": "The requested time for the agent to call back the customer"
+    },
+    "extracted_entities_updated_fields": []
   }
 }

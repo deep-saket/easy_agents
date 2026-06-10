@@ -30,6 +30,14 @@ def test_response_node_renders_from_hardship_response_directive() -> None:
             "response_mode": "empathetic",
             "active_dialogue_owner": "plan_proposal",
             "identity_verified": True,
+            "active_collection_context": {
+                "policy": {
+                    "allow_partial_payment": True,
+                    "min_partial_payment_pct": 20,
+                    "max_promise_days": 5,
+                    "restructure_allowed": True,
+                }
+            },
         },
     )
     state = {
@@ -42,7 +50,11 @@ def test_response_node_renders_from_hardship_response_directive() -> None:
                 "conversation_objective": "assess_affordability",
                 "dialogue_action": "ask_affordable_amount",
                 "response_mode": "empathetic",
-                "required_response_elements": ["acknowledge_hardship", "ask_affordable_amount"],
+                "required_response_elements": [
+                    "acknowledge_hardship",
+                    "explain_applicable_policy_options",
+                    "ask_affordable_amount",
+                ],
                 "forbidden_dialogue_actions": ["restart_collections_menu", "ask_pay_now_or_arrangement"],
                 "allowed_dialogue_actions": ["acknowledge_hardship", "ask_affordable_amount"],
                 "customer_facing_goal": "Ask the customer what monthly amount is manageable.",
@@ -57,21 +69,80 @@ def test_response_node_renders_from_hardship_response_directive() -> None:
     lowered = response.lower()
     assert "pay now" not in lowered
     assert "schedule a follow-up" not in lowered
-    assert "monthly amount" in lowered
-    assert "realistically work for you right now" in lowered
+    assert "partial payment starting from 20%" in lowered
+    assert "payment commitment within 5 days" in lowered
+    assert "standard restructure review" in lowered
+    assert "what amount or payment date" in lowered
     assert update["response_render_debug"]["template_selected"] == "capacity_question"
     assert update["response_render_debug"]["response_mode"] == "empathetic"
     assert update["response_render_debug"]["renderer_fallback_used"] is True
 
 
-def test_response_node_collects_missing_verification_fields_only() -> None:
+def test_response_node_opens_with_dynamic_right_party_confirmation() -> None:
     node = _build_node()
     memory = WorkingMemory(
         session_id="response-verification",
         state={
-            "active_customer_name": "Aditi",
-            "active_case_id": "COLL-1001",
+            "active_customer_name": "Rohan Gupta",
+            "active_case_id": "COLL-1002",
             "active_overdue_amount": 1200.0,
+            "turn_index": 0,
+            "greeted": False,
+            "conversation_mode": "verification",
+            "negotiation_stage": "none",
+            "customer_payment_posture": "unknown",
+            "hardship_context": {
+                "hardship_detected": False,
+                "hardship_reason": None,
+                "confidence": 0.0,
+            },
+            "response_mode": "compliance",
+            "active_dialogue_owner": "verification",
+            "identity_verified": False,
+            "active_verification_required_fields": ["dob", "phone"],
+            "verification_missing_fields": ["dob", "phone"],
+            "verification_entities": {},
+            "active_collection_context": {
+                "customer": {
+                    "variables": {
+                        "[AGENT_NAME]": "Alex",
+                        "[COMPANY_NAME]": "EasySecure Financial Services",
+                    }
+                },
+                "case": {"assigned_agent": "Fallback Agent"},
+            },
+        },
+    )
+    state = {
+        "user_input": "hello",
+        "memory": memory,
+        "plan_proposal": {
+            "target": "customer",
+            "intent": "generic_plan",
+        },
+    }
+
+    response = node.execute(state)["response"].lower()
+
+    assert "alex" in response
+    assert "easysecure financial services" in response
+    assert "may be recorded for quality and training" in response
+    assert "may i please speak with rohan gupta" in response
+    assert "overdue amount" not in response
+    assert "date of birth" not in response
+    assert "registered phone number" not in response
+
+
+def test_response_node_requests_verification_after_opening() -> None:
+    node = _build_node()
+    memory = WorkingMemory(
+        session_id="response-verification-followup",
+        state={
+            "active_customer_name": "Rohan Gupta",
+            "active_case_id": "COLL-1002",
+            "active_overdue_amount": 1200.0,
+            "turn_index": 1,
+            "greeted": True,
             "conversation_mode": "verification",
             "negotiation_stage": "none",
             "customer_payment_posture": "unknown",
@@ -89,7 +160,7 @@ def test_response_node_collects_missing_verification_fields_only() -> None:
         },
     )
     state = {
-        "user_input": "hello",
+        "user_input": "Yes, that's me.",
         "memory": memory,
         "plan_proposal": {
             "target": "customer",
@@ -99,9 +170,144 @@ def test_response_node_collects_missing_verification_fields_only() -> None:
 
     response = node.execute(state)["response"].lower()
 
-    assert "overdue amount" not in response
+    assert "privacy and security" in response
+    assert "before i share any account details" in response
     assert "date of birth" in response
     assert "registered phone number" in response
+    assert "overdue amount" not in response
+
+
+def test_response_node_wrong_party_privacy_notice_is_separate_from_callback_request() -> None:
+    node = _build_node()
+    memory = WorkingMemory(
+        session_id="response-wrong-party",
+        state={
+            "active_customer_name": "Rohan Gupta",
+            "active_case_id": "COLL-1002",
+            "active_overdue_amount": 37800.0,
+            "identity_verified": False,
+            "right_party_status": "wrong_party",
+            "wrong_party_callback_stage": "privacy_notice_given",
+            "active_collection_context": {
+                "customer": {
+                    "variables": {
+                        "[COMPANY_NAME]": "EasySecure Financial Services",
+                        "[CONTACT_NUMBER]": "+91-1800-555-2002",
+                    }
+                }
+            },
+        },
+    )
+    state = {
+        "user_input": "No",
+        "memory": memory,
+        "plan_proposal": {
+            "target": "customer",
+            "response_directive": {
+                "conversation_objective": "wrong_party_privacy_notice",
+                "dialogue_action": "wrong_party_privacy_notice",
+                "response_mode": "compliance",
+            },
+        },
+    }
+
+    response = node.execute(state)["response"].lower()
+
+    assert "privacy reasons" in response
+    assert "only discuss this directly with rohan gupta" in response
+    assert "when would be a good time" not in response
+    assert "+91-1800-555-2002" not in response
+    assert "37800" not in response
+    assert "loan" not in response
+    assert "policy number" not in response
+    assert "date of birth" not in response
+
+
+def test_response_node_wrong_party_callback_request_does_not_repeat_privacy_notice() -> None:
+    node = _build_node()
+    memory = WorkingMemory(
+        session_id="response-wrong-party-followup",
+        state={
+            "active_customer_name": "Rohan Gupta",
+            "active_case_id": "COLL-1002",
+            "active_overdue_amount": 37800.0,
+            "identity_verified": False,
+            "right_party_status": "wrong_party",
+            "wrong_party_callback_stage": "awaiting_callback",
+            "active_collection_context": {
+                "customer": {
+                    "variables": {
+                        "[COMPANY_NAME]": "EasySecure Financial Services",
+                        "[CONTACT_NUMBER]": "+91-1800-555-2002",
+                    }
+                }
+            },
+        },
+    )
+    state = {
+        "user_input": "They're not here. What's it about?",
+        "memory": memory,
+        "plan_proposal": {
+            "target": "customer",
+            "response_directive": {
+                "conversation_objective": "wrong_party_callback_request",
+                "dialogue_action": "wrong_party_callback_request",
+                "response_mode": "compliance",
+            },
+        },
+    }
+
+    response = node.execute(state)["response"].lower()
+
+    assert "unable to share what the call is about" in response
+    assert "easysecure financial services called" in response
+    assert "+91-1800-555-2002" in response
+    assert "when would be a good time" in response
+    assert "only discuss this directly" not in response
+    assert "date of birth" not in response
+    assert "overdue" not in response
+
+
+def test_response_node_wrong_party_callback_confirmation_closes_call() -> None:
+    node = _build_node()
+    memory = WorkingMemory(
+        session_id="response-wrong-party-close",
+        state={
+            "active_customer_name": "Rohan Gupta",
+            "active_case_id": "COLL-1002",
+            "identity_verified": False,
+            "right_party_status": "wrong_party",
+            "wrong_party_callback_stage": "completed",
+            "wrong_party_callback_time": "this evening",
+            "active_collection_context": {
+                "customer": {
+                    "variables": {
+                        "[COMPANY_NAME]": "EasySecure Financial Services",
+                    }
+                }
+            },
+        },
+    )
+    state = {
+        "user_input": "Try this evening",
+        "memory": memory,
+        "plan_proposal": {
+            "target": "customer",
+            "response_directive": {
+                "conversation_objective": "wrong_party_callback_confirmation",
+                "dialogue_action": "wrong_party_callback_confirmation",
+                "response_mode": "compliance",
+            },
+        },
+    }
+
+    response = node.execute(state)["response"].lower()
+
+    assert "this evening" in response
+    assert "easysecure financial services called" in response
+    assert "goodbye" in response
+    assert "date of birth" not in response
+    assert "overdue" not in response
 
 
 def test_response_node_missing_directive_does_not_infer_hardship_objective() -> None:
