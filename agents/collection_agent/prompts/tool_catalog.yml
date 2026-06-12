@@ -39,13 +39,23 @@ tools:
   input: case_id, customer_id, program_id, hold_months
   output: reference_number, effective_from, effective_until, status
 
+- name: installment_discount_evaluate
+  purpose: Evaluate a configured hardship installment-discount program and calculate the revised amount.
+  input: case_id, customer_id, program_id, original_amount
+  output: eligible, approval_status, discount_pct, discount_amount, revised_amount, review_after_months
+
+- name: installment_discount_apply
+  purpose: Apply and persist an approved installment discount with a generated reference.
+  input: case_id, customer_id, program_id, original_amount, discount_pct, revised_amount
+  output: reference_number, original_amount, discount_pct, discount_amount, revised_amount, status
+
 - name: sms_confirmation_send
-  purpose: Send and persist the premium-hold confirmation to the registered mobile number.
+  purpose: Send and persist an outcome confirmation to the registered mobile number.
   input: customer_id, reference_number, message
   output: message_id, recipient, status
 
 - name: email_confirmation_send
-  purpose: Send and persist the premium-hold confirmation to the registered email address.
+  purpose: Send and persist an outcome confirmation to the registered email address.
   input: customer_id, reference_number, subject, message
   output: message_id, recipient, status
 

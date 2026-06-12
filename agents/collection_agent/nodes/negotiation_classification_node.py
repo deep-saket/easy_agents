@@ -70,8 +70,12 @@ class NegotiationClassificationNode(BaseGraphNode):
         "none",
         "requested",
         "planning",
+        "evaluating",
         "offered",
         "accepted",
+        "applied",
+        "sms_sent",
+        "confirmed",
         "rejected",
         "counter_offer",
         "closed",
@@ -178,6 +182,11 @@ class NegotiationClassificationNode(BaseGraphNode):
             ),
             identity_verified=identity_verified,
         )
+        if self._discount_operationally_confirmed(memory_state):
+            merged["discount_stage"] = "confirmed"
+            merged["discount_offered"] = True
+            merged["discount_accepted"] = True
+            merged["discount_rejected"] = False
 
         update: NodeUpdate = {
             "negotiation_classification": {
@@ -236,6 +245,22 @@ class NegotiationClassificationNode(BaseGraphNode):
                 ),
             )
         return update
+
+    @staticmethod
+    def _discount_operationally_confirmed(prior: dict[str, Any]) -> bool:
+        details = (
+            prior.get("installment_discount_details")
+            if isinstance(prior.get("installment_discount_details"), dict)
+            else {}
+        )
+        sms = details.get("sms_confirmation") if isinstance(details.get("sms_confirmation"), dict) else {}
+        email = details.get("email_confirmation") if isinstance(details.get("email_confirmation"), dict) else {}
+        return (
+            str(details.get("status", "")).strip().lower() == "applied"
+            and bool(str(details.get("reference_number", "")).strip())
+            and str(sms.get("status", "")).strip().lower() == "sent"
+            and str(email.get("status", "")).strip().lower() == "sent"
+        )
 
     @staticmethod
     def _is_provider_rate_limit_error(error_text: str) -> bool:
@@ -370,7 +395,13 @@ class NegotiationClassificationNode(BaseGraphNode):
             merged["response_mode"] = "negotiation"
         elif merged["conversation_mode"] == "escalation":
             merged["response_mode"] = "firm"
-        elif merged["discount_stage"] in {"requested", "planning", "offered", "counter_offer"}:
+        elif merged["discount_stage"] in {
+            "requested",
+            "planning",
+            "evaluating",
+            "offered",
+            "counter_offer",
+        }:
             merged["active_dialogue_owner"] = "plan_proposal"
             if merged["response_mode"] == "informational":
                 merged["response_mode"] = "negotiation"
@@ -456,7 +487,9 @@ class NegotiationClassificationNode(BaseGraphNode):
             discount_stage = "accepted"
         elif prior_discount_stage == "offered" and any(token in lowered for token in ["reject", "no", "not possible", "too high"]):
             discount_stage = "rejected"
-        elif prior_discount_stage in {"accepted", "rejected"} and any(token in lowered for token in ["thanks", "okay", "done", "close"]):
+        elif prior_discount_stage in {"accepted", "rejected"} and any(
+            token in lowered for token in ["thanks", "thankyou", "thank you", "okay", "done", "close"]
+        ):
             discount_stage = "closed"
 
         willingness = self._fallback_payment_willingness(
@@ -770,7 +803,7 @@ class NegotiationClassificationNode(BaseGraphNode):
                 "counter_offer",
                 "closed",
             },
-            "discount_accepted": prior_accepted or stage in {"accepted"},
+            "discount_accepted": prior_accepted or stage in {"accepted", "applied", "sms_sent", "confirmed"},
             "discount_rejected": prior_rejected or stage in {"rejected"},
             "counter_offer_present": prior_counter or stage in {"counter_offer"},
         }

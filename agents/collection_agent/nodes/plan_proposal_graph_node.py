@@ -225,13 +225,20 @@ class PlanProposalGraphNode(BaseGraphNode):
             )
         elif bool(memory_state.get("identity_verified", False)):
             hold_stage = str(memory_state.get("hardship_hold_stage", "")).strip().lower()
+            discount_stage = str(memory_state.get("discount_stage", "")).strip().lower()
             hardship_context = (
                 memory_state.get("hardship_context")
                 if isinstance(memory_state.get("hardship_context"), dict)
                 else {}
             )
             hardship_active = bool(hardship_context.get("hardship_detected", False))
-            if hold_stage == "confirmed" and self._is_hold_closing_reply(user_input):
+            if discount_stage == "confirmed" and self._is_hold_closing_reply(user_input):
+                inferred_next = "close_conversation"
+            elif discount_stage == "confirmed":
+                inferred_next = "confirmation"
+            elif discount_stage in {"offered", "accepted"}:
+                inferred_next = "discount_offer"
+            elif hold_stage == "confirmed" and self._is_hold_closing_reply(user_input):
                 inferred_next = "close_conversation"
             elif hold_stage == "confirmed":
                 inferred_next = "confirmation"
@@ -520,7 +527,9 @@ class PlanProposalGraphNode(BaseGraphNode):
                 "that is all",
                 "that's all",
                 "thank you",
+                "thankyou",
                 "thanks",
+                "sure",
                 "bye",
                 "goodbye",
             )
@@ -571,6 +580,8 @@ class PlanProposalGraphNode(BaseGraphNode):
             {"id": "purpose_disclosure", "label": "Disclose call purpose and overdue installment", "owner": "collection_agent", "status": "pending"},
             {"id": "discovery_empathy", "label": "Understand and acknowledge customer situation", "owner": "collection_agent", "status": "pending"},
             {"id": "resolution_offer", "label": "Present eligible resolution option", "owner": "collection_agent", "status": "pending"},
+            {"id": "assess_after_hold", "label": "Assess ability to resume after hold", "owner": "customer", "status": "pending"},
+            {"id": "discount_offer", "label": "Present eligible installment discount", "owner": "collection_agent", "status": "pending"},
             {"id": "confirmation", "label": "Confirm agreed outcome and reference", "owner": "collection_agent", "status": "pending"},
             {"id": "explain_dues", "label": "Explain standard payment options", "owner": "customer", "status": "pending"},
             {"id": "collect_payment_intent", "label": "Collect payment intent", "owner": "customer", "status": "pending"},
@@ -585,7 +596,10 @@ class PlanProposalGraphNode(BaseGraphNode):
             {"from": "purpose_disclosure", "to": "discovery_empathy", "condition": "customer_situation_shared"},
             {"from": "purpose_disclosure", "to": "explain_dues", "condition": "standard_resolution_requested"},
             {"from": "discovery_empathy", "to": "resolution_offer", "condition": "eligible_assistance_found"},
-            {"from": "resolution_offer", "to": "confirmation", "condition": "offer_accepted"},
+            {"from": "resolution_offer", "to": "confirmation", "condition": "hold_accepted"},
+            {"from": "resolution_offer", "to": "assess_after_hold", "condition": "customer_unsure_after_hold"},
+            {"from": "assess_after_hold", "to": "discount_offer", "condition": "discount_eligible"},
+            {"from": "discount_offer", "to": "confirmation", "condition": "discount_accepted"},
             {"from": "confirmation", "to": "close_conversation", "condition": "outcome_confirmed"},
             {"from": "explain_dues", "to": "collect_payment_intent", "condition": "dues_explained"},
             {"from": "collect_payment_intent", "to": "resolve_outcome", "condition": "pay_now"},
@@ -654,6 +668,18 @@ class PlanProposalGraphNode(BaseGraphNode):
                 "owner": "collection_agent",
                 "status": "pending",
             },
+            {
+                "id": "assess_after_hold",
+                "label": "Assess ability to resume after hold",
+                "owner": "customer",
+                "status": "pending",
+            },
+            {
+                "id": "discount_offer",
+                "label": "Present eligible installment discount",
+                "owner": "collection_agent",
+                "status": "pending",
+            },
         ]
         for node in additions:
             if node["id"] not in node_ids:
@@ -671,7 +697,10 @@ class PlanProposalGraphNode(BaseGraphNode):
             {"from": "purpose_disclosure", "to": "discovery_empathy", "condition": "customer_situation_shared"},
             {"from": "purpose_disclosure", "to": "explain_dues", "condition": "standard_resolution_requested"},
             {"from": "discovery_empathy", "to": "resolution_offer", "condition": "eligible_assistance_found"},
-            {"from": "resolution_offer", "to": "confirmation", "condition": "offer_accepted"},
+            {"from": "resolution_offer", "to": "confirmation", "condition": "hold_accepted"},
+            {"from": "resolution_offer", "to": "assess_after_hold", "condition": "customer_unsure_after_hold"},
+            {"from": "assess_after_hold", "to": "discount_offer", "condition": "discount_eligible"},
+            {"from": "discount_offer", "to": "confirmation", "condition": "discount_accepted"},
             {"from": "confirmation", "to": "close_conversation", "condition": "outcome_confirmed"},
             {"from": "wrong_party_callback", "to": "close_conversation", "condition": "callback_confirmed"},
             {"from": "resolve_outcome", "to": "close_conversation", "condition": "outcome_confirmed"},

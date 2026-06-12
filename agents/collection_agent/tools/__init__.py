@@ -5,6 +5,8 @@ Purpose: Exports Collection Agent tool classes and schemas.
 
 from agents.collection_agent.tools.data_store import CollectionDataStore
 from agents.collection_agent.tools.email_confirmation_send_tool import EmailConfirmationSendTool
+from agents.collection_agent.tools.installment_discount_apply_tool import InstallmentDiscountApplyTool
+from agents.collection_agent.tools.installment_discount_evaluate_tool import InstallmentDiscountEvaluateTool
 from agents.collection_agent.tools.entity_extract_tool import EntityExtractTool
 from agents.collection_agent.tools.human_escalation_tool import HumanEscalationTool
 from agents.collection_agent.tools.loan_policy_lookup_tool import LoanPolicyLookupTool
@@ -25,6 +27,10 @@ from agents.collection_agent.tools.schemas import (
     EntityExtractOutput,
     EmailConfirmationSendInput,
     EmailConfirmationSendOutput,
+    InstallmentDiscountApplyInput,
+    InstallmentDiscountApplyOutput,
+    InstallmentDiscountEvaluateInput,
+    InstallmentDiscountEvaluateOutput,
     HumanEscalationInput,
     HumanEscalationOutput,
     LoanPolicyLookupInput,
@@ -60,6 +66,8 @@ from agents.collection_agent.tools.schemas import (
 __all__ = [
     "CollectionDataStore",
     "EmailConfirmationSendTool",
+    "InstallmentDiscountEvaluateTool",
+    "InstallmentDiscountApplyTool",
     "EntityExtractTool",
     "HumanEscalationTool",
     "LoanPolicyLookupTool",
@@ -79,6 +87,10 @@ __all__ = [
     "EntityExtractOutput",
     "EmailConfirmationSendInput",
     "EmailConfirmationSendOutput",
+    "InstallmentDiscountEvaluateInput",
+    "InstallmentDiscountEvaluateOutput",
+    "InstallmentDiscountApplyInput",
+    "InstallmentDiscountApplyOutput",
     "HumanEscalationInput",
     "HumanEscalationOutput",
     "LoanPolicyLookupInput",

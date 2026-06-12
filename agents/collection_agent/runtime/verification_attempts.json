@@ -1178,5 +1178,69 @@
     "field": "phone",
     "status": "verified",
     "created_at": "2026-06-12T03:51:32.863085+00:00"
+  },
+  {
+    "attempt_id": "VER-1DB10B0ED8",
+    "customer_id": "CUST-2002",
+    "case_id": "COLL-1002",
+    "field": "dob",
+    "status": "verified",
+    "created_at": "2026-06-12T05:02:32.520541+00:00"
+  },
+  {
+    "attempt_id": "VER-19F360C53A",
+    "customer_id": "CUST-2002",
+    "case_id": "COLL-1002",
+    "field": "phone",
+    "status": "verified",
+    "created_at": "2026-06-12T05:02:33.100882+00:00"
+  },
+  {
+    "attempt_id": "VER-5D6F4B7330",
+    "customer_id": "CUST-2002",
+    "case_id": "COLL-1002",
+    "field": "dob",
+    "status": "verified",
+    "created_at": "2026-06-12T05:21:48.346779+00:00"
+  },
+  {
+    "attempt_id": "VER-37DE1F19CE",
+    "customer_id": "CUST-2002",
+    "case_id": "COLL-1002",
+    "field": "phone",
+    "status": "verified",
+    "created_at": "2026-06-12T05:21:48.847891+00:00"
+  },
+  {
+    "attempt_id": "VER-7F22D1662F",
+    "customer_id": "CUST-2002",
+    "case_id": "COLL-1002",
+    "field": "dob",
+    "status": "verified",
+    "created_at": "2026-06-12T05:44:55.214873+00:00"
+  },
+  {
+    "attempt_id": "VER-43DF5C50F5",
+    "customer_id": "CUST-2002",
+    "case_id": "COLL-1002",
+    "field": "phone",
+    "status": "verified",
+    "created_at": "2026-06-12T05:44:55.754695+00:00"
+  },
+  {
+    "attempt_id": "VER-4347AA466E",
+    "customer_id": "CUST-2002",
+    "case_id": "COLL-1002",
+    "field": "dob",
+    "status": "verified",
+    "created_at": "2026-06-12T06:05:31.106010+00:00"
+  },
+  {
+    "attempt_id": "VER-B90A8D9137",
+    "customer_id": "CUST-2002",
+    "case_id": "COLL-1002",
+    "field": "phone",
+    "status": "verified",
+    "created_at": "2026-06-12T06:05:31.665728+00:00"
   }
 ]

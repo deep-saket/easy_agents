@@ -106,6 +106,7 @@ class CollectionResponseNode(ResponseNode):
             "wrong_party_callback_revision_confirmation",
             "wrong_party_closing_acknowledgement",
             "hardship_hold_closing",
+            "installment_discount_closing",
         }:
             update["conversation_complete"] = False
             update["conversation_closing"] = True
@@ -116,7 +117,10 @@ class CollectionResponseNode(ResponseNode):
         memory = state.get("memory")
         if memory is not None:
             memory_state = dict(getattr(memory, "state", {}))
-            if objective == "hardship_hold_confirmation" and str(update.get("response", "")).strip():
+            if objective in {
+                "hardship_hold_confirmation",
+                "installment_discount_confirmation",
+            } and str(update.get("response", "")).strip():
                 advanced_plan = mark_confirmation_delivered(memory)
                 if advanced_plan:
                     update["conversation_plan"] = advanced_plan
@@ -217,6 +221,9 @@ class CollectionResponseNode(ResponseNode):
             "hardship_hold_offer",
             "hardship_hold_confirmation",
             "hardship_hold_closing",
+            "installment_discount_offer",
+            "installment_discount_confirmation",
+            "installment_discount_closing",
         }:
             render_debug["renderer_fallback_used"] = True
             render_debug["policy_filters_applied"] = ["deterministic_compliance_template"]
@@ -503,6 +510,12 @@ class CollectionResponseNode(ResponseNode):
             return "hardship_hold_confirmation"
         if objective == "hardship_hold_closing" or action == "close_hardship_hold_conversation":
             return "hardship_hold_closing"
+        if objective == "installment_discount_offer" or action == "offer_installment_discount":
+            return "installment_discount_offer"
+        if objective == "installment_discount_confirmation" or action == "confirm_installment_discount":
+            return "installment_discount_confirmation"
+        if objective == "installment_discount_closing" or action == "close_installment_discount_conversation":
+            return "installment_discount_closing"
         if action == "ask_affordable_amount" or objective == "assess_affordability":
             return "capacity_question"
         if action in {"present_offer", "discuss_arrangement"} or objective in {
@@ -742,6 +755,12 @@ class CollectionResponseNode(ResponseNode):
         confirmation_sla_hours = int(render_variables.get("confirmation_sla_hours", 24) or 24)
         sms_confirmation_sent = bool(render_variables.get("sms_confirmation_sent", False))
         email_confirmation_sent = bool(render_variables.get("email_confirmation_sent", False))
+        discount_pct_text = str(render_variables.get("discount_pct_text", "0")).strip() or "0"
+        original_amount_text = str(
+            render_variables.get("original_amount_text", overdue_amount_text)
+        ).strip() or overdue_amount_text
+        revised_amount_text = str(render_variables.get("revised_amount_text", "0.00")).strip() or "0.00"
+        review_after_months = int(render_variables.get("review_after_months", 3) or 3)
         opening_turn = bool(render_variables.get("opening_turn", False))
 
         if template_id == "verification_request":
@@ -832,7 +851,8 @@ class CollectionResponseNode(ResponseNode):
                 "I am really sorry to hear that, and thank you for letting me know. "
                 "The most important thing right now is keeping your cover active while you get back on your feet. "
                 f"Given your situation, I can place your premium on hold for up to {hold_months} months"
-                f"{benefit_text}. Would that give you the breathing room you need?"
+                f"{benefit_text}. Would that give you some breathing room, and do you think you would "
+                "be in a position to resume payments after that?"
             ).strip()
         if template_id == "hardship_hold_confirmation":
             reference_text = (
@@ -852,6 +872,24 @@ class CollectionResponseNode(ResponseNode):
         if template_id == "hardship_hold_closing":
             return (
                 f"Thank you for your time, {customer_name}. Take care, and we wish you all the best. Goodbye."
+            ).strip()
+        if template_id == "installment_discount_offer":
+            return (
+                "That is completely understandable, and thank you for being honest. "
+                f"In that case, I can apply a {discount_pct_text}% discount to this installment, "
+                f"bringing the amount down from {original_amount_text} to {revised_amount_text}. "
+                "Would that help ease the pressure?"
+            ).strip()
+        if template_id == "installment_discount_confirmation":
+            return (
+                f"I have applied the {discount_pct_text}% discount to this installment. "
+                f"Your revised amount is {revised_amount_text}, and your reference number is {reference_number}. "
+                "Confirmation has been sent by SMS and email. "
+                f"We will review your situation again in {review_after_months} months."
+            ).strip()
+        if template_id == "installment_discount_closing":
+            return (
+                f"Thank you for your time, {customer_name}. Take care of yourself, and goodbye."
             ).strip()
         if template_id == "dues_explanation":
             return (
@@ -1031,6 +1069,11 @@ class CollectionResponseNode(ResponseNode):
             if isinstance(memory_state.get("hardship_hold_details"), dict)
             else {}
         )
+        discount_details = (
+            memory_state.get("installment_discount_details")
+            if isinstance(memory_state.get("installment_discount_details"), dict)
+            else {}
+        )
         return {
             "customer_name": customer_name,
             "agent_name": agent_name,
@@ -1039,7 +1082,10 @@ class CollectionResponseNode(ResponseNode):
             "policy_number": policy_number,
             "due_date": due_date,
             "reference_number": str(
-                hold_details.get("reference_number", reference_number)
+                discount_details.get(
+                    "reference_number",
+                    hold_details.get("reference_number", reference_number),
+                )
             ).strip(),
             "installment_amount_text": installment_amount,
             "hold_months": int(
@@ -1066,6 +1112,10 @@ class CollectionResponseNode(ResponseNode):
                 isinstance(hold_details.get("email_confirmation"), dict)
                 and str(hold_details.get("email_confirmation", {}).get("status", "")).strip().lower() == "sent"
             ),
+            "discount_pct_text": f"{float(discount_details.get('discount_pct', 0) or 0):g}",
+            "original_amount_text": f"{float(discount_details.get('original_amount', overdue_amount) or 0):.2f}",
+            "revised_amount_text": f"{float(discount_details.get('revised_amount', 0) or 0):.2f}",
+            "review_after_months": int(discount_details.get("review_after_months", 3) or 3),
             "callback_time": callback_time,
             "case_id": str(facts.get("case_id", memory_state.get("active_case_id", "COLL-1001"))).strip() or "COLL-1001",
             "overdue_amount_text": f"{overdue_amount:.2f}",

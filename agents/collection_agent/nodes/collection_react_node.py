@@ -53,6 +53,64 @@ class CollectionReactNode(ReactNode):
         case_id = str(state.get("case_id") or memory_state.get("active_case_id", "")).strip()
         customer_id = str(state.get("user_id") or memory_state.get("active_user_id", "")).strip()
 
+        if latest_tool == "installment_discount_evaluate" and tool_completed_this_turn:
+            if not bool(latest_output.get("eligible", False)):
+                return None
+            if memory is not None:
+                memory.set_state(
+                    discount_stage="offered",
+                    discount_offered=True,
+                    installment_discount_details=dict(latest_output),
+                    post_hold_capacity="uncertain",
+                    hardship_hold_stage="superseded",
+                )
+            return {
+                "skip_llm": True,
+                "reason": "Approved installment discount is ready to present.",
+                "decision": SimpleNamespace(
+                    thought="Present the approved installment discount.",
+                    tool_call=None,
+                    tool_calls=[],
+                    respond_directly=True,
+                    response_text=None,
+                    done=True,
+                    no_tools_required=True,
+                ),
+            }
+
+        if latest_tool == "installment_discount_apply" and tool_completed_this_turn:
+            details = {
+                **(
+                    dict(memory_state.get("installment_discount_details", {}))
+                    if isinstance(memory_state.get("installment_discount_details"), dict)
+                    else {}
+                ),
+                **latest_output,
+            }
+            if memory is not None:
+                memory.set_state(
+                    discount_stage="applied",
+                    discount_accepted=True,
+                    installment_discount_details=details,
+                )
+            reference_number = str(latest_output.get("reference_number", "")).strip()
+            message = (
+                f"Your installment discount has been applied. Reference: {reference_number}. "
+                f"Revised amount: {float(latest_output.get('revised_amount', 0) or 0):.2f}."
+            )
+            return {
+                "skip_llm": True,
+                "reason": "Installment discount applied; send SMS confirmation.",
+                "decision": self._tool_decision(
+                    "sms_confirmation_send",
+                    {
+                        "customer_id": customer_id,
+                        "reference_number": reference_number,
+                        "message": message,
+                    },
+                ),
+            }
+
         if latest_tool == "premium_hold_create" and tool_completed_this_turn:
             reference_number = str(latest_output.get("reference_number", "")).strip()
             if not reference_number:
@@ -88,6 +146,36 @@ class CollectionReactNode(ReactNode):
             }
 
         if latest_tool == "sms_confirmation_send" and tool_completed_this_turn:
+            if str(memory_state.get("discount_stage", "")).strip().lower() == "applied":
+                details = (
+                    dict(memory_state.get("installment_discount_details", {}))
+                    if isinstance(memory_state.get("installment_discount_details"), dict)
+                    else {}
+                )
+                details["sms_confirmation"] = dict(latest_output)
+                if memory is not None:
+                    memory.set_state(
+                        discount_stage="sms_sent",
+                        installment_discount_details=details,
+                    )
+                reference_number = str(latest_output.get("reference_number", "")).strip()
+                message = (
+                    f"Your installment discount has been applied. Reference: {reference_number}. "
+                    f"Revised amount: {float(details.get('revised_amount', 0) or 0):.2f}."
+                )
+                return {
+                    "skip_llm": True,
+                    "reason": "Discount SMS sent; send email confirmation.",
+                    "decision": self._tool_decision(
+                        "email_confirmation_send",
+                        {
+                            "customer_id": customer_id,
+                            "reference_number": reference_number,
+                            "subject": "Installment discount confirmation",
+                            "message": message,
+                        },
+                    ),
+                }
             reference_number = str(latest_output.get("reference_number", "")).strip()
             hold_details = (
                 dict(memory_state.get("hardship_hold_details", {}))
@@ -119,6 +207,32 @@ class CollectionReactNode(ReactNode):
             }
 
         if latest_tool == "email_confirmation_send" and tool_completed_this_turn:
+            if str(memory_state.get("discount_stage", "")).strip().lower() == "sms_sent":
+                details = (
+                    dict(memory_state.get("installment_discount_details", {}))
+                    if isinstance(memory_state.get("installment_discount_details"), dict)
+                    else {}
+                )
+                details["email_confirmation"] = dict(latest_output)
+                if memory is not None:
+                    memory.set_state(
+                        discount_stage="confirmed",
+                        installment_discount_details=details,
+                        negotiation_stage="confirming_commitment",
+                    )
+                return {
+                    "skip_llm": True,
+                    "reason": "Discount and both confirmations completed.",
+                    "decision": SimpleNamespace(
+                        thought="Discount application and notifications are complete.",
+                        tool_call=None,
+                        tool_calls=[],
+                        respond_directly=True,
+                        response_text=None,
+                        done=True,
+                        no_tools_required=True,
+                    ),
+                }
             hold_details = (
                 dict(memory_state.get("hardship_hold_details", {}))
                 if isinstance(memory_state.get("hardship_hold_details"), dict)
@@ -185,7 +299,58 @@ class CollectionReactNode(ReactNode):
         user_input = str(state.get("user_input", ""))
         lowered = user_input.lower()
         hold_stage = str(memory_state.get("hardship_hold_stage", "")).strip().lower()
-        if hold_stage == "offered" and self._is_affirmative(user_input):
+        discount_stage = str(memory_state.get("discount_stage", "")).strip().lower()
+        if hold_stage == "offered" and self._is_post_hold_uncertain(user_input):
+            program = self._eligible_discount_program(memory_state)
+            original_amount = float(memory_state.get("active_overdue_amount", 0) or 0)
+            if program and case_id and customer_id and original_amount > 0:
+                if memory is not None:
+                    memory.set_state(
+                        discount_stage="evaluating",
+                        post_hold_capacity="uncertain",
+                        installment_discount_program=dict(program),
+                        hardship_hold_stage="superseded",
+                    )
+                return {
+                    "skip_llm": True,
+                    "reason": "Customer is unsure after the hold; evaluate installment discount.",
+                    "decision": self._tool_decision(
+                        "installment_discount_evaluate",
+                        {
+                            "case_id": case_id,
+                            "customer_id": customer_id,
+                            "program_id": str(program.get("program_id", "")),
+                            "original_amount": original_amount,
+                        },
+                    ),
+                }
+        if discount_stage in {"offered", "accepted"} and self._is_affirmative(user_input):
+            details = (
+                memory_state.get("installment_discount_details")
+                if isinstance(memory_state.get("installment_discount_details"), dict)
+                else {}
+            )
+            if case_id and customer_id and details:
+                return {
+                    "skip_llm": True,
+                    "reason": "Customer accepted the approved installment discount.",
+                    "decision": self._tool_decision(
+                        "installment_discount_apply",
+                        {
+                            "case_id": case_id,
+                            "customer_id": customer_id,
+                            "program_id": str(details.get("program_id", "")),
+                            "original_amount": float(memory_state.get("active_overdue_amount", 0) or 0),
+                            "discount_pct": float(details.get("discount_pct", 0) or 0),
+                            "revised_amount": float(details.get("revised_amount", 0) or 0),
+                        },
+                    ),
+                }
+        if (
+            hold_stage == "offered"
+            and not self._has_active_discount_branch(memory_state)
+            and self._is_affirmative(user_input)
+        ):
             program = (
                 memory_state.get("hardship_hold_program")
                 if isinstance(memory_state.get("hardship_hold_program"), dict)
@@ -275,6 +440,73 @@ class CollectionReactNode(ReactNode):
                 "okay",
                 "ok",
             )
+        )
+
+    @staticmethod
+    def _is_post_hold_uncertain(text: str) -> bool:
+        normalized = re.sub(r"[^a-z0-9\s]", " ", str(text).lower())
+        normalized = re.sub(r"\s+", " ", normalized).strip()
+        return any(
+            phrase in normalized
+            for phrase in (
+                "not sure",
+                "unsure",
+                "even after 2 months",
+                "even after two months",
+                "cannot manage after",
+                "can't manage after",
+                "may not manage",
+                "might not manage",
+            )
+        )
+
+    @staticmethod
+    def _eligible_discount_program(memory_state: dict[str, Any]) -> dict[str, Any]:
+        hardship = (
+            memory_state.get("hardship_context")
+            if isinstance(memory_state.get("hardship_context"), dict)
+            else {}
+        )
+        reason = str(hardship.get("hardship_reason", "")).strip().lower()
+        context = (
+            memory_state.get("active_collection_context")
+            if isinstance(memory_state.get("active_collection_context"), dict)
+            else {}
+        )
+        case = context.get("case") if isinstance(context.get("case"), dict) else {}
+        loan_id = str(case.get("loan_id", memory_state.get("active_loan_id", ""))).strip().upper()
+        programs = (
+            memory_state.get("assistance_programs")
+            if isinstance(memory_state.get("assistance_programs"), list)
+            else []
+        )
+        for item in programs:
+            if not isinstance(item, dict) or str(item.get("program_type", "")).strip() != "installment_discount":
+                continue
+            loan_ids = {str(value).strip().upper() for value in item.get("eligible_loan_ids", [])}
+            reasons = {str(value).strip().lower() for value in item.get("hardship_reasons", [])}
+            if loan_ids and loan_id not in loan_ids:
+                continue
+            if reasons and reason not in reasons:
+                continue
+            return dict(item)
+        return {}
+
+    @staticmethod
+    def _has_active_discount_branch(memory_state: dict[str, Any]) -> bool:
+        stage = str(memory_state.get("discount_stage", "")).strip().lower()
+        details = memory_state.get("installment_discount_details")
+        return stage in {
+            "evaluating",
+            "offered",
+            "accepted",
+            "applied",
+            "sms_sent",
+            "confirmed",
+        } or (
+            isinstance(details, dict)
+            and bool(details.get("eligible", False))
+            and str(details.get("approval_status", "")).strip().lower() == "approved"
         )
 
     def _build_context_for_react(self, state: AgentState) -> dict[str, Any]:

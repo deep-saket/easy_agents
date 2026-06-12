@@ -39,6 +39,8 @@ from agents.collection_agent.tools import (
     EmailConfirmationSendTool,
     EntityExtractTool,
     HumanEscalationTool,
+    InstallmentDiscountApplyTool,
+    InstallmentDiscountEvaluateTool,
     LoanPolicyLookupTool,
     OfferEligibilityTool,
     OutboundCallbackCancelTool,
@@ -355,6 +357,8 @@ class CollectionAgent(BaseAgent):
         registry.register(PaymentLinkCreateTool(store=self.data_store))
         registry.register(PromiseCaptureTool(store=self.data_store))
         registry.register(PremiumHoldCreateTool(store=self.data_store))
+        registry.register(InstallmentDiscountEvaluateTool(store=self.data_store))
+        registry.register(InstallmentDiscountApplyTool(store=self.data_store))
         registry.register(SMSConfirmationSendTool(store=self.data_store))
         registry.register(EmailConfirmationSendTool(store=self.data_store))
         registry.register(HumanEscalationTool(store=self.data_store))

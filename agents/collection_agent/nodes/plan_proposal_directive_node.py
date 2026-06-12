@@ -460,6 +460,89 @@ class PlanProposalDirectiveNode(BaseGraphNode):
             else {}
         )
         hardship_active = bool(hardship_context.get("hardship_detected", False))
+        discount_stage = str(memory_state.get("discount_stage", "")).strip().lower()
+
+        if (
+            identity_verified
+            and discount_stage == "confirmed"
+            and self._is_hold_closing_reply(user_input)
+        ):
+            if memory is not None:
+                memory.set_state(conversation_complete=False, conversation_closing=True)
+            return with_plan({
+                "route": "continue",
+                "response_target": "customer",
+                "plan_proposal": {
+                    "target": "customer",
+                    "intent": "installment_discount_closing",
+                    "conversation_objective": "installment_discount_closing",
+                    "dialogue_action": "close_installment_discount_conversation",
+                    "response_mode": "empathetic",
+                    "customer_facing_goal": "Thank the customer by name and close warmly.",
+                    "plan_origin": "installment_discount_closing",
+                    "plan_tree_update": {
+                        "operation": "complete",
+                        "selected_next_node_id": "close_conversation",
+                        "mark_done": ["confirmation"],
+                        "status": "active",
+                    },
+                },
+            })
+
+        if identity_verified and discount_stage == "confirmed":
+            details = (
+                memory_state.get("installment_discount_details")
+                if isinstance(memory_state.get("installment_discount_details"), dict)
+                else {}
+            )
+            sms_status = str((details.get("sms_confirmation") or {}).get("status", "")).lower()
+            email_status = str((details.get("email_confirmation") or {}).get("status", "")).lower()
+            if (
+                str(details.get("status", "")).lower() == "applied"
+                and str(details.get("reference_number", "")).strip()
+                and sms_status == "sent"
+                and email_status == "sent"
+            ):
+                return with_plan({
+                    "route": "continue",
+                    "response_target": "customer",
+                    "plan_proposal": {
+                        "target": "customer",
+                        "intent": "installment_discount_confirmation",
+                        "conversation_objective": "installment_discount_confirmation",
+                        "dialogue_action": "confirm_installment_discount",
+                        "response_mode": "empathetic",
+                        "customer_facing_goal": "Confirm the applied discount, revised amount, reference, notifications, and review timing.",
+                        "plan_origin": "installment_discount_tools_completed",
+                        "plan_tree_update": {
+                            "operation": "advance",
+                            "selected_next_node_id": "confirmation",
+                            "mark_done": ["assess_after_hold", "discount_offer"],
+                            "status": "active",
+                        },
+                    },
+                })
+
+        if identity_verified and discount_stage in {"offered", "accepted"}:
+            return with_plan({
+                "route": "continue",
+                "response_target": "customer",
+                "plan_proposal": {
+                    "target": "customer",
+                    "intent": "installment_discount_offer",
+                    "conversation_objective": "installment_discount_offer",
+                    "dialogue_action": "offer_installment_discount",
+                    "response_mode": "empathetic",
+                    "customer_facing_goal": "Acknowledge the uncertainty and offer the approved installment discount with its revised amount.",
+                    "plan_origin": "installment_discount_eligibility",
+                    "plan_tree_update": {
+                        "operation": "advance",
+                        "selected_next_node_id": "discount_offer",
+                        "mark_done": ["resolution_offer", "assess_after_hold"],
+                        "status": "active",
+                    },
+                },
+            })
 
         if (
             identity_verified
@@ -1478,6 +1561,9 @@ class PlanProposalDirectiveNode(BaseGraphNode):
             "hardship_hold_offer",
             "hardship_hold_confirmation",
             "hardship_hold_closing",
+            "installment_discount_offer",
+            "installment_discount_confirmation",
+            "installment_discount_closing",
             "close_conversation",
         }:
             objective = explicit_objective
@@ -1580,7 +1666,9 @@ class PlanProposalDirectiveNode(BaseGraphNode):
                 "that is all",
                 "that's all",
                 "thank you",
+                "thankyou",
                 "thanks",
+                "sure",
                 "bye",
                 "goodbye",
             )
@@ -1645,6 +1733,9 @@ class PlanProposalDirectiveNode(BaseGraphNode):
             "hardship_hold_offer": ["acknowledge_hardship", "offer_eligible_hold", "ask_if_hold_helps"],
             "hardship_hold_confirmation": ["confirm_hold", "give_reference", "state_notification", "state_next_steps"],
             "hardship_hold_closing": ["thank_customer_by_name", "warm_signoff", "goodbye"],
+            "installment_discount_offer": ["acknowledge_uncertainty", "state_discount", "state_revised_amount", "ask_if_helpful"],
+            "installment_discount_confirmation": ["confirm_discount", "give_reference", "state_revised_amount", "state_notification", "state_review_timing"],
+            "installment_discount_closing": ["thank_customer_by_name", "warm_signoff", "goodbye"],
             "assess_affordability": [
                 "acknowledge_hardship",
                 "ask_affordable_amount",
@@ -1699,6 +1790,9 @@ class PlanProposalDirectiveNode(BaseGraphNode):
             "hardship_hold_offer": ["repeat_standard_options", "ask_affordable_amount", "mention_internal_processing"],
             "hardship_hold_confirmation": ["repeat_standard_options", "request_payment", "mention_internal_processing"],
             "hardship_hold_closing": ["repeat_hold_details", "restart_conversation", "mention_internal_processing"],
+            "installment_discount_offer": ["invent_discount", "promise_unapproved_discount", "mention_internal_processing"],
+            "installment_discount_confirmation": ["repeat_standard_options", "request_payment", "mention_internal_processing"],
+            "installment_discount_closing": ["repeat_discount_details", "restart_conversation"],
             "assess_affordability": ["restart_collections_menu", "ask_pay_now_or_arrangement", "mention_internal_processing"],
             "present_arrangement_options": ["restart_collections_menu", "ask_pay_now_or_arrangement", "mention_internal_processing"],
             "negotiate_installment": ["restart_collections_menu", "ask_pay_now_or_arrangement", "mention_internal_processing"],
@@ -1724,6 +1818,9 @@ class PlanProposalDirectiveNode(BaseGraphNode):
             "hardship_hold_offer": ["acknowledge_hardship", "offer_hardship_hold"],
             "hardship_hold_confirmation": ["confirm_hardship_hold"],
             "hardship_hold_closing": ["close_hardship_hold_conversation"],
+            "installment_discount_offer": ["offer_installment_discount"],
+            "installment_discount_confirmation": ["confirm_installment_discount"],
+            "installment_discount_closing": ["close_installment_discount_conversation"],
             "assess_affordability": ["acknowledge_hardship", "ask_affordable_amount"],
             "present_arrangement_options": ["present_offer", "discuss_arrangement"],
             "negotiate_installment": ["discuss_arrangement", "ask_affordable_amount"],
@@ -1750,6 +1847,9 @@ class PlanProposalDirectiveNode(BaseGraphNode):
             "hardship_hold_offer": "Acknowledge the hardship and offer the eligible temporary hold without repeating generic payment options.",
             "hardship_hold_confirmation": "Confirm the hold, generated reference number, completed notifications, and next steps.",
             "hardship_hold_closing": "Thank the customer by name, offer a warm sign-off, and say goodbye.",
+            "installment_discount_offer": "Offer only the approved installment discount and revised amount, then ask whether it would help.",
+            "installment_discount_confirmation": "Confirm the applied discount, revised amount, generated reference, delivered notifications, and next review.",
+            "installment_discount_closing": "Thank the customer by name, offer a warm sign-off, and say goodbye.",
             "assess_affordability": (
                 "Acknowledge the hardship, understand what is manageable, and avoid repeating the standard policy menu."
             ),

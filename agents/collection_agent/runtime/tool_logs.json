@@ -6124,5 +6124,461 @@
     "status": "completed",
     "error": null,
     "created_at": "2026-06-12T03:53:56.314683Z"
+  },
+  {
+    "id": "ba076288-e444-4f57-b175-1da6fd0b306f",
+    "tool_name": "verify_dob",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "dob": "1988-04-22"
+    },
+    "output_payload": {
+      "customer_id": "CUST-2002",
+      "status": "verified",
+      "field": "dob",
+      "failed_attempts": 0
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-12T05:02:32.499230Z"
+  },
+  {
+    "id": "a70176a1-be11-4479-aff6-4c891251f710",
+    "tool_name": "verify_mobile",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "phone": "9900001002"
+    },
+    "output_payload": {
+      "customer_id": "CUST-2002",
+      "status": "verified",
+      "field": "phone",
+      "failed_attempts": 1
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-12T05:02:33.077833Z"
+  },
+  {
+    "id": "8c52fb04-db1a-4c3e-b6a5-c9633d8dd6a6",
+    "tool_name": "installment_discount_evaluate",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "program_id": "JOB_LOSS_INSTALLMENT_DISCOUNT_001",
+      "original_amount": 37800.0
+    },
+    "output_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "program_id": "JOB_LOSS_INSTALLMENT_DISCOUNT_001",
+      "eligible": true,
+      "approval_status": "approved",
+      "discount_pct": 10.0,
+      "discount_amount": 3780.0,
+      "revised_amount": 34020.0,
+      "review_after_months": 3
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-12T05:05:48.756800Z"
+  },
+  {
+    "id": "5c9e7c9e-6da5-49ee-b713-3714991e4208",
+    "tool_name": "installment_discount_evaluate",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "program_id": "JOB_LOSS_INSTALLMENT_DISCOUNT_001",
+      "original_amount": 37800.0
+    },
+    "output_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "program_id": "JOB_LOSS_INSTALLMENT_DISCOUNT_001",
+      "eligible": true,
+      "approval_status": "approved",
+      "discount_pct": 10.0,
+      "discount_amount": 3780.0,
+      "revised_amount": 34020.0,
+      "review_after_months": 3
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-12T05:08:40.297352Z"
+  },
+  {
+    "id": "a241fb06-4d9a-45ae-bc63-33a71213320b",
+    "tool_name": "verify_dob",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "dob": "1988-04-22"
+    },
+    "output_payload": {
+      "customer_id": "CUST-2002",
+      "status": "verified",
+      "field": "dob",
+      "failed_attempts": 0
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-12T05:21:48.319750Z"
+  },
+  {
+    "id": "0dd54e56-86b5-4ab4-b4f8-c991c5a7403c",
+    "tool_name": "verify_mobile",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "phone": "9900001002"
+    },
+    "output_payload": {
+      "customer_id": "CUST-2002",
+      "status": "verified",
+      "field": "phone",
+      "failed_attempts": 1
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-12T05:21:48.830891Z"
+  },
+  {
+    "id": "2541911d-521e-4452-b562-4851ccf27312",
+    "tool_name": "installment_discount_evaluate",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "program_id": "JOB_LOSS_INSTALLMENT_DISCOUNT_001",
+      "original_amount": 37800.0
+    },
+    "output_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "program_id": "JOB_LOSS_INSTALLMENT_DISCOUNT_001",
+      "eligible": true,
+      "approval_status": "approved",
+      "discount_pct": 10.0,
+      "discount_amount": 3780.0,
+      "revised_amount": 34020.0,
+      "review_after_months": 3
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-12T05:24:43.693395Z"
+  },
+  {
+    "id": "ecd214eb-5e50-46da-9076-b7bc254bd468",
+    "tool_name": "premium_hold_create",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "program_id": "PREMIUM_HOLD_001",
+      "hold_months": 2
+    },
+    "output_payload": {
+      "reference_number": "HOLD-7D047AF9A9",
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "program_id": "PREMIUM_HOLD_001",
+      "hold_months": 2,
+      "effective_from": "2026-06-12",
+      "effective_until": "2026-08-12",
+      "status": "active"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-12T05:26:24.128651Z"
+  },
+  {
+    "id": "80b9cf8a-6158-458e-9d3b-15fb8f52e509",
+    "tool_name": "sms_confirmation_send",
+    "input_payload": {
+      "customer_id": "CUST-2002",
+      "reference_number": "HOLD-7D047AF9A9",
+      "message": "Your premium hold has been arranged. Reference: HOLD-7D047AF9A9. The hold is active until 2026-08-12."
+    },
+    "output_payload": {
+      "message_id": "SMS-99355770F1",
+      "customer_id": "CUST-2002",
+      "reference_number": "HOLD-7D047AF9A9",
+      "recipient": "+919900001002",
+      "status": "sent"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-12T05:26:24.749966Z"
+  },
+  {
+    "id": "145b5246-6190-4b43-9fa8-5cddfaf42eda",
+    "tool_name": "email_confirmation_send",
+    "input_payload": {
+      "customer_id": "CUST-2002",
+      "reference_number": "HOLD-7D047AF9A9",
+      "subject": "Premium hold confirmation",
+      "message": "Your premium hold has been arranged. Reference: HOLD-7D047AF9A9. The hold is active until 2026-08-12."
+    },
+    "output_payload": {
+      "message_id": "EMAIL-AE4EBF7EFF",
+      "customer_id": "CUST-2002",
+      "reference_number": "HOLD-7D047AF9A9",
+      "recipient": "rohan.gupta@example.com",
+      "status": "sent"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-12T05:26:25.268063Z"
+  },
+  {
+    "id": "3f26f6f5-edd3-4fad-8cf5-2f721e2da624",
+    "tool_name": "verify_dob",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "dob": "1988-04-22"
+    },
+    "output_payload": {
+      "customer_id": "CUST-2002",
+      "status": "verified",
+      "field": "dob",
+      "failed_attempts": 0
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-12T05:44:55.191624Z"
+  },
+  {
+    "id": "33374a61-b3d6-4295-ae2d-1f8f4c130bbf",
+    "tool_name": "verify_mobile",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "phone": "9900001002"
+    },
+    "output_payload": {
+      "customer_id": "CUST-2002",
+      "status": "verified",
+      "field": "phone",
+      "failed_attempts": 1
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-12T05:44:55.732487Z"
+  },
+  {
+    "id": "53731314-0ecc-4c89-8c11-97ca81277c7f",
+    "tool_name": "installment_discount_evaluate",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "program_id": "JOB_LOSS_INSTALLMENT_DISCOUNT_001",
+      "original_amount": 37800.0
+    },
+    "output_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "program_id": "JOB_LOSS_INSTALLMENT_DISCOUNT_001",
+      "eligible": true,
+      "approval_status": "approved",
+      "discount_pct": 10.0,
+      "discount_amount": 3780.0,
+      "revised_amount": 34020.0,
+      "review_after_months": 3
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-12T05:49:20.600785Z"
+  },
+  {
+    "id": "af3285df-3420-4d1d-9b96-4e4fb4ae04e7",
+    "tool_name": "installment_discount_apply",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "program_id": "JOB_LOSS_INSTALLMENT_DISCOUNT_001",
+      "original_amount": 37800.0,
+      "discount_pct": 10.0,
+      "revised_amount": 34020.0
+    },
+    "output_payload": {
+      "reference_number": "DISC-B1DD3405F5",
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "program_id": "JOB_LOSS_INSTALLMENT_DISCOUNT_001",
+      "original_amount": 37800.0,
+      "discount_pct": 10.0,
+      "discount_amount": 3780.0,
+      "revised_amount": 34020.0,
+      "status": "applied"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-12T05:50:45.898050Z"
+  },
+  {
+    "id": "af0eba56-5225-45f7-ae7d-b7bbba4bd634",
+    "tool_name": "sms_confirmation_send",
+    "input_payload": {
+      "customer_id": "CUST-2002",
+      "reference_number": "DISC-B1DD3405F5",
+      "message": "Your installment discount has been applied. Reference: DISC-B1DD3405F5. Revised amount: 34020.00."
+    },
+    "output_payload": {
+      "message_id": "SMS-8E0A098E66",
+      "customer_id": "CUST-2002",
+      "reference_number": "DISC-B1DD3405F5",
+      "recipient": "+919900001002",
+      "status": "sent"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-12T05:50:46.532310Z"
+  },
+  {
+    "id": "29db7f68-727b-46cf-80ea-bea21ea39fb5",
+    "tool_name": "email_confirmation_send",
+    "input_payload": {
+      "customer_id": "CUST-2002",
+      "reference_number": "DISC-B1DD3405F5",
+      "subject": "Installment discount confirmation",
+      "message": "Your installment discount has been applied. Reference: DISC-B1DD3405F5. Revised amount: 34020.00."
+    },
+    "output_payload": {
+      "message_id": "EMAIL-48422A3DF3",
+      "customer_id": "CUST-2002",
+      "reference_number": "DISC-B1DD3405F5",
+      "recipient": "rohan.gupta@example.com",
+      "status": "sent"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-12T05:50:47.229067Z"
+  },
+  {
+    "id": "5df45ab3-cc19-44c0-be6c-0457e893626f",
+    "tool_name": "verify_dob",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "dob": "1988-04-22"
+    },
+    "output_payload": {
+      "customer_id": "CUST-2002",
+      "status": "verified",
+      "field": "dob",
+      "failed_attempts": 0
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-12T06:05:31.081431Z"
+  },
+  {
+    "id": "4c88ea4a-7991-4736-aa2c-17e6d6cf73b0",
+    "tool_name": "verify_mobile",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "phone": "9900001002"
+    },
+    "output_payload": {
+      "customer_id": "CUST-2002",
+      "status": "verified",
+      "field": "phone",
+      "failed_attempts": 1
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-12T06:05:31.646197Z"
+  },
+  {
+    "id": "83a5ae9e-4af6-4018-ae38-5453ef6ac946",
+    "tool_name": "installment_discount_evaluate",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "program_id": "JOB_LOSS_INSTALLMENT_DISCOUNT_001",
+      "original_amount": 37800.0
+    },
+    "output_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "program_id": "JOB_LOSS_INSTALLMENT_DISCOUNT_001",
+      "eligible": true,
+      "approval_status": "approved",
+      "discount_pct": 10.0,
+      "discount_amount": 3780.0,
+      "revised_amount": 34020.0,
+      "review_after_months": 3
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-12T06:11:37.684959Z"
+  },
+  {
+    "id": "e16a6677-469a-476a-8f9c-593e279f00d1",
+    "tool_name": "installment_discount_apply",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "program_id": "JOB_LOSS_INSTALLMENT_DISCOUNT_001",
+      "original_amount": 37800.0,
+      "discount_pct": 10.0,
+      "revised_amount": 34020.0
+    },
+    "output_payload": {
+      "reference_number": "DISC-3C6B206C2C",
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "program_id": "JOB_LOSS_INSTALLMENT_DISCOUNT_001",
+      "original_amount": 37800.0,
+      "discount_pct": 10.0,
+      "discount_amount": 3780.0,
+      "revised_amount": 34020.0,
+      "status": "applied"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-12T06:19:16.471529Z"
+  },
+  {
+    "id": "5489d07f-1e27-40a8-93f4-0b4949438454",
+    "tool_name": "sms_confirmation_send",
+    "input_payload": {
+      "customer_id": "CUST-2002",
+      "reference_number": "DISC-3C6B206C2C",
+      "message": "Your installment discount has been applied. Reference: DISC-3C6B206C2C. Revised amount: 34020.00."
+    },
+    "output_payload": {
+      "message_id": "SMS-78541628D7",
+      "customer_id": "CUST-2002",
+      "reference_number": "DISC-3C6B206C2C",
+      "recipient": "+919900001002",
+      "status": "sent"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-12T06:19:16.934644Z"
+  },
+  {
+    "id": "b9fc8c2f-f560-418b-be7f-04899777ed23",
+    "tool_name": "email_confirmation_send",
+    "input_payload": {
+      "customer_id": "CUST-2002",
+      "reference_number": "DISC-3C6B206C2C",
+      "subject": "Installment discount confirmation",
+      "message": "Your installment discount has been applied. Reference: DISC-3C6B206C2C. Revised amount: 34020.00."
+    },
+    "output_payload": {
+      "message_id": "EMAIL-8CA5505D29",
+      "customer_id": "CUST-2002",
+      "reference_number": "DISC-3C6B206C2C",
+      "recipient": "rohan.gupta@example.com",
+      "status": "sent"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-12T06:19:17.403532Z"
   }
 ]

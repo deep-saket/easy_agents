@@ -33,6 +33,7 @@ class CollectionDataStore:
         self._ensure_runtime_file("premium_holds.json")
         self._ensure_runtime_file("sms_confirmations.json")
         self._ensure_runtime_file("email_confirmations.json")
+        self._ensure_runtime_file("installment_discounts.json")
 
     def _ensure_runtime_file(self, name: str) -> None:
         path = self.runtime_dir / name

@@ -187,6 +187,33 @@ class ExecutionPathIntentNode(CollectionIntentNode):
         lowered = str(state.get("user_input", "")).lower()
         if (
             str(memory_state.get("hardship_hold_stage", "")).strip().lower() == "offered"
+            and self._is_post_hold_uncertain(lowered)
+        ):
+            return {
+                "skip_llm": True,
+                "reason": "Post-hold uncertainty requires installment discount evaluation.",
+                "intent": {
+                    "intent": "need_tool",
+                    "confidence": 1.0,
+                    "reason": "Evaluate the configured installment discount.",
+                },
+            }
+        if (
+            str(memory_state.get("discount_stage", "")).strip().lower() in {"offered", "accepted"}
+            and self._is_affirmative(lowered)
+        ):
+            return {
+                "skip_llm": True,
+                "reason": "Accepted installment discount requires application and notification tools.",
+                "intent": {
+                    "intent": "need_tool",
+                    "confidence": 1.0,
+                    "reason": "Apply the accepted installment discount.",
+                },
+            }
+        if (
+            str(memory_state.get("hardship_hold_stage", "")).strip().lower() == "offered"
+            and not self._has_active_discount_branch(memory_state)
             and self._is_affirmative(lowered)
         ):
             return {
@@ -239,6 +266,41 @@ class ExecutionPathIntentNode(CollectionIntentNode):
                 "reason": "Verification evidence present for missing field; route to tool execution.",
             },
         }
+
+    @staticmethod
+    def _is_post_hold_uncertain(text: str) -> bool:
+        normalized = re.sub(r"[^a-z0-9\s]", " ", str(text).lower())
+        normalized = re.sub(r"\s+", " ", normalized).strip()
+        return any(
+            phrase in normalized
+            for phrase in (
+                "not sure",
+                "unsure",
+                "even after 2 months",
+                "even after two months",
+                "cannot manage after",
+                "can't manage after",
+                "may not manage",
+                "might not manage",
+            )
+        )
+
+    @staticmethod
+    def _has_active_discount_branch(memory_state: dict[str, Any]) -> bool:
+        stage = str(memory_state.get("discount_stage", "")).strip().lower()
+        details = memory_state.get("installment_discount_details")
+        return stage in {
+            "evaluating",
+            "offered",
+            "accepted",
+            "applied",
+            "sms_sent",
+            "confirmed",
+        } or (
+            isinstance(details, dict)
+            and bool(details.get("eligible", False))
+            and str(details.get("approval_status", "")).strip().lower() == "approved"
+        )
 
     @staticmethod
     def _is_affirmative(text: str) -> bool:

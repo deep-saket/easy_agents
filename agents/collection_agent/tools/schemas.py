@@ -227,6 +227,46 @@ class EmailConfirmationSendOutput(BaseModel):
     status: Literal["sent"]
 
 
+class InstallmentDiscountEvaluateInput(BaseModel):
+    case_id: str
+    customer_id: str
+    program_id: str
+    original_amount: float = Field(gt=0)
+
+
+class InstallmentDiscountEvaluateOutput(BaseModel):
+    case_id: str
+    customer_id: str
+    program_id: str
+    eligible: bool
+    approval_status: Literal["approved", "not_eligible", "approval_required"]
+    discount_pct: float = Field(ge=0, le=100)
+    discount_amount: float = Field(ge=0)
+    revised_amount: float = Field(ge=0)
+    review_after_months: int = Field(ge=0)
+
+
+class InstallmentDiscountApplyInput(BaseModel):
+    case_id: str
+    customer_id: str
+    program_id: str
+    original_amount: float = Field(gt=0)
+    discount_pct: float = Field(gt=0, le=100)
+    revised_amount: float = Field(ge=0)
+
+
+class InstallmentDiscountApplyOutput(BaseModel):
+    reference_number: str
+    case_id: str
+    customer_id: str
+    program_id: str
+    original_amount: float
+    discount_pct: float
+    discount_amount: float
+    revised_amount: float
+    status: Literal["applied"]
+
+
 class FollowupScheduleInput(BaseModel):
     case_id: str
     scheduled_for: str

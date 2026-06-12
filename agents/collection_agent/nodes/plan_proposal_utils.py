@@ -95,24 +95,47 @@ def overlay_negotiation_state_from_graph(*, state: AgentState, memory_state: dic
         "conversation_mode",
         "negotiation_stage",
         "customer_payment_posture",
-        "discount_stage",
         "response_mode",
         "active_dialogue_owner",
     ):
         if key in state and str(state.get(key, "")).strip():
             merged[key] = str(state.get(key, "")).strip()
+
+    memory_discount_stage = str(memory_state.get("discount_stage", "")).strip().lower()
+    graph_discount_stage = str(state.get("discount_stage", "")).strip().lower()
+    tool_derived_discount_stages = {
+        "evaluating",
+        "offered",
+        "applied",
+        "sms_sent",
+        "confirmed",
+    }
+    if memory_discount_stage in tool_derived_discount_stages:
+        merged["discount_stage"] = memory_discount_stage
+    elif graph_discount_stage:
+        merged["discount_stage"] = graph_discount_stage
+
     for key in (
         "customer_payment_capacity",
         "customer_payment_capacity_pct",
         "customer_payment_willingness",
+    ):
+        if key in state and state.get(key) is not None:
+            merged[key] = state.get(key)
+    for key in (
         "discount_requested",
         "discount_offered",
         "discount_accepted",
         "discount_rejected",
         "counter_offer_present",
     ):
-        if key in state and state.get(key) is not None:
-            merged[key] = state.get(key)
+        if key in state or key in memory_state:
+            merged[key] = bool(memory_state.get(key, False)) or bool(state.get(key, False))
+    effective_discount_stage = str(merged.get("discount_stage", "")).strip().lower()
+    if effective_discount_stage in {"offered", "applied", "sms_sent", "confirmed"}:
+        merged["discount_offered"] = True
+    if effective_discount_stage in {"applied", "sms_sent", "confirmed"}:
+        merged["discount_accepted"] = True
     if isinstance(state.get("customer_payment_posture_history"), list):
         merged["customer_payment_posture_history"] = list(state.get("customer_payment_posture_history", []))
     if isinstance(state.get("hardship_context"), dict):

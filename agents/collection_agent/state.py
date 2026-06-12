@@ -70,6 +70,9 @@ class CollectionGraphState(AgentState, total=False):
     customer_payment_capacity: float | None
     customer_payment_capacity_pct: float | None
     discount_stage: str
+    post_hold_capacity: str
+    installment_discount_program: dict[str, Any]
+    installment_discount_details: dict[str, Any]
     customer_payment_willingness: float
     hardship_context: dict[str, Any]
     discount_requested: bool
