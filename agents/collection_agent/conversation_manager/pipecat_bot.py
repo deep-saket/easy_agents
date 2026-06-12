@@ -28,12 +28,17 @@ class _VoiceDownstreamRuntime:
         session_id = str(getattr(request, "session_id", "")).strip() or "voice-session"
         message = str(getattr(request, "message", "")).strip()
         response = self._orchestrator.handle_text(session_id=session_id, text=message)
+        lifecycle = self._orchestrator.lifecycle_state(session_id=session_id)
         return {
             "session_id": session_id,
             "final_response": response,
             "final_target": "customer",
             "hops": [],
+            **lifecycle,
         }
+
+    def finalize_conversation(self, session_id: str) -> None:
+        self._orchestrator.finalize_conversation(session_id=session_id)
 
 
 async def _run_bot(transport: Any, runner_args: Any) -> None:
@@ -59,6 +64,7 @@ async def _run_bot(transport: Any, runner_args: Any) -> None:
             self._active_turn_token = 0
             self._active_speech: dict[str, Any] | None = None
             self._speech_completion_task: asyncio.Task[Any] | None = None
+            self._termination_task: asyncio.Task[Any] | None = None
 
         async def process_frame(self, frame: Any, direction: FrameDirection) -> None:
             await super().process_frame(frame, direction)
@@ -75,6 +81,7 @@ async def _run_bot(transport: Any, runner_args: Any) -> None:
 
                 if not utterance:
                     return
+                self._cancel_pending_termination()
                 if self._active_speech is not None:
                     await self._interrupt_active_delivery(session_id=session_id)
                 self._start_managed_turn(session_id=session_id, utterance=utterance)
@@ -137,6 +144,8 @@ async def _run_bot(transport: Any, runner_args: Any) -> None:
                             text=filler_text,
                             kind="filler",
                             delivery=None,
+                            terminate_call=False,
+                            termination_grace_seconds=0.0,
                         )
                 elif event_name == "turn_complete":
                     manager_meta = payload.get("conversation_manager", {}) if isinstance(payload, dict) else {}
@@ -150,6 +159,14 @@ async def _run_bot(transport: Any, runner_args: Any) -> None:
                             text=response_text,
                             kind="business",
                             delivery=delivery,
+                            terminate_call=bool(manager_meta.get("terminate_call", False)),
+                            termination_grace_seconds=float(
+                                manager_meta.get(
+                                    "termination_grace_seconds",
+                                    manager.config.termination_grace_seconds,
+                                )
+                                or manager.config.termination_grace_seconds
+                            ),
                         )
                 elif event_name == "turn_error":
                     error_text = str(payload.get("error", "")).strip()
@@ -159,6 +176,8 @@ async def _run_bot(transport: Any, runner_args: Any) -> None:
                             text=f"Error: {error_text}",
                             kind="error",
                             delivery=None,
+                            terminate_call=False,
+                            termination_grace_seconds=0.0,
                         )
 
         async def _speak_text(
@@ -168,10 +187,13 @@ async def _run_bot(transport: Any, runner_args: Any) -> None:
             text: str,
             kind: str,
             delivery: dict[str, Any] | None,
+            terminate_call: bool,
+            termination_grace_seconds: float,
         ) -> None:
             if not text:
                 return
             self._clear_speech_completion_task()
+            self._cancel_pending_termination()
             estimated_total_ms = float(
                 (delivery or {}).get("estimated_total_ms") or max(len(text) * manager.config.estimated_speech_ms_per_character, 1.0)
             )
@@ -189,6 +211,8 @@ async def _run_bot(transport: Any, runner_args: Any) -> None:
                     session_id=session_id,
                     delivery=delivery,
                     estimated_total_ms=estimated_total_ms,
+                    terminate_call=terminate_call,
+                    termination_grace_seconds=termination_grace_seconds,
                 )
             )
 
@@ -198,14 +222,42 @@ async def _run_bot(transport: Any, runner_args: Any) -> None:
             session_id: str,
             delivery: dict[str, Any] | None,
             estimated_total_ms: float,
+            terminate_call: bool,
+            termination_grace_seconds: float,
         ) -> None:
             try:
                 await asyncio.sleep(max(estimated_total_ms / 1000.0, 0.05))
                 if delivery and isinstance(delivery.get("message_id"), str):
                     manager.complete_voice_delivery(session_id=session_id, message_id=str(delivery["message_id"]))
                 self._active_speech = None
+                if terminate_call:
+                    grace_seconds = max(
+                        float(termination_grace_seconds),
+                        float(manager.config.termination_grace_seconds),
+                        3.0,
+                    )
+                    self._termination_task = asyncio.create_task(
+                        self._terminate_after_grace_period(
+                            session_id=session_id,
+                            grace_seconds=grace_seconds,
+                        )
+                    )
             except asyncio.CancelledError:
                 raise
+
+        async def _terminate_after_grace_period(self, *, session_id: str, grace_seconds: float) -> None:
+            try:
+                await asyncio.sleep(grace_seconds)
+                manager.finalize_conversation(session_id)
+                try:
+                    from pipecat.frames.frames import EndFrame
+                except Exception:
+                    return
+                await self.push_frame(EndFrame(), FrameDirection.DOWNSTREAM)
+            except asyncio.CancelledError:
+                raise
+            finally:
+                self._termination_task = None
 
         async def _interrupt_active_delivery(self, *, session_id: str) -> None:
             active = self._active_speech
@@ -241,6 +293,12 @@ async def _run_bot(transport: Any, runner_args: Any) -> None:
             if task is not None and not task.done():
                 task.cancel()
             self._speech_completion_task = None
+
+        def _cancel_pending_termination(self) -> None:
+            task = self._termination_task
+            if task is not None and not task.done():
+                task.cancel()
+            self._termination_task = None
 
     import os
 

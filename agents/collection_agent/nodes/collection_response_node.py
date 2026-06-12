@@ -10,6 +10,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from agents.collection_agent.llm_structured import StructuredOutputRunner
+from agents.collection_agent.nodes.plan_proposal_utils import mark_confirmation_delivered
 from src.nodes.response_node import ResponseNode
 from src.nodes.types import AgentState, NodeUpdate
 
@@ -98,11 +99,27 @@ class CollectionResponseNode(ResponseNode):
         update["llm_response"] = self.last_render_debug.get("llm_response")
         update["llm_error"] = self.last_render_debug.get("llm_error")
         update["response_render_debug"] = self.last_render_debug.get("response_render_debug")
+        directive = plan.get("response_directive") if isinstance(plan.get("response_directive"), dict) else {}
+        objective = str(directive.get("conversation_objective", "")).strip().lower()
+        if objective in {
+            "wrong_party_callback_confirmation",
+            "wrong_party_callback_revision_confirmation",
+            "wrong_party_closing_acknowledgement",
+            "hardship_hold_closing",
+        }:
+            update["conversation_complete"] = False
+            update["conversation_closing"] = True
+            update["terminate_call"] = True
+            update["termination_grace_seconds"] = 3.0
         if self.last_render_debug.get("fallback_reason"):
             update["fallback_reason"] = self.last_render_debug.get("fallback_reason")
         memory = state.get("memory")
         if memory is not None:
             memory_state = dict(getattr(memory, "state", {}))
+            if objective == "hardship_hold_confirmation" and str(update.get("response", "")).strip():
+                advanced_plan = mark_confirmation_delivered(memory)
+                if advanced_plan:
+                    update["conversation_plan"] = advanced_plan
             opening_rendered = (
                 str(self.last_render_debug.get("response_render_debug", {}).get("template_selected", "")).strip()
                 == "verification_request"
@@ -115,6 +132,14 @@ class CollectionResponseNode(ResponseNode):
                     right_party_status="awaiting_confirmation",
                     wrong_party_callback_stage=None,
                     wrong_party_callback_time=None,
+                )
+            if bool(update.get("conversation_complete", False)):
+                memory.set_state(
+                    conversation_complete=False,
+                    conversation_closing=True,
+                    conversation_closed=False,
+                    terminate_call=True,
+                    termination_grace_seconds=float(update.get("termination_grace_seconds", 3.0)),
                 )
         self._update_conversation_history_memory(state=state, update=update)
         return update
@@ -183,8 +208,15 @@ class CollectionResponseNode(ResponseNode):
         if str(directive.get("template_id", "")).strip() in {
             "wrong_party_privacy_notice",
             "wrong_party_callback_request",
+            "wrong_party_callback_clarification",
             "wrong_party_callback_confirmation",
+            "wrong_party_callback_revision_confirmation",
+            "wrong_party_closing_acknowledgement",
             "conversation_closing",
+            "purpose_disclosure",
+            "hardship_hold_offer",
+            "hardship_hold_confirmation",
+            "hardship_hold_closing",
         }:
             render_debug["renderer_fallback_used"] = True
             render_debug["policy_filters_applied"] = ["deterministic_compliance_template"]
@@ -450,10 +482,27 @@ class CollectionResponseNode(ResponseNode):
             return "wrong_party_privacy_notice"
         if objective == "wrong_party_callback_request" or action == "wrong_party_callback_request":
             return "wrong_party_callback_request"
+        if objective == "wrong_party_callback_clarification" or action == "wrong_party_callback_clarification":
+            return "wrong_party_callback_clarification"
         if objective == "wrong_party_callback_confirmation" or action == "wrong_party_callback_confirmation":
             return "wrong_party_callback_confirmation"
+        if (
+            objective == "wrong_party_callback_revision_confirmation"
+            or action == "wrong_party_callback_revision_confirmation"
+        ):
+            return "wrong_party_callback_revision_confirmation"
+        if objective == "wrong_party_closing_acknowledgement" or action == "wrong_party_closing_acknowledgement":
+            return "wrong_party_closing_acknowledgement"
         if objective == "close_conversation" or action == "close_conversation":
             return "conversation_closing"
+        if objective == "purpose_disclosure" or action == "disclose_call_purpose":
+            return "purpose_disclosure"
+        if objective == "hardship_hold_offer" or action == "offer_hardship_hold":
+            return "hardship_hold_offer"
+        if objective == "hardship_hold_confirmation" or action == "confirm_hardship_hold":
+            return "hardship_hold_confirmation"
+        if objective == "hardship_hold_closing" or action == "close_hardship_hold_conversation":
+            return "hardship_hold_closing"
         if action == "ask_affordable_amount" or objective == "assess_affordability":
             return "capacity_question"
         if action in {"present_offer", "discuss_arrangement"} or objective in {
@@ -682,6 +731,17 @@ class CollectionResponseNode(ResponseNode):
         policy_options_text = str(
             render_variables.get("policy_options_text", "a payment arrangement based on the account policy")
         ).strip()
+        policy_number = str(render_variables.get("policy_number", "")).strip()
+        due_date = str(render_variables.get("due_date", "")).strip()
+        reference_number = str(render_variables.get("reference_number", "")).strip()
+        installment_amount_text = str(
+            render_variables.get("installment_amount_text", overdue_amount_text)
+        ).strip()
+        hold_months = int(render_variables.get("hold_months", 0) or 0)
+        benefits_remain_active = bool(render_variables.get("benefits_remain_active", False))
+        confirmation_sla_hours = int(render_variables.get("confirmation_sla_hours", 24) or 24)
+        sms_confirmation_sent = bool(render_variables.get("sms_confirmation_sent", False))
+        email_confirmation_sent = bool(render_variables.get("email_confirmation_sent", False))
         opening_turn = bool(render_variables.get("opening_turn", False))
 
         if template_id == "verification_request":
@@ -729,15 +789,70 @@ class CollectionResponseNode(ResponseNode):
                 f"{contact_sentence}"
                 "When would be a good time to try again?"
             ).strip()
+        if template_id == "wrong_party_callback_clarification":
+            goal = str(directive.get("customer_facing_goal", "")).lower()
+            if "has passed" in goal:
+                return "That time has already passed. What later time would work for the callback?"
+            return (
+                "Of course. What time would be best to try again, for example a specific time "
+                "or a part of the day?"
+            )
         if template_id == "wrong_party_callback_confirmation":
             timing = f" {callback_time}" if callback_time else ""
             return (
-                f"Thank you. I will try to reach {customer_name}{timing}. "
+                f"Certainly. I will try to reach {customer_name}{timing}. "
                 f"Please let them know that {company_name} called. "
-                "Thank you for your help, and have a good day. Goodbye."
+                "Thank you for your help. Have a good day. Goodbye."
             ).strip()
+        if template_id == "wrong_party_callback_revision_confirmation":
+            timing = f" {callback_time}" if callback_time else ""
+            return (
+                f"Understood. I will update the callback and try to reach {customer_name}{timing}. "
+                "Thank you for letting me know. Goodbye."
+            ).strip()
+        if template_id == "wrong_party_closing_acknowledgement":
+            return "You're welcome. Goodbye."
         if template_id == "conversation_closing":
             return "Thank you for your time. Have a good day. Goodbye."
+        if template_id == "purpose_disclosure":
+            policy_text = f" policy {policy_number}" if policy_number else " policy"
+            due_text = f", due on {due_date}," if due_date else ""
+            return (
+                f"Thank you for confirming. I am calling about your{policy_text}. "
+                f"A premium installment of {installment_amount_text}{due_text} is currently overdue. "
+                "I wanted to check in and see how I can help."
+            ).strip()
+        if template_id == "hardship_hold_offer":
+            benefit_text = (
+                ", with no impact to your policy benefits during that time"
+                if benefits_remain_active
+                else ""
+            )
+            return (
+                "I am really sorry to hear that, and thank you for letting me know. "
+                "The most important thing right now is keeping your cover active while you get back on your feet. "
+                f"Given your situation, I can place your premium on hold for up to {hold_months} months"
+                f"{benefit_text}. Would that give you the breathing room you need?"
+            ).strip()
+        if template_id == "hardship_hold_confirmation":
+            reference_text = (
+                f" Your reference number is {reference_number}." if reference_number else ""
+            )
+            if sms_confirmation_sent and email_confirmation_sent:
+                notification_text = " Confirmation has been sent by SMS and email."
+            else:
+                notification_text = (
+                    f" You will receive confirmation within {confirmation_sla_hours} hours."
+                )
+            return (
+                f"I have arranged a {hold_months}-month hold on your installment."
+                f"{reference_text}{notification_text} We will reach out a few days before the hold ends "
+                "to discuss next steps."
+            ).strip()
+        if template_id == "hardship_hold_closing":
+            return (
+                f"Thank you for your time, {customer_name}. Take care, and we wish you all the best. Goodbye."
+            ).strip()
         if template_id == "dues_explanation":
             return (
                 f"Thank you {customer_name}. Your overdue amount is INR {overdue_amount_text}. "
@@ -896,13 +1011,61 @@ class CollectionResponseNode(ResponseNode):
         ).strip() or "Collections representative"
         company_name = str(customer_variables.get("[COMPANY_NAME]", "the bank")).strip() or "the bank"
         contact_number = str(customer_variables.get("[CONTACT_NUMBER]", "")).strip()
+        policy_number = str(customer_variables.get("[POLICY_NUMBER]", case.get("loan_id", ""))).strip()
+        due_date = str(customer_variables.get("[DUE_DATE]", "")).strip()
+        reference_number = str(
+            customer_variables.get("[REF_NUMBER]", memory_state.get("active_case_id", ""))
+        ).strip()
+        installment_amount = str(
+            customer_variables.get("[AMOUNT]", f"{overdue_amount:.2f}")
+        ).strip()
         callback_time = str(memory_state.get("wrong_party_callback_time", "") or "").strip()
         policy = active_context.get("policy") if isinstance(active_context.get("policy"), dict) else {}
+        hold_program = (
+            memory_state.get("hardship_hold_program")
+            if isinstance(memory_state.get("hardship_hold_program"), dict)
+            else {}
+        )
+        hold_details = (
+            memory_state.get("hardship_hold_details")
+            if isinstance(memory_state.get("hardship_hold_details"), dict)
+            else {}
+        )
         return {
             "customer_name": customer_name,
             "agent_name": agent_name,
             "company_name": company_name,
             "contact_number": contact_number,
+            "policy_number": policy_number,
+            "due_date": due_date,
+            "reference_number": str(
+                hold_details.get("reference_number", reference_number)
+            ).strip(),
+            "installment_amount_text": installment_amount,
+            "hold_months": int(
+                hold_details.get("hold_months", hold_program.get("max_hold_months", 0)) or 0
+            ),
+            "benefits_remain_active": bool(
+                hold_details.get(
+                    "benefits_remain_active",
+                    hold_program.get("benefits_remain_active", False),
+                )
+            ),
+            "confirmation_sla_hours": int(
+                hold_details.get(
+                    "confirmation_sla_hours",
+                    hold_program.get("confirmation_sla_hours", 24),
+                )
+                or 24
+            ),
+            "sms_confirmation_sent": (
+                isinstance(hold_details.get("sms_confirmation"), dict)
+                and str(hold_details.get("sms_confirmation", {}).get("status", "")).strip().lower() == "sent"
+            ),
+            "email_confirmation_sent": (
+                isinstance(hold_details.get("email_confirmation"), dict)
+                and str(hold_details.get("email_confirmation", {}).get("status", "")).strip().lower() == "sent"
+            ),
             "callback_time": callback_time,
             "case_id": str(facts.get("case_id", memory_state.get("active_case_id", "COLL-1001"))).strip() or "COLL-1001",
             "overdue_amount_text": f"{overdue_amount:.2f}",

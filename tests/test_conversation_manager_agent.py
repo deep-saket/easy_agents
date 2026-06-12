@@ -56,6 +56,26 @@ class _FakeRuntime:
         return {"voice": {"active": True}}
 
 
+class _TerminatingRuntime(_FakeRuntime):
+    def __init__(self) -> None:
+        super().__init__()
+        self.finalized_sessions: list[str] = []
+
+    def run_turn(self, request, event_callback=None):
+        payload = super().run_turn(request, event_callback=event_callback)
+        payload.update(
+            {
+                "conversation_complete": True,
+                "terminate_call": True,
+                "termination_grace_seconds": 3.0,
+            }
+        )
+        return payload
+
+    def finalize_conversation(self, session_id: str) -> None:
+        self.finalized_sessions.append(session_id)
+
+
 def _config(tmp_path: Path) -> ConversationManagerConfig:
     return ConversationManagerConfig(
         short_wait_seconds=0.02,
@@ -67,7 +87,11 @@ def _config(tmp_path: Path) -> ConversationManagerConfig:
         monitor_poll_seconds=0.005,
         filler_enabled=True,
         filler_library_path=(
-            Path("/Users/saketm10/Projects/openclaw_agents/agents/collection_agent/conversation_manager/filler_library.json")
+            Path(__file__).resolve().parents[1]
+            / "agents"
+            / "collection_agent"
+            / "conversation_manager"
+            / "filler_library.json"
         ),
         runtime_dir=tmp_path / "runtime",
     )
@@ -219,6 +243,78 @@ def test_voice_delivery_starts_then_completes(tmp_path: Path) -> None:
     )
     assert completed is not None
     assert completed["delivery_status"] == "delivered"
+
+
+def test_termination_metadata_reaches_voice_manager(tmp_path: Path) -> None:
+    manager = ConversationManagerAgent(
+        config=_config(tmp_path),
+        downstream_runtime=_TerminatingRuntime(),
+    )
+
+    result = manager.run_turn(
+        SimpleNamespace(message="goodbye", session_id="voice-close"),
+        delivery_mode="voice",
+    )
+
+    metadata = result["conversation_manager"]
+    assert metadata["conversation_complete"] is True
+    assert metadata["terminate_call"] is True
+    assert metadata["termination_grace_seconds"] == 3.0
+
+
+def test_text_closure_waits_three_seconds_then_rejects_late_turn(tmp_path: Path) -> None:
+    runtime = _TerminatingRuntime()
+    manager = ConversationManagerAgent(
+        config=_config(tmp_path),
+        downstream_runtime=runtime,
+    )
+
+    manager.run_turn(SimpleNamespace(message="schedule callback", session_id="text-close"))
+    immediate = manager.debug_state("text-close")
+    assert immediate["conversation_closing"] is True
+    assert immediate["conversation_closed"] is False
+
+    time.sleep(3.2)
+
+    closed = manager.debug_state("text-close")
+    assert closed["conversation_closing"] is False
+    assert closed["conversation_closed"] is True
+    assert runtime.finalized_sessions == ["text-close"]
+
+    late = manager.run_turn(SimpleNamespace(message="bye", session_id="text-close"))
+    assert late["final_response"] == ""
+    assert late["conversation_manager"]["conversation_closed"] is True
+    assert runtime.calls == ["schedule callback"]
+
+
+def test_followup_during_grace_restarts_closure_timer(tmp_path: Path) -> None:
+    runtime = _TerminatingRuntime()
+    manager = ConversationManagerAgent(
+        config=_config(tmp_path),
+        downstream_runtime=runtime,
+    )
+
+    manager.run_turn(SimpleNamespace(message="try this evening", session_id="grace-revision"))
+    time.sleep(1.0)
+    revised = manager.run_turn(
+        SimpleNamespace(
+            message="sorry he may be late so call at 9am tomorrow",
+            session_id="grace-revision",
+        )
+    )
+
+    assert revised["conversation_manager"]["response_suppressed"] is False
+    assert runtime.calls == [
+        "try this evening",
+        "sorry he may be late so call at 9am tomorrow",
+    ]
+
+    time.sleep(2.2)
+    assert manager.debug_state("grace-revision")["conversation_closed"] is False
+
+    time.sleep(1.1)
+    assert manager.debug_state("grace-revision")["conversation_closed"] is True
+    assert runtime.finalized_sessions == ["grace-revision"]
 
 
 def test_voice_run_turn_then_barge_in_marks_interrupted(tmp_path: Path) -> None:

@@ -1,0 +1,24 @@
+[
+  {
+    "reference_number": "HOLD-295745D5D2",
+    "case_id": "COLL-1002",
+    "customer_id": "CUST-2002",
+    "program_id": "PREMIUM_HOLD_001",
+    "hold_months": 2,
+    "effective_from": "2026-06-12",
+    "effective_until": "2026-08-12",
+    "status": "active",
+    "created_at": "2026-06-12T03:39:51.241789+00:00"
+  },
+  {
+    "reference_number": "HOLD-2916C1CF0D",
+    "case_id": "COLL-1002",
+    "customer_id": "CUST-2002",
+    "program_id": "PREMIUM_HOLD_001",
+    "hold_months": 2,
+    "effective_from": "2026-06-12",
+    "effective_until": "2026-08-12",
+    "status": "active",
+    "created_at": "2026-06-12T03:53:55.154538+00:00"
+  }
+]

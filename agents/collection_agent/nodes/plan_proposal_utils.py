@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import UTC, datetime
 from typing import Any
 
 from src.nodes.types import AgentState
@@ -234,6 +235,189 @@ def normalize_callback_time(text: str) -> str:
         value,
     ).strip(" .")
     return value or str(text or "").strip()
+
+
+def mark_confirmation_delivered(memory: Any) -> dict[str, Any]:
+    """Complete confirmation and move the active plan to closing."""
+
+    memory_state = dict(getattr(memory, "state", {}))
+    plan = (
+        dict(memory_state.get("active_conversation_plan", {}))
+        if isinstance(memory_state.get("active_conversation_plan"), dict)
+        else {}
+    )
+    if not plan:
+        return {}
+
+    now = datetime.now(UTC).isoformat()
+    markers = dict(plan.get("step_markers", {})) if isinstance(plan.get("step_markers"), dict) else {}
+    markers["confirmation"] = {
+        "state": "done",
+        "updated_at": now,
+        "source": "response_render",
+        "reason": "agreed_outcome_and_reference_delivered",
+    }
+    markers["close_conversation"] = {
+        "state": "pending",
+        "updated_at": now,
+        "source": "response_render",
+        "reason": "awaiting_customer_closing_reply",
+    }
+
+    nodes = [dict(node) for node in plan.get("nodes", []) if isinstance(node, dict)]
+    for node in nodes:
+        node_id = str(node.get("id", "")).strip()
+        if node_id == "confirmation":
+            node["status"] = "done"
+        elif node_id == "close_conversation":
+            node["status"] = "in_progress"
+
+    plan["nodes"] = nodes
+    plan["step_markers"] = markers
+    plan["previous_node_id"] = "confirmation"
+    plan["current_node_id"] = "close_conversation"
+    plan["next_node_ids"] = []
+    plan["status"] = "active"
+    plan["updated_from"] = "response_render"
+    transition_update = {
+        "origin": "response_render",
+        "operation": "advance",
+        "mark_done": ["confirmation"],
+        "current_node_id": "close_conversation",
+    }
+
+    timeline = list(plan.get("timeline", [])) if isinstance(plan.get("timeline"), list) else []
+    timeline.append(
+        {
+            "at_utc": now,
+            "version": int(plan.get("version", 1) or 1),
+            "status": "active",
+            "current_node_id": "close_conversation",
+            "next_node_ids": [],
+            "update": transition_update,
+        }
+    )
+    plan["timeline"] = timeline[-40:]
+
+    snapshot_plan = {
+        "plan_id": str(plan.get("plan_id", "")),
+        "version": int(plan.get("version", 1) or 1),
+        "status": "active",
+        "mode": str(plan.get("mode", "strict_collections")),
+        "objective": str(plan.get("objective", "")),
+        "root_node_id": str(plan.get("root_node_id", "")),
+        "current_node_id": "close_conversation",
+        "previous_node_id": "confirmation",
+        "next_node_ids": [],
+        "nodes": [dict(node) for node in nodes],
+        "edges": [dict(edge) for edge in plan.get("edges", []) if isinstance(edge, dict)],
+        "step_markers": dict(markers),
+        "updated_from": "response_render",
+        "last_response_target": str(plan.get("last_response_target", "")),
+    }
+    snapshots = (
+        list(plan.get("timeline_snapshots", []))
+        if isinstance(plan.get("timeline_snapshots"), list)
+        else []
+    )
+    snapshots.append(
+        {
+            "at_utc": now,
+            "version": int(plan.get("version", 1) or 1),
+            "status": "active",
+            "current_node_id": "close_conversation",
+            "update": dict(transition_update),
+            "plan": snapshot_plan,
+        }
+    )
+    plan["timeline_snapshots"] = snapshots[-80:]
+    memory.set_state(active_conversation_plan=plan)
+    return plan
+
+
+def finalize_conversation_memory(memory: Any) -> None:
+    """Marks the active plan and session closed after transport grace expires."""
+
+    memory_state = dict(getattr(memory, "state", {}))
+    plan = (
+        dict(memory_state.get("active_conversation_plan", {}))
+        if isinstance(memory_state.get("active_conversation_plan"), dict)
+        else {}
+    )
+    if plan:
+        now = datetime.now(UTC).isoformat()
+        markers = dict(plan.get("step_markers", {})) if isinstance(plan.get("step_markers"), dict) else {}
+        markers["close_conversation"] = {
+            "state": "done",
+            "updated_at": now,
+            "source": "conversation_manager_timer",
+            "reason": "termination_grace_period_elapsed",
+        }
+        nodes = [dict(node) for node in plan.get("nodes", []) if isinstance(node, dict)]
+        for node in nodes:
+            if str(node.get("id", "")).strip() == "close_conversation":
+                node["status"] = "done"
+        plan["nodes"] = nodes
+        plan["step_markers"] = markers
+        plan["current_node_id"] = "close_conversation"
+        plan["next_node_ids"] = []
+        plan["status"] = "completed"
+        plan["updated_from"] = "conversation_manager_timer"
+        completion_update = {
+            "origin": "conversation_manager_timer",
+            "operation": "complete",
+            "current_node_id": "close_conversation",
+        }
+        timeline = list(plan.get("timeline", [])) if isinstance(plan.get("timeline"), list) else []
+        timeline.append(
+            {
+                "at_utc": now,
+                "version": int(plan.get("version", 1) or 1),
+                "status": "completed",
+                "current_node_id": "close_conversation",
+                "next_node_ids": [],
+                "update": completion_update,
+            }
+        )
+        plan["timeline"] = timeline[-40:]
+
+        snapshot_plan = {
+            "plan_id": str(plan.get("plan_id", "")),
+            "version": int(plan.get("version", 1) or 1),
+            "status": "completed",
+            "mode": str(plan.get("mode", "strict_collections")),
+            "objective": str(plan.get("objective", "")),
+            "root_node_id": str(plan.get("root_node_id", "")),
+            "current_node_id": "close_conversation",
+            "previous_node_id": plan.get("previous_node_id"),
+            "next_node_ids": [],
+            "nodes": [dict(node) for node in nodes],
+            "edges": [dict(edge) for edge in plan.get("edges", []) if isinstance(edge, dict)],
+            "step_markers": dict(markers),
+            "updated_from": "conversation_manager_timer",
+            "last_response_target": str(plan.get("last_response_target", "")),
+        }
+        snapshots_raw = plan.get("timeline_snapshots")
+        snapshots = list(snapshots_raw) if isinstance(snapshots_raw, list) else []
+        snapshots.append(
+            {
+                "at_utc": now,
+                "version": int(plan.get("version", 1) or 1),
+                "status": "completed",
+                "current_node_id": "close_conversation",
+                "update": dict(completion_update),
+                "plan": snapshot_plan,
+            }
+        )
+        plan["timeline_snapshots"] = snapshots[-80:]
+
+    memory.set_state(
+        active_conversation_plan=plan or memory_state.get("active_conversation_plan"),
+        conversation_complete=True,
+        conversation_closing=False,
+        conversation_closed=True,
+        terminate_call=False,
+    )
 
 
 def is_provider_rate_limit_error(error_text: str) -> bool:

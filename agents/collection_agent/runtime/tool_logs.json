@@ -5820,5 +5820,309 @@
     "status": "completed",
     "error": null,
     "created_at": "2026-06-10T03:27:32.542918Z"
+  },
+  {
+    "id": "886989b5-9807-4c21-803e-c8f9d60e4ff8",
+    "tool_name": "verify_dob",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "dob": "1988-04-22"
+    },
+    "output_payload": {
+      "customer_id": "CUST-2002",
+      "status": "verified",
+      "field": "dob",
+      "failed_attempts": 0
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-11T18:35:01.510949Z"
+  },
+  {
+    "id": "6264f7d2-6c48-43a1-9927-a0243d21bcaf",
+    "tool_name": "verify_mobile",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "phone": "9900001002"
+    },
+    "output_payload": {
+      "customer_id": "CUST-2002",
+      "status": "verified",
+      "field": "phone",
+      "failed_attempts": 1
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-11T18:35:02.077520Z"
+  },
+  {
+    "id": "3d68b279-7401-4a74-8750-cce39c10d6e5",
+    "tool_name": "verify_dob",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "dob": "1988-04-22"
+    },
+    "output_payload": {
+      "customer_id": "CUST-2002",
+      "status": "verified",
+      "field": "dob",
+      "failed_attempts": 0
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-11T19:10:40.812817Z"
+  },
+  {
+    "id": "3365ce60-9817-4af4-961b-d2ba6b0f76f0",
+    "tool_name": "verify_mobile",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "phone": "9900001002"
+    },
+    "output_payload": {
+      "customer_id": "CUST-2002",
+      "status": "verified",
+      "field": "phone",
+      "failed_attempts": 1
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-11T19:10:41.380336Z"
+  },
+  {
+    "id": "3ea34770-54c0-46ba-8c1d-1cee74e24d5d",
+    "tool_name": "verify_dob",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "dob": "1988-04-22"
+    },
+    "output_payload": {
+      "customer_id": "CUST-2002",
+      "status": "verified",
+      "field": "dob",
+      "failed_attempts": 0
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-12T03:17:50.374557Z"
+  },
+  {
+    "id": "74058469-8002-4f68-abad-8629196553fe",
+    "tool_name": "verify_mobile",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "phone": "9900001002"
+    },
+    "output_payload": {
+      "customer_id": "CUST-2002",
+      "status": "verified",
+      "field": "phone",
+      "failed_attempts": 1
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-12T03:17:50.919752Z"
+  },
+  {
+    "id": "42f56d8f-b112-4e08-b757-4cf97e788644",
+    "tool_name": "verify_dob",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "dob": "1988-04-22"
+    },
+    "output_payload": {
+      "customer_id": "CUST-2002",
+      "status": "verified",
+      "field": "dob",
+      "failed_attempts": 0
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-12T03:36:23.694230Z"
+  },
+  {
+    "id": "5d4a4fb4-1ea0-40ca-bc03-371a452463cb",
+    "tool_name": "verify_mobile",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "phone": "9900001002"
+    },
+    "output_payload": {
+      "customer_id": "CUST-2002",
+      "status": "verified",
+      "field": "phone",
+      "failed_attempts": 1
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-12T03:36:24.264017Z"
+  },
+  {
+    "id": "37a70162-b9e8-4c12-a2bc-e454feee003d",
+    "tool_name": "premium_hold_create",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "program_id": "PREMIUM_HOLD_001",
+      "hold_months": 2
+    },
+    "output_payload": {
+      "reference_number": "HOLD-295745D5D2",
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "program_id": "PREMIUM_HOLD_001",
+      "hold_months": 2,
+      "effective_from": "2026-06-12",
+      "effective_until": "2026-08-12",
+      "status": "active"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-12T03:39:51.240788Z"
+  },
+  {
+    "id": "c50cc733-6e1e-49e9-a42d-3cf02d4beda6",
+    "tool_name": "sms_confirmation_send",
+    "input_payload": {
+      "customer_id": "CUST-2002",
+      "reference_number": "HOLD-295745D5D2",
+      "message": "Your premium hold has been arranged. Reference: HOLD-295745D5D2. The hold is active until 2026-08-12."
+    },
+    "output_payload": {
+      "message_id": "SMS-67747C7449",
+      "customer_id": "CUST-2002",
+      "reference_number": "HOLD-295745D5D2",
+      "recipient": "+919900001002",
+      "status": "sent"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-12T03:39:51.808528Z"
+  },
+  {
+    "id": "90b87827-8f3a-441d-a292-05c17f4b14aa",
+    "tool_name": "email_confirmation_send",
+    "input_payload": {
+      "customer_id": "CUST-2002",
+      "reference_number": "HOLD-295745D5D2",
+      "subject": "Premium hold confirmation",
+      "message": "Your premium hold has been arranged. Reference: HOLD-295745D5D2. The hold is active until 2026-08-12."
+    },
+    "output_payload": {
+      "message_id": "EMAIL-72D57B70B7",
+      "customer_id": "CUST-2002",
+      "reference_number": "HOLD-295745D5D2",
+      "recipient": "rohan.gupta@example.com",
+      "status": "sent"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-12T03:39:52.375004Z"
+  },
+  {
+    "id": "35005406-dd9e-45ca-9dd6-ae2425d70ea7",
+    "tool_name": "verify_dob",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "dob": "1988-04-22"
+    },
+    "output_payload": {
+      "customer_id": "CUST-2002",
+      "status": "verified",
+      "field": "dob",
+      "failed_attempts": 0
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-12T03:51:32.297854Z"
+  },
+  {
+    "id": "3c63b25e-3d76-45b0-8a38-ac319906798e",
+    "tool_name": "verify_mobile",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "phone": "9900001002"
+    },
+    "output_payload": {
+      "customer_id": "CUST-2002",
+      "status": "verified",
+      "field": "phone",
+      "failed_attempts": 1
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-12T03:51:32.842065Z"
+  },
+  {
+    "id": "325cde23-f30d-4ae0-ac89-a904e5733394",
+    "tool_name": "premium_hold_create",
+    "input_payload": {
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "program_id": "PREMIUM_HOLD_001",
+      "hold_months": 2
+    },
+    "output_payload": {
+      "reference_number": "HOLD-2916C1CF0D",
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "program_id": "PREMIUM_HOLD_001",
+      "hold_months": 2,
+      "effective_from": "2026-06-12",
+      "effective_until": "2026-08-12",
+      "status": "active"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-12T03:53:55.154538Z"
+  },
+  {
+    "id": "8cf3d33c-2b36-43d7-9714-33787921bc7a",
+    "tool_name": "sms_confirmation_send",
+    "input_payload": {
+      "customer_id": "CUST-2002",
+      "reference_number": "HOLD-2916C1CF0D",
+      "message": "Your premium hold has been arranged. Reference: HOLD-2916C1CF0D. The hold is active until 2026-08-12."
+    },
+    "output_payload": {
+      "message_id": "SMS-CE4596C016",
+      "customer_id": "CUST-2002",
+      "reference_number": "HOLD-2916C1CF0D",
+      "recipient": "+919900001002",
+      "status": "sent"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-12T03:53:55.742336Z"
+  },
+  {
+    "id": "d22e3bc7-2f6e-465e-92cb-06e3104a082b",
+    "tool_name": "email_confirmation_send",
+    "input_payload": {
+      "customer_id": "CUST-2002",
+      "reference_number": "HOLD-2916C1CF0D",
+      "subject": "Premium hold confirmation",
+      "message": "Your premium hold has been arranged. Reference: HOLD-2916C1CF0D. The hold is active until 2026-08-12."
+    },
+    "output_payload": {
+      "message_id": "EMAIL-734D4D02F5",
+      "customer_id": "CUST-2002",
+      "reference_number": "HOLD-2916C1CF0D",
+      "recipient": "rohan.gupta@example.com",
+      "status": "sent"
+    },
+    "status": "completed",
+    "error": null,
+    "created_at": "2026-06-12T03:53:56.314683Z"
   }
 ]

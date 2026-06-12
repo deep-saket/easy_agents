@@ -26,6 +26,7 @@ from pydantic import BaseModel, Field
 
 from agents.collection_agent.agent import CollectionAgent
 from agents.collection_agent.main import DEFAULT_CONFIG_PATH, build_llm, load_collection_config, load_env_file
+from agents.collection_agent.nodes.plan_proposal_utils import finalize_conversation_memory
 from agents.collection_agent.repository import CollectionRepository
 from agents.collection_agent.tools.data_store import CollectionDataStore
 from agents.collection_memory_helper_agent.agent import CollectionMemoryHelperAgent
@@ -73,6 +74,7 @@ class RunTurnRequest(BaseModel):
     hard_cap: int = Field(default=50, ge=1)
     timeout_seconds: float = Field(default=20.0, ge=1.0)
     sender: str = Field(default="customer", description="customer|admin")
+    client_request_id: str | None = Field(default=None)
 
 
 class SessionStateResponse(BaseModel):
@@ -549,6 +551,11 @@ class CollectionDebugRuntime:
                     "session_id": session_id,
                     "final_response": response,
                     "final_target": "customer",
+                    "conversation_complete": bool(state.get("conversation_complete", False)),
+                    "conversation_closing": bool(state.get("conversation_closing", False)),
+                    "conversation_closed": bool(state.get("conversation_closed", False)),
+                    "terminate_call": bool(state.get("terminate_call", False)),
+                    "termination_grace_seconds": float(state.get("termination_grace_seconds", 0.0) or 0.0),
                     "hops": hops,
                     "final_state": self._sanitize_state(state),
                     "final_working_memory_state": self._memory_state(session_id=session_id),
@@ -752,6 +759,10 @@ class CollectionDebugRuntime:
             conversation_state=_json_safe(state),
             working_memory_state=self._memory_state(session_id=sid),
         )
+
+    def finalize_conversation(self, session_id: str) -> None:
+        memory = self.collection_agent.session_store.load(session_id)
+        finalize_conversation_memory(memory)
 
     def _run_memory_helper_if_requested(self, *, session_id: str, state: dict[str, Any]) -> dict[str, Any] | None:
         targets = state.get("additional_targets")

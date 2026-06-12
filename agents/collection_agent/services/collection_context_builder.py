@@ -28,7 +28,8 @@ class CollectionContextBuilder:
         payment_history = self.store.get_payment_history(resolved_customer_id) or {}
         offer_history = self.store.get_offer_history(case_id) or {}
         assistance_programs = self.store.get_assistance_programs(
-            product=str(case_row.get("product", "")).strip() or None
+            product=str(case_row.get("product", "")).strip() or None,
+            loan_id=loan_id or None,
         )
 
         return {

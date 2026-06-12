@@ -180,6 +180,53 @@ class PromiseCaptureOutput(BaseModel):
     status: str
 
 
+class PremiumHoldCreateInput(BaseModel):
+    case_id: str
+    customer_id: str
+    program_id: str
+    hold_months: int = Field(ge=1, le=12)
+
+
+class PremiumHoldCreateOutput(BaseModel):
+    reference_number: str
+    case_id: str
+    customer_id: str
+    program_id: str
+    hold_months: int
+    effective_from: str
+    effective_until: str
+    status: Literal["active"]
+
+
+class SMSConfirmationSendInput(BaseModel):
+    customer_id: str
+    reference_number: str
+    message: str
+
+
+class SMSConfirmationSendOutput(BaseModel):
+    message_id: str
+    customer_id: str
+    reference_number: str
+    recipient: str
+    status: Literal["sent"]
+
+
+class EmailConfirmationSendInput(BaseModel):
+    customer_id: str
+    reference_number: str
+    subject: str
+    message: str
+
+
+class EmailConfirmationSendOutput(BaseModel):
+    message_id: str
+    customer_id: str
+    reference_number: str
+    recipient: str
+    status: Literal["sent"]
+
+
 class FollowupScheduleInput(BaseModel):
     case_id: str
     scheduled_for: str
@@ -193,6 +240,39 @@ class FollowupScheduleOutput(BaseModel):
     scheduled_for: str
     preferred_channel: str
     reason: str
+
+
+class OutboundCallbackScheduleInput(BaseModel):
+    case_id: str
+    customer_id: str
+    session_id: str
+    callback_time: str
+    timezone: str = "Asia/Kolkata"
+    phone: str | None = None
+    max_retries: int = Field(default=3, ge=0, le=10)
+
+
+class OutboundCallbackScheduleOutput(BaseModel):
+    job_id: str
+    case_id: str
+    customer_id: str
+    session_id: str
+    scheduled_for: datetime
+    timezone: str
+    phone: str
+    status: Literal["scheduled", "duplicate", "expired"]
+    retry_count: int = 0
+
+
+class OutboundCallbackCancelInput(BaseModel):
+    job_id: str | None = None
+    case_id: str | None = None
+    reason: str = "cancelled_by_agent"
+
+
+class OutboundCallbackCancelOutput(BaseModel):
+    cancelled_job_ids: list[str] = Field(default_factory=list)
+    status: Literal["cancelled", "not_found"]
 
 
 class DispositionUpdateInput(BaseModel):

@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+from agents.collection_agent.nodes.callback_time_extractor import extract_callback_time
 from agents.collection_agent.nodes.plan_proposal_utils import (
     effective_mode,
     fresh_debug_state,
@@ -14,7 +15,6 @@ from agents.collection_agent.nodes.plan_proposal_utils import (
     is_conversation_termination,
     is_right_party_denial,
     looks_like_callback_time,
-    normalize_callback_time,
     latest_observation,
     overlay_negotiation_state_from_graph,
     overlay_verification_state_from_graph,
@@ -223,6 +223,24 @@ class PlanProposalGraphNode(BaseGraphNode):
                 if callback_confirmed_now or callback_already_completed
                 else "wrong_party_callback"
             )
+        elif bool(memory_state.get("identity_verified", False)):
+            hold_stage = str(memory_state.get("hardship_hold_stage", "")).strip().lower()
+            hardship_context = (
+                memory_state.get("hardship_context")
+                if isinstance(memory_state.get("hardship_context"), dict)
+                else {}
+            )
+            hardship_active = bool(hardship_context.get("hardship_detected", False))
+            if hold_stage == "confirmed" and self._is_hold_closing_reply(user_input):
+                inferred_next = "close_conversation"
+            elif hold_stage == "confirmed":
+                inferred_next = "confirmation"
+            elif hold_stage == "offered" and self._is_affirmative(user_input):
+                inferred_next = "confirmation"
+            elif hardship_active and self._has_eligible_premium_hold(memory_state):
+                inferred_next = "resolution_offer"
+            elif previous_current in {"open_and_context", "verify_identity", "explain_dues"}:
+                inferred_next = "purpose_disclosure"
         self._apply_plan_tree_update(plan=plan, plan_update=plan_update)
         markers = self._init_or_reconcile_step_markers(plan=plan)
         if right_party_status == "wrong_party":
@@ -253,6 +271,11 @@ class PlanProposalGraphNode(BaseGraphNode):
             observed_tool=observed_tool,
             observed_output=(observed_output if isinstance(observed_output, dict) else {}),
         )
+        self._reconcile_canonical_stage_markers(
+            plan=plan,
+            candidate=inferred_next,
+            identity_verified=bool(memory_state.get("identity_verified", False)),
+        )
         self._remove_verify_identity_node_if_verified(
             plan=plan,
             identity_verified=bool(memory_state.get("identity_verified", False)),
@@ -263,6 +286,14 @@ class PlanProposalGraphNode(BaseGraphNode):
             previous_current=previous_current,
             candidate=inferred_next,
             markers=markers,
+        )
+        callback_flow_completed = (
+            callback_confirmed_now
+            or (
+                right_party_status == "wrong_party"
+                and wrong_party_callback_stage == "completed"
+                and bool(str(memory_state.get("wrong_party_callback_time", "")).strip())
+            )
         )
         root_id = str(plan.get("root_node_id", "open_and_context")).strip() or "open_and_context"
         if next_current != root_id and self._marker_state(markers=markers, node_id=root_id) == "pending":
@@ -316,14 +347,7 @@ class PlanProposalGraphNode(BaseGraphNode):
         else:
             plan["status"] = (
                 "completed"
-                if (
-                    is_conversation_termination(user_input)
-                    or callback_confirmed_now
-                    or (
-                        wrong_party_callback_stage == "completed"
-                        and bool(str(memory_state.get("wrong_party_callback_time", "")).strip())
-                    )
-                )
+                if is_conversation_termination(user_input) and not callback_flow_completed
                 else "active"
             )
         self._append_timeline_snapshot(
@@ -354,7 +378,7 @@ class PlanProposalGraphNode(BaseGraphNode):
             return
 
         normalized_input = re.sub(r"\s+", " ", user_input.strip().lower())
-        callback_time = normalize_callback_time(user_input) if looks_like_callback_time(user_input) else ""
+        callback_time = extract_callback_time(user_input) if looks_like_callback_time(user_input) else ""
         memory_state["right_party_status"] = "wrong_party"
         memory_state["wrong_party_callback_stage"] = (
             "completed"
@@ -383,6 +407,10 @@ class PlanProposalGraphNode(BaseGraphNode):
             "wrong_party_detected_no_verification_allowed",
         )
         for node_id in (
+            "purpose_disclosure",
+            "discovery_empathy",
+            "resolution_offer",
+            "confirmation",
             "explain_dues",
             "collect_payment_intent",
             "evaluate_assistance",
@@ -417,6 +445,122 @@ class PlanProposalGraphNode(BaseGraphNode):
             plan["step_markers"] = markers
 
     @staticmethod
+    def _has_eligible_premium_hold(memory_state: dict[str, Any]) -> bool:
+        context = (
+            memory_state.get("active_collection_context")
+            if isinstance(memory_state.get("active_collection_context"), dict)
+            else {}
+        )
+        case = context.get("case") if isinstance(context.get("case"), dict) else {}
+        loan_id = str(case.get("loan_id", memory_state.get("active_loan_id", ""))).strip().upper()
+        hardship_context = (
+            memory_state.get("hardship_context")
+            if isinstance(memory_state.get("hardship_context"), dict)
+            else {}
+        )
+        hardship_reason = str(
+            hardship_context.get("hardship_reason", memory_state.get("hardship_reason", ""))
+        ).strip().lower()
+        programs = (
+            memory_state.get("assistance_programs")
+            if isinstance(memory_state.get("assistance_programs"), list)
+            else []
+        )
+        for program in programs:
+            if not isinstance(program, dict):
+                continue
+            if str(program.get("program_type", "")).strip().lower() != "premium_hold":
+                continue
+            eligible_loan_ids = {
+                str(item).strip().upper()
+                for item in program.get("eligible_loan_ids", [])
+                if str(item).strip()
+            } if isinstance(program.get("eligible_loan_ids"), list) else set()
+            hardship_reasons = {
+                str(item).strip().lower()
+                for item in program.get("hardship_reasons", [])
+                if str(item).strip()
+            } if isinstance(program.get("hardship_reasons"), list) else set()
+            if eligible_loan_ids and loan_id not in eligible_loan_ids:
+                continue
+            if hardship_reasons and hardship_reason not in hardship_reasons:
+                continue
+            return True
+        return False
+
+    @staticmethod
+    def _is_affirmative(text: str) -> bool:
+        normalized = re.sub(r"[^a-z0-9\s]", " ", str(text).lower())
+        normalized = re.sub(r"\s+", " ", normalized).strip()
+        return any(
+            phrase in normalized
+            for phrase in (
+                "yes",
+                "that would help",
+                "would really help",
+                "sounds good",
+                "i agree",
+                "please do",
+                "go ahead",
+                "okay",
+                "ok",
+            )
+        )
+
+    @staticmethod
+    def _is_hold_closing_reply(text: str) -> bool:
+        normalized = re.sub(r"[^a-z0-9\s]", " ", str(text).lower())
+        normalized = re.sub(r"\s+", " ", normalized).strip()
+        return any(
+            phrase in normalized
+            for phrase in (
+                "no thank",
+                "no thanks",
+                "nothing else",
+                "that is all",
+                "that's all",
+                "thank you",
+                "thanks",
+                "bye",
+                "goodbye",
+            )
+        )
+
+    @staticmethod
+    def _reconcile_canonical_stage_markers(
+        *,
+        plan: dict[str, Any],
+        candidate: str,
+        identity_verified: bool,
+    ) -> None:
+        if not identity_verified:
+            return
+        markers = plan.get("step_markers") if isinstance(plan.get("step_markers"), dict) else {}
+        now = datetime.now(UTC).isoformat()
+
+        def mark_done(node_id: str, reason: str) -> None:
+            if node_id not in {
+                str(node.get("id", "")).strip()
+                for node in plan.get("nodes", [])
+                if isinstance(node, dict)
+            }:
+                return
+            markers[node_id] = {
+                "state": "done",
+                "updated_at": now,
+                "source": "canonical_flow",
+                "reason": reason,
+            }
+
+        if candidate in {"discovery_empathy", "resolution_offer", "confirmation"}:
+            mark_done("purpose_disclosure", "purpose_disclosed_before_resolution")
+        if candidate in {"resolution_offer", "confirmation"}:
+            mark_done("discovery_empathy", "hardship_acknowledged")
+        if candidate == "confirmation":
+            mark_done("resolution_offer", "eligible_offer_accepted")
+        plan["step_markers"] = markers
+
+    @staticmethod
     def _create_initial_plan_graph(*, memory_state: dict[str, Any], mode: str) -> dict[str, Any]:
         case_id = str(memory_state.get("active_case_id", "COLL-1001")).strip().upper() or "COLL-1001"
         identity_verified = bool(memory_state.get("identity_verified", False))
@@ -424,7 +568,11 @@ class PlanProposalGraphNode(BaseGraphNode):
             {"id": "open_and_context", "label": "Initialize case context", "owner": "collection_agent", "status": "in_progress"},
             {"id": "verify_identity", "label": "Verify customer identity", "owner": "customer", "status": ("done" if identity_verified else "pending")},
             {"id": "wrong_party_callback", "label": "Arrange privacy-safe callback", "owner": "collection_agent", "status": "pending"},
-            {"id": "explain_dues", "label": "Explain dues and policy options", "owner": "customer", "status": "pending"},
+            {"id": "purpose_disclosure", "label": "Disclose call purpose and overdue installment", "owner": "collection_agent", "status": "pending"},
+            {"id": "discovery_empathy", "label": "Understand and acknowledge customer situation", "owner": "collection_agent", "status": "pending"},
+            {"id": "resolution_offer", "label": "Present eligible resolution option", "owner": "collection_agent", "status": "pending"},
+            {"id": "confirmation", "label": "Confirm agreed outcome and reference", "owner": "collection_agent", "status": "pending"},
+            {"id": "explain_dues", "label": "Explain standard payment options", "owner": "customer", "status": "pending"},
             {"id": "collect_payment_intent", "label": "Collect payment intent", "owner": "customer", "status": "pending"},
             {"id": "evaluate_assistance", "label": "Evaluate discount/restructure assistance", "owner": "collection_agent", "status": "pending"},
             {"id": "resolve_outcome", "label": "Finalize payment, promise, or follow-up", "owner": "customer", "status": "pending"},
@@ -432,8 +580,13 @@ class PlanProposalGraphNode(BaseGraphNode):
         ]
         edges = [
             {"from": "open_and_context", "to": "verify_identity", "condition": "case_context_ready"},
-            {"from": "verify_identity", "to": "explain_dues", "condition": "identity_verified"},
+            {"from": "verify_identity", "to": "purpose_disclosure", "condition": "identity_verified"},
             {"from": "verify_identity", "to": "wrong_party_callback", "condition": "wrong_party_detected"},
+            {"from": "purpose_disclosure", "to": "discovery_empathy", "condition": "customer_situation_shared"},
+            {"from": "purpose_disclosure", "to": "explain_dues", "condition": "standard_resolution_requested"},
+            {"from": "discovery_empathy", "to": "resolution_offer", "condition": "eligible_assistance_found"},
+            {"from": "resolution_offer", "to": "confirmation", "condition": "offer_accepted"},
+            {"from": "confirmation", "to": "close_conversation", "condition": "outcome_confirmed"},
             {"from": "explain_dues", "to": "collect_payment_intent", "condition": "dues_explained"},
             {"from": "collect_payment_intent", "to": "resolve_outcome", "condition": "pay_now"},
             {"from": "collect_payment_intent", "to": "evaluate_assistance", "condition": "cannot_pay_full"},
@@ -441,7 +594,7 @@ class PlanProposalGraphNode(BaseGraphNode):
             {"from": "wrong_party_callback", "to": "close_conversation", "condition": "callback_confirmed"},
             {"from": "resolve_outcome", "to": "close_conversation", "condition": "outcome_confirmed"},
         ]
-        next_node_ids = ["verify_identity"] if not identity_verified else ["explain_dues"]
+        next_node_ids = ["verify_identity"] if not identity_verified else ["purpose_disclosure"]
         return {
             "plan_id": f"plan-{case_id}",
             "version": 1,
@@ -477,6 +630,30 @@ class PlanProposalGraphNode(BaseGraphNode):
                 "owner": "collection_agent",
                 "status": "pending",
             },
+            {
+                "id": "purpose_disclosure",
+                "label": "Disclose call purpose and overdue installment",
+                "owner": "collection_agent",
+                "status": "pending",
+            },
+            {
+                "id": "discovery_empathy",
+                "label": "Understand and acknowledge customer situation",
+                "owner": "collection_agent",
+                "status": "pending",
+            },
+            {
+                "id": "resolution_offer",
+                "label": "Present eligible resolution option",
+                "owner": "collection_agent",
+                "status": "pending",
+            },
+            {
+                "id": "confirmation",
+                "label": "Confirm agreed outcome and reference",
+                "owner": "collection_agent",
+                "status": "pending",
+            },
         ]
         for node in additions:
             if node["id"] not in node_ids:
@@ -490,6 +667,12 @@ class PlanProposalGraphNode(BaseGraphNode):
         }
         additions_edges = [
             {"from": "verify_identity", "to": "wrong_party_callback", "condition": "wrong_party_detected"},
+            {"from": "verify_identity", "to": "purpose_disclosure", "condition": "identity_verified"},
+            {"from": "purpose_disclosure", "to": "discovery_empathy", "condition": "customer_situation_shared"},
+            {"from": "purpose_disclosure", "to": "explain_dues", "condition": "standard_resolution_requested"},
+            {"from": "discovery_empathy", "to": "resolution_offer", "condition": "eligible_assistance_found"},
+            {"from": "resolution_offer", "to": "confirmation", "condition": "offer_accepted"},
+            {"from": "confirmation", "to": "close_conversation", "condition": "outcome_confirmed"},
             {"from": "wrong_party_callback", "to": "close_conversation", "condition": "callback_confirmed"},
             {"from": "resolve_outcome", "to": "close_conversation", "condition": "outcome_confirmed"},
         ]
@@ -636,7 +819,14 @@ class PlanProposalGraphNode(BaseGraphNode):
 
         previous_current = nearest_unlocked(previous_current)
         allowed_next = self._next_nodes_from_edges(nodes=plan.get("edges", []), current_node_id=previous_current)
-        if candidate in {"wrong_party_callback", "close_conversation"} and is_actionable(candidate):
+        if candidate in {
+            "wrong_party_callback",
+            "close_conversation",
+            "purpose_disclosure",
+            "discovery_empathy",
+            "resolution_offer",
+            "confirmation",
+        } and is_actionable(candidate):
             return candidate
         if not allowed_next:
             if is_actionable(candidate):

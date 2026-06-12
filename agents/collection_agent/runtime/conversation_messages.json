@@ -1752,32 +1752,81 @@
   ],
   "collection-user_b": [
     {
-      "id": "393c4d00-c1f1-440f-9ef2-5ea9c8eaaddd",
+      "id": "26dc147f-c553-4cbe-aed3-437515aa26cb",
       "session_id": "collection-user_b",
       "role": "customer",
-      "content": "no",
-      "created_at": "2026-06-10T09:07:20.687442Z"
+      "content": "yes I'm",
+      "created_at": "2026-06-12T03:50:16.870955Z"
     },
     {
-      "id": "1fefa9d8-a79d-40dd-be5f-264a93056057",
+      "id": "7c61f856-2f32-4aea-ad97-9050ae930f48",
       "session_id": "collection-user_b",
       "role": "agent",
-      "content": "Thank you. For privacy reasons, I can only discuss this directly with Rohan Gupta. I am unable to share any details with anyone else.",
-      "created_at": "2026-06-10T09:07:57.086652Z"
+      "content": "For your privacy and security, I need to verify a few details before we proceed. Could you please provide your date of birth and phone number?",
+      "created_at": "2026-06-12T03:51:08.552148Z"
     },
     {
-      "id": "bc3e647d-9f0a-493a-9886-597065ee99ce",
+      "id": "a89c9415-38e3-4ce2-a443-07f09dc02d09",
       "session_id": "collection-user_b",
       "role": "customer",
-      "content": "he is not here now, please try at 5:30pm in evening today",
-      "created_at": "2026-06-10T10:03:00.407624Z"
+      "content": "My phone number is : 9900001002 and date of birth is 1988-04-22",
+      "created_at": "2026-06-12T03:51:17.421826Z"
     },
     {
-      "id": "4923f463-15aa-4834-bce7-324c8c4f3771",
+      "id": "60c08a98-4586-4ca2-80aa-c584e3ff7e40",
       "session_id": "collection-user_b",
       "role": "agent",
-      "content": "Thank you. I will try to reach Rohan Gupta he is not here now, please try at 5:30pm in evening today. Please let them know that EasySecure Financial Services called. Thank you for your help, and have a good day. Goodbye.",
-      "created_at": "2026-06-10T10:03:54.793945Z"
+      "content": "Thank you for confirming. I am calling about your policy LOAN-3002. A premium installment of 37800.00, due on 2026-06-10, is currently overdue. I wanted to check in and see how I can help.",
+      "created_at": "2026-06-12T03:52:16.293489Z"
+    },
+    {
+      "id": "dafa6b6c-6294-4bd8-ad5d-5d2743460413",
+      "session_id": "collection-user_b",
+      "role": "customer",
+      "content": "i recently lost my job",
+      "created_at": "2026-06-12T03:52:40.498582Z"
+    },
+    {
+      "id": "58595459-2f1a-4121-ba7e-b467f6e78b1b",
+      "session_id": "collection-user_b",
+      "role": "agent",
+      "content": "I am really sorry to hear that, and thank you for letting me know. The most important thing right now is keeping your cover active while you get back on your feet. Given your situation, I can place your premium on hold for up to 2 months, with no impact to your policy benefits during that time. Would that give you the breathing room you need?",
+      "created_at": "2026-06-12T03:53:20.066228Z"
+    },
+    {
+      "id": "c25856d4-94c8-415f-8aaa-97e39211bf75",
+      "session_id": "collection-user_b",
+      "role": "customer",
+      "content": "yes please",
+      "created_at": "2026-06-12T03:53:40.643061Z"
+    },
+    {
+      "id": "9957ad6c-c662-44fb-b0dc-a4f84b01f444",
+      "session_id": "collection-user_b",
+      "role": "agent",
+      "content": "I have arranged a 2-month hold on your installment. Your reference number is HOLD-2916C1CF0D. Confirmation has been sent by SMS and email. We will reach out a few days before the hold ends to discuss next steps.",
+      "created_at": "2026-06-12T03:54:24.433165Z"
+    },
+    {
+      "id": "02f8f00e-e389-455e-9e30-35cb7b0127cb",
+      "session_id": "collection-user_b",
+      "role": "customer",
+      "content": "sure thanks",
+      "created_at": "2026-06-12T03:55:00.595522Z"
+    },
+    {
+      "id": "8cc53258-d951-4707-8473-462a150f40f8",
+      "session_id": "collection-user_b",
+      "role": "customer",
+      "content": "The customer interrupted while the previous turn was still processing.\nPrevious interrupted customer message: sure thanks\nLatest customer message: sure\nUse the latest message as authoritative, but keep the interrupted message as immediate context.",
+      "created_at": "2026-06-12T03:59:41.916365Z"
+    },
+    {
+      "id": "bb23a25c-c751-4ab7-b89d-d2cc717108dd",
+      "session_id": "collection-user_b",
+      "role": "agent",
+      "content": "Thank you for your time, Rohan Gupta. Take care, and we wish you all the best. Goodbye.",
+      "created_at": "2026-06-12T04:00:19.096908Z"
     }
   ]
 }

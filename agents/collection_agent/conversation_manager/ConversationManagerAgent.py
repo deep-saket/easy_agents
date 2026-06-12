@@ -50,6 +50,10 @@ class _SessionControlState:
     interrupted_request_id: str | None = None
     interrupted_customer_input: str | None = None
     interruption_handoff: dict[str, Any] | None = None
+    conversation_closing: bool = False
+    conversation_closed: bool = False
+    termination_grace_seconds: float = 3.0
+    closure_timer: threading.Timer | None = None
 
 
 class ConversationManagerAgent:
@@ -165,6 +169,11 @@ class ConversationManagerAgent:
     ) -> dict[str, Any]:
         session_id = str(getattr(request, "session_id", "")).strip() or "conversation-manager-session"
         customer_input = str(getattr(request, "message", "")).strip()
+        with self._lock:
+            session = self._session_state_for(session_id)
+            if session.conversation_closed:
+                return self._closed_turn_payload(session_id=session_id)
+            self._cancel_pending_closure_locked(session)
         customer_input_id = self._next_id("MSG")
         request_id = self._next_id("REQ")
         superseded_request_id: str | None = None
@@ -290,6 +299,11 @@ class ConversationManagerAgent:
                 "response_suppressed": is_superseded,
                 "interruption_handoff": interruption_handoff,
                 "downstream_customer_input": str(getattr(downstream_request, "message", "")).strip(),
+                "conversation_complete": bool(payload.get("conversation_complete", False)),
+                "conversation_closing": bool(payload.get("conversation_closing", False)),
+                "conversation_closed": bool(payload.get("conversation_closed", False)),
+                "terminate_call": bool(payload.get("terminate_call", False)),
+                "termination_grace_seconds": float(payload.get("termination_grace_seconds", 0.0) or 0.0),
             }
         )
 
@@ -361,6 +375,18 @@ class ConversationManagerAgent:
 
         final_payload = dict(payload)
         final_payload["conversation_manager"] = conversation_manager
+        if bool(payload.get("terminate_call", False)):
+            grace_seconds = max(
+                float(payload.get("termination_grace_seconds", self.config.termination_grace_seconds) or 0.0),
+                float(self.config.termination_grace_seconds),
+                3.0,
+            )
+            with self._lock:
+                session = self._session_state_for(session_id)
+                session.conversation_closing = True
+                session.termination_grace_seconds = grace_seconds
+            if delivery_mode == "text":
+                self._schedule_session_closure(session_id=session_id, grace_seconds=grace_seconds)
         self._write_log(conversation_manager)
         return final_payload
 
@@ -522,6 +548,9 @@ class ConversationManagerAgent:
                 "interruption_handoff": (
                     dict(session.interruption_handoff) if isinstance(session.interruption_handoff, dict) else None
                 ),
+                "conversation_closing": session.conversation_closing,
+                "conversation_closed": session.conversation_closed,
+                "termination_grace_seconds": session.termination_grace_seconds,
                 "buffered_responses": self._response_buffer.all_for_session(session_id),
             }
 
@@ -570,6 +599,9 @@ class ConversationManagerAgent:
             session.last_delivered_response_id = record.response_id
             session.last_delivered_message_id = record.message_id
         return snapshot
+
+    def finalize_conversation(self, session_id: str) -> None:
+        self._finalize_session_closure(session_id=session_id)
 
     def _build_replay_payload(
         self,
@@ -663,9 +695,69 @@ class ConversationManagerAgent:
 
     def _clear_session_runtime_state(self, session_id: str) -> None:
         with self._lock:
-            self._session_states.pop(session_id, None)
+            session = self._session_states.pop(session_id, None)
+            if session is not None:
+                self._cancel_pending_closure_locked(session)
         self._response_buffer.clear_session(session_id)
         self._delivery_tracker.clear_session(session_id)
+
+    def _schedule_session_closure(self, *, session_id: str, grace_seconds: float) -> None:
+        with self._lock:
+            session = self._session_state_for(session_id)
+            self._cancel_pending_closure_locked(session)
+            session.conversation_closing = True
+            session.termination_grace_seconds = max(float(grace_seconds), 3.0)
+            timer = threading.Timer(
+                session.termination_grace_seconds,
+                self._finalize_session_closure,
+                kwargs={"session_id": session_id},
+            )
+            timer.daemon = True
+            session.closure_timer = timer
+            timer.start()
+
+    @staticmethod
+    def _cancel_pending_closure_locked(session: _SessionControlState) -> None:
+        timer = session.closure_timer
+        if timer is not None:
+            timer.cancel()
+        session.closure_timer = None
+        session.conversation_closing = False
+
+    def _finalize_session_closure(self, *, session_id: str) -> None:
+        with self._lock:
+            session = self._session_state_for(session_id)
+            if not session.conversation_closing or session.conversation_closed:
+                return
+            session.closure_timer = None
+            session.conversation_closing = False
+            session.conversation_closed = True
+            session.active_task_status = "closed"
+        finalize = getattr(self.downstream_runtime, "finalize_conversation", None)
+        if callable(finalize):
+            finalize(session_id)
+
+    def _closed_turn_payload(self, *, session_id: str) -> dict[str, Any]:
+        metadata = {
+            "conversation_id": session_id,
+            "conversation_complete": True,
+            "conversation_closing": False,
+            "conversation_closed": True,
+            "terminate_call": False,
+            "termination_grace_seconds": 0.0,
+            "response_suppressed": True,
+            "response_delivered": False,
+            "active_task_status": "closed",
+        }
+        return {
+            "session_id": session_id,
+            "final_response": "",
+            "final_target": "customer",
+            "conversation_complete": True,
+            "conversation_closed": True,
+            "hops": [],
+            "conversation_manager": metadata,
+        }
 
     @staticmethod
     def _compose_interruption_message(*, previous_input: str, current_input: str) -> str:

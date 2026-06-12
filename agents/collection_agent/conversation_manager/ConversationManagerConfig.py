@@ -29,6 +29,7 @@ class ConversationManagerConfig:
     repeat_strategy: str = "full_message"
     enable_voice_delivery_tracking: bool = True
     estimated_speech_ms_per_character: float = 45.0
+    termination_grace_seconds: float = 3.0
     filler_library_path: Path | None = None
     runtime_dir: Path | None = None
 

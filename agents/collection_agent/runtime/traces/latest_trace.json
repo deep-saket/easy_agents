@@ -1,14 +1,14 @@
 {
-  "trace_id": "8c1dda35-8595-4995-81c5-1a35096e6def",
+  "trace_id": "337e2fc1-ec5f-4f82-b658-e0fd8faf9adb",
   "agent_name": "collection_agent",
   "session_id": "collection-user_b",
-  "user_input": "he is not here now, please try at 5:30pm in evening today",
+  "user_input": "The customer interrupted while the previous turn was still processing.\nPrevious interrupted customer message: sure thanks\nLatest customer message: sure\nUse the latest message as authoritative, but keep the interrupted message as immediate context.",
   "status": "completed",
-  "started_at": "2026-06-10T10:03:01.215671+00:00",
-  "finished_at": "2026-06-10T10:03:54.800946+00:00",
+  "started_at": "2026-06-12T03:59:42.726317+00:00",
+  "finished_at": "2026-06-12T04:00:19.101905+00:00",
   "error": null,
   "summary": {
-    "trace_id": "8c1dda35-8595-4995-81c5-1a35096e6def",
+    "trace_id": "337e2fc1-ec5f-4f82-b658-e0fd8faf9adb",
     "agent_name": "collection_agent",
     "session_id": "collection-user_b",
     "status": "completed",
@@ -17,17 +17,14 @@
       "entity_extract",
       "negotiation_classification",
       "pre_plan_intent",
-      "execution_path_intent",
-      "memory_retrieve",
-      "post_memory_plan_intent",
       "plan_proposal_state",
       "plan_proposal_graph",
       "plan_proposal_directive",
       "reflect",
       "relevant_response"
     ],
-    "node_count": 12,
-    "llm_call_count": 10,
+    "node_count": 9,
+    "llm_call_count": 7,
     "tool_call_count": 0,
     "models": [
       "gemma4:31b-cloud"
@@ -41,220 +38,160 @@
     {
       "node_name": "relevance_intent",
       "status": "completed",
-      "started_at": "2026-06-10T10:03:01.221681+00:00",
-      "finished_at": "2026-06-10T10:03:05.679752+00:00",
-      "duration_ms": 4458.071,
+      "started_at": "2026-06-12T03:59:42.729316+00:00",
+      "finished_at": "2026-06-12T03:59:46.488531+00:00",
+      "duration_ms": 3759.215,
       "error": null
     },
     {
       "node_name": "entity_extract",
       "status": "completed",
-      "started_at": "2026-06-10T10:03:05.681767+00:00",
-      "finished_at": "2026-06-10T10:03:10.368520+00:00",
-      "duration_ms": 4686.753,
+      "started_at": "2026-06-12T03:59:46.489639+00:00",
+      "finished_at": "2026-06-12T03:59:50.237023+00:00",
+      "duration_ms": 3747.384,
       "error": null
     },
     {
       "node_name": "negotiation_classification",
       "status": "completed",
-      "started_at": "2026-06-10T10:03:10.371518+00:00",
-      "finished_at": "2026-06-10T10:03:15.240243+00:00",
-      "duration_ms": 4868.725,
+      "started_at": "2026-06-12T03:59:50.240018+00:00",
+      "finished_at": "2026-06-12T03:59:55.421669+00:00",
+      "duration_ms": 5181.651,
       "error": null
     },
     {
       "node_name": "pre_plan_intent",
       "status": "completed",
-      "started_at": "2026-06-10T10:03:15.242241+00:00",
-      "finished_at": "2026-06-10T10:03:19.535456+00:00",
-      "duration_ms": 4293.215,
-      "error": null
-    },
-    {
-      "node_name": "execution_path_intent",
-      "status": "completed",
-      "started_at": "2026-06-10T10:03:19.538470+00:00",
-      "finished_at": "2026-06-10T10:03:24.746459+00:00",
-      "duration_ms": 5207.989,
-      "error": null
-    },
-    {
-      "node_name": "memory_retrieve",
-      "status": "completed",
-      "started_at": "2026-06-10T10:03:24.748461+00:00",
-      "finished_at": "2026-06-10T10:03:24.754456+00:00",
-      "duration_ms": 5.995,
-      "error": null
-    },
-    {
-      "node_name": "post_memory_plan_intent",
-      "status": "completed",
-      "started_at": "2026-06-10T10:03:24.770389+00:00",
-      "finished_at": "2026-06-10T10:03:28.439932+00:00",
-      "duration_ms": 3669.543,
+      "started_at": "2026-06-12T03:59:55.422675+00:00",
+      "finished_at": "2026-06-12T03:59:59.594948+00:00",
+      "duration_ms": 4172.273,
       "error": null
     },
     {
       "node_name": "plan_proposal_state",
       "status": "completed",
-      "started_at": "2026-06-10T10:03:28.441447+00:00",
-      "finished_at": "2026-06-10T10:03:48.891471+00:00",
-      "duration_ms": 20450.024,
+      "started_at": "2026-06-12T03:59:59.597348+00:00",
+      "finished_at": "2026-06-12T04:00:14.339275+00:00",
+      "duration_ms": 14741.927,
       "error": null
     },
     {
       "node_name": "plan_proposal_graph",
       "status": "completed",
-      "started_at": "2026-06-10T10:03:48.894098+00:00",
-      "finished_at": "2026-06-10T10:03:49.038213+00:00",
-      "duration_ms": 144.115,
+      "started_at": "2026-06-12T04:00:14.348669+00:00",
+      "finished_at": "2026-06-12T04:00:14.506611+00:00",
+      "duration_ms": 157.942,
       "error": null
     },
     {
       "node_name": "plan_proposal_directive",
       "status": "completed",
-      "started_at": "2026-06-10T10:03:49.040240+00:00",
-      "finished_at": "2026-06-10T10:03:49.530090+00:00",
-      "duration_ms": 489.85,
+      "started_at": "2026-06-12T04:00:14.510623+00:00",
+      "finished_at": "2026-06-12T04:00:15.039418+00:00",
+      "duration_ms": 528.795,
       "error": null
     },
     {
       "node_name": "reflect",
       "status": "completed",
-      "started_at": "2026-06-10T10:03:49.533089+00:00",
-      "finished_at": "2026-06-10T10:03:54.526773+00:00",
-      "duration_ms": 4993.684,
+      "started_at": "2026-06-12T04:00:15.043419+00:00",
+      "finished_at": "2026-06-12T04:00:18.799685+00:00",
+      "duration_ms": 3756.266,
       "error": null
     },
     {
       "node_name": "relevant_response",
       "status": "completed",
-      "started_at": "2026-06-10T10:03:54.529773+00:00",
-      "finished_at": "2026-06-10T10:03:54.666166+00:00",
-      "duration_ms": 136.393,
+      "started_at": "2026-06-12T04:00:18.802709+00:00",
+      "finished_at": "2026-06-12T04:00:18.962339+00:00",
+      "duration_ms": 159.63,
       "error": null
     }
   ],
   "llm_calls": [
     {
-      "call_id": "f1d0aa3b-775e-48b0-9f2d-5c47fc418d0c",
+      "call_id": "fd864d6b-b013-44c5-99fd-1944ea0d509b",
       "node_name": "relevance_intent",
       "model_name": "gemma4:31b-cloud",
       "call_kind": "generate",
       "prompt_tokens": null,
       "completion_tokens": null,
       "total_tokens": null,
-      "started_at": "2026-06-10T10:03:05.677391+00:00",
-      "finished_at": "2026-06-10T10:03:05.677391+00:00",
-      "duration_ms": 4329.691
+      "started_at": "2026-06-12T03:59:46.487515+00:00",
+      "finished_at": "2026-06-12T03:59:46.487515+00:00",
+      "duration_ms": 3611.737
     },
     {
-      "call_id": "215a8603-95c9-430c-9e0f-f47a3684e17a",
+      "call_id": "0673d2ac-c53a-4a58-af9f-8733e7e62be9",
       "node_name": "entity_extract",
       "model_name": "gemma4:31b-cloud",
       "call_kind": "generate",
       "prompt_tokens": null,
       "completion_tokens": null,
       "total_tokens": null,
-      "started_at": "2026-06-10T10:03:10.089907+00:00",
-      "finished_at": "2026-06-10T10:03:10.089907+00:00",
-      "duration_ms": 4407.622
+      "started_at": "2026-06-12T03:59:49.956326+00:00",
+      "finished_at": "2026-06-12T03:59:49.956326+00:00",
+      "duration_ms": 3461.9
     },
     {
-      "call_id": "ba33ed7b-daaa-4800-90c8-954909067048",
+      "call_id": "73ee1cb6-a6d7-418e-bd8a-6053fabf9453",
       "node_name": "negotiation_classification",
       "model_name": "gemma4:31b-cloud",
       "call_kind": "generate",
       "prompt_tokens": null,
       "completion_tokens": null,
       "total_tokens": null,
-      "started_at": "2026-06-10T10:03:15.109837+00:00",
-      "finished_at": "2026-06-10T10:03:15.109837+00:00",
-      "duration_ms": 4612.843
+      "started_at": "2026-06-12T03:59:55.291185+00:00",
+      "finished_at": "2026-06-12T03:59:55.291185+00:00",
+      "duration_ms": 4898.306
     },
     {
-      "call_id": "229605a1-e2ad-473c-a08c-d4c9abe60c76",
+      "call_id": "8be37df7-de91-4e9b-8f15-d80c6cdfd7e5",
       "node_name": "pre_plan_intent",
       "model_name": "gemma4:31b-cloud",
       "call_kind": "generate",
       "prompt_tokens": null,
       "completion_tokens": null,
       "total_tokens": null,
-      "started_at": "2026-06-10T10:03:19.535456+00:00",
-      "finished_at": "2026-06-10T10:03:19.535456+00:00",
-      "duration_ms": 4148.371
+      "started_at": "2026-06-12T03:59:59.594948+00:00",
+      "finished_at": "2026-06-12T03:59:59.594948+00:00",
+      "duration_ms": 4019.579
     },
     {
-      "call_id": "f1bbdcbb-6cb7-46dc-aecc-797e48b73783",
-      "node_name": "execution_path_intent",
-      "model_name": "gemma4:31b-cloud",
-      "call_kind": "generate",
-      "prompt_tokens": null,
-      "completion_tokens": null,
-      "total_tokens": null,
-      "started_at": "2026-06-10T10:03:24.745440+00:00",
-      "finished_at": "2026-06-10T10:03:24.745440+00:00",
-      "duration_ms": 5084.813
-    },
-    {
-      "call_id": "ebb8f015-e599-4cce-84ea-58b2d3850034",
-      "node_name": "post_memory_plan_intent",
-      "model_name": "gemma4:31b-cloud",
-      "call_kind": "generate",
-      "prompt_tokens": null,
-      "completion_tokens": null,
-      "total_tokens": null,
-      "started_at": "2026-06-10T10:03:28.439932+00:00",
-      "finished_at": "2026-06-10T10:03:28.439932+00:00",
-      "duration_ms": 3543.51
-    },
-    {
-      "call_id": "08f33545-bc57-41ff-bbb9-388f735237e9",
+      "call_id": "6bd95876-b456-4f31-81eb-67eac9ade206",
       "node_name": "plan_proposal_state",
       "model_name": "gemma4:31b-cloud",
       "call_kind": "generate",
       "prompt_tokens": null,
       "completion_tokens": null,
       "total_tokens": null,
-      "started_at": "2026-06-10T10:03:34.128049+00:00",
-      "finished_at": "2026-06-10T10:03:34.128049+00:00",
-      "duration_ms": 5557.516
+      "started_at": "2026-06-12T04:00:05.014825+00:00",
+      "finished_at": "2026-06-12T04:00:05.014825+00:00",
+      "duration_ms": 5271.512
     },
     {
-      "call_id": "8dff9337-4728-43ce-adb4-deb1d7010603",
+      "call_id": "1d0a0ce0-e235-480a-9074-29a7e3899616",
       "node_name": "plan_proposal_state",
       "model_name": "gemma4:31b-cloud",
       "call_kind": "generate",
       "prompt_tokens": null,
       "completion_tokens": null,
       "total_tokens": null,
-      "started_at": "2026-06-10T10:03:43.773831+00:00",
-      "finished_at": "2026-06-10T10:03:43.773831+00:00",
-      "duration_ms": 9645.06
+      "started_at": "2026-06-12T04:00:14.338256+00:00",
+      "finished_at": "2026-06-12T04:00:14.338256+00:00",
+      "duration_ms": 9323.068
     },
     {
-      "call_id": "faf13e19-9eac-4e39-b592-9b962497e097",
-      "node_name": "plan_proposal_state",
-      "model_name": "gemma4:31b-cloud",
-      "call_kind": "generate",
-      "prompt_tokens": null,
-      "completion_tokens": null,
-      "total_tokens": null,
-      "started_at": "2026-06-10T10:03:48.890312+00:00",
-      "finished_at": "2026-06-10T10:03:48.890312+00:00",
-      "duration_ms": 5116.781
-    },
-    {
-      "call_id": "832283e8-73d9-433e-9416-425b8effb7b0",
+      "call_id": "0da717ae-8a2d-4a14-934c-7e755e3be729",
       "node_name": "reflect",
       "model_name": "gemma4:31b-cloud",
       "call_kind": "generate",
       "prompt_tokens": null,
       "completion_tokens": null,
       "total_tokens": null,
-      "started_at": "2026-06-10T10:03:54.526773+00:00",
-      "finished_at": "2026-06-10T10:03:54.526773+00:00",
-      "duration_ms": 4854.982
+      "started_at": "2026-06-12T04:00:18.799685+00:00",
+      "finished_at": "2026-06-12T04:00:18.799685+00:00",
+      "duration_ms": 3615.787
     }
   ],
   "tool_calls": []

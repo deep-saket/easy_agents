@@ -42168,40 +42168,42 @@
     "greeted": true
   },
   "collection-user_b": {
-    "mode": "strict_collections",
+    "mode": "hardship_negotiation",
     "active_channel": "voice",
     "active_case_id": "COLL-1002",
     "active_user_id": "CUST-2002",
     "active_customer_name": "Rohan Gupta",
     "agent_loop_blocked": false,
     "agent_loop_count": 0,
-    "last_agent_response": "Thank you. I will try to reach Rohan Gupta he is not here now, please try at 5:30pm in evening today. Please let them know that EasySecure Financial Services called. Thank you for your help, and have a good day. Goodbye.",
+    "last_agent_response": "Thank you for your time, Rohan Gupta. Take care, and we wish you all the best. Goodbye.",
     "last_response_target": "customer",
-    "turn_index": 3,
+    "turn_index": 6,
     "greeted": true,
-    "right_party_status": "wrong_party",
-    "wrong_party_callback_stage": "completed",
-    "wrong_party_callback_time": "he is not here now, please try at 5:30pm in evening today",
-    "conversation_mode": "verification",
-    "negotiation_stage": "none",
-    "customer_payment_posture": "unknown",
-    "customer_payment_posture_history": [],
+    "right_party_status": "awaiting_confirmation",
+    "wrong_party_callback_stage": null,
+    "wrong_party_callback_time": null,
+    "conversation_mode": "hardship_negotiation",
+    "negotiation_stage": "confirming_commitment",
+    "customer_payment_posture": "cannot_pay",
+    "customer_payment_posture_history": [
+      "cannot_pay"
+    ],
     "customer_payment_capacity": null,
     "customer_payment_capacity_pct": null,
     "discount_stage": "none",
-    "customer_payment_willingness": 0.5,
+    "customer_payment_willingness": 0.6,
     "hardship_context": {
-      "hardship_detected": false,
-      "hardship_reason": null,
-      "confidence": 0.0
+      "hardship_detected": true,
+      "hardship_reason": "job_loss",
+      "confidence": 1.0
     },
     "discount_requested": false,
     "discount_offered": false,
     "discount_accepted": false,
     "discount_rejected": false,
     "counter_offer_present": false,
-    "response_mode": "compliance",
-    "active_dialogue_owner": "verification",
+    "response_mode": "empathetic",
+    "active_dialogue_owner": "plan_proposal",
     "customer_profile": {
       "customer_id": "CUST-2002",
       "employment_type": "self_employed",
@@ -42270,6 +42272,27 @@
       ]
     },
     "assistance_programs": [
+      {
+        "program_id": "PREMIUM_HOLD_001",
+        "program_type": "premium_hold",
+        "eligible_products": [
+          "personal_loan"
+        ],
+        "eligible_loan_ids": [
+          "LOAN-3002"
+        ],
+        "hardship_reasons": [
+          "job_loss"
+        ],
+        "max_hold_months": 2,
+        "benefits_remain_active": true,
+        "requires_manager_approval": false,
+        "confirmation_channels": [
+          "sms",
+          "email"
+        ],
+        "confirmation_sla_hours": 24
+      },
       {
         "program_id": "HARDSHIP_001",
         "eligible_products": [
@@ -42398,6 +42421,27 @@
       },
       "assistance_programs": [
         {
+          "program_id": "PREMIUM_HOLD_001",
+          "program_type": "premium_hold",
+          "eligible_products": [
+            "personal_loan"
+          ],
+          "eligible_loan_ids": [
+            "LOAN-3002"
+          ],
+          "hardship_reasons": [
+            "job_loss"
+          ],
+          "max_hold_months": 2,
+          "benefits_remain_active": true,
+          "requires_manager_approval": false,
+          "confirmation_channels": [
+            "sms",
+            "email"
+          ],
+          "confirmation_sla_hours": 24
+        },
+        {
           "program_id": "HARDSHIP_001",
           "eligible_products": [
             "personal_loan"
@@ -42502,7 +42546,7 @@
         "preferred_channel": "voice",
         "risk_band": "unknown"
       },
-      "latest_summary": "customer: no | agent: Thank you. For privacy reasons, I can only discuss this directly with Rohan Gupta. I am unable to share any details with anyone else. | customer: They're not here right now. Can I take a message? What's it about? | agent: I am unable to share what the call is about, but please let Rohan Gupta know that EasySecure Financial Services called and would like to speak with them. They can also reach EasySecure Financial Services at +91-1800-555-2002 at their convenience. When would be a good time to try again? | customer: try this evening | agent: Thank you. I will try to reach Rohan Gupta this evening. Please let them know that EasySecure Financial Services called. Thank you for your help, and have a good day. Goodbye.",
+      "latest_summary": "customer: no he is not here | agent: I am unable to share what the call is about, but please let Rohan Gupta know that EasySecure Financial Services called and would like to speak with them. They can also reach EasySecure Financial Services at +91-1800-555-2002 at their convenience. When would be a good time to try again? | customer: try this evening | agent: Certainly. I will try to reach Rohan Gupta this evening. Please let them know that EasySecure Financial Services called. Thank you for your help. Have a good day. Goodbye.",
       "procedural_key_points": [
         "Lead with hardship acknowledgement before proposing collections action.",
         "Evaluate discount/restructure options before requesting immediate payment."
@@ -42518,23 +42562,28 @@
       "negotiation_classification": "gemma4:31b-cloud",
       "plan_proposal_state": "gemma4:31b-cloud",
       "plan_proposal_directive": "gemma4:31b-cloud",
-      "reflect": "gemma4:31b-cloud"
+      "reflect": "gemma4:31b-cloud",
+      "react": "gemma4:31b-cloud"
     },
-    "verification_entities": {},
-    "verification_collected": {},
-    "hardship_reason": null,
+    "verification_entities": {
+      "dob": "1988-04-22",
+      "phone": "9900001002"
+    },
+    "verification_collected": {
+      "dob": "1988-04-22",
+      "phone": "9900001002"
+    },
+    "hardship_reason": "job_loss",
     "active_conversation_plan": {
       "plan_id": "plan-COLL-1002",
       "version": 1,
-      "status": "active",
+      "status": "completed",
       "mode": "strict_collections",
       "objective": "Move borrower conversation to payment, promise-to-pay, or compliant follow-up.",
       "root_node_id": "open_and_context",
-      "current_node_id": "wrong_party_callback",
-      "previous_node_id": "wrong_party_callback",
-      "next_node_ids": [
-        "close_conversation"
-      ],
+      "current_node_id": "close_conversation",
+      "previous_node_id": "close_conversation",
+      "next_node_ids": [],
       "nodes": [
         {
           "id": "open_and_context",
@@ -42546,43 +42595,67 @@
           "id": "verify_identity",
           "label": "Verify customer identity",
           "owner": "customer",
-          "status": "skipped"
+          "status": "done"
         },
         {
           "id": "wrong_party_callback",
           "label": "Arrange privacy-safe callback",
           "owner": "collection_agent",
-          "status": "in_progress"
+          "status": "pending"
+        },
+        {
+          "id": "purpose_disclosure",
+          "label": "Disclose call purpose and overdue installment",
+          "owner": "collection_agent",
+          "status": "done"
+        },
+        {
+          "id": "discovery_empathy",
+          "label": "Understand and acknowledge customer situation",
+          "owner": "collection_agent",
+          "status": "done"
+        },
+        {
+          "id": "resolution_offer",
+          "label": "Present eligible resolution option",
+          "owner": "collection_agent",
+          "status": "done"
+        },
+        {
+          "id": "confirmation",
+          "label": "Confirm agreed outcome and reference",
+          "owner": "collection_agent",
+          "status": "done"
         },
         {
           "id": "explain_dues",
-          "label": "Explain dues and policy options",
+          "label": "Explain standard payment options",
           "owner": "customer",
-          "status": "skipped"
+          "status": "pending"
         },
         {
           "id": "collect_payment_intent",
           "label": "Collect payment intent",
           "owner": "customer",
-          "status": "skipped"
+          "status": "pending"
         },
         {
           "id": "evaluate_assistance",
           "label": "Evaluate discount/restructure assistance",
           "owner": "collection_agent",
-          "status": "skipped"
+          "status": "pending"
         },
         {
           "id": "resolve_outcome",
           "label": "Finalize payment, promise, or follow-up",
           "owner": "customer",
-          "status": "skipped"
+          "status": "pending"
         },
         {
           "id": "close_conversation",
           "label": "Close conversation",
           "owner": "collection_agent",
-          "status": "pending"
+          "status": "done"
         }
       ],
       "edges": [
@@ -42593,13 +42666,38 @@
         },
         {
           "from": "verify_identity",
-          "to": "explain_dues",
+          "to": "purpose_disclosure",
           "condition": "identity_verified"
         },
         {
           "from": "verify_identity",
           "to": "wrong_party_callback",
           "condition": "wrong_party_detected"
+        },
+        {
+          "from": "purpose_disclosure",
+          "to": "discovery_empathy",
+          "condition": "customer_situation_shared"
+        },
+        {
+          "from": "purpose_disclosure",
+          "to": "explain_dues",
+          "condition": "standard_resolution_requested"
+        },
+        {
+          "from": "discovery_empathy",
+          "to": "resolution_offer",
+          "condition": "eligible_assistance_found"
+        },
+        {
+          "from": "resolution_offer",
+          "to": "confirmation",
+          "condition": "offer_accepted"
+        },
+        {
+          "from": "confirmation",
+          "to": "close_conversation",
+          "condition": "outcome_confirmed"
         },
         {
           "from": "explain_dues",
@@ -42634,28 +42732,84 @@
       ],
       "timeline": [
         {
-          "at_utc": "2026-06-10T09:07:51.294395+00:00",
+          "at_utc": "2026-06-12T03:50:50.433404+00:00",
           "version": 1,
           "status": "active",
-          "current_node_id": "wrong_party_callback",
+          "current_node_id": "open_and_context",
           "next_node_ids": [
-            "close_conversation"
+            "verify_identity"
           ],
           "update": {
             "origin": "react",
             "route": "continue",
             "response_target": "customer",
             "previous_node_id": "open_and_context",
-            "current_node_id": "wrong_party_callback",
+            "current_node_id": "open_and_context",
             "plan_outline": "",
             "operation": "advance"
           }
         },
         {
-          "at_utc": "2026-06-10T10:03:48.898993+00:00",
+          "at_utc": "2026-06-12T03:51:51.973343+00:00",
           "version": 1,
           "status": "active",
-          "current_node_id": "wrong_party_callback",
+          "current_node_id": "purpose_disclosure",
+          "next_node_ids": [
+            "discovery_empathy",
+            "explain_dues"
+          ],
+          "update": {
+            "origin": "react",
+            "route": "continue",
+            "response_target": "customer",
+            "previous_node_id": "open_and_context",
+            "current_node_id": "purpose_disclosure",
+            "plan_outline": "",
+            "operation": "advance"
+          }
+        },
+        {
+          "at_utc": "2026-06-12T03:52:11.531354+00:00",
+          "version": 1,
+          "status": "active",
+          "current_node_id": "purpose_disclosure",
+          "next_node_ids": [
+            "discovery_empathy",
+            "explain_dues"
+          ],
+          "update": {
+            "origin": "react",
+            "route": "continue",
+            "response_target": "customer",
+            "previous_node_id": "purpose_disclosure",
+            "current_node_id": "purpose_disclosure",
+            "plan_outline": "",
+            "operation": "advance"
+          }
+        },
+        {
+          "at_utc": "2026-06-12T03:53:15.019869+00:00",
+          "version": 1,
+          "status": "active",
+          "current_node_id": "resolution_offer",
+          "next_node_ids": [
+            "confirmation"
+          ],
+          "update": {
+            "origin": "react",
+            "route": "continue",
+            "response_target": "customer",
+            "previous_node_id": "purpose_disclosure",
+            "current_node_id": "resolution_offer",
+            "plan_outline": "",
+            "operation": "advance"
+          }
+        },
+        {
+          "at_utc": "2026-06-12T03:54:03.162273+00:00",
+          "version": 1,
+          "status": "active",
+          "current_node_id": "confirmation",
           "next_node_ids": [
             "close_conversation"
           ],
@@ -42663,78 +42817,163 @@
             "origin": "react",
             "route": "continue",
             "response_target": "customer",
-            "previous_node_id": "wrong_party_callback",
-            "current_node_id": "wrong_party_callback",
+            "previous_node_id": "resolution_offer",
+            "current_node_id": "confirmation",
             "plan_outline": "",
             "operation": "advance"
+          }
+        },
+        {
+          "at_utc": "2026-06-12T03:54:19.324378+00:00",
+          "version": 1,
+          "status": "active",
+          "current_node_id": "confirmation",
+          "next_node_ids": [
+            "close_conversation"
+          ],
+          "update": {
+            "origin": "react",
+            "route": "continue",
+            "response_target": "customer",
+            "previous_node_id": "confirmation",
+            "current_node_id": "confirmation",
+            "plan_outline": "",
+            "operation": "advance"
+          }
+        },
+        {
+          "at_utc": "2026-06-12T03:54:24.028654+00:00",
+          "version": 1,
+          "status": "active",
+          "current_node_id": "close_conversation",
+          "next_node_ids": [],
+          "update": {
+            "origin": "response_render",
+            "operation": "advance",
+            "mark_done": [
+              "confirmation"
+            ],
+            "current_node_id": "close_conversation"
+          }
+        },
+        {
+          "at_utc": "2026-06-12T04:00:14.353310+00:00",
+          "version": 1,
+          "status": "active",
+          "current_node_id": "close_conversation",
+          "next_node_ids": [],
+          "update": {
+            "origin": "react",
+            "route": "continue",
+            "response_target": "customer",
+            "previous_node_id": "close_conversation",
+            "current_node_id": "close_conversation",
+            "plan_outline": "",
+            "operation": "advance"
+          }
+        },
+        {
+          "at_utc": "2026-06-12T04:00:22.158955+00:00",
+          "version": 1,
+          "status": "completed",
+          "current_node_id": "close_conversation",
+          "next_node_ids": [],
+          "update": {
+            "origin": "conversation_manager_timer",
+            "operation": "complete",
+            "current_node_id": "close_conversation"
           }
         }
       ],
       "revision_log": [],
-      "updated_from": "react",
+      "updated_from": "conversation_manager_timer",
       "last_response_target": "customer",
       "step_markers": {
         "open_and_context": {
           "state": "done",
-          "updated_at": "2026-06-10T09:07:51.294395+00:00",
+          "updated_at": "2026-06-12T03:51:51.973343+00:00",
           "source": "plan_tree_update",
           "reason": "case_context_ready_transition"
         },
         "verify_identity": {
-          "state": "skipped",
-          "updated_at": "2026-06-10T10:03:48.898993+00:00",
-          "source": "wrong_party_guard",
-          "reason": "wrong_party_detected_no_verification_allowed"
+          "state": "done",
+          "updated_at": "2026-06-12T04:00:14.353310+00:00",
+          "source": "memory_identity_verified",
+          "reason": "memory_identity_verified"
         },
         "wrong_party_callback": {
           "state": "pending",
-          "updated_at": "2026-06-10T09:07:51.294395+00:00",
+          "updated_at": "2026-06-12T03:50:50.432405+00:00",
           "source": "reconciler",
           "reason": ""
+        },
+        "purpose_disclosure": {
+          "state": "done",
+          "updated_at": "2026-06-12T03:54:19.324378+00:00",
+          "source": "canonical_flow",
+          "reason": "purpose_disclosed_before_resolution"
+        },
+        "discovery_empathy": {
+          "state": "done",
+          "updated_at": "2026-06-12T03:54:19.324378+00:00",
+          "source": "canonical_flow",
+          "reason": "hardship_acknowledged"
+        },
+        "resolution_offer": {
+          "state": "done",
+          "updated_at": "2026-06-12T03:54:19.324378+00:00",
+          "source": "canonical_flow",
+          "reason": "eligible_offer_accepted"
+        },
+        "confirmation": {
+          "state": "done",
+          "updated_at": "2026-06-12T03:54:24.028654+00:00",
+          "source": "response_render",
+          "reason": "agreed_outcome_and_reference_delivered"
         },
         "explain_dues": {
-          "state": "skipped",
-          "updated_at": "2026-06-10T10:03:48.898993+00:00",
-          "source": "wrong_party_guard",
-          "reason": "wrong_party_branch_prevents_account_disclosure"
-        },
-        "collect_payment_intent": {
-          "state": "skipped",
-          "updated_at": "2026-06-10T10:03:48.898993+00:00",
-          "source": "wrong_party_guard",
-          "reason": "wrong_party_branch_prevents_account_disclosure"
-        },
-        "evaluate_assistance": {
-          "state": "skipped",
-          "updated_at": "2026-06-10T10:03:48.898993+00:00",
-          "source": "wrong_party_guard",
-          "reason": "wrong_party_branch_prevents_account_disclosure"
-        },
-        "resolve_outcome": {
-          "state": "skipped",
-          "updated_at": "2026-06-10T10:03:48.898993+00:00",
-          "source": "wrong_party_guard",
-          "reason": "wrong_party_branch_prevents_account_disclosure"
-        },
-        "close_conversation": {
           "state": "pending",
-          "updated_at": "2026-06-10T09:07:51.294395+00:00",
+          "updated_at": "2026-06-12T03:50:50.432405+00:00",
           "source": "reconciler",
           "reason": ""
+        },
+        "collect_payment_intent": {
+          "state": "pending",
+          "updated_at": "2026-06-12T03:50:50.432405+00:00",
+          "source": "reconciler",
+          "reason": ""
+        },
+        "evaluate_assistance": {
+          "state": "pending",
+          "updated_at": "2026-06-12T03:50:50.432405+00:00",
+          "source": "reconciler",
+          "reason": ""
+        },
+        "resolve_outcome": {
+          "state": "pending",
+          "updated_at": "2026-06-12T03:50:50.432405+00:00",
+          "source": "reconciler",
+          "reason": ""
+        },
+        "close_conversation": {
+          "state": "done",
+          "updated_at": "2026-06-12T04:00:22.158955+00:00",
+          "source": "conversation_manager_timer",
+          "reason": "termination_grace_period_elapsed"
         }
       },
       "timeline_snapshots": [
         {
-          "at_utc": "2026-06-10T09:07:51.294395+00:00",
+          "at_utc": "2026-06-12T03:50:50.433404+00:00",
           "version": 1,
           "status": "active",
-          "current_node_id": "wrong_party_callback",
+          "current_node_id": "open_and_context",
           "update": {
             "origin": "react",
             "route": "continue",
             "response_target": "customer",
             "previous_node_id": "open_and_context",
-            "current_node_id": "wrong_party_callback",
+            "current_node_id": "open_and_context",
             "plan_outline": "",
             "operation": "advance"
           },
@@ -42745,53 +42984,77 @@
             "mode": "strict_collections",
             "objective": "Move borrower conversation to payment, promise-to-pay, or compliant follow-up.",
             "root_node_id": "open_and_context",
-            "current_node_id": "wrong_party_callback",
+            "current_node_id": "open_and_context",
             "previous_node_id": "open_and_context",
             "next_node_ids": [
-              "close_conversation"
+              "verify_identity"
             ],
             "nodes": [
               {
                 "id": "open_and_context",
                 "label": "Initialize case context",
                 "owner": "collection_agent",
-                "status": "done"
+                "status": "in_progress"
               },
               {
                 "id": "verify_identity",
                 "label": "Verify customer identity",
                 "owner": "customer",
-                "status": "skipped"
+                "status": "pending"
               },
               {
                 "id": "wrong_party_callback",
                 "label": "Arrange privacy-safe callback",
                 "owner": "collection_agent",
-                "status": "in_progress"
+                "status": "pending"
+              },
+              {
+                "id": "purpose_disclosure",
+                "label": "Disclose call purpose and overdue installment",
+                "owner": "collection_agent",
+                "status": "pending"
+              },
+              {
+                "id": "discovery_empathy",
+                "label": "Understand and acknowledge customer situation",
+                "owner": "collection_agent",
+                "status": "pending"
+              },
+              {
+                "id": "resolution_offer",
+                "label": "Present eligible resolution option",
+                "owner": "collection_agent",
+                "status": "pending"
+              },
+              {
+                "id": "confirmation",
+                "label": "Confirm agreed outcome and reference",
+                "owner": "collection_agent",
+                "status": "pending"
               },
               {
                 "id": "explain_dues",
-                "label": "Explain dues and policy options",
+                "label": "Explain standard payment options",
                 "owner": "customer",
-                "status": "skipped"
+                "status": "pending"
               },
               {
                 "id": "collect_payment_intent",
                 "label": "Collect payment intent",
                 "owner": "customer",
-                "status": "skipped"
+                "status": "pending"
               },
               {
                 "id": "evaluate_assistance",
                 "label": "Evaluate discount/restructure assistance",
                 "owner": "collection_agent",
-                "status": "skipped"
+                "status": "pending"
               },
               {
                 "id": "resolve_outcome",
                 "label": "Finalize payment, promise, or follow-up",
                 "owner": "customer",
-                "status": "skipped"
+                "status": "pending"
               },
               {
                 "id": "close_conversation",
@@ -42808,13 +43071,38 @@
               },
               {
                 "from": "verify_identity",
-                "to": "explain_dues",
+                "to": "purpose_disclosure",
                 "condition": "identity_verified"
               },
               {
                 "from": "verify_identity",
                 "to": "wrong_party_callback",
                 "condition": "wrong_party_detected"
+              },
+              {
+                "from": "purpose_disclosure",
+                "to": "discovery_empathy",
+                "condition": "customer_situation_shared"
+              },
+              {
+                "from": "purpose_disclosure",
+                "to": "explain_dues",
+                "condition": "standard_resolution_requested"
+              },
+              {
+                "from": "discovery_empathy",
+                "to": "resolution_offer",
+                "condition": "eligible_assistance_found"
+              },
+              {
+                "from": "resolution_offer",
+                "to": "confirmation",
+                "condition": "offer_accepted"
+              },
+              {
+                "from": "confirmation",
+                "to": "close_conversation",
+                "condition": "outcome_confirmed"
               },
               {
                 "from": "explain_dues",
@@ -42849,50 +43137,74 @@
             ],
             "step_markers": {
               "open_and_context": {
-                "state": "done",
-                "updated_at": "2026-06-10T09:07:51.294395+00:00",
-                "source": "plan_tree_update",
-                "reason": "case_context_ready_transition"
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
               },
               "verify_identity": {
-                "state": "skipped",
-                "updated_at": "2026-06-10T09:07:51.294395+00:00",
-                "source": "wrong_party_guard",
-                "reason": "wrong_party_detected_no_verification_allowed"
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
               },
               "wrong_party_callback": {
                 "state": "pending",
-                "updated_at": "2026-06-10T09:07:51.294395+00:00",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "purpose_disclosure": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "discovery_empathy": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "resolution_offer": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "confirmation": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
                 "source": "reconciler",
                 "reason": ""
               },
               "explain_dues": {
-                "state": "skipped",
-                "updated_at": "2026-06-10T09:07:51.294395+00:00",
-                "source": "wrong_party_guard",
-                "reason": "wrong_party_branch_prevents_account_disclosure"
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
               },
               "collect_payment_intent": {
-                "state": "skipped",
-                "updated_at": "2026-06-10T09:07:51.294395+00:00",
-                "source": "wrong_party_guard",
-                "reason": "wrong_party_branch_prevents_account_disclosure"
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
               },
               "evaluate_assistance": {
-                "state": "skipped",
-                "updated_at": "2026-06-10T09:07:51.294395+00:00",
-                "source": "wrong_party_guard",
-                "reason": "wrong_party_branch_prevents_account_disclosure"
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
               },
               "resolve_outcome": {
-                "state": "skipped",
-                "updated_at": "2026-06-10T09:07:51.294395+00:00",
-                "source": "wrong_party_guard",
-                "reason": "wrong_party_branch_prevents_account_disclosure"
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
               },
               "close_conversation": {
                 "state": "pending",
-                "updated_at": "2026-06-10T09:07:51.294395+00:00",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
                 "source": "reconciler",
                 "reason": ""
               }
@@ -42902,16 +43214,16 @@
           }
         },
         {
-          "at_utc": "2026-06-10T10:03:48.898993+00:00",
+          "at_utc": "2026-06-12T03:51:51.973343+00:00",
           "version": 1,
           "status": "active",
-          "current_node_id": "wrong_party_callback",
+          "current_node_id": "purpose_disclosure",
           "update": {
             "origin": "react",
             "route": "continue",
             "response_target": "customer",
-            "previous_node_id": "wrong_party_callback",
-            "current_node_id": "wrong_party_callback",
+            "previous_node_id": "open_and_context",
+            "current_node_id": "purpose_disclosure",
             "plan_outline": "",
             "operation": "advance"
           },
@@ -42922,10 +43234,11 @@
             "mode": "strict_collections",
             "objective": "Move borrower conversation to payment, promise-to-pay, or compliant follow-up.",
             "root_node_id": "open_and_context",
-            "current_node_id": "wrong_party_callback",
-            "previous_node_id": "wrong_party_callback",
+            "current_node_id": "purpose_disclosure",
+            "previous_node_id": "open_and_context",
             "next_node_ids": [
-              "close_conversation"
+              "discovery_empathy",
+              "explain_dues"
             ],
             "nodes": [
               {
@@ -42938,37 +43251,61 @@
                 "id": "verify_identity",
                 "label": "Verify customer identity",
                 "owner": "customer",
-                "status": "skipped"
+                "status": "done"
               },
               {
                 "id": "wrong_party_callback",
                 "label": "Arrange privacy-safe callback",
                 "owner": "collection_agent",
+                "status": "pending"
+              },
+              {
+                "id": "purpose_disclosure",
+                "label": "Disclose call purpose and overdue installment",
+                "owner": "collection_agent",
                 "status": "in_progress"
               },
               {
+                "id": "discovery_empathy",
+                "label": "Understand and acknowledge customer situation",
+                "owner": "collection_agent",
+                "status": "pending"
+              },
+              {
+                "id": "resolution_offer",
+                "label": "Present eligible resolution option",
+                "owner": "collection_agent",
+                "status": "pending"
+              },
+              {
+                "id": "confirmation",
+                "label": "Confirm agreed outcome and reference",
+                "owner": "collection_agent",
+                "status": "pending"
+              },
+              {
                 "id": "explain_dues",
-                "label": "Explain dues and policy options",
+                "label": "Explain standard payment options",
                 "owner": "customer",
-                "status": "skipped"
+                "status": "pending"
               },
               {
                 "id": "collect_payment_intent",
                 "label": "Collect payment intent",
                 "owner": "customer",
-                "status": "skipped"
+                "status": "pending"
               },
               {
                 "id": "evaluate_assistance",
                 "label": "Evaluate discount/restructure assistance",
                 "owner": "collection_agent",
-                "status": "skipped"
+                "status": "pending"
               },
               {
                 "id": "resolve_outcome",
                 "label": "Finalize payment, promise, or follow-up",
                 "owner": "customer",
-                "status": "skipped"
+                "status": "pending"
               },
               {
                 "id": "close_conversation",
@@ -42985,13 +43322,38 @@
               },
               {
                 "from": "verify_identity",
-                "to": "explain_dues",
+                "to": "purpose_disclosure",
                 "condition": "identity_verified"
               },
               {
                 "from": "verify_identity",
                 "to": "wrong_party_callback",
                 "condition": "wrong_party_detected"
+              },
+              {
+                "from": "purpose_disclosure",
+                "to": "discovery_empathy",
+                "condition": "customer_situation_shared"
+              },
+              {
+                "from": "purpose_disclosure",
+                "to": "explain_dues",
+                "condition": "standard_resolution_requested"
+              },
+              {
+                "from": "discovery_empathy",
+                "to": "resolution_offer",
+                "condition": "eligible_assistance_found"
+              },
+              {
+                "from": "resolution_offer",
+                "to": "confirmation",
+                "condition": "offer_accepted"
+              },
+              {
+                "from": "confirmation",
+                "to": "close_conversation",
+                "condition": "outcome_confirmed"
               },
               {
                 "from": "explain_dues",
@@ -43027,54 +43389,1818 @@
             "step_markers": {
               "open_and_context": {
                 "state": "done",
-                "updated_at": "2026-06-10T09:07:51.294395+00:00",
+                "updated_at": "2026-06-12T03:51:51.973343+00:00",
                 "source": "plan_tree_update",
                 "reason": "case_context_ready_transition"
               },
               "verify_identity": {
-                "state": "skipped",
-                "updated_at": "2026-06-10T10:03:48.898993+00:00",
-                "source": "wrong_party_guard",
-                "reason": "wrong_party_detected_no_verification_allowed"
+                "state": "done",
+                "updated_at": "2026-06-12T03:51:51.973343+00:00",
+                "source": "memory_identity_verified",
+                "reason": "memory_identity_verified"
               },
               "wrong_party_callback": {
                 "state": "pending",
-                "updated_at": "2026-06-10T09:07:51.294395+00:00",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "purpose_disclosure": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "discovery_empathy": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "resolution_offer": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "confirmation": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
                 "source": "reconciler",
                 "reason": ""
               },
               "explain_dues": {
-                "state": "skipped",
-                "updated_at": "2026-06-10T10:03:48.898993+00:00",
-                "source": "wrong_party_guard",
-                "reason": "wrong_party_branch_prevents_account_disclosure"
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
               },
               "collect_payment_intent": {
-                "state": "skipped",
-                "updated_at": "2026-06-10T10:03:48.898993+00:00",
-                "source": "wrong_party_guard",
-                "reason": "wrong_party_branch_prevents_account_disclosure"
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
               },
               "evaluate_assistance": {
-                "state": "skipped",
-                "updated_at": "2026-06-10T10:03:48.898993+00:00",
-                "source": "wrong_party_guard",
-                "reason": "wrong_party_branch_prevents_account_disclosure"
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
               },
               "resolve_outcome": {
-                "state": "skipped",
-                "updated_at": "2026-06-10T10:03:48.898993+00:00",
-                "source": "wrong_party_guard",
-                "reason": "wrong_party_branch_prevents_account_disclosure"
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
               },
               "close_conversation": {
                 "state": "pending",
-                "updated_at": "2026-06-10T09:07:51.294395+00:00",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
                 "source": "reconciler",
                 "reason": ""
               }
             },
             "updated_from": "react",
+            "last_response_target": "customer"
+          }
+        },
+        {
+          "at_utc": "2026-06-12T03:52:11.531354+00:00",
+          "version": 1,
+          "status": "active",
+          "current_node_id": "purpose_disclosure",
+          "update": {
+            "origin": "react",
+            "route": "continue",
+            "response_target": "customer",
+            "previous_node_id": "purpose_disclosure",
+            "current_node_id": "purpose_disclosure",
+            "plan_outline": "",
+            "operation": "advance"
+          },
+          "plan": {
+            "plan_id": "plan-COLL-1002",
+            "version": 1,
+            "status": "active",
+            "mode": "strict_collections",
+            "objective": "Move borrower conversation to payment, promise-to-pay, or compliant follow-up.",
+            "root_node_id": "open_and_context",
+            "current_node_id": "purpose_disclosure",
+            "previous_node_id": "purpose_disclosure",
+            "next_node_ids": [
+              "discovery_empathy",
+              "explain_dues"
+            ],
+            "nodes": [
+              {
+                "id": "open_and_context",
+                "label": "Initialize case context",
+                "owner": "collection_agent",
+                "status": "done"
+              },
+              {
+                "id": "verify_identity",
+                "label": "Verify customer identity",
+                "owner": "customer",
+                "status": "done"
+              },
+              {
+                "id": "wrong_party_callback",
+                "label": "Arrange privacy-safe callback",
+                "owner": "collection_agent",
+                "status": "pending"
+              },
+              {
+                "id": "purpose_disclosure",
+                "label": "Disclose call purpose and overdue installment",
+                "owner": "collection_agent",
+                "status": "in_progress"
+              },
+              {
+                "id": "discovery_empathy",
+                "label": "Understand and acknowledge customer situation",
+                "owner": "collection_agent",
+                "status": "pending"
+              },
+              {
+                "id": "resolution_offer",
+                "label": "Present eligible resolution option",
+                "owner": "collection_agent",
+                "status": "pending"
+              },
+              {
+                "id": "confirmation",
+                "label": "Confirm agreed outcome and reference",
+                "owner": "collection_agent",
+                "status": "pending"
+              },
+              {
+                "id": "explain_dues",
+                "label": "Explain standard payment options",
+                "owner": "customer",
+                "status": "pending"
+              },
+              {
+                "id": "collect_payment_intent",
+                "label": "Collect payment intent",
+                "owner": "customer",
+                "status": "pending"
+              },
+              {
+                "id": "evaluate_assistance",
+                "label": "Evaluate discount/restructure assistance",
+                "owner": "collection_agent",
+                "status": "pending"
+              },
+              {
+                "id": "resolve_outcome",
+                "label": "Finalize payment, promise, or follow-up",
+                "owner": "customer",
+                "status": "pending"
+              },
+              {
+                "id": "close_conversation",
+                "label": "Close conversation",
+                "owner": "collection_agent",
+                "status": "pending"
+              }
+            ],
+            "edges": [
+              {
+                "from": "open_and_context",
+                "to": "verify_identity",
+                "condition": "case_context_ready"
+              },
+              {
+                "from": "verify_identity",
+                "to": "purpose_disclosure",
+                "condition": "identity_verified"
+              },
+              {
+                "from": "verify_identity",
+                "to": "wrong_party_callback",
+                "condition": "wrong_party_detected"
+              },
+              {
+                "from": "purpose_disclosure",
+                "to": "discovery_empathy",
+                "condition": "customer_situation_shared"
+              },
+              {
+                "from": "purpose_disclosure",
+                "to": "explain_dues",
+                "condition": "standard_resolution_requested"
+              },
+              {
+                "from": "discovery_empathy",
+                "to": "resolution_offer",
+                "condition": "eligible_assistance_found"
+              },
+              {
+                "from": "resolution_offer",
+                "to": "confirmation",
+                "condition": "offer_accepted"
+              },
+              {
+                "from": "confirmation",
+                "to": "close_conversation",
+                "condition": "outcome_confirmed"
+              },
+              {
+                "from": "explain_dues",
+                "to": "collect_payment_intent",
+                "condition": "dues_explained"
+              },
+              {
+                "from": "collect_payment_intent",
+                "to": "resolve_outcome",
+                "condition": "pay_now"
+              },
+              {
+                "from": "collect_payment_intent",
+                "to": "evaluate_assistance",
+                "condition": "cannot_pay_full"
+              },
+              {
+                "from": "evaluate_assistance",
+                "to": "resolve_outcome",
+                "condition": "assistance_ready"
+              },
+              {
+                "from": "wrong_party_callback",
+                "to": "close_conversation",
+                "condition": "callback_confirmed"
+              },
+              {
+                "from": "resolve_outcome",
+                "to": "close_conversation",
+                "condition": "outcome_confirmed"
+              }
+            ],
+            "step_markers": {
+              "open_and_context": {
+                "state": "done",
+                "updated_at": "2026-06-12T03:51:51.973343+00:00",
+                "source": "plan_tree_update",
+                "reason": "case_context_ready_transition"
+              },
+              "verify_identity": {
+                "state": "done",
+                "updated_at": "2026-06-12T03:52:11.531354+00:00",
+                "source": "memory_identity_verified",
+                "reason": "memory_identity_verified"
+              },
+              "wrong_party_callback": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "purpose_disclosure": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "discovery_empathy": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "resolution_offer": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "confirmation": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "explain_dues": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "collect_payment_intent": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "evaluate_assistance": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "resolve_outcome": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "close_conversation": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              }
+            },
+            "updated_from": "react",
+            "last_response_target": "customer"
+          }
+        },
+        {
+          "at_utc": "2026-06-12T03:53:15.019869+00:00",
+          "version": 1,
+          "status": "active",
+          "current_node_id": "resolution_offer",
+          "update": {
+            "origin": "react",
+            "route": "continue",
+            "response_target": "customer",
+            "previous_node_id": "purpose_disclosure",
+            "current_node_id": "resolution_offer",
+            "plan_outline": "",
+            "operation": "advance"
+          },
+          "plan": {
+            "plan_id": "plan-COLL-1002",
+            "version": 1,
+            "status": "active",
+            "mode": "strict_collections",
+            "objective": "Move borrower conversation to payment, promise-to-pay, or compliant follow-up.",
+            "root_node_id": "open_and_context",
+            "current_node_id": "resolution_offer",
+            "previous_node_id": "purpose_disclosure",
+            "next_node_ids": [
+              "confirmation"
+            ],
+            "nodes": [
+              {
+                "id": "open_and_context",
+                "label": "Initialize case context",
+                "owner": "collection_agent",
+                "status": "done"
+              },
+              {
+                "id": "verify_identity",
+                "label": "Verify customer identity",
+                "owner": "customer",
+                "status": "done"
+              },
+              {
+                "id": "wrong_party_callback",
+                "label": "Arrange privacy-safe callback",
+                "owner": "collection_agent",
+                "status": "pending"
+              },
+              {
+                "id": "purpose_disclosure",
+                "label": "Disclose call purpose and overdue installment",
+                "owner": "collection_agent",
+                "status": "done"
+              },
+              {
+                "id": "discovery_empathy",
+                "label": "Understand and acknowledge customer situation",
+                "owner": "collection_agent",
+                "status": "done"
+              },
+              {
+                "id": "resolution_offer",
+                "label": "Present eligible resolution option",
+                "owner": "collection_agent",
+                "status": "in_progress"
+              },
+              {
+                "id": "confirmation",
+                "label": "Confirm agreed outcome and reference",
+                "owner": "collection_agent",
+                "status": "pending"
+              },
+              {
+                "id": "explain_dues",
+                "label": "Explain standard payment options",
+                "owner": "customer",
+                "status": "pending"
+              },
+              {
+                "id": "collect_payment_intent",
+                "label": "Collect payment intent",
+                "owner": "customer",
+                "status": "pending"
+              },
+              {
+                "id": "evaluate_assistance",
+                "label": "Evaluate discount/restructure assistance",
+                "owner": "collection_agent",
+                "status": "pending"
+              },
+              {
+                "id": "resolve_outcome",
+                "label": "Finalize payment, promise, or follow-up",
+                "owner": "customer",
+                "status": "pending"
+              },
+              {
+                "id": "close_conversation",
+                "label": "Close conversation",
+                "owner": "collection_agent",
+                "status": "pending"
+              }
+            ],
+            "edges": [
+              {
+                "from": "open_and_context",
+                "to": "verify_identity",
+                "condition": "case_context_ready"
+              },
+              {
+                "from": "verify_identity",
+                "to": "purpose_disclosure",
+                "condition": "identity_verified"
+              },
+              {
+                "from": "verify_identity",
+                "to": "wrong_party_callback",
+                "condition": "wrong_party_detected"
+              },
+              {
+                "from": "purpose_disclosure",
+                "to": "discovery_empathy",
+                "condition": "customer_situation_shared"
+              },
+              {
+                "from": "purpose_disclosure",
+                "to": "explain_dues",
+                "condition": "standard_resolution_requested"
+              },
+              {
+                "from": "discovery_empathy",
+                "to": "resolution_offer",
+                "condition": "eligible_assistance_found"
+              },
+              {
+                "from": "resolution_offer",
+                "to": "confirmation",
+                "condition": "offer_accepted"
+              },
+              {
+                "from": "confirmation",
+                "to": "close_conversation",
+                "condition": "outcome_confirmed"
+              },
+              {
+                "from": "explain_dues",
+                "to": "collect_payment_intent",
+                "condition": "dues_explained"
+              },
+              {
+                "from": "collect_payment_intent",
+                "to": "resolve_outcome",
+                "condition": "pay_now"
+              },
+              {
+                "from": "collect_payment_intent",
+                "to": "evaluate_assistance",
+                "condition": "cannot_pay_full"
+              },
+              {
+                "from": "evaluate_assistance",
+                "to": "resolve_outcome",
+                "condition": "assistance_ready"
+              },
+              {
+                "from": "wrong_party_callback",
+                "to": "close_conversation",
+                "condition": "callback_confirmed"
+              },
+              {
+                "from": "resolve_outcome",
+                "to": "close_conversation",
+                "condition": "outcome_confirmed"
+              }
+            ],
+            "step_markers": {
+              "open_and_context": {
+                "state": "done",
+                "updated_at": "2026-06-12T03:51:51.973343+00:00",
+                "source": "plan_tree_update",
+                "reason": "case_context_ready_transition"
+              },
+              "verify_identity": {
+                "state": "done",
+                "updated_at": "2026-06-12T03:53:15.019869+00:00",
+                "source": "memory_identity_verified",
+                "reason": "memory_identity_verified"
+              },
+              "wrong_party_callback": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "purpose_disclosure": {
+                "state": "done",
+                "updated_at": "2026-06-12T03:53:15.019869+00:00",
+                "source": "canonical_flow",
+                "reason": "purpose_disclosed_before_resolution"
+              },
+              "discovery_empathy": {
+                "state": "done",
+                "updated_at": "2026-06-12T03:53:15.019869+00:00",
+                "source": "canonical_flow",
+                "reason": "hardship_acknowledged"
+              },
+              "resolution_offer": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "confirmation": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "explain_dues": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "collect_payment_intent": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "evaluate_assistance": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "resolve_outcome": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "close_conversation": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              }
+            },
+            "updated_from": "react",
+            "last_response_target": "customer"
+          }
+        },
+        {
+          "at_utc": "2026-06-12T03:54:03.162273+00:00",
+          "version": 1,
+          "status": "active",
+          "current_node_id": "confirmation",
+          "update": {
+            "origin": "react",
+            "route": "continue",
+            "response_target": "customer",
+            "previous_node_id": "resolution_offer",
+            "current_node_id": "confirmation",
+            "plan_outline": "",
+            "operation": "advance"
+          },
+          "plan": {
+            "plan_id": "plan-COLL-1002",
+            "version": 1,
+            "status": "active",
+            "mode": "strict_collections",
+            "objective": "Move borrower conversation to payment, promise-to-pay, or compliant follow-up.",
+            "root_node_id": "open_and_context",
+            "current_node_id": "confirmation",
+            "previous_node_id": "resolution_offer",
+            "next_node_ids": [
+              "close_conversation"
+            ],
+            "nodes": [
+              {
+                "id": "open_and_context",
+                "label": "Initialize case context",
+                "owner": "collection_agent",
+                "status": "done"
+              },
+              {
+                "id": "verify_identity",
+                "label": "Verify customer identity",
+                "owner": "customer",
+                "status": "done"
+              },
+              {
+                "id": "wrong_party_callback",
+                "label": "Arrange privacy-safe callback",
+                "owner": "collection_agent",
+                "status": "pending"
+              },
+              {
+                "id": "purpose_disclosure",
+                "label": "Disclose call purpose and overdue installment",
+                "owner": "collection_agent",
+                "status": "done"
+              },
+              {
+                "id": "discovery_empathy",
+                "label": "Understand and acknowledge customer situation",
+                "owner": "collection_agent",
+                "status": "done"
+              },
+              {
+                "id": "resolution_offer",
+                "label": "Present eligible resolution option",
+                "owner": "collection_agent",
+                "status": "done"
+              },
+              {
+                "id": "confirmation",
+                "label": "Confirm agreed outcome and reference",
+                "owner": "collection_agent",
+                "status": "in_progress"
+              },
+              {
+                "id": "explain_dues",
+                "label": "Explain standard payment options",
+                "owner": "customer",
+                "status": "pending"
+              },
+              {
+                "id": "collect_payment_intent",
+                "label": "Collect payment intent",
+                "owner": "customer",
+                "status": "pending"
+              },
+              {
+                "id": "evaluate_assistance",
+                "label": "Evaluate discount/restructure assistance",
+                "owner": "collection_agent",
+                "status": "pending"
+              },
+              {
+                "id": "resolve_outcome",
+                "label": "Finalize payment, promise, or follow-up",
+                "owner": "customer",
+                "status": "pending"
+              },
+              {
+                "id": "close_conversation",
+                "label": "Close conversation",
+                "owner": "collection_agent",
+                "status": "pending"
+              }
+            ],
+            "edges": [
+              {
+                "from": "open_and_context",
+                "to": "verify_identity",
+                "condition": "case_context_ready"
+              },
+              {
+                "from": "verify_identity",
+                "to": "purpose_disclosure",
+                "condition": "identity_verified"
+              },
+              {
+                "from": "verify_identity",
+                "to": "wrong_party_callback",
+                "condition": "wrong_party_detected"
+              },
+              {
+                "from": "purpose_disclosure",
+                "to": "discovery_empathy",
+                "condition": "customer_situation_shared"
+              },
+              {
+                "from": "purpose_disclosure",
+                "to": "explain_dues",
+                "condition": "standard_resolution_requested"
+              },
+              {
+                "from": "discovery_empathy",
+                "to": "resolution_offer",
+                "condition": "eligible_assistance_found"
+              },
+              {
+                "from": "resolution_offer",
+                "to": "confirmation",
+                "condition": "offer_accepted"
+              },
+              {
+                "from": "confirmation",
+                "to": "close_conversation",
+                "condition": "outcome_confirmed"
+              },
+              {
+                "from": "explain_dues",
+                "to": "collect_payment_intent",
+                "condition": "dues_explained"
+              },
+              {
+                "from": "collect_payment_intent",
+                "to": "resolve_outcome",
+                "condition": "pay_now"
+              },
+              {
+                "from": "collect_payment_intent",
+                "to": "evaluate_assistance",
+                "condition": "cannot_pay_full"
+              },
+              {
+                "from": "evaluate_assistance",
+                "to": "resolve_outcome",
+                "condition": "assistance_ready"
+              },
+              {
+                "from": "wrong_party_callback",
+                "to": "close_conversation",
+                "condition": "callback_confirmed"
+              },
+              {
+                "from": "resolve_outcome",
+                "to": "close_conversation",
+                "condition": "outcome_confirmed"
+              }
+            ],
+            "step_markers": {
+              "open_and_context": {
+                "state": "done",
+                "updated_at": "2026-06-12T03:51:51.973343+00:00",
+                "source": "plan_tree_update",
+                "reason": "case_context_ready_transition"
+              },
+              "verify_identity": {
+                "state": "done",
+                "updated_at": "2026-06-12T03:54:03.162273+00:00",
+                "source": "memory_identity_verified",
+                "reason": "memory_identity_verified"
+              },
+              "wrong_party_callback": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "purpose_disclosure": {
+                "state": "done",
+                "updated_at": "2026-06-12T03:54:03.162273+00:00",
+                "source": "canonical_flow",
+                "reason": "purpose_disclosed_before_resolution"
+              },
+              "discovery_empathy": {
+                "state": "done",
+                "updated_at": "2026-06-12T03:54:03.162273+00:00",
+                "source": "canonical_flow",
+                "reason": "hardship_acknowledged"
+              },
+              "resolution_offer": {
+                "state": "done",
+                "updated_at": "2026-06-12T03:54:03.162273+00:00",
+                "source": "canonical_flow",
+                "reason": "eligible_offer_accepted"
+              },
+              "confirmation": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "explain_dues": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "collect_payment_intent": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "evaluate_assistance": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "resolve_outcome": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "close_conversation": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              }
+            },
+            "updated_from": "react",
+            "last_response_target": "customer"
+          }
+        },
+        {
+          "at_utc": "2026-06-12T03:54:19.324378+00:00",
+          "version": 1,
+          "status": "active",
+          "current_node_id": "confirmation",
+          "update": {
+            "origin": "react",
+            "route": "continue",
+            "response_target": "customer",
+            "previous_node_id": "confirmation",
+            "current_node_id": "confirmation",
+            "plan_outline": "",
+            "operation": "advance"
+          },
+          "plan": {
+            "plan_id": "plan-COLL-1002",
+            "version": 1,
+            "status": "active",
+            "mode": "strict_collections",
+            "objective": "Move borrower conversation to payment, promise-to-pay, or compliant follow-up.",
+            "root_node_id": "open_and_context",
+            "current_node_id": "confirmation",
+            "previous_node_id": "confirmation",
+            "next_node_ids": [
+              "close_conversation"
+            ],
+            "nodes": [
+              {
+                "id": "open_and_context",
+                "label": "Initialize case context",
+                "owner": "collection_agent",
+                "status": "done"
+              },
+              {
+                "id": "verify_identity",
+                "label": "Verify customer identity",
+                "owner": "customer",
+                "status": "done"
+              },
+              {
+                "id": "wrong_party_callback",
+                "label": "Arrange privacy-safe callback",
+                "owner": "collection_agent",
+                "status": "pending"
+              },
+              {
+                "id": "purpose_disclosure",
+                "label": "Disclose call purpose and overdue installment",
+                "owner": "collection_agent",
+                "status": "done"
+              },
+              {
+                "id": "discovery_empathy",
+                "label": "Understand and acknowledge customer situation",
+                "owner": "collection_agent",
+                "status": "done"
+              },
+              {
+                "id": "resolution_offer",
+                "label": "Present eligible resolution option",
+                "owner": "collection_agent",
+                "status": "done"
+              },
+              {
+                "id": "confirmation",
+                "label": "Confirm agreed outcome and reference",
+                "owner": "collection_agent",
+                "status": "in_progress"
+              },
+              {
+                "id": "explain_dues",
+                "label": "Explain standard payment options",
+                "owner": "customer",
+                "status": "pending"
+              },
+              {
+                "id": "collect_payment_intent",
+                "label": "Collect payment intent",
+                "owner": "customer",
+                "status": "pending"
+              },
+              {
+                "id": "evaluate_assistance",
+                "label": "Evaluate discount/restructure assistance",
+                "owner": "collection_agent",
+                "status": "pending"
+              },
+              {
+                "id": "resolve_outcome",
+                "label": "Finalize payment, promise, or follow-up",
+                "owner": "customer",
+                "status": "pending"
+              },
+              {
+                "id": "close_conversation",
+                "label": "Close conversation",
+                "owner": "collection_agent",
+                "status": "pending"
+              }
+            ],
+            "edges": [
+              {
+                "from": "open_and_context",
+                "to": "verify_identity",
+                "condition": "case_context_ready"
+              },
+              {
+                "from": "verify_identity",
+                "to": "purpose_disclosure",
+                "condition": "identity_verified"
+              },
+              {
+                "from": "verify_identity",
+                "to": "wrong_party_callback",
+                "condition": "wrong_party_detected"
+              },
+              {
+                "from": "purpose_disclosure",
+                "to": "discovery_empathy",
+                "condition": "customer_situation_shared"
+              },
+              {
+                "from": "purpose_disclosure",
+                "to": "explain_dues",
+                "condition": "standard_resolution_requested"
+              },
+              {
+                "from": "discovery_empathy",
+                "to": "resolution_offer",
+                "condition": "eligible_assistance_found"
+              },
+              {
+                "from": "resolution_offer",
+                "to": "confirmation",
+                "condition": "offer_accepted"
+              },
+              {
+                "from": "confirmation",
+                "to": "close_conversation",
+                "condition": "outcome_confirmed"
+              },
+              {
+                "from": "explain_dues",
+                "to": "collect_payment_intent",
+                "condition": "dues_explained"
+              },
+              {
+                "from": "collect_payment_intent",
+                "to": "resolve_outcome",
+                "condition": "pay_now"
+              },
+              {
+                "from": "collect_payment_intent",
+                "to": "evaluate_assistance",
+                "condition": "cannot_pay_full"
+              },
+              {
+                "from": "evaluate_assistance",
+                "to": "resolve_outcome",
+                "condition": "assistance_ready"
+              },
+              {
+                "from": "wrong_party_callback",
+                "to": "close_conversation",
+                "condition": "callback_confirmed"
+              },
+              {
+                "from": "resolve_outcome",
+                "to": "close_conversation",
+                "condition": "outcome_confirmed"
+              }
+            ],
+            "step_markers": {
+              "open_and_context": {
+                "state": "done",
+                "updated_at": "2026-06-12T03:51:51.973343+00:00",
+                "source": "plan_tree_update",
+                "reason": "case_context_ready_transition"
+              },
+              "verify_identity": {
+                "state": "done",
+                "updated_at": "2026-06-12T03:54:19.324378+00:00",
+                "source": "memory_identity_verified",
+                "reason": "memory_identity_verified"
+              },
+              "wrong_party_callback": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "purpose_disclosure": {
+                "state": "done",
+                "updated_at": "2026-06-12T03:54:19.324378+00:00",
+                "source": "canonical_flow",
+                "reason": "purpose_disclosed_before_resolution"
+              },
+              "discovery_empathy": {
+                "state": "done",
+                "updated_at": "2026-06-12T03:54:19.324378+00:00",
+                "source": "canonical_flow",
+                "reason": "hardship_acknowledged"
+              },
+              "resolution_offer": {
+                "state": "done",
+                "updated_at": "2026-06-12T03:54:19.324378+00:00",
+                "source": "canonical_flow",
+                "reason": "eligible_offer_accepted"
+              },
+              "confirmation": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "explain_dues": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "collect_payment_intent": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "evaluate_assistance": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "resolve_outcome": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "close_conversation": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              }
+            },
+            "updated_from": "react",
+            "last_response_target": "customer"
+          }
+        },
+        {
+          "at_utc": "2026-06-12T03:54:24.028654+00:00",
+          "version": 1,
+          "status": "active",
+          "current_node_id": "close_conversation",
+          "update": {
+            "origin": "response_render",
+            "operation": "advance",
+            "mark_done": [
+              "confirmation"
+            ],
+            "current_node_id": "close_conversation"
+          },
+          "plan": {
+            "plan_id": "plan-COLL-1002",
+            "version": 1,
+            "status": "active",
+            "mode": "strict_collections",
+            "objective": "Move borrower conversation to payment, promise-to-pay, or compliant follow-up.",
+            "root_node_id": "open_and_context",
+            "current_node_id": "close_conversation",
+            "previous_node_id": "confirmation",
+            "next_node_ids": [],
+            "nodes": [
+              {
+                "id": "open_and_context",
+                "label": "Initialize case context",
+                "owner": "collection_agent",
+                "status": "done"
+              },
+              {
+                "id": "verify_identity",
+                "label": "Verify customer identity",
+                "owner": "customer",
+                "status": "done"
+              },
+              {
+                "id": "wrong_party_callback",
+                "label": "Arrange privacy-safe callback",
+                "owner": "collection_agent",
+                "status": "pending"
+              },
+              {
+                "id": "purpose_disclosure",
+                "label": "Disclose call purpose and overdue installment",
+                "owner": "collection_agent",
+                "status": "done"
+              },
+              {
+                "id": "discovery_empathy",
+                "label": "Understand and acknowledge customer situation",
+                "owner": "collection_agent",
+                "status": "done"
+              },
+              {
+                "id": "resolution_offer",
+                "label": "Present eligible resolution option",
+                "owner": "collection_agent",
+                "status": "done"
+              },
+              {
+                "id": "confirmation",
+                "label": "Confirm agreed outcome and reference",
+                "owner": "collection_agent",
+                "status": "done"
+              },
+              {
+                "id": "explain_dues",
+                "label": "Explain standard payment options",
+                "owner": "customer",
+                "status": "pending"
+              },
+              {
+                "id": "collect_payment_intent",
+                "label": "Collect payment intent",
+                "owner": "customer",
+                "status": "pending"
+              },
+              {
+                "id": "evaluate_assistance",
+                "label": "Evaluate discount/restructure assistance",
+                "owner": "collection_agent",
+                "status": "pending"
+              },
+              {
+                "id": "resolve_outcome",
+                "label": "Finalize payment, promise, or follow-up",
+                "owner": "customer",
+                "status": "pending"
+              },
+              {
+                "id": "close_conversation",
+                "label": "Close conversation",
+                "owner": "collection_agent",
+                "status": "in_progress"
+              }
+            ],
+            "edges": [
+              {
+                "from": "open_and_context",
+                "to": "verify_identity",
+                "condition": "case_context_ready"
+              },
+              {
+                "from": "verify_identity",
+                "to": "purpose_disclosure",
+                "condition": "identity_verified"
+              },
+              {
+                "from": "verify_identity",
+                "to": "wrong_party_callback",
+                "condition": "wrong_party_detected"
+              },
+              {
+                "from": "purpose_disclosure",
+                "to": "discovery_empathy",
+                "condition": "customer_situation_shared"
+              },
+              {
+                "from": "purpose_disclosure",
+                "to": "explain_dues",
+                "condition": "standard_resolution_requested"
+              },
+              {
+                "from": "discovery_empathy",
+                "to": "resolution_offer",
+                "condition": "eligible_assistance_found"
+              },
+              {
+                "from": "resolution_offer",
+                "to": "confirmation",
+                "condition": "offer_accepted"
+              },
+              {
+                "from": "confirmation",
+                "to": "close_conversation",
+                "condition": "outcome_confirmed"
+              },
+              {
+                "from": "explain_dues",
+                "to": "collect_payment_intent",
+                "condition": "dues_explained"
+              },
+              {
+                "from": "collect_payment_intent",
+                "to": "resolve_outcome",
+                "condition": "pay_now"
+              },
+              {
+                "from": "collect_payment_intent",
+                "to": "evaluate_assistance",
+                "condition": "cannot_pay_full"
+              },
+              {
+                "from": "evaluate_assistance",
+                "to": "resolve_outcome",
+                "condition": "assistance_ready"
+              },
+              {
+                "from": "wrong_party_callback",
+                "to": "close_conversation",
+                "condition": "callback_confirmed"
+              },
+              {
+                "from": "resolve_outcome",
+                "to": "close_conversation",
+                "condition": "outcome_confirmed"
+              }
+            ],
+            "step_markers": {
+              "open_and_context": {
+                "state": "done",
+                "updated_at": "2026-06-12T03:51:51.973343+00:00",
+                "source": "plan_tree_update",
+                "reason": "case_context_ready_transition"
+              },
+              "verify_identity": {
+                "state": "done",
+                "updated_at": "2026-06-12T03:54:19.324378+00:00",
+                "source": "memory_identity_verified",
+                "reason": "memory_identity_verified"
+              },
+              "wrong_party_callback": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "purpose_disclosure": {
+                "state": "done",
+                "updated_at": "2026-06-12T03:54:19.324378+00:00",
+                "source": "canonical_flow",
+                "reason": "purpose_disclosed_before_resolution"
+              },
+              "discovery_empathy": {
+                "state": "done",
+                "updated_at": "2026-06-12T03:54:19.324378+00:00",
+                "source": "canonical_flow",
+                "reason": "hardship_acknowledged"
+              },
+              "resolution_offer": {
+                "state": "done",
+                "updated_at": "2026-06-12T03:54:19.324378+00:00",
+                "source": "canonical_flow",
+                "reason": "eligible_offer_accepted"
+              },
+              "confirmation": {
+                "state": "done",
+                "updated_at": "2026-06-12T03:54:24.028654+00:00",
+                "source": "response_render",
+                "reason": "agreed_outcome_and_reference_delivered"
+              },
+              "explain_dues": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "collect_payment_intent": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "evaluate_assistance": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "resolve_outcome": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "close_conversation": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:54:24.028654+00:00",
+                "source": "response_render",
+                "reason": "awaiting_customer_closing_reply"
+              }
+            },
+            "updated_from": "response_render",
+            "last_response_target": "customer"
+          }
+        },
+        {
+          "at_utc": "2026-06-12T04:00:14.353310+00:00",
+          "version": 1,
+          "status": "active",
+          "current_node_id": "close_conversation",
+          "update": {
+            "origin": "react",
+            "route": "continue",
+            "response_target": "customer",
+            "previous_node_id": "close_conversation",
+            "current_node_id": "close_conversation",
+            "plan_outline": "",
+            "operation": "advance"
+          },
+          "plan": {
+            "plan_id": "plan-COLL-1002",
+            "version": 1,
+            "status": "active",
+            "mode": "strict_collections",
+            "objective": "Move borrower conversation to payment, promise-to-pay, or compliant follow-up.",
+            "root_node_id": "open_and_context",
+            "current_node_id": "close_conversation",
+            "previous_node_id": "close_conversation",
+            "next_node_ids": [],
+            "nodes": [
+              {
+                "id": "open_and_context",
+                "label": "Initialize case context",
+                "owner": "collection_agent",
+                "status": "done"
+              },
+              {
+                "id": "verify_identity",
+                "label": "Verify customer identity",
+                "owner": "customer",
+                "status": "done"
+              },
+              {
+                "id": "wrong_party_callback",
+                "label": "Arrange privacy-safe callback",
+                "owner": "collection_agent",
+                "status": "pending"
+              },
+              {
+                "id": "purpose_disclosure",
+                "label": "Disclose call purpose and overdue installment",
+                "owner": "collection_agent",
+                "status": "done"
+              },
+              {
+                "id": "discovery_empathy",
+                "label": "Understand and acknowledge customer situation",
+                "owner": "collection_agent",
+                "status": "done"
+              },
+              {
+                "id": "resolution_offer",
+                "label": "Present eligible resolution option",
+                "owner": "collection_agent",
+                "status": "done"
+              },
+              {
+                "id": "confirmation",
+                "label": "Confirm agreed outcome and reference",
+                "owner": "collection_agent",
+                "status": "done"
+              },
+              {
+                "id": "explain_dues",
+                "label": "Explain standard payment options",
+                "owner": "customer",
+                "status": "pending"
+              },
+              {
+                "id": "collect_payment_intent",
+                "label": "Collect payment intent",
+                "owner": "customer",
+                "status": "pending"
+              },
+              {
+                "id": "evaluate_assistance",
+                "label": "Evaluate discount/restructure assistance",
+                "owner": "collection_agent",
+                "status": "pending"
+              },
+              {
+                "id": "resolve_outcome",
+                "label": "Finalize payment, promise, or follow-up",
+                "owner": "customer",
+                "status": "pending"
+              },
+              {
+                "id": "close_conversation",
+                "label": "Close conversation",
+                "owner": "collection_agent",
+                "status": "in_progress"
+              }
+            ],
+            "edges": [
+              {
+                "from": "open_and_context",
+                "to": "verify_identity",
+                "condition": "case_context_ready"
+              },
+              {
+                "from": "verify_identity",
+                "to": "purpose_disclosure",
+                "condition": "identity_verified"
+              },
+              {
+                "from": "verify_identity",
+                "to": "wrong_party_callback",
+                "condition": "wrong_party_detected"
+              },
+              {
+                "from": "purpose_disclosure",
+                "to": "discovery_empathy",
+                "condition": "customer_situation_shared"
+              },
+              {
+                "from": "purpose_disclosure",
+                "to": "explain_dues",
+                "condition": "standard_resolution_requested"
+              },
+              {
+                "from": "discovery_empathy",
+                "to": "resolution_offer",
+                "condition": "eligible_assistance_found"
+              },
+              {
+                "from": "resolution_offer",
+                "to": "confirmation",
+                "condition": "offer_accepted"
+              },
+              {
+                "from": "confirmation",
+                "to": "close_conversation",
+                "condition": "outcome_confirmed"
+              },
+              {
+                "from": "explain_dues",
+                "to": "collect_payment_intent",
+                "condition": "dues_explained"
+              },
+              {
+                "from": "collect_payment_intent",
+                "to": "resolve_outcome",
+                "condition": "pay_now"
+              },
+              {
+                "from": "collect_payment_intent",
+                "to": "evaluate_assistance",
+                "condition": "cannot_pay_full"
+              },
+              {
+                "from": "evaluate_assistance",
+                "to": "resolve_outcome",
+                "condition": "assistance_ready"
+              },
+              {
+                "from": "wrong_party_callback",
+                "to": "close_conversation",
+                "condition": "callback_confirmed"
+              },
+              {
+                "from": "resolve_outcome",
+                "to": "close_conversation",
+                "condition": "outcome_confirmed"
+              }
+            ],
+            "step_markers": {
+              "open_and_context": {
+                "state": "done",
+                "updated_at": "2026-06-12T03:51:51.973343+00:00",
+                "source": "plan_tree_update",
+                "reason": "case_context_ready_transition"
+              },
+              "verify_identity": {
+                "state": "done",
+                "updated_at": "2026-06-12T04:00:14.353310+00:00",
+                "source": "memory_identity_verified",
+                "reason": "memory_identity_verified"
+              },
+              "wrong_party_callback": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "purpose_disclosure": {
+                "state": "done",
+                "updated_at": "2026-06-12T03:54:19.324378+00:00",
+                "source": "canonical_flow",
+                "reason": "purpose_disclosed_before_resolution"
+              },
+              "discovery_empathy": {
+                "state": "done",
+                "updated_at": "2026-06-12T03:54:19.324378+00:00",
+                "source": "canonical_flow",
+                "reason": "hardship_acknowledged"
+              },
+              "resolution_offer": {
+                "state": "done",
+                "updated_at": "2026-06-12T03:54:19.324378+00:00",
+                "source": "canonical_flow",
+                "reason": "eligible_offer_accepted"
+              },
+              "confirmation": {
+                "state": "done",
+                "updated_at": "2026-06-12T03:54:24.028654+00:00",
+                "source": "response_render",
+                "reason": "agreed_outcome_and_reference_delivered"
+              },
+              "explain_dues": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "collect_payment_intent": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "evaluate_assistance": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "resolve_outcome": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "close_conversation": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:54:24.028654+00:00",
+                "source": "response_render",
+                "reason": "awaiting_customer_closing_reply"
+              }
+            },
+            "updated_from": "react",
+            "last_response_target": "customer"
+          }
+        },
+        {
+          "at_utc": "2026-06-12T04:00:22.158955+00:00",
+          "version": 1,
+          "status": "completed",
+          "current_node_id": "close_conversation",
+          "update": {
+            "origin": "conversation_manager_timer",
+            "operation": "complete",
+            "current_node_id": "close_conversation"
+          },
+          "plan": {
+            "plan_id": "plan-COLL-1002",
+            "version": 1,
+            "status": "completed",
+            "mode": "strict_collections",
+            "objective": "Move borrower conversation to payment, promise-to-pay, or compliant follow-up.",
+            "root_node_id": "open_and_context",
+            "current_node_id": "close_conversation",
+            "previous_node_id": "close_conversation",
+            "next_node_ids": [],
+            "nodes": [
+              {
+                "id": "open_and_context",
+                "label": "Initialize case context",
+                "owner": "collection_agent",
+                "status": "done"
+              },
+              {
+                "id": "verify_identity",
+                "label": "Verify customer identity",
+                "owner": "customer",
+                "status": "done"
+              },
+              {
+                "id": "wrong_party_callback",
+                "label": "Arrange privacy-safe callback",
+                "owner": "collection_agent",
+                "status": "pending"
+              },
+              {
+                "id": "purpose_disclosure",
+                "label": "Disclose call purpose and overdue installment",
+                "owner": "collection_agent",
+                "status": "done"
+              },
+              {
+                "id": "discovery_empathy",
+                "label": "Understand and acknowledge customer situation",
+                "owner": "collection_agent",
+                "status": "done"
+              },
+              {
+                "id": "resolution_offer",
+                "label": "Present eligible resolution option",
+                "owner": "collection_agent",
+                "status": "done"
+              },
+              {
+                "id": "confirmation",
+                "label": "Confirm agreed outcome and reference",
+                "owner": "collection_agent",
+                "status": "done"
+              },
+              {
+                "id": "explain_dues",
+                "label": "Explain standard payment options",
+                "owner": "customer",
+                "status": "pending"
+              },
+              {
+                "id": "collect_payment_intent",
+                "label": "Collect payment intent",
+                "owner": "customer",
+                "status": "pending"
+              },
+              {
+                "id": "evaluate_assistance",
+                "label": "Evaluate discount/restructure assistance",
+                "owner": "collection_agent",
+                "status": "pending"
+              },
+              {
+                "id": "resolve_outcome",
+                "label": "Finalize payment, promise, or follow-up",
+                "owner": "customer",
+                "status": "pending"
+              },
+              {
+                "id": "close_conversation",
+                "label": "Close conversation",
+                "owner": "collection_agent",
+                "status": "done"
+              }
+            ],
+            "edges": [
+              {
+                "from": "open_and_context",
+                "to": "verify_identity",
+                "condition": "case_context_ready"
+              },
+              {
+                "from": "verify_identity",
+                "to": "purpose_disclosure",
+                "condition": "identity_verified"
+              },
+              {
+                "from": "verify_identity",
+                "to": "wrong_party_callback",
+                "condition": "wrong_party_detected"
+              },
+              {
+                "from": "purpose_disclosure",
+                "to": "discovery_empathy",
+                "condition": "customer_situation_shared"
+              },
+              {
+                "from": "purpose_disclosure",
+                "to": "explain_dues",
+                "condition": "standard_resolution_requested"
+              },
+              {
+                "from": "discovery_empathy",
+                "to": "resolution_offer",
+                "condition": "eligible_assistance_found"
+              },
+              {
+                "from": "resolution_offer",
+                "to": "confirmation",
+                "condition": "offer_accepted"
+              },
+              {
+                "from": "confirmation",
+                "to": "close_conversation",
+                "condition": "outcome_confirmed"
+              },
+              {
+                "from": "explain_dues",
+                "to": "collect_payment_intent",
+                "condition": "dues_explained"
+              },
+              {
+                "from": "collect_payment_intent",
+                "to": "resolve_outcome",
+                "condition": "pay_now"
+              },
+              {
+                "from": "collect_payment_intent",
+                "to": "evaluate_assistance",
+                "condition": "cannot_pay_full"
+              },
+              {
+                "from": "evaluate_assistance",
+                "to": "resolve_outcome",
+                "condition": "assistance_ready"
+              },
+              {
+                "from": "wrong_party_callback",
+                "to": "close_conversation",
+                "condition": "callback_confirmed"
+              },
+              {
+                "from": "resolve_outcome",
+                "to": "close_conversation",
+                "condition": "outcome_confirmed"
+              }
+            ],
+            "step_markers": {
+              "open_and_context": {
+                "state": "done",
+                "updated_at": "2026-06-12T03:51:51.973343+00:00",
+                "source": "plan_tree_update",
+                "reason": "case_context_ready_transition"
+              },
+              "verify_identity": {
+                "state": "done",
+                "updated_at": "2026-06-12T04:00:14.353310+00:00",
+                "source": "memory_identity_verified",
+                "reason": "memory_identity_verified"
+              },
+              "wrong_party_callback": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "purpose_disclosure": {
+                "state": "done",
+                "updated_at": "2026-06-12T03:54:19.324378+00:00",
+                "source": "canonical_flow",
+                "reason": "purpose_disclosed_before_resolution"
+              },
+              "discovery_empathy": {
+                "state": "done",
+                "updated_at": "2026-06-12T03:54:19.324378+00:00",
+                "source": "canonical_flow",
+                "reason": "hardship_acknowledged"
+              },
+              "resolution_offer": {
+                "state": "done",
+                "updated_at": "2026-06-12T03:54:19.324378+00:00",
+                "source": "canonical_flow",
+                "reason": "eligible_offer_accepted"
+              },
+              "confirmation": {
+                "state": "done",
+                "updated_at": "2026-06-12T03:54:24.028654+00:00",
+                "source": "response_render",
+                "reason": "agreed_outcome_and_reference_delivered"
+              },
+              "explain_dues": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "collect_payment_intent": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "evaluate_assistance": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "resolve_outcome": {
+                "state": "pending",
+                "updated_at": "2026-06-12T03:50:50.432405+00:00",
+                "source": "reconciler",
+                "reason": ""
+              },
+              "close_conversation": {
+                "state": "done",
+                "updated_at": "2026-06-12T04:00:22.158955+00:00",
+                "source": "conversation_manager_timer",
+                "reason": "termination_grace_period_elapsed"
+              }
+            },
+            "updated_from": "conversation_manager_timer",
             "last_response_target": "customer"
           }
         }
@@ -43083,31 +45209,224 @@
     "conversation_history": [
       {
         "role": "customer",
-        "content": "no"
+        "content": "yes I'm"
       },
       {
         "role": "agent",
-        "content": "Thank you. For privacy reasons, I can only discuss this directly with Rohan Gupta. I am unable to share any details with anyone else."
+        "content": "For your privacy and security, I need to verify a few details before we proceed. Could you please provide your date of birth and phone number?"
       },
       {
         "role": "customer",
-        "content": "he is not here now, please try at 5:30pm in evening today"
+        "content": "My phone number is : 9900001002 and date of birth is 1988-04-22"
       },
       {
         "role": "agent",
-        "content": "Thank you. I will try to reach Rohan Gupta he is not here now, please try at 5:30pm in evening today. Please let them know that EasySecure Financial Services called. Thank you for your help, and have a good day. Goodbye."
+        "content": "Thank you for confirming. I am calling about your policy LOAN-3002. A premium installment of 37800.00, due on 2026-06-10, is currently overdue. I wanted to check in and see how I can help."
+      },
+      {
+        "role": "customer",
+        "content": "i recently lost my job"
+      },
+      {
+        "role": "agent",
+        "content": "I am really sorry to hear that, and thank you for letting me know. The most important thing right now is keeping your cover active while you get back on your feet. Given your situation, I can place your premium on hold for up to 2 months, with no impact to your policy benefits during that time. Would that give you the breathing room you need?"
+      },
+      {
+        "role": "customer",
+        "content": "yes please"
+      },
+      {
+        "role": "agent",
+        "content": "I have arranged a 2-month hold on your installment. Your reference number is HOLD-2916C1CF0D. Confirmation has been sent by SMS and email. We will reach out a few days before the hold ends to discuss next steps."
+      },
+      {
+        "role": "customer",
+        "content": "The customer interrupted while the previous turn was still processing.\nPrevious interrupted customer message: sure thanks\nLatest customer message: sure\nUse the latest message as authoritative, but keep the interrupted message as immediate context."
+      },
+      {
+        "role": "agent",
+        "content": "Thank you for your time, Rohan Gupta. Take care, and we wish you all the best. Goodbye."
       }
     ],
-    "last_user_input": "he is not here now, please try at 5:30pm in evening today",
+    "last_user_input": "The customer interrupted while the previous turn was still processing.\nPrevious interrupted customer message: sure thanks\nLatest customer message: sure\nUse the latest message as authoritative, but keep the interrupted message as immediate context.",
     "extracted_entities": {
-      "callback_time": "5:30pm today"
+      "phone": "9900001002",
+      "dob": "1988-04-22",
+      "employment_status": "unemployed"
     },
-    "extracted_entities_turn": {
-      "callback_time": "5:30pm today"
-    },
+    "extracted_entities_turn": {},
     "extracted_entity_descriptions": {
-      "callback_time": "The requested time for the agent to call back the customer"
+      "phone": "Customer's contact phone number",
+      "dob": "Customer's date of birth",
+      "employment_status": "Current employment state of the customer"
     },
-    "extracted_entities_updated_fields": []
+    "extracted_entities_updated_fields": [],
+    "verification_verified_fields": [
+      "dob",
+      "phone"
+    ],
+    "verification_missing_fields": [],
+    "verified_dob": true,
+    "verified_mobile": true,
+    "identity_verified": true,
+    "last_tool_used": "email_confirmation_send",
+    "last_tool_observation": {
+      "tool_name": "email_confirmation_send",
+      "status": "",
+      "input": {
+        "customer_id": "CUST-2002",
+        "reference_number": "HOLD-2916C1CF0D",
+        "subject": "Premium hold confirmation",
+        "message": "Your premium hold has been arranged. Reference: HOLD-2916C1CF0D. The hold is active until 2026-08-12."
+      },
+      "output": {
+        "message_id": "EMAIL-734D4D02F5",
+        "customer_id": "CUST-2002",
+        "reference_number": "HOLD-2916C1CF0D",
+        "recipient": "rohan.gupta@example.com",
+        "status": "sent"
+      },
+      "timestamp_ms": 1781236436479
+    },
+    "tool_observations_history": [
+      {
+        "tool_name": "verify_dob",
+        "status": "",
+        "input": {
+          "case_id": "COLL-1002",
+          "customer_id": "CUST-2002",
+          "dob": "1988-04-22"
+        },
+        "output": {
+          "customer_id": "CUST-2002",
+          "status": "verified",
+          "field": "dob",
+          "failed_attempts": 0
+        },
+        "timestamp_ms": 1781236292445
+      },
+      {
+        "tool_name": "verify_mobile",
+        "status": "",
+        "input": {
+          "case_id": "COLL-1002",
+          "customer_id": "CUST-2002",
+          "phone": "9900001002"
+        },
+        "output": {
+          "customer_id": "CUST-2002",
+          "status": "verified",
+          "field": "phone",
+          "failed_attempts": 1
+        },
+        "timestamp_ms": 1781236293024
+      },
+      {
+        "tool_name": "premium_hold_create",
+        "status": "",
+        "input": {
+          "case_id": "COLL-1002",
+          "customer_id": "CUST-2002",
+          "program_id": "PREMIUM_HOLD_001",
+          "hold_months": 2
+        },
+        "output": {
+          "reference_number": "HOLD-2916C1CF0D",
+          "case_id": "COLL-1002",
+          "customer_id": "CUST-2002",
+          "program_id": "PREMIUM_HOLD_001",
+          "hold_months": 2,
+          "effective_from": "2026-06-12",
+          "effective_until": "2026-08-12",
+          "status": "active"
+        },
+        "timestamp_ms": 1781236435333
+      },
+      {
+        "tool_name": "sms_confirmation_send",
+        "status": "",
+        "input": {
+          "customer_id": "CUST-2002",
+          "reference_number": "HOLD-2916C1CF0D",
+          "message": "Your premium hold has been arranged. Reference: HOLD-2916C1CF0D. The hold is active until 2026-08-12."
+        },
+        "output": {
+          "message_id": "SMS-CE4596C016",
+          "customer_id": "CUST-2002",
+          "reference_number": "HOLD-2916C1CF0D",
+          "recipient": "+919900001002",
+          "status": "sent"
+        },
+        "timestamp_ms": 1781236435921
+      },
+      {
+        "tool_name": "email_confirmation_send",
+        "status": "",
+        "input": {
+          "customer_id": "CUST-2002",
+          "reference_number": "HOLD-2916C1CF0D",
+          "subject": "Premium hold confirmation",
+          "message": "Your premium hold has been arranged. Reference: HOLD-2916C1CF0D. The hold is active until 2026-08-12."
+        },
+        "output": {
+          "message_id": "EMAIL-734D4D02F5",
+          "customer_id": "CUST-2002",
+          "reference_number": "HOLD-2916C1CF0D",
+          "recipient": "rohan.gupta@example.com",
+          "status": "sent"
+        },
+        "timestamp_ms": 1781236436479
+      }
+    ],
+    "hardship_hold_stage": "confirmed",
+    "hardship_hold_program": {
+      "program_id": "PREMIUM_HOLD_001",
+      "program_type": "premium_hold",
+      "eligible_products": [
+        "personal_loan"
+      ],
+      "eligible_loan_ids": [
+        "LOAN-3002"
+      ],
+      "hardship_reasons": [
+        "job_loss"
+      ],
+      "max_hold_months": 2,
+      "benefits_remain_active": true,
+      "requires_manager_approval": false,
+      "confirmation_channels": [
+        "sms",
+        "email"
+      ],
+      "confirmation_sla_hours": 24
+    },
+    "hardship_hold_details": {
+      "reference_number": "HOLD-2916C1CF0D",
+      "case_id": "COLL-1002",
+      "customer_id": "CUST-2002",
+      "program_id": "PREMIUM_HOLD_001",
+      "hold_months": 2,
+      "effective_from": "2026-06-12",
+      "effective_until": "2026-08-12",
+      "status": "active",
+      "sms_confirmation": {
+        "message_id": "SMS-CE4596C016",
+        "customer_id": "CUST-2002",
+        "reference_number": "HOLD-2916C1CF0D",
+        "recipient": "+919900001002",
+        "status": "sent"
+      },
+      "email_confirmation": {
+        "message_id": "EMAIL-734D4D02F5",
+        "customer_id": "CUST-2002",
+        "reference_number": "HOLD-2916C1CF0D",
+        "recipient": "rohan.gupta@example.com",
+        "status": "sent"
+      }
+    },
+    "conversation_complete": true,
+    "conversation_closing": false,
+    "conversation_closed": true,
+    "terminate_call": false
   }
 }

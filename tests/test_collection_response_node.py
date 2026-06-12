@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from agents.collection_agent.nodes.collection_response_node import CollectionResponseNode
+from agents.collection_agent.nodes.plan_proposal_utils import finalize_conversation_memory
 from src.memory.types import WorkingMemory
 
 
@@ -76,6 +77,162 @@ def test_response_node_renders_from_hardship_response_directive() -> None:
     assert update["response_render_debug"]["template_selected"] == "capacity_question"
     assert update["response_render_debug"]["response_mode"] == "empathetic"
     assert update["response_render_debug"]["renderer_fallback_used"] is True
+
+
+def test_response_node_renders_staged_job_loss_hold_flow_from_data() -> None:
+    node = _build_node()
+    base_state = {
+        "active_customer_name": "Rohan Gupta",
+        "active_case_id": "COLL-1002",
+        "active_overdue_amount": 37800.0,
+        "identity_verified": True,
+        "active_collection_context": {
+            "customer": {
+                "variables": {
+                    "[POLICY_NUMBER]": "LOAN-3002",
+                    "[AMOUNT]": "37800.00",
+                    "[DUE_DATE]": "2026-06-10",
+                    "[REF_NUMBER]": "COLL-1002",
+                }
+            },
+            "case": {"loan_id": "LOAN-3002"},
+        },
+    }
+    memory = WorkingMemory(session_id="response-hold", state=dict(base_state))
+
+    purpose = node.execute(
+        {
+            "user_input": "verified",
+            "memory": memory,
+            "plan_proposal": {
+                "target": "customer",
+                "response_directive": {
+                    "conversation_objective": "purpose_disclosure",
+                    "dialogue_action": "disclose_call_purpose",
+                    "response_mode": "informational",
+                },
+            },
+        }
+    )["response"]
+    assert "policy LOAN-3002" in purpose
+    assert "37800.00" in purpose
+    assert "2026-06-10" in purpose
+    assert "20%" not in purpose
+    assert "5 days" not in purpose
+
+    memory.set_state(
+        hardship_hold_program={
+            "max_hold_months": 2,
+            "benefits_remain_active": True,
+            "confirmation_sla_hours": 24,
+        }
+    )
+    offer = node.execute(
+        {
+            "user_input": "I lost my job",
+            "memory": memory,
+            "plan_proposal": {
+                "target": "customer",
+                "response_directive": {
+                    "conversation_objective": "hardship_hold_offer",
+                    "dialogue_action": "offer_hardship_hold",
+                    "response_mode": "empathetic",
+                },
+            },
+        }
+    )["response"]
+    assert "hold for up to 2 months" in offer
+    assert "no impact to your policy benefits" in offer
+    assert "20%" not in offer
+
+    memory.set_state(
+        active_conversation_plan={
+            "plan_id": "PLAN-HOLD-1",
+            "version": 1,
+            "status": "active",
+            "mode": "hardship_negotiation",
+            "objective": "Resolve hardship",
+            "root_node_id": "open_and_context",
+            "current_node_id": "confirmation",
+            "previous_node_id": "resolution_offer",
+            "next_node_ids": ["close_conversation"],
+            "nodes": [
+                {"id": "confirmation", "label": "Confirm agreed outcome and reference", "status": "in_progress"},
+                {"id": "close_conversation", "label": "Close conversation", "status": "pending"},
+            ],
+            "edges": [
+                {"from": "confirmation", "to": "close_conversation", "condition": "outcome_confirmed"},
+            ],
+            "step_markers": {
+                "confirmation": {"state": "pending"},
+                "close_conversation": {"state": "pending"},
+            },
+            "timeline": [],
+            "timeline_snapshots": [],
+        },
+        hardship_hold_details={
+            "hold_months": 2,
+            "reference_number": "HOLD-A1B2C3D4E5",
+            "confirmation_sla_hours": 24,
+            "sms_confirmation": {"status": "sent"},
+            "email_confirmation": {"status": "sent"},
+        }
+    )
+    confirmation_update = node.execute(
+        {
+            "user_input": "Yes, that would really help",
+            "memory": memory,
+            "plan_proposal": {
+                "target": "customer",
+                "response_directive": {
+                    "conversation_objective": "hardship_hold_confirmation",
+                    "dialogue_action": "confirm_hardship_hold",
+                    "response_mode": "empathetic",
+                },
+            },
+        }
+    )
+    confirmation = confirmation_update["response"]
+    assert "2-month hold" in confirmation
+    assert "reference number is HOLD-A1B2C3D4E5" in confirmation
+    assert "confirmation has been sent by sms and email" in confirmation.lower()
+    assert "anything else" not in confirmation.lower()
+    advanced_plan = confirmation_update["conversation_plan"]
+    advanced_nodes = {item["id"]: item for item in advanced_plan["nodes"]}
+    assert advanced_plan["current_node_id"] == "close_conversation"
+    assert advanced_plan["status"] == "active"
+    assert advanced_plan["step_markers"]["confirmation"]["state"] == "done"
+    assert advanced_nodes["confirmation"]["status"] == "done"
+    assert advanced_nodes["close_conversation"]["status"] == "in_progress"
+    assert advanced_plan["timeline_snapshots"][-1]["update"]["origin"] == "response_render"
+
+    closing_update = node.execute(
+        {
+            "user_input": "No, thank you",
+            "memory": memory,
+            "plan_proposal": {
+                "target": "customer",
+                "response_directive": {
+                    "conversation_objective": "hardship_hold_closing",
+                    "dialogue_action": "close_hardship_hold_conversation",
+                    "response_mode": "empathetic",
+                },
+            },
+        }
+    )
+    assert "Thank you for your time, Rohan Gupta." in closing_update["response"]
+    assert closing_update["response"].endswith("Goodbye.")
+    assert closing_update["conversation_closing"] is True
+    assert closing_update["termination_grace_seconds"] == 3.0
+
+    finalize_conversation_memory(memory)
+    completed_plan = memory.state["active_conversation_plan"]
+    completed_nodes = {item["id"]: item for item in completed_plan["nodes"]}
+    assert completed_plan["status"] == "completed"
+    assert completed_plan["step_markers"]["confirmation"]["state"] == "done"
+    assert completed_plan["step_markers"]["close_conversation"]["state"] == "done"
+    assert completed_nodes["confirmation"]["status"] == "done"
+    assert completed_nodes["close_conversation"]["status"] == "done"
 
 
 def test_response_node_opens_with_dynamic_right_party_confirmation() -> None:
@@ -308,6 +465,108 @@ def test_response_node_wrong_party_callback_confirmation_closes_call() -> None:
     assert "goodbye" in response
     assert "date of birth" not in response
     assert "overdue" not in response
+
+
+def test_response_node_callback_confirmation_uses_clean_natural_timing() -> None:
+    node = _build_node()
+    memory = WorkingMemory(
+        session_id="response-wrong-party-clean-time",
+        state={
+            "active_customer_name": "Rohan Gupta",
+            "identity_verified": False,
+            "right_party_status": "wrong_party",
+            "wrong_party_callback_stage": "completed",
+            "wrong_party_callback_time": "at 5:30 PM today",
+            "active_collection_context": {
+                "customer": {
+                    "variables": {
+                        "[COMPANY_NAME]": "EasySecure Financial Services",
+                    }
+                }
+            },
+        },
+    )
+    state = {
+        "user_input": "he is not here now, please try at 5:30pm in evening today",
+        "memory": memory,
+        "plan_proposal": {
+            "target": "customer",
+            "response_directive": {
+                "conversation_objective": "wrong_party_callback_confirmation",
+                "dialogue_action": "wrong_party_callback_confirmation",
+                "response_mode": "compliance",
+            },
+        },
+    }
+
+    response = node.execute(state)["response"]
+
+    assert "reach Rohan Gupta at 5:30 PM today" in response
+    assert "he is not here now" not in response
+    assert response.count("Thank you") == 1
+
+
+def test_response_node_closing_acknowledgement_does_not_repeat_callback() -> None:
+    node = _build_node()
+    memory = WorkingMemory(
+        session_id="response-wrong-party-ack",
+        state={
+            "active_customer_name": "Rohan Gupta",
+            "wrong_party_callback_stage": "completed",
+            "wrong_party_callback_time": "at 5 PM today",
+        },
+    )
+    state = {
+        "user_input": "sure, thank you",
+        "memory": memory,
+        "plan_proposal": {
+            "target": "customer",
+            "response_directive": {
+                "conversation_objective": "wrong_party_closing_acknowledgement",
+                "dialogue_action": "wrong_party_closing_acknowledgement",
+                "response_mode": "compliance",
+            },
+        },
+    }
+
+    update = node.execute(state)
+
+    assert update["response"] == "You're welcome. Goodbye."
+    assert "5 PM" not in update["response"]
+    assert update["conversation_complete"] is False
+    assert update["conversation_closing"] is True
+    assert update["terminate_call"] is True
+    assert update["termination_grace_seconds"] == 3.0
+
+
+def test_response_node_revised_callback_confirms_only_new_time() -> None:
+    node = _build_node()
+    memory = WorkingMemory(
+        session_id="response-wrong-party-revision",
+        state={
+            "active_customer_name": "Rohan Gupta",
+            "wrong_party_callback_stage": "completed",
+            "wrong_party_callback_time": "at 9 PM",
+        },
+    )
+    state = {
+        "user_input": "No, his flight is late, try at 9pm.",
+        "memory": memory,
+        "plan_proposal": {
+            "target": "customer",
+            "response_directive": {
+                "conversation_objective": "wrong_party_callback_revision_confirmation",
+                "dialogue_action": "wrong_party_callback_revision_confirmation",
+                "response_mode": "compliance",
+            },
+        },
+    }
+
+    response = node.execute(state)["response"]
+
+    assert "at 9 PM" in response
+    assert "5 PM" not in response
+    assert "update the callback" in response
 
 
 def test_response_node_missing_directive_does_not_infer_hardship_objective() -> None:

@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Any
 
+from agents.collection_agent.nodes.callback_time_extractor import extract_callback_time
 from src.nodes.react_node import ReactNode
 from src.nodes.types import AgentState
 from src.tools.registry import ToolRegistry
@@ -33,6 +35,247 @@ class CollectionReactNode(ReactNode):
     """
 
     tool_registry: ToolRegistry | None = None
+
+    def _apply_pre_llm_override(self, *, state: AgentState, context: dict[str, Any]) -> dict[str, Any] | None:
+        queued = ReactNode._apply_pre_llm_override(self, state=state, context=context)
+        if queued is not None:
+            return queued
+
+        memory = state.get("memory")
+        memory_state = dict(getattr(memory, "state", {})) if memory is not None else {}
+        observations = context.get("observations") if isinstance(context.get("observations"), list) else []
+        latest = observations[-1] if observations and isinstance(observations[-1], dict) else {}
+        if isinstance(latest.get("tool_phase"), dict):
+            latest = latest["tool_phase"]
+        latest_tool = str(latest.get("tool_name", "")).strip().lower()
+        latest_output = latest.get("output") if isinstance(latest.get("output"), dict) else {}
+        tool_completed_this_turn = int(state.get("steps", 0) or 0) > 0
+        case_id = str(state.get("case_id") or memory_state.get("active_case_id", "")).strip()
+        customer_id = str(state.get("user_id") or memory_state.get("active_user_id", "")).strip()
+
+        if latest_tool == "premium_hold_create" and tool_completed_this_turn:
+            reference_number = str(latest_output.get("reference_number", "")).strip()
+            if not reference_number:
+                return None
+            hold_details = {
+                **(
+                    dict(memory_state.get("hardship_hold_details", {}))
+                    if isinstance(memory_state.get("hardship_hold_details"), dict)
+                    else {}
+                ),
+                **latest_output,
+            }
+            if memory is not None:
+                memory.set_state(
+                    hardship_hold_stage="created",
+                    hardship_hold_details=hold_details,
+                )
+            message = (
+                f"Your premium hold has been arranged. Reference: {reference_number}. "
+                f"The hold is active until {latest_output.get('effective_until', '')}."
+            )
+            return {
+                "skip_llm": True,
+                "reason": "Premium hold created; send SMS confirmation.",
+                "decision": self._tool_decision(
+                    "sms_confirmation_send",
+                    {
+                        "customer_id": customer_id,
+                        "reference_number": reference_number,
+                        "message": message,
+                    },
+                ),
+            }
+
+        if latest_tool == "sms_confirmation_send" and tool_completed_this_turn:
+            reference_number = str(latest_output.get("reference_number", "")).strip()
+            hold_details = (
+                dict(memory_state.get("hardship_hold_details", {}))
+                if isinstance(memory_state.get("hardship_hold_details"), dict)
+                else {}
+            )
+            hold_details["sms_confirmation"] = dict(latest_output)
+            if memory is not None:
+                memory.set_state(
+                    hardship_hold_stage="sms_sent",
+                    hardship_hold_details=hold_details,
+                )
+            message = (
+                f"Your premium hold has been arranged. Reference: {reference_number}. "
+                f"The hold is active until {hold_details.get('effective_until', '')}."
+            )
+            return {
+                "skip_llm": True,
+                "reason": "SMS confirmation sent; send email confirmation.",
+                "decision": self._tool_decision(
+                    "email_confirmation_send",
+                    {
+                        "customer_id": customer_id,
+                        "reference_number": reference_number,
+                        "subject": "Premium hold confirmation",
+                        "message": message,
+                    },
+                ),
+            }
+
+        if latest_tool == "email_confirmation_send" and tool_completed_this_turn:
+            hold_details = (
+                dict(memory_state.get("hardship_hold_details", {}))
+                if isinstance(memory_state.get("hardship_hold_details"), dict)
+                else {}
+            )
+            hold_details["email_confirmation"] = dict(latest_output)
+            if memory is not None:
+                memory.set_state(
+                    hardship_hold_stage="confirmed",
+                    hardship_hold_details=hold_details,
+                    negotiation_stage="confirming_commitment",
+                )
+            return {
+                "skip_llm": True,
+                "reason": "Premium hold and both confirmations completed.",
+                "decision": SimpleNamespace(
+                    thought="Hold creation and notifications are complete; continue to customer confirmation.",
+                    tool_call=None,
+                    tool_calls=[],
+                    respond_directly=True,
+                    response_text=None,
+                    done=True,
+                    no_tools_required=True,
+                ),
+            }
+
+        if latest_tool == "outbound_callback_schedule" and tool_completed_this_turn:
+            if memory is not None:
+                memory.set_state(
+                    outbound_callback_job_id=latest_output.get("job_id"),
+                    outbound_callback_scheduled_for=latest_output.get("scheduled_for"),
+                    outbound_callback_status=latest_output.get("status"),
+                )
+            return {
+                "skip_llm": True,
+                "reason": "Outbound callback scheduling tool completed.",
+                "decision": SimpleNamespace(
+                    thought="Callback scheduling is complete; continue to customer confirmation.",
+                    tool_call=None,
+                    tool_calls=[],
+                    respond_directly=True,
+                    response_text=None,
+                    done=True,
+                    no_tools_required=True,
+                ),
+            }
+        if latest_tool == "outbound_callback_cancel" and tool_completed_this_turn:
+            if memory is not None:
+                memory.set_state(outbound_callback_status=latest_output.get("status"))
+            return {
+                "skip_llm": True,
+                "reason": "Outbound callback cancellation tool completed.",
+                "decision": SimpleNamespace(
+                    thought="Callback cancellation is complete.",
+                    tool_call=None,
+                    tool_calls=[],
+                    respond_directly=True,
+                    response_text=None,
+                    done=True,
+                    no_tools_required=True,
+                ),
+            }
+
+        user_input = str(state.get("user_input", ""))
+        lowered = user_input.lower()
+        hold_stage = str(memory_state.get("hardship_hold_stage", "")).strip().lower()
+        if hold_stage == "offered" and self._is_affirmative(user_input):
+            program = (
+                memory_state.get("hardship_hold_program")
+                if isinstance(memory_state.get("hardship_hold_program"), dict)
+                else {}
+            )
+            program_id = str(program.get("program_id", "")).strip()
+            hold_months = int(program.get("max_hold_months", 0) or 0)
+            if case_id and customer_id and program_id and hold_months > 0:
+                return {
+                    "skip_llm": True,
+                    "reason": "Customer accepted the eligible premium hold.",
+                    "decision": self._tool_decision(
+                        "premium_hold_create",
+                        {
+                            "case_id": case_id,
+                            "customer_id": customer_id,
+                            "program_id": program_id,
+                            "hold_months": hold_months,
+                        },
+                    ),
+                }
+        if "callback" in lowered and any(token in lowered for token in ("cancel", "remove", "do not call", "don't call")):
+            return {
+                "skip_llm": True,
+                "reason": "Customer requested callback cancellation.",
+                "decision": self._tool_decision(
+                    "outbound_callback_cancel",
+                    {
+                        "job_id": memory_state.get("outbound_callback_job_id"),
+                        "case_id": case_id or None,
+                        "reason": "customer_requested_cancellation",
+                    },
+                ),
+            }
+
+        right_party_status = str(memory_state.get("right_party_status", "")).strip().lower()
+        callback_stage = str(memory_state.get("wrong_party_callback_stage", "")).strip().lower()
+        if right_party_status != "wrong_party" or callback_stage not in {
+            "privacy_notice_given",
+            "awaiting_callback",
+        }:
+            return None
+        callback_time = extract_callback_time(user_input, llm=self.llm)
+        if not callback_time or not case_id or not customer_id:
+            return None
+
+        for observation in reversed(observations):
+            if not isinstance(observation, dict):
+                continue
+            payload = observation.get("tool_phase") if isinstance(observation.get("tool_phase"), dict) else observation
+            if str(payload.get("tool_name", "")).strip().lower() != "outbound_callback_schedule":
+                continue
+            tool_input = payload.get("input") if isinstance(payload.get("input"), dict) else {}
+            if tool_input.get("case_id") == case_id and tool_input.get("callback_time") == callback_time:
+                return None
+
+        return {
+            "skip_llm": True,
+            "reason": "Schedule privacy-safe outbound callback.",
+            "decision": self._tool_decision(
+                "outbound_callback_schedule",
+                {
+                    "case_id": case_id,
+                    "customer_id": customer_id,
+                    "session_id": str(state.get("session_id", "")).strip() or "collection-session",
+                    "callback_time": callback_time,
+                    "timezone": str(memory_state.get("timezone", "Asia/Kolkata")).strip() or "Asia/Kolkata",
+                    "max_retries": 3,
+                },
+            ),
+        }
+
+    @staticmethod
+    def _is_affirmative(text: str) -> bool:
+        normalized = re.sub(r"[^a-z0-9\s]", " ", str(text).lower())
+        normalized = re.sub(r"\s+", " ", normalized).strip()
+        return any(
+            phrase in normalized
+            for phrase in (
+                "yes",
+                "that would help",
+                "would really help",
+                "sounds good",
+                "i agree",
+                "please do",
+                "go ahead",
+                "okay",
+                "ok",
+            )
+        )
 
     def _build_context_for_react(self, state: AgentState) -> dict[str, Any]:
         memory = state.get("memory")

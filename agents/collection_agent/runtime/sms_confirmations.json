@@ -1,0 +1,20 @@
+[
+  {
+    "message_id": "SMS-67747C7449",
+    "customer_id": "CUST-2002",
+    "reference_number": "HOLD-295745D5D2",
+    "recipient": "+919900001002",
+    "message": "Your premium hold has been arranged. Reference: HOLD-295745D5D2. The hold is active until 2026-08-12.",
+    "status": "sent",
+    "sent_at": "2026-06-12T03:39:51.812527+00:00"
+  },
+  {
+    "message_id": "SMS-CE4596C016",
+    "customer_id": "CUST-2002",
+    "reference_number": "HOLD-2916C1CF0D",
+    "recipient": "+919900001002",
+    "message": "Your premium hold has been arranged. Reference: HOLD-2916C1CF0D. The hold is active until 2026-08-12.",
+    "status": "sent",
+    "sent_at": "2026-06-12T03:53:55.744328+00:00"
+  }
+]

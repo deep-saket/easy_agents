@@ -33,15 +33,21 @@ from agents.collection_agent.nodes import (
 from agents.collection_agent.prompts import load_collection_agent_prompts, render_collection_tool_catalog_yaml
 from agents.collection_agent.repository import CollectionRepository
 from agents.collection_agent.services import CollectionContextBuilder
+from agents.collection_agent.services.outbound_callback_queue import OutboundCallbackQueue
 from agents.collection_agent.state import CollectionGraphState
 from agents.collection_agent.tools import (
+    EmailConfirmationSendTool,
     EntityExtractTool,
     HumanEscalationTool,
     LoanPolicyLookupTool,
     OfferEligibilityTool,
+    OutboundCallbackCancelTool,
+    OutboundCallbackScheduleTool,
     PaymentLinkCreateTool,
     PlanProposeTool,
+    PremiumHoldCreateTool,
     PromiseCaptureTool,
+    SMSConfirmationSendTool,
     VerifyDOBTool,
     VerifyMobileTool,
     VerificationEntityExtractTool,
@@ -92,6 +98,7 @@ class CollectionAgent(BaseAgent):
     last_trace: ExecutionTrace | None = None
     _session_locks: dict[str, threading.Lock] = field(default_factory=dict, init=False, repr=False)
     _session_locks_guard: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
+    outbound_callback_queue: OutboundCallbackQueue | None = None
 
     _STATIC_NEXT_NODE_MAP: ClassVar[dict[str, str]] = {
         "entity_extract": "negotiation_classification",
@@ -176,6 +183,10 @@ class CollectionAgent(BaseAgent):
             trace_sink=self.trace_sink,
         )
         self.session_store = self.session_store or SessionStore(self.repository)
+        self.outbound_callback_queue = self.outbound_callback_queue or OutboundCallbackQueue(
+            runtime_dir=self.data_store.runtime_dir,
+        )
+        self.outbound_callback_queue.start()
         self.memory_repository = self.memory_repository or CollectionMemoryRepository(
             collection_runtime_dir=self.repository.runtime_dir
         )
@@ -328,8 +339,24 @@ class CollectionAgent(BaseAgent):
         registry.register(VerifyMobileTool(store=self.data_store))
         registry.register(LoanPolicyLookupTool(store=self.data_store))
         registry.register(OfferEligibilityTool(store=self.data_store))
+        registry.register(
+            OutboundCallbackScheduleTool(
+                store=self.data_store,
+                queue=self.outbound_callback_queue
+                or OutboundCallbackQueue(runtime_dir=self.data_store.runtime_dir),
+            )
+        )
+        registry.register(
+            OutboundCallbackCancelTool(
+                queue=self.outbound_callback_queue
+                or OutboundCallbackQueue(runtime_dir=self.data_store.runtime_dir),
+            )
+        )
         registry.register(PaymentLinkCreateTool(store=self.data_store))
         registry.register(PromiseCaptureTool(store=self.data_store))
+        registry.register(PremiumHoldCreateTool(store=self.data_store))
+        registry.register(SMSConfirmationSendTool(store=self.data_store))
+        registry.register(EmailConfirmationSendTool(store=self.data_store))
         registry.register(HumanEscalationTool(store=self.data_store))
         registry.register(PlanProposeTool(store=self.data_store))
         return registry
@@ -694,12 +721,20 @@ class CollectionAgent(BaseAgent):
         route = str(self.execution_path_intent_node.route(state)).strip().lower()
         if route != "need_tool":
             return route
+        memory = state.get("memory")
+        memory_state = dict(getattr(memory, "state", {})) if memory is not None else {}
+        if str(memory_state.get("right_party_status", "")).strip().lower() == "wrong_party":
+            return "react"
         return "verification_react" if not self._identity_verified_from_state(state) else "react"
 
     def _route_post_memory_plan_intent(self, state: CollectionGraphState) -> str:
         route = str(self.post_memory_plan_intent_node.route(state)).strip().lower()
         if route != "react":
             return route
+        memory = state.get("memory")
+        memory_state = dict(getattr(memory, "state", {})) if memory is not None else {}
+        if str(memory_state.get("right_party_status", "")).strip().lower() == "wrong_party":
+            return "react"
         return "verification_react" if not self._identity_verified_from_state(state) else "react"
 
     @staticmethod

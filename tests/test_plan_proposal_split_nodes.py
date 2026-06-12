@@ -4,7 +4,11 @@ from agents.collection_agent.agent import CollectionAgent
 from agents.collection_agent.nodes.plan_proposal_directive_node import PlanProposalDirectiveNode
 from agents.collection_agent.nodes.plan_proposal_graph_node import PlanProposalGraphNode
 from agents.collection_agent.nodes.plan_proposal_state_node import PlanProposalStateNode
-from agents.collection_agent.nodes.plan_proposal_utils import is_right_party_denial
+from agents.collection_agent.nodes.plan_proposal_utils import (
+    finalize_conversation_memory,
+    is_right_party_denial,
+)
+from agents.collection_agent.nodes.callback_time_extractor import extract_callback_time
 from src.nodes.base import BaseGraphNode
 from src.memory.types import WorkingMemory
 
@@ -145,6 +149,44 @@ def test_bare_no_is_detected_as_right_party_denial_only_during_confirmation() ->
     assert is_right_party_denial("No", awaiting_confirmation=False) is False
 
 
+def test_callback_time_extractor_cleans_conversational_sentence() -> None:
+    assert (
+        extract_callback_time("he is not here now, please try at 5:30pm in evening today")
+        == "at 5:30 PM today"
+    )
+    assert extract_callback_time("try this evening") == "this evening"
+    assert extract_callback_time("he is not here, try at 5 today in evening") == "at 5 PM today"
+    assert extract_callback_time("sorry he may be late so call at 9am tommarrow") == "at 9 AM tomorrow"
+
+
+def test_callback_time_extractor_uses_grounded_llm_fallback() -> None:
+    class CallbackLLM:
+        def structured_generate(self, prompt: str, schema: type, **_: object):
+            assert "after my shift" in prompt
+            return schema(
+                callback_time="after my shift",
+                confidence=0.92,
+                needs_clarification=False,
+            )
+
+    assert (
+        extract_callback_time("Please call him after my shift", llm=CallbackLLM())
+        == "after my shift"
+    )
+
+
+def test_callback_time_extractor_rejects_vague_llm_result() -> None:
+    class VagueCallbackLLM:
+        def structured_generate(self, prompt: str, schema: type, **_: object):
+            return schema(
+                callback_time="later",
+                confidence=0.95,
+                needs_clarification=False,
+            )
+
+    assert extract_callback_time("Maybe sometime later", llm=VagueCallbackLLM()) == ""
+
+
 def test_wrong_party_callback_flow_reaches_explicit_closing_node() -> None:
     memory = _memory(
         {
@@ -208,9 +250,12 @@ def test_wrong_party_callback_flow_reaches_explicit_closing_node() -> None:
     plan = third_graph_update["conversation_plan"]
     third_directive = third_directive_update["plan_proposal"]["response_directive"]
     assert plan["current_node_id"] == "close_conversation"
-    assert plan["status"] == "completed"
+    assert plan["status"] == "active"
     assert plan["step_markers"]["verify_identity"]["state"] == "skipped"
     assert plan["step_markers"]["wrong_party_callback"]["state"] == "done"
+    assert plan["step_markers"]["close_conversation"]["state"] == "pending"
+    plan_nodes = {node["id"]: node for node in plan["nodes"]}
+    assert plan_nodes["close_conversation"]["status"] == "in_progress"
     assert third_directive["conversation_objective"] == "wrong_party_callback_confirmation"
     assert memory.state["wrong_party_callback_time"] == "this evening"
 
@@ -224,8 +269,37 @@ def test_wrong_party_callback_flow_reaches_explicit_closing_node() -> None:
     retry_plan = retry_graph_update["conversation_plan"]
     retry_directive = retry_directive_update["plan_proposal"]["response_directive"]
     assert retry_plan["current_node_id"] == "close_conversation"
-    assert retry_plan["status"] == "completed"
-    assert retry_directive["conversation_objective"] == "wrong_party_callback_confirmation"
+    assert retry_plan["status"] == "active"
+    assert retry_directive["conversation_objective"] == "wrong_party_closing_acknowledgement"
+
+    revision_state = _base_state(
+        memory,
+        user_input="No, his flight is running late, so please try at 9pm.",
+    )
+    revision_state_update = state_node.execute(revision_state)
+    revision_graph_update = graph_node.execute({**revision_state, **revision_state_update})
+    revision_directive_update = directive_node.execute(
+        {**revision_state, **revision_state_update, **revision_graph_update}
+    )
+    revision_directive = revision_directive_update["plan_proposal"]["response_directive"]
+    assert revision_directive["conversation_objective"] == "wrong_party_callback_revision_confirmation"
+    assert memory.state["wrong_party_callback_time"] == "at 9 PM"
+
+    finalize_conversation_memory(memory)
+    closed_plan = memory.state["active_conversation_plan"]
+    closed_nodes = {node["id"]: node for node in closed_plan["nodes"]}
+    assert closed_plan["status"] == "completed"
+    assert closed_plan["step_markers"]["close_conversation"]["state"] == "done"
+    assert closed_nodes["close_conversation"]["status"] == "done"
+    final_snapshot = closed_plan["timeline_snapshots"][-1]
+    final_snapshot_nodes = {
+        node["id"]: node for node in final_snapshot["plan"]["nodes"]
+    }
+    assert final_snapshot["status"] == "completed"
+    assert final_snapshot["current_node_id"] == "close_conversation"
+    assert final_snapshot["update"]["origin"] == "conversation_manager_timer"
+    assert final_snapshot["plan"]["status"] == "completed"
+    assert final_snapshot_nodes["close_conversation"]["status"] == "done"
 
 
 def test_plan_proposal_directive_node_returns_response_directive() -> None:
@@ -280,9 +354,88 @@ def test_plan_proposal_directive_uses_hardship_arrangement_directive() -> None:
     assert directive_update["response_target"] == "customer"
     assert directive["conversation_objective"] == "assess_affordability"
     assert directive["dialogue_action"] == "ask_affordable_amount"
-    assert "explain_applicable_policy_options" in directive["required_response_elements"]
+    assert "explain_applicable_policy_options" not in directive["required_response_elements"]
     assert "ask_pay_now_or_arrangement" in directive["forbidden_dialogue_actions"]
     assert "amount or payment date" in directive["customer_facing_goal"].lower()
+
+
+def test_job_loss_routes_to_data_driven_hold_then_confirmation() -> None:
+    hold_program = {
+        "program_id": "PREMIUM_HOLD_001",
+        "program_type": "premium_hold",
+        "eligible_products": ["personal_loan"],
+        "eligible_loan_ids": ["LOAN-3002"],
+        "hardship_reasons": ["job_loss"],
+        "max_hold_months": 2,
+        "benefits_remain_active": True,
+        "confirmation_channels": ["sms", "email"],
+        "confirmation_sla_hours": 24,
+    }
+    memory = _memory(
+        {
+            "mode": "hardship_negotiation",
+            "active_case_id": "COLL-1002",
+            "active_user_id": "CUST-2002",
+            "active_customer_name": "Rohan Gupta",
+            "identity_verified": True,
+            "conversation_mode": "hardship_negotiation",
+            "negotiation_stage": "discovering_hardship",
+            "customer_payment_posture": "cannot_pay",
+            "hardship_context": {
+                "hardship_detected": True,
+                "hardship_reason": "job_loss",
+                "confidence": 1.0,
+            },
+            "assistance_programs": [hold_program],
+            "active_collection_context": {
+                "case": {
+                    "case_id": "COLL-1002",
+                    "loan_id": "LOAN-3002",
+                    "product": "personal_loan",
+                },
+                "customer": {
+                    "variables": {
+                        "[REF_NUMBER]": "COLL-1002",
+                    }
+                },
+            },
+        }
+    )
+    state_node = PlanProposalStateNode(llm=None, strict_llm_mode=False)
+    graph_node = PlanProposalGraphNode(llm=None, strict_llm_mode=False)
+    directive_node = PlanProposalDirectiveNode(llm=None, strict_llm_mode=False)
+
+    offer_state = _base_state(memory, user_input="I recently lost my job")
+    offer_prepared = state_node.execute(offer_state)
+    offer_graph = graph_node.execute({**offer_state, **offer_prepared})
+    offer_update = directive_node.execute({**offer_state, **offer_prepared, **offer_graph})
+
+    assert offer_graph["conversation_plan"]["current_node_id"] == "resolution_offer"
+    assert offer_update["plan_proposal"]["conversation_objective"] == "hardship_hold_offer"
+    assert memory.state["hardship_hold_stage"] == "offered"
+
+    memory.set_state(
+        hardship_hold_stage="confirmed",
+        hardship_hold_details={
+            "hold_months": 2,
+            "reference_number": "HOLD-A1B2C3D4E5",
+            "status": "active",
+            "sms_confirmation": {"status": "sent"},
+            "email_confirmation": {"status": "sent"},
+        },
+    )
+    accepted_state = _base_state(memory, user_input="Yes, that would really help")
+    accepted_prepared = state_node.execute(accepted_state)
+    accepted_graph = graph_node.execute({**accepted_state, **accepted_prepared})
+    accepted_update = directive_node.execute(
+        {**accepted_state, **accepted_prepared, **accepted_graph}
+    )
+
+    assert accepted_graph["conversation_plan"]["current_node_id"] == "confirmation"
+    assert accepted_update["plan_proposal"]["conversation_objective"] == "hardship_hold_confirmation"
+    assert memory.state["hardship_hold_stage"] == "confirmed"
+    assert memory.state["hardship_hold_details"]["hold_months"] == 2
+    assert memory.state["hardship_hold_details"]["reference_number"] == "HOLD-A1B2C3D4E5"
 
 
 def test_plan_proposal_directive_discount_handoff_remains_intact() -> None:

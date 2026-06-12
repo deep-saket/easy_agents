@@ -17,3 +17,5 @@ tests/voice_transcript.json
 tests/youtube_audio.wav
 tests/youtube_downloaded_audio.m4a
 agents/collection_agent/runtime/traces/
+agents/collection_agent/runtime/outbound_callback_jobs.json
+agents/collection_agent/runtime/outbound_call_attempts.json

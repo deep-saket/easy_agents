@@ -114,6 +114,10 @@ class AgentState(TypedDict, total=False):
     additional_targets: list[str]
     memory_helper_trigger: dict[str, Any]
     pending_tool_calls: list[dict[str, Any]]
+    conversation_complete: bool
+    conversation_closing: bool
+    terminate_call: bool
+    termination_grace_seconds: float
 
 
 class NodeUpdate(TypedDict, total=False):
@@ -166,6 +170,10 @@ class NodeUpdate(TypedDict, total=False):
     additional_targets: list[str]
     memory_helper_trigger: dict[str, Any]
     pending_tool_calls: list[dict[str, Any]]
+    conversation_complete: bool
+    conversation_closing: bool
+    terminate_call: bool
+    termination_grace_seconds: float
 
 
 ReActState = AgentState

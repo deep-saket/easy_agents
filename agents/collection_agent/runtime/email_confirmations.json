@@ -1,0 +1,22 @@
+[
+  {
+    "message_id": "EMAIL-72D57B70B7",
+    "customer_id": "CUST-2002",
+    "reference_number": "HOLD-295745D5D2",
+    "recipient": "rohan.gupta@example.com",
+    "subject": "Premium hold confirmation",
+    "message": "Your premium hold has been arranged. Reference: HOLD-295745D5D2. The hold is active until 2026-08-12.",
+    "status": "sent",
+    "sent_at": "2026-06-12T03:39:52.375990+00:00"
+  },
+  {
+    "message_id": "EMAIL-734D4D02F5",
+    "customer_id": "CUST-2002",
+    "reference_number": "HOLD-2916C1CF0D",
+    "recipient": "rohan.gupta@example.com",
+    "subject": "Premium hold confirmation",
+    "message": "Your premium hold has been arranged. Reference: HOLD-2916C1CF0D. The hold is active until 2026-08-12.",
+    "status": "sent",
+    "sent_at": "2026-06-12T03:53:56.317686+00:00"
+  }
+]

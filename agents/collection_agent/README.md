@@ -951,3 +951,27 @@ Both stores are physically under collection agent runtime so collection logic ca
 npx -y @mermaid-js/mermaid-cli -i agents/collection_agent/graph.mmd -o agents/collection_agent/graph.png -b white -s 2
 python3 -c "from PIL import Image; Image.open('agents/collection_agent/graph.png').convert('RGB').save('agents/collection_agent/graph.jpg', 'JPEG', quality=92)"
 ```
+
+# Outbound callback scheduler
+
+Wrong-party callback confirmations invoke the `outbound_callback_schedule` tool. Jobs are stored in
+`runtime/outbound_callback_jobs.json`, and dispatch attempts are stored in
+`runtime/outbound_call_attempts.json`. The in-process scheduler checks due jobs automatically while
+the collection agent process is running.
+
+Configure one outbound provider:
+
+```text
+# Generic outbound-call service
+COLLECTION_OUTBOUND_CALL_WEBHOOK=https://your-service.example/outbound-calls
+
+# Or Twilio Voice
+TWILIO_ACCOUNT_SID=...
+TWILIO_AUTH_TOKEN=...
+EASY_AGENT_TWILIO_VOICE_FROM=+1...
+EASY_AGENT_TWILIO_VOICE_URL=https://your-public-host.example/twilio/voice
+```
+
+If no provider is configured, due jobs remain auditable and move through retry/failure states; the
+system does not falsely mark a call as dispatched. Use `outbound_callback_cancel` to cancel an active
+job by callback job ID or case ID.

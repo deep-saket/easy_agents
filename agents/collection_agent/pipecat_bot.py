@@ -14,6 +14,7 @@ from typing import Any
 
 from agents.collection_agent.agent import CollectionAgent
 from agents.collection_agent.main import _route_internal_turn, build_llm, load_collection_config
+from agents.collection_agent.nodes.plan_proposal_utils import finalize_conversation_memory
 from agents.collection_agent.repository import CollectionRepository
 from agents.collection_agent.tools.data_store import CollectionDataStore
 from agents.collection_memory_helper_agent.agent import CollectionMemoryHelperAgent
@@ -59,6 +60,19 @@ class CollectionVoiceOrchestrator:
             timeout_seconds=20.0,
             trace_readable=False,
         )
+
+    def lifecycle_state(self, *, session_id: str) -> dict[str, Any]:
+        memory_state = dict(self._collection_agent.session_store.load(session_id).state)
+        return {
+            "conversation_complete": bool(memory_state.get("conversation_complete", False)),
+            "conversation_closing": bool(memory_state.get("conversation_closing", False)),
+            "conversation_closed": bool(memory_state.get("conversation_closed", False)),
+            "terminate_call": bool(memory_state.get("terminate_call", False)),
+            "termination_grace_seconds": float(memory_state.get("termination_grace_seconds", 0.0) or 0.0),
+        }
+
+    def finalize_conversation(self, *, session_id: str) -> None:
+        finalize_conversation_memory(self._collection_agent.session_store.load(session_id))
 
 
 def _build_runtime() -> tuple[CollectionVoiceOrchestrator, PipecatRunnerConfig, dict[str, Any]]:

@@ -54,6 +54,8 @@ const viewState = {
   activeStreamSource: null,
   activeStreamToken: 0,
   requestSequence: 0,
+  lastSubmissionFingerprint: "",
+  lastSubmissionAt: 0,
   suppressedResponseCount: 0,
   lastDeliveredResponse: "",
   lastFinalState: {},
@@ -1406,6 +1408,7 @@ async function runUserTurn(message) {
       session_id: sessionId,
       soft_cap: "10",
       hard_cap: "50",
+      client_request_id: `ui-${sessionId}-${streamToken}`,
     });
     if (viewState.activeStreamSource) {
       try {
@@ -1486,7 +1489,7 @@ async function runUserTurn(message) {
       if (manager.response_suppressed) {
         viewState.suppressedResponseCount += 1;
         viewState.lastConversationManagerState = manager;
-        addBubble("system", "Suppressed a stale response from an older request.");
+        syncPlanTimelineFromSession(String(payload.session_id || sessionId));
         finalize();
         return;
       }
@@ -1496,6 +1499,12 @@ async function runUserTurn(message) {
       addBubble("agent", responseText);
       renderTurnPayload(payload);
       syncPlanTimelineFromSession(String(payload.session_id || sessionId));
+      if (manager.conversation_closing) {
+        const graceMs = Math.max(Number(manager.termination_grace_seconds || 3) * 1000, 3000);
+        window.setTimeout(() => {
+          syncPlanTimelineFromSession(String(payload.session_id || sessionId));
+        }, graceMs + 350);
+      }
       finalize();
     });
 
@@ -1744,6 +1753,17 @@ chatForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const message = messageInput.value.trim();
   if (!message) return;
+  const sessionId = sessionIdInput.value.trim() || "collection-ui-session";
+  const fingerprint = `${sessionId}\n${message.toLowerCase()}`;
+  const now = Date.now();
+  if (
+    fingerprint === viewState.lastSubmissionFingerprint
+    && now - viewState.lastSubmissionAt < 1000
+  ) {
+    return;
+  }
+  viewState.lastSubmissionFingerprint = fingerprint;
+  viewState.lastSubmissionAt = now;
   messageInput.value = "";
   void runUserTurn(message);
 });

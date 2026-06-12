@@ -59,6 +59,10 @@ class CollectionGraphState(AgentState, total=False):
     right_party_status: str
     wrong_party_callback_stage: str | None
     wrong_party_callback_time: str | None
+    conversation_complete: bool
+    conversation_closing: bool
+    terminate_call: bool
+    termination_grace_seconds: float
     conversation_mode: str
     negotiation_stage: str
     customer_payment_posture: str

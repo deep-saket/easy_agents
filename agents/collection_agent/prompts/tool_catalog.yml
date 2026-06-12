@@ -34,6 +34,31 @@ tools:
   input: case_id, promised_date, promised_amount
   output: promise_id, status
 
+- name: premium_hold_create
+  purpose: Create and persist an approved premium hold with a newly generated reference.
+  input: case_id, customer_id, program_id, hold_months
+  output: reference_number, effective_from, effective_until, status
+
+- name: sms_confirmation_send
+  purpose: Send and persist the premium-hold confirmation to the registered mobile number.
+  input: customer_id, reference_number, message
+  output: message_id, recipient, status
+
+- name: email_confirmation_send
+  purpose: Send and persist the premium-hold confirmation to the registered email address.
+  input: customer_id, reference_number, subject, message
+  output: message_id, recipient, status
+
+- name: outbound_callback_schedule
+  purpose: Schedule a durable outbound voice callback after a wrong-party or customer callback request.
+  input: case_id, customer_id, session_id, callback_time, timezone(optional), phone(optional), max_retries(optional)
+  output: job_id, scheduled_for(absolute timestamp), status, retry_count
+
+- name: outbound_callback_cancel
+  purpose: Cancel queued outbound callbacks by job ID or case ID.
+  input: job_id(optional), case_id(optional), reason(optional)
+  output: cancelled_job_ids, status
+
 - name: human_escalation
   purpose: Escalate disputes/fraud/sensitive cases to human collections desk.
   input: case_id, reason

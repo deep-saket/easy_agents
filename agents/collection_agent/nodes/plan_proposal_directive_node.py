@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from typing import Any
 
 from agents.collection_agent.llm_structured import StructuredOutputRunner
+from agents.collection_agent.nodes.callback_time_extractor import extract_callback_time
 from agents.collection_agent.nodes.plan_proposal_models import PlanProposalPayload
 from agents.collection_agent.nodes.plan_proposal_utils import (
     compact_existing_plan_for_prompt,
@@ -20,13 +21,13 @@ from agents.collection_agent.nodes.plan_proposal_utils import (
     is_right_party_denial,
     json_compact,
     looks_like_callback_time,
-    normalize_callback_time,
     node_label,
     overlay_negotiation_state_from_graph,
     overlay_verification_state_from_graph,
     render_prompt_template,
     truncate_text,
 )
+from agents.collection_agent.services.assistance_program_service import AssistanceProgramService
 from src.nodes.base import BaseGraphNode
 from src.nodes.types import AgentState, NodeUpdate
 
@@ -80,6 +81,19 @@ class PlanProposalDirectiveNode(BaseGraphNode):
         identity_verified = bool(memory_state.get("identity_verified", False))
         right_party_status = str(memory_state.get("right_party_status", "")).strip().lower()
         wrong_party_callback_stage = str(memory_state.get("wrong_party_callback_stage", "")).strip().lower()
+        if (
+            str(observed_tool).strip().lower() == "outbound_callback_schedule"
+            and isinstance(output, dict)
+            and str(output.get("status", "")).strip().lower() == "expired"
+        ):
+            if memory is not None:
+                memory.set_state(
+                    wrong_party_callback_stage="awaiting_callback",
+                    wrong_party_callback_time=None,
+                    outbound_callback_status="expired",
+                )
+            right_party_status = "wrong_party"
+            wrong_party_callback_stage = "awaiting_callback"
 
         def with_debug(update: NodeUpdate) -> NodeUpdate:
             update.setdefault("prompt", self.last_debug.get("prompt"))
@@ -136,6 +150,33 @@ class PlanProposalDirectiveNode(BaseGraphNode):
                 memory.set_state(**state_persist)
             return with_debug(update)
 
+        if (
+            str(observed_tool).strip().lower() == "outbound_callback_schedule"
+            and isinstance(output, dict)
+            and str(output.get("status", "")).strip().lower() == "expired"
+        ):
+            return with_plan({
+                "route": "continue",
+                "response_target": "customer",
+                "right_party_status": "wrong_party",
+                "wrong_party_callback_stage": "awaiting_callback",
+                "plan_proposal": {
+                    "target": "customer",
+                    "intent": "wrong_party_callback_clarification",
+                    "conversation_objective": "wrong_party_callback_clarification",
+                    "dialogue_action": "wrong_party_callback_clarification",
+                    "response_mode": "compliance",
+                    "customer_facing_goal": "Explain briefly that the requested time has passed and ask for a new callback time.",
+                    "plan_origin": "outbound_callback_expired",
+                    "plan_tree_update": {
+                        "operation": "branch",
+                        "selected_next_node_id": "wrong_party_callback",
+                        "mark_skipped": ["verify_identity"],
+                        "status": "active",
+                    },
+                },
+            })
+
         if bool(memory_state.get("agent_loop_blocked", False)):
             if memory is not None:
                 memory.set_state(agent_loop_blocked=False)
@@ -158,7 +199,11 @@ class PlanProposalDirectiveNode(BaseGraphNode):
         ):
             normalized_input = re.sub(r"\s+", " ", user_input.strip().lower())
             bare_denial = normalized_input in {"no", "nope", "nah"}
-            callback_time = normalize_callback_time(user_input) if looks_like_callback_time(user_input) else ""
+            callback_time = (
+                extract_callback_time(user_input, llm=self.llm)
+                if looks_like_callback_time(user_input)
+                else ""
+            )
             callback_stage = (
                 "completed"
                 if callback_time
@@ -198,8 +243,12 @@ class PlanProposalDirectiveNode(BaseGraphNode):
                             "close_conversation" if callback_time else "wrong_party_callback"
                         ),
                         "mark_skipped": ["verify_identity"],
-                        "mark_done": (["wrong_party_callback"] if callback_time else []),
-                        "status": ("completed" if callback_time else "active"),
+                        "mark_done": (
+                            ["wrong_party_callback"]
+                            if callback_time
+                            else []
+                        ),
+                        "status": "active",
                     },
                 },
             })
@@ -209,7 +258,51 @@ class PlanProposalDirectiveNode(BaseGraphNode):
                 wrong_party_callback_stage == "completed"
                 and str(memory_state.get("wrong_party_callback_time", "")).strip()
             ):
-                callback_time = str(memory_state.get("wrong_party_callback_time", "")).strip()
+                existing_callback_time = str(memory_state.get("wrong_party_callback_time", "")).strip()
+                revised_callback_time = (
+                    extract_callback_time(user_input, llm=self.llm)
+                    if looks_like_callback_time(user_input)
+                    else ""
+                )
+                if revised_callback_time and revised_callback_time != existing_callback_time:
+                    if memory is not None:
+                        memory.set_state(
+                            wrong_party_callback_stage="completed",
+                            wrong_party_callback_time=revised_callback_time,
+                            conversation_complete=False,
+                            conversation_closing=True,
+                        )
+                    return with_plan({
+                        "route": "continue",
+                        "response_target": "customer",
+                        "right_party_status": "wrong_party",
+                        "wrong_party_callback_stage": "completed",
+                        "plan_proposal": {
+                            "target": "customer",
+                            "intent": "wrong_party_callback_revision_confirmation",
+                            "conversation_objective": "wrong_party_callback_revision_confirmation",
+                            "dialogue_action": "wrong_party_callback_revision_confirmation",
+                            "response_mode": "compliance",
+                            "customer_facing_goal": "Confirm only the revised callback time and close naturally.",
+                            "plan_origin": "wrong_party_callback_revision",
+                            "plan_tree_update": {
+                                "operation": "complete",
+                                "selected_next_node_id": "close_conversation",
+                                "mark_skipped": ["verify_identity"],
+                                "mark_done": ["wrong_party_callback"],
+                                "status": "active",
+                            },
+                        },
+                        "additional_targets": ["collection_memory_helper_agent"],
+                        "memory_helper_trigger": {
+                            "reason": "wrong_party_callback_rescheduled",
+                            "callback_time": revised_callback_time,
+                            "previous_callback_time": existing_callback_time,
+                        },
+                    })
+
+                if memory is not None:
+                    memory.set_state(conversation_complete=False, conversation_closing=True)
                 return with_plan({
                     "route": "continue",
                     "response_target": "customer",
@@ -217,32 +310,51 @@ class PlanProposalDirectiveNode(BaseGraphNode):
                     "wrong_party_callback_stage": "completed",
                     "plan_proposal": {
                         "target": "customer",
-                        "intent": "wrong_party_callback_confirmation",
-                        "conversation_objective": "wrong_party_callback_confirmation",
-                        "dialogue_action": "wrong_party_callback_confirmation",
+                        "intent": "wrong_party_closing_acknowledgement",
+                        "conversation_objective": "wrong_party_closing_acknowledgement",
+                        "dialogue_action": "wrong_party_closing_acknowledgement",
                         "response_mode": "compliance",
-                        "customer_facing_goal": "Confirm the callback and close respectfully without disclosing account information.",
+                        "customer_facing_goal": "Acknowledge briefly and end the call without repeating callback details.",
                         "plan_origin": "wrong_party_callback_completed",
                         "plan_tree_update": {
                             "operation": "complete",
                             "selected_next_node_id": "close_conversation",
                             "mark_skipped": ["verify_identity"],
                             "mark_done": ["wrong_party_callback"],
-                            "status": "completed",
+                            "status": "active",
                         },
-                    },
-                    "additional_targets": ["collection_memory_helper_agent"],
-                    "memory_helper_trigger": {
-                        "reason": "wrong_party_callback_scheduled",
-                        "callback_time": callback_time,
                     },
                 })
             if wrong_party_callback_stage == "awaiting_callback" and looks_like_callback_time(user_input):
-                callback_time = normalize_callback_time(user_input)
+                callback_time = extract_callback_time(user_input, llm=self.llm)
+                if not callback_time:
+                    return with_plan({
+                        "route": "continue",
+                        "response_target": "customer",
+                        "right_party_status": "wrong_party",
+                        "wrong_party_callback_stage": "awaiting_callback",
+                        "plan_proposal": {
+                            "target": "customer",
+                            "intent": "wrong_party_callback_clarification",
+                            "conversation_objective": "wrong_party_callback_clarification",
+                            "dialogue_action": "wrong_party_callback_clarification",
+                            "response_mode": "compliance",
+                            "customer_facing_goal": "Ask briefly for a clearer callback time without repeating the privacy notice.",
+                            "plan_origin": "wrong_party_callback",
+                            "plan_tree_update": {
+                                "operation": "branch",
+                                "selected_next_node_id": "wrong_party_callback",
+                                "mark_skipped": ["verify_identity"],
+                                "status": "active",
+                            },
+                        },
+                    })
                 if memory is not None:
                     memory.set_state(
                         wrong_party_callback_stage="completed",
                         wrong_party_callback_time=callback_time,
+                        conversation_complete=False,
+                        conversation_closing=True,
                     )
                 return with_plan({
                     "route": "continue",
@@ -262,7 +374,7 @@ class PlanProposalDirectiveNode(BaseGraphNode):
                             "selected_next_node_id": "close_conversation",
                             "mark_skipped": ["verify_identity"],
                             "mark_done": ["wrong_party_callback"],
-                            "status": "completed",
+                            "status": "active",
                         },
                     },
                     "additional_targets": ["collection_memory_helper_agent"],
@@ -335,6 +447,142 @@ class PlanProposalDirectiveNode(BaseGraphNode):
                 "memory_helper_trigger": {
                     "reason": "conversation_termination",
                     "final_user_message": user_input,
+                },
+            })
+
+        current_node_id = str(existing_plan.get("current_node_id", "")).strip().lower()
+        active_case_id = str(memory_state.get("active_case_id", "COLL-1001")).strip() or "COLL-1001"
+        eligible_hold = self._eligible_premium_hold(memory_state)
+        hold_stage = str(memory_state.get("hardship_hold_stage", "")).strip().lower()
+        hardship_context = (
+            memory_state.get("hardship_context")
+            if isinstance(memory_state.get("hardship_context"), dict)
+            else {}
+        )
+        hardship_active = bool(hardship_context.get("hardship_detected", False))
+
+        if (
+            identity_verified
+            and eligible_hold
+            and hold_stage == "confirmed"
+            and self._is_hold_closing_reply(user_input)
+        ):
+            if memory is not None:
+                memory.set_state(
+                    conversation_complete=False,
+                    conversation_closing=True,
+                )
+            return with_plan({
+                "route": "continue",
+                "response_target": "customer",
+                "plan_proposal": {
+                    "target": "customer",
+                    "intent": "hardship_hold_closing",
+                    "conversation_objective": "hardship_hold_closing",
+                    "dialogue_action": "close_hardship_hold_conversation",
+                    "response_mode": "empathetic",
+                    "customer_facing_goal": "Thank the customer by name and close warmly after the confirmed hold.",
+                    "plan_origin": "hardship_hold_closing",
+                    "plan_tree_update": {
+                        "operation": "complete",
+                        "selected_next_node_id": "close_conversation",
+                        "mark_done": ["confirmation"],
+                        "status": "active",
+                    },
+                },
+            })
+
+        if identity_verified and eligible_hold and hold_stage == "confirmed":
+            hold_details = (
+                memory_state.get("hardship_hold_details")
+                if isinstance(memory_state.get("hardship_hold_details"), dict)
+                else {}
+            )
+            sms_status = str(
+                (hold_details.get("sms_confirmation") or {}).get("status", "")
+                if isinstance(hold_details.get("sms_confirmation"), dict)
+                else ""
+            ).strip().lower()
+            email_status = str(
+                (hold_details.get("email_confirmation") or {}).get("status", "")
+                if isinstance(hold_details.get("email_confirmation"), dict)
+                else ""
+            ).strip().lower()
+            if (
+                str(hold_details.get("status", "")).strip().lower() == "active"
+                and str(hold_details.get("reference_number", "")).strip()
+                and sms_status == "sent"
+                and email_status == "sent"
+            ):
+                return with_plan({
+                    "route": "continue",
+                    "response_target": "customer",
+                    "plan_proposal": {
+                        "target": "customer",
+                        "intent": "hardship_hold_confirmation",
+                        "conversation_objective": "hardship_hold_confirmation",
+                        "dialogue_action": "confirm_hardship_hold",
+                        "response_mode": "empathetic",
+                        "customer_facing_goal": "Confirm the created hold, generated reference, delivered notifications, and next steps.",
+                        "plan_origin": "hardship_hold_tools_completed",
+                        "plan_tree_update": {
+                            "operation": "advance",
+                            "selected_next_node_id": "confirmation",
+                            "mark_done": ["purpose_disclosure", "discovery_empathy", "resolution_offer"],
+                            "status": "active",
+                        },
+                    },
+                })
+
+        if identity_verified and hardship_active and eligible_hold and hold_stage != "confirmed":
+            if memory is not None:
+                memory.set_state(
+                    hardship_hold_stage="offered",
+                    hardship_hold_program=dict(eligible_hold),
+                    negotiation_stage="awaiting_customer_decision",
+                )
+            return with_plan({
+                "route": "continue",
+                "response_target": "customer",
+                "plan_proposal": {
+                    "target": "customer",
+                    "intent": "hardship_hold_offer",
+                    "conversation_objective": "hardship_hold_offer",
+                    "dialogue_action": "offer_hardship_hold",
+                    "response_mode": "empathetic",
+                    "customer_facing_goal": "Acknowledge the job loss and offer only the eligible temporary premium hold.",
+                    "plan_origin": "hardship_hold_eligibility",
+                    "plan_tree_update": {
+                        "operation": "branch",
+                        "selected_next_node_id": "resolution_offer",
+                        "mark_done": ["purpose_disclosure", "discovery_empathy"],
+                        "status": "active",
+                    },
+                },
+            })
+
+        if identity_verified and current_node_id in {
+            "verify_identity",
+            "purpose_disclosure",
+            "explain_dues",
+        } and not hardship_active:
+            return with_plan({
+                "route": "continue",
+                "response_target": "customer",
+                "plan_proposal": {
+                    "target": "customer",
+                    "intent": "purpose_disclosure",
+                    "conversation_objective": "purpose_disclosure",
+                    "dialogue_action": "disclose_call_purpose",
+                    "response_mode": "informational",
+                    "customer_facing_goal": "State the policy, overdue installment, due date, and invite the customer to explain their situation.",
+                    "plan_origin": "post_verification_purpose_disclosure",
+                    "plan_tree_update": {
+                        "operation": "advance",
+                        "selected_next_node_id": "purpose_disclosure",
+                        "mark_done": ["verify_identity"],
+                        "status": "active",
+                    },
                 },
             })
 
@@ -1124,7 +1372,10 @@ class PlanProposalDirectiveNode(BaseGraphNode):
         privacy_safe_intents = {
             "wrong_party_privacy_notice",
             "wrong_party_callback_request",
+            "wrong_party_callback_clarification",
             "wrong_party_callback_confirmation",
+            "wrong_party_callback_revision_confirmation",
+            "wrong_party_closing_acknowledgement",
             "conversation_termination",
         }
         if (
@@ -1219,7 +1470,14 @@ class PlanProposalDirectiveNode(BaseGraphNode):
         if explicit_objective in {
             "wrong_party_privacy_notice",
             "wrong_party_callback_request",
+            "wrong_party_callback_clarification",
             "wrong_party_callback_confirmation",
+            "wrong_party_callback_revision_confirmation",
+            "wrong_party_closing_acknowledgement",
+            "purpose_disclosure",
+            "hardship_hold_offer",
+            "hardship_hold_confirmation",
+            "hardship_hold_closing",
             "close_conversation",
         }:
             objective = explicit_objective
@@ -1252,6 +1510,81 @@ class PlanProposalDirectiveNode(BaseGraphNode):
             "handoff_target": ("discount_planning_agent" if response_target == "discount_planning_agent" else None),
         }
         return directive
+
+    @staticmethod
+    def _customer_variable(memory_state: dict[str, Any], key: str) -> str:
+        context = (
+            memory_state.get("active_collection_context")
+            if isinstance(memory_state.get("active_collection_context"), dict)
+            else {}
+        )
+        customer = context.get("customer") if isinstance(context.get("customer"), dict) else {}
+        variables = customer.get("variables") if isinstance(customer.get("variables"), dict) else {}
+        return str(variables.get(key, "")).strip()
+
+    @staticmethod
+    def _eligible_premium_hold(memory_state: dict[str, Any]) -> dict[str, Any] | None:
+        context = (
+            memory_state.get("active_collection_context")
+            if isinstance(memory_state.get("active_collection_context"), dict)
+            else {}
+        )
+        case = context.get("case") if isinstance(context.get("case"), dict) else {}
+        hardship_context = (
+            memory_state.get("hardship_context")
+            if isinstance(memory_state.get("hardship_context"), dict)
+            else {}
+        )
+        matches = AssistanceProgramService.match_programs(
+            programs=(
+                [dict(item) for item in memory_state.get("assistance_programs", []) if isinstance(item, dict)]
+                if isinstance(memory_state.get("assistance_programs"), list)
+                else []
+            ),
+            product=str(case.get("product", "")).strip() or None,
+            hardship_reason=str(hardship_context.get("hardship_reason", "")).strip() or None,
+            loan_id=str(case.get("loan_id", memory_state.get("active_loan_id", ""))).strip() or None,
+            program_type="premium_hold",
+        )
+        return dict(matches[0]) if matches else None
+
+    @staticmethod
+    def _is_affirmative(text: str) -> bool:
+        normalized = re.sub(r"[^a-z0-9\s]", " ", str(text).lower())
+        normalized = re.sub(r"\s+", " ", normalized).strip()
+        return any(
+            phrase in normalized
+            for phrase in (
+                "yes",
+                "that would help",
+                "would really help",
+                "sounds good",
+                "i agree",
+                "please do",
+                "go ahead",
+                "okay",
+                "ok",
+            )
+        )
+
+    @staticmethod
+    def _is_hold_closing_reply(text: str) -> bool:
+        normalized = re.sub(r"[^a-z0-9\s]", " ", str(text).lower())
+        normalized = re.sub(r"\s+", " ", normalized).strip()
+        return any(
+            phrase in normalized
+            for phrase in (
+                "no thank",
+                "no thanks",
+                "nothing else",
+                "that is all",
+                "that's all",
+                "thank you",
+                "thanks",
+                "bye",
+                "goodbye",
+            )
+        )
 
     @staticmethod
     def _infer_response_objective(
@@ -1303,11 +1636,17 @@ class PlanProposalDirectiveNode(BaseGraphNode):
             "collect_verification": ["ask_only_missing_verification_fields"],
             "wrong_party_privacy_notice": ["state_privacy_boundary"],
             "wrong_party_callback_request": ["state_privacy_boundary", "request_callback_time"],
+            "wrong_party_callback_clarification": ["request_clearer_callback_time"],
             "wrong_party_callback_confirmation": ["confirm_callback_time", "close_conversation"],
+            "wrong_party_callback_revision_confirmation": ["confirm_revised_callback_time", "close_conversation"],
+            "wrong_party_closing_acknowledgement": ["acknowledge_and_close"],
             "explain_dues": ["mention_due_amount", "ask_next_step"],
+            "purpose_disclosure": ["mention_policy_number", "mention_due_amount", "mention_due_date", "invite_context"],
+            "hardship_hold_offer": ["acknowledge_hardship", "offer_eligible_hold", "ask_if_hold_helps"],
+            "hardship_hold_confirmation": ["confirm_hold", "give_reference", "state_notification", "state_next_steps"],
+            "hardship_hold_closing": ["thank_customer_by_name", "warm_signoff", "goodbye"],
             "assess_affordability": [
                 "acknowledge_hardship",
-                "explain_applicable_policy_options",
                 "ask_affordable_amount",
             ],
             "present_arrangement_options": ["discuss_arrangement", "ask_next_step"],
@@ -1333,12 +1672,33 @@ class PlanProposalDirectiveNode(BaseGraphNode):
                 "request_verification_from_third_party",
                 "mention_dues_or_policy_number",
             ],
+            "wrong_party_callback_clarification": [
+                "disclose_account_details",
+                "request_verification_from_third_party",
+                "mention_dues_or_policy_number",
+                "repeat_privacy_notice",
+            ],
+            "wrong_party_callback_revision_confirmation": [
+                "disclose_account_details",
+                "request_verification_from_third_party",
+                "mention_dues_or_policy_number",
+                "repeat_previous_callback_time",
+            ],
+            "wrong_party_closing_acknowledgement": [
+                "disclose_account_details",
+                "repeat_callback_details",
+                "restart_conversation",
+            ],
             "wrong_party_callback_confirmation": [
                 "disclose_account_details",
                 "request_verification_from_third_party",
                 "mention_dues_or_policy_number",
             ],
             "explain_dues": ["disclose_dues_before_verification", "mention_internal_processing"],
+            "purpose_disclosure": ["present_resolution_menu", "offer_discount", "offer_restructure", "mention_internal_processing"],
+            "hardship_hold_offer": ["repeat_standard_options", "ask_affordable_amount", "mention_internal_processing"],
+            "hardship_hold_confirmation": ["repeat_standard_options", "request_payment", "mention_internal_processing"],
+            "hardship_hold_closing": ["repeat_hold_details", "restart_conversation", "mention_internal_processing"],
             "assess_affordability": ["restart_collections_menu", "ask_pay_now_or_arrangement", "mention_internal_processing"],
             "present_arrangement_options": ["restart_collections_menu", "ask_pay_now_or_arrangement", "mention_internal_processing"],
             "negotiate_installment": ["restart_collections_menu", "ask_pay_now_or_arrangement", "mention_internal_processing"],
@@ -1355,8 +1715,15 @@ class PlanProposalDirectiveNode(BaseGraphNode):
             "collect_verification": ["ask_verification"],
             "wrong_party_privacy_notice": ["state_privacy_boundary"],
             "wrong_party_callback_request": ["state_privacy_boundary", "request_callback_time"],
+            "wrong_party_callback_clarification": ["request_clearer_callback_time"],
             "wrong_party_callback_confirmation": ["confirm_callback_time", "close_conversation"],
+            "wrong_party_callback_revision_confirmation": ["confirm_revised_callback_time", "close_conversation"],
+            "wrong_party_closing_acknowledgement": ["acknowledge_and_close"],
             "explain_dues": ["present_due_amount", "ask_next_step"],
+            "purpose_disclosure": ["disclose_call_purpose", "invite_context"],
+            "hardship_hold_offer": ["acknowledge_hardship", "offer_hardship_hold"],
+            "hardship_hold_confirmation": ["confirm_hardship_hold"],
+            "hardship_hold_closing": ["close_hardship_hold_conversation"],
             "assess_affordability": ["acknowledge_hardship", "ask_affordable_amount"],
             "present_arrangement_options": ["present_offer", "discuss_arrangement"],
             "negotiate_installment": ["discuss_arrangement", "ask_affordable_amount"],
@@ -1374,10 +1741,17 @@ class PlanProposalDirectiveNode(BaseGraphNode):
             "collect_verification": "Ask only for the missing verification details needed to continue securely.",
             "wrong_party_privacy_notice": "State that details can only be discussed directly with the customer.",
             "wrong_party_callback_request": "Protect privacy, provide the company callback number, and ask for a suitable callback time.",
+            "wrong_party_callback_clarification": "Ask briefly for a more specific callback time without repeating prior wording.",
             "wrong_party_callback_confirmation": "Confirm the callback time and close the call respectfully.",
+            "wrong_party_callback_revision_confirmation": "Confirm the updated callback time and close without repeating the previous time.",
+            "wrong_party_closing_acknowledgement": "Acknowledge politely and end the call without repeating callback details.",
             "explain_dues": "Explain the overdue amount clearly and ask the next useful payment question.",
+            "purpose_disclosure": "State the policy number, overdue installment, and original due date, then ask how you can help.",
+            "hardship_hold_offer": "Acknowledge the hardship and offer the eligible temporary hold without repeating generic payment options.",
+            "hardship_hold_confirmation": "Confirm the hold, generated reference number, completed notifications, and next steps.",
+            "hardship_hold_closing": "Thank the customer by name, offer a warm sign-off, and say goodbye.",
             "assess_affordability": (
-                "Explain the standard policy options that apply, then ask what amount or payment date is realistically manageable."
+                "Acknowledge the hardship, understand what is manageable, and avoid repeating the standard policy menu."
             ),
             "present_arrangement_options": "Continue arrangement discussion with practical repayment options.",
             "negotiate_installment": "Refine the repayment arrangement toward a manageable installment.",
