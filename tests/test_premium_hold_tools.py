@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from agents.collection_agent.nodes.collection_react_node import CollectionReactNode
+from agents.collection_agent.nodes.collection_response_node import CollectionResponseNode
 from agents.collection_agent.nodes.pre_plan_intent_node import PrePlanIntentNode
 from agents.collection_agent.tools.data_store import CollectionDataStore
 from agents.collection_agent.tools.email_confirmation_send_tool import EmailConfirmationSendTool
@@ -109,6 +110,7 @@ def test_accepted_hold_routes_through_all_three_tools(tmp_path: Path) -> None:
         "steps": 0,
         "observations": [],
     }
+    memory.set_state(hold_response="accepted")
 
     executed: list[str] = []
     for _ in range(3):
@@ -141,6 +143,7 @@ def test_pre_plan_routes_accepted_hold_to_decision_path() -> None:
         state={
             "identity_verified": True,
             "hardship_hold_stage": "offered",
+            "hold_response": "accepted",
         },
     )
     node = PrePlanIntentNode(
@@ -160,3 +163,56 @@ def test_pre_plan_routes_accepted_hold_to_decision_path() -> None:
 
     assert update["pre_plan_intent"]["intent"] == "decide"
     assert node.route(update) == "decide"
+
+
+def test_hold_offer_uses_guarded_llm_wording() -> None:
+    class HoldOfferLLM:
+        @staticmethod
+        def generate_json(system_prompt: str, user_prompt: str) -> dict[str, str]:
+            del system_prompt, user_prompt
+            return {
+                "message": (
+                    "I am sorry you are dealing with this. We can pause the premium for 2 months "
+                    "while keeping your policy benefits active. Would that give you enough breathing room?"
+                ),
+                "response_target": "customer",
+            }
+
+    memory = WorkingMemory(
+        session_id="hold-offer-llm",
+        state={
+            "active_customer_name": "Rohan Gupta",
+            "identity_verified": True,
+            "hardship_hold_program": {
+                "max_hold_months": 2,
+                "benefits_remain_active": True,
+            },
+        },
+    )
+    node = CollectionResponseNode(
+        llm=HoldOfferLLM(),
+        strict_llm_mode=False,
+        system_prompt="Respond naturally while following the supplied directive.",
+        render_user_prompt=(
+            "Template: {template_id}\nTone: {tone}\n"
+            "Variables: {render_variables_json}\nConstraints: {response_constraints_json}"
+        ),
+    )
+
+    update = node.execute(
+        {
+            "user_input": "I have been out of work for a while.",
+            "memory": memory,
+            "plan_proposal": {
+                "target": "customer",
+                "response_directive": {
+                    "conversation_objective": "hardship_hold_offer",
+                    "dialogue_action": "offer_hardship_hold",
+                    "response_mode": "empathetic",
+                },
+            },
+        }
+    )
+
+    assert update["response"].startswith("I am sorry you are dealing with this.")
+    assert update["response_render_debug"]["renderer_fallback_used"] is False

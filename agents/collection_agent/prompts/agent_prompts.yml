@@ -23,6 +23,8 @@ negotiation_classification:
     - customer_payment_willingness
     - response_mode
     - active_dialogue_owner
+    - hold_response
+    - discount_response
     - reason
 
     Allowed conversation_mode values:
@@ -100,6 +102,16 @@ negotiation_classification:
     - customer declines -> rejected
     - customer proposes alternate amount -> counter_offer
     - negotiation concluded -> closed
+
+    Offer-response guidance:
+    - hold_response applies only to the customer's current response to an offered premium hold
+    - discount_response applies only to the customer's current response to an offered installment discount
+    - allowed values for both are: none, accepted, uncertain, rejected, counter
+    - "that would help", agreement, or permission to proceed -> accepted
+    - doubt about being able to resume after the hold, even when phrased indirectly -> hold_response=uncertain
+    - refusal or a clear decline -> rejected
+    - a different amount, percentage, or alternative proposal -> counter
+    - use none when the current turn is not responding to that specific offer
 
     customer_payment_willingness must be a float from 0.0 to 1.0:
     - 0.0 means unwilling to pay
@@ -1133,15 +1145,16 @@ entity_extract:
     Return strict JSON only with keys: entities, entity_descriptions, field_evidence.
     Extract all useful named entities from the current user turn, and update/extend previously extracted entities when the new turn provides newer or corrected values.
     Keep entity keys stable and practical (snake_case). Canonical keys include but are not limited to:
-    case_id, customer_id, loan_id, account_id, name, dob, phone, email, zip, last4_pan, amount, emi_amount, promised_date, promised_amount, callback_time, relation, location, customer_payment_capacity, customer_payment_capacity_pct.
+    case_id, customer_id, loan_id, account_id, name, dob, phone, email, zip, last4_pan, amount, emi_amount, promised_date, promised_amount, callback_time, relation, location, customer_payment_capacity.
     Populate entity_descriptions with concise semantic meaning for each entity key.
     field_evidence should include short supporting span(s) from current user input for extracted/updated keys whenever available.
     Do not drop broader entities only because they are outside verification scope.
     Existing extracted entities are the canonical session memory.
     Payment-capacity extraction guidance:
     - If the customer states how much they can pay now or in a specific near-term commitment, capture that as customer_payment_capacity.
-    - If the customer states a proportion such as half / 50 percent, capture that as customer_payment_capacity_pct on a 0-100 scale.
-    - Do not fabricate customer_payment_capacity or customer_payment_capacity_pct when the input is ambiguous.
+    - If the customer states a natural fraction such as half or quarter, use Active overdue amount to normalize it into customer_payment_capacity.
+    - If the customer says they can pay the full amount, capture customer_payment_capacity as the full overdue amount; downstream routing will treat it as full payment, not partial payment.
+    - Do not fabricate customer_payment_capacity when the input is ambiguous.
     Output turn-level delta only:
     - include keys that are newly provided in current user input, or explicitly corrected/updated now
     - do NOT re-emit unchanged entities already present in Existing extracted entities
@@ -1151,6 +1164,7 @@ entity_extract:
     Conversation history (recent): {conversation_history_compact}
     Required verification fields: {required_fields_json}
     Active customer name: {active_customer_name}
+    Active overdue amount: {active_overdue_amount}
     Existing extracted entities JSON: {existing_entities_json}
     Existing entity descriptions JSON: {existing_entity_descriptions_json}
     Instructions:
@@ -1160,8 +1174,8 @@ entity_extract:
     - Output only turn delta: new keys in this turn + corrected values in this turn.
     - If a new value conflicts with an old value and current turn clearly indicates correction, keep the new value.
     - Normalize obvious forms when safe (for example phone digits, ISO-like DOB) but do not fabricate missing values.
-    - For customer_payment_capacity, prefer numeric amount only.
-    - For customer_payment_capacity_pct, prefer numeric percentage only on a 0-100 scale.
+    - For customer_payment_capacity, output numeric money amount only.
+    - For "half", use 50% of Active overdue amount. For "quarter", use 25% of Active overdue amount. For "full", use 100% of Active overdue amount.
     - Include verification entities (dob/phone/name/etc.) when present, but also capture other named entities relevant to collections.
     - Output strict JSON only.
 

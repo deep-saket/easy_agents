@@ -97,6 +97,8 @@ def overlay_negotiation_state_from_graph(*, state: AgentState, memory_state: dic
         "customer_payment_posture",
         "response_mode",
         "active_dialogue_owner",
+        "hold_response",
+        "discount_response",
     ):
         if key in state and str(state.get(key, "")).strip():
             merged[key] = str(state.get(key, "")).strip()
@@ -274,6 +276,26 @@ def mark_confirmation_delivered(memory: Any) -> dict[str, Any]:
 
     now = datetime.now(UTC).isoformat()
     markers = dict(plan.get("step_markers", {})) if isinstance(plan.get("step_markers"), dict) else {}
+    completed_prerequisites: list[str] = []
+    if str(memory_state.get("partial_payment_stage", "")).strip().lower() == "confirmed":
+        details = (
+            memory_state.get("partial_payment_details")
+            if isinstance(memory_state.get("partial_payment_details"), dict)
+            else {}
+        )
+        sms = details.get("sms_confirmation") if isinstance(details.get("sms_confirmation"), dict) else {}
+        if (
+            str(details.get("payment_reference_id", "")).strip()
+            and str(sms.get("status", "")).strip().lower() == "sent"
+        ):
+            completed_prerequisites = ["partial_amount", "partial_link"]
+            for node_id in completed_prerequisites:
+                markers[node_id] = {
+                    "state": "done",
+                    "updated_at": now,
+                    "source": "response_render",
+                    "reason": "payment_link_created_and_sms_sent",
+                }
     markers["confirmation"] = {
         "state": "done",
         "updated_at": now,
@@ -290,7 +312,7 @@ def mark_confirmation_delivered(memory: Any) -> dict[str, Any]:
     nodes = [dict(node) for node in plan.get("nodes", []) if isinstance(node, dict)]
     for node in nodes:
         node_id = str(node.get("id", "")).strip()
-        if node_id == "confirmation":
+        if node_id in completed_prerequisites or node_id == "confirmation":
             node["status"] = "done"
         elif node_id == "close_conversation":
             node["status"] = "in_progress"
@@ -305,7 +327,7 @@ def mark_confirmation_delivered(memory: Any) -> dict[str, Any]:
     transition_update = {
         "origin": "response_render",
         "operation": "advance",
-        "mark_done": ["confirmation"],
+        "mark_done": [*completed_prerequisites, "confirmation"],
         "current_node_id": "close_conversation",
     }
 

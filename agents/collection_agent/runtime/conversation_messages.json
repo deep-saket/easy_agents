@@ -1752,95 +1752,39 @@
   ],
   "collection-user_b": [
     {
-      "id": "c826be37-e525-409a-8df6-cdb57e2ff254",
-      "session_id": "collection-user_b",
-      "role": "customer",
-      "content": "yes",
-      "created_at": "2026-06-12T06:03:56.622435Z"
-    },
-    {
-      "id": "9d90002d-e06f-44de-be98-0a0525634386",
+      "id": "5349f8b4-cb32-42d6-9c00-7bd5246efa4b",
       "session_id": "collection-user_b",
       "role": "agent",
-      "content": "For security and privacy reasons, I need to verify your identity before we proceed. Could you please provide your date of birth and phone number?",
-      "created_at": "2026-06-12T06:04:51.750408Z"
+      "content": "I am unable to share what the call is about, but please let Rohan Gupta know that EasySecure Financial Services called and would like to speak with them. They can also reach EasySecure Financial Services at +91-1800-555-2002 at their convenience. When would be a good time to try again?",
+      "created_at": "2026-06-16T10:46:44.958967Z"
     },
     {
-      "id": "8cb3bc2c-1bc1-4306-9b5d-197c0e3f0d1a",
+      "id": "791ad194-79b5-438b-aeb3-fc2a5ef4993b",
       "session_id": "collection-user_b",
       "role": "customer",
-      "content": "My phone number is : 9900001002 and date of birth is 1988-04-22",
-      "created_at": "2026-06-12T06:05:15.428025Z"
+      "content": "no he is not here",
+      "created_at": "2026-06-16T10:46:44.971259Z"
     },
     {
-      "id": "d52a38ba-c502-4e77-a25e-cfd4bb1e5e81",
+      "id": "52046dd0-ffbb-40e5-953a-f31c6c5f6ee8",
       "session_id": "collection-user_b",
       "role": "agent",
-      "content": "Thank you for confirming. I am calling about your policy LOAN-3002. A premium installment of 37800.00, due on 2026-06-10, is currently overdue. I wanted to check in and see how I can help.",
-      "created_at": "2026-06-12T06:07:48.436908Z"
+      "content": "I am unable to share what the call is about, but please let Rohan Gupta know that EasySecure Financial Services called and would like to speak with them. They can also reach EasySecure Financial Services at +91-1800-555-2002 at their convenience. When would be a good time to try again?",
+      "created_at": "2026-06-16T10:47:56.942495Z"
     },
     {
-      "id": "946b6d3b-c73b-4186-b589-2b16a343a50b",
+      "id": "2426f5e5-76bb-4dbb-8a22-77667b11be0b",
       "session_id": "collection-user_b",
       "role": "customer",
-      "content": "Honestly, I've been laid off and I'm struggling right now",
-      "created_at": "2026-06-12T06:08:33.834686Z"
+      "content": "he is not here, try this evening",
+      "created_at": "2026-06-16T10:48:43.911192Z"
     },
     {
-      "id": "b56f2515-23ae-4942-a103-ba83b94948d4",
-      "session_id": "collection-user_b",
-      "role": "customer",
-      "content": "The customer interrupted while the previous turn was still processing.\nPrevious interrupted customer message: Honestly, I've been laid off and I'm struggling right now\nLatest customer message: Honestly, I've been laid off and I'm struggling right now\nUse the latest message as authoritative, but keep the interrupted message as immediate context.",
-      "created_at": "2026-06-12T06:08:49.087910Z"
-    },
-    {
-      "id": "8a0e9be2-0bea-46a1-b84c-5c1f5c0cfa45",
+      "id": "d455f117-66ad-4e2b-8e57-6b11833a9dc7",
       "session_id": "collection-user_b",
       "role": "agent",
-      "content": "I am really sorry to hear that, and thank you for letting me know. The most important thing right now is keeping your cover active while you get back on your feet. Given your situation, I can place your premium on hold for up to 2 months, with no impact to your policy benefits during that time. Would that give you some breathing room, and do you think you would be in a position to resume payments after that?",
-      "created_at": "2026-06-12T06:10:39.203007Z"
-    },
-    {
-      "id": "9942cbb0-8359-4c56-a83a-1b075ce28e0f",
-      "session_id": "collection-user_b",
-      "role": "customer",
-      "content": "I'm not sure I can manage even after 2 months.",
-      "created_at": "2026-06-12T06:11:17.770160Z"
-    },
-    {
-      "id": "e92322aa-fa9f-422b-93be-5ebd9321ab9e",
-      "session_id": "collection-user_b",
-      "role": "agent",
-      "content": "That is completely understandable, and thank you for being honest. In that case, I can apply a 10% discount to this installment, bringing the amount down from 37800.00 to 34020.00. Would that help ease the pressure?",
-      "created_at": "2026-06-12T06:12:03.486128Z"
-    },
-    {
-      "id": "e39dbe3f-f443-4dbd-9f2c-30aef6dbb5f7",
-      "session_id": "collection-user_b",
-      "role": "customer",
-      "content": "Yes, that would make a real difference",
-      "created_at": "2026-06-12T06:17:54.515604Z"
-    },
-    {
-      "id": "3275c460-9165-496c-a353-3ba01de0ec33",
-      "session_id": "collection-user_b",
-      "role": "agent",
-      "content": "I have applied the 10% discount to this installment. Your revised amount is 34020.00, and your reference number is DISC-3C6B206C2C. Confirmation has been sent by SMS and email. We will review your situation again in 3 months.",
-      "created_at": "2026-06-12T06:19:47.276439Z"
-    },
-    {
-      "id": "58cabc71-0c41-4284-95c2-8304a75683a3",
-      "session_id": "collection-user_b",
-      "role": "customer",
-      "content": "sure, thankyou so much",
-      "created_at": "2026-06-12T06:20:14.433701Z"
-    },
-    {
-      "id": "6d8fef1b-73f3-4ae7-acd1-a4b390975c83",
-      "session_id": "collection-user_b",
-      "role": "agent",
-      "content": "Thank you for your time, Rohan Gupta. Take care of yourself, and goodbye.",
-      "created_at": "2026-06-12T06:20:56.453913Z"
+      "content": "Certainly. I will try to reach Rohan Gupta this evening. Please let them know that EasySecure Financial Services called. Thank you for your help. Have a good day. Goodbye.",
+      "created_at": "2026-06-16T10:52:31.630035Z"
     }
   ]
 }

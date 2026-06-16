@@ -73,6 +73,9 @@ class CollectionGraphState(AgentState, total=False):
     post_hold_capacity: str
     installment_discount_program: dict[str, Any]
     installment_discount_details: dict[str, Any]
+    partial_payment_stage: str
+    partial_payment_details: dict[str, Any]
+    followup_status: str
     customer_payment_willingness: float
     hardship_context: dict[str, Any]
     discount_requested: bool
@@ -82,6 +85,8 @@ class CollectionGraphState(AgentState, total=False):
     counter_offer_present: bool
     response_mode: str
     active_dialogue_owner: str
+    hold_response: str
+    discount_response: str
     reflection_retry_count: int
     reflection_plan_retry_count: int
     reflection_feedback: dict[str, Any]

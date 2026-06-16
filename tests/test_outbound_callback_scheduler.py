@@ -146,6 +146,27 @@ def test_schedule_and_cancel_tools_use_durable_queue() -> None:
         assert cancelled.cancelled_job_ids == [scheduled.job_id]
 
 
+def test_queue_recovers_from_corrupt_runtime_json() -> None:
+    with TemporaryDirectory() as raw_dir:
+        root = Path(raw_dir)
+        queue = OutboundCallbackQueue(runtime_dir=root, dispatch=lambda _: {})
+        queue.queue_path.write_bytes(b"\x00\x00\x00\x00")
+
+        job = queue.schedule(
+            case_id="COLL-1002",
+            customer_id="CUST-2002",
+            session_id="session-1",
+            callback_time="tomorrow morning",
+            timezone_name="Asia/Kolkata",
+            phone="+919900001002",
+            max_retries=3,
+            now=datetime(2026, 6, 11, 10, 0, tzinfo=UTC),
+        )
+
+        assert job["status"] == "scheduled"
+        assert queue._read_rows(queue.queue_path)[0]["job_id"] == job["job_id"]
+
+
 def test_wrong_party_callback_turn_selects_scheduler_tool() -> None:
     with TemporaryDirectory() as raw_dir:
         root = Path(raw_dir)

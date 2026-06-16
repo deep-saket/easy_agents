@@ -29,6 +29,8 @@ class _NegotiationPayload(BaseModel):
     customer_payment_willingness: float = 0.5
     response_mode: str = "informational"
     active_dialogue_owner: str = "collections"
+    hold_response: str = "none"
+    discount_response: str = "none"
     reason: str | None = None
 
 
@@ -92,6 +94,13 @@ class NegotiationClassificationNode(BaseGraphNode):
         "collections",
         "plan_proposal",
         "promise_capture",
+    }
+    _ALLOWED_OFFER_RESPONSES = {
+        "none",
+        "accepted",
+        "uncertain",
+        "rejected",
+        "counter",
     }
 
     def execute(self, state: AgentState) -> NodeUpdate:
@@ -203,6 +212,8 @@ class NegotiationClassificationNode(BaseGraphNode):
                 "counter_offer_present": bool(merged["counter_offer_present"]),
                 "response_mode": merged["response_mode"],
                 "active_dialogue_owner": merged["active_dialogue_owner"],
+                "hold_response": merged["hold_response"],
+                "discount_response": merged["discount_response"],
             },
             "conversation_mode": merged["conversation_mode"],
             "negotiation_stage": merged["negotiation_stage"],
@@ -217,6 +228,8 @@ class NegotiationClassificationNode(BaseGraphNode):
             "counter_offer_present": bool(merged["counter_offer_present"]),
             "response_mode": merged["response_mode"],
             "active_dialogue_owner": merged["active_dialogue_owner"],
+            "hold_response": merged["hold_response"],
+            "discount_response": merged["discount_response"],
             "prompt": prompt_debug.get("prompt"),
             "system_prompt": prompt_debug.get("system_prompt"),
             "llm_response": prompt_debug.get("llm_response"),
@@ -237,6 +250,8 @@ class NegotiationClassificationNode(BaseGraphNode):
                 counter_offer_present=bool(merged["counter_offer_present"]),
                 response_mode=merged["response_mode"],
                 active_dialogue_owner=merged["active_dialogue_owner"],
+                hold_response=merged["hold_response"],
+                discount_response=merged["discount_response"],
                 mode=("hardship_negotiation" if merged["conversation_mode"] == "hardship_negotiation" else "strict_collections"),
                 hardship_reason=(
                     str(merged["hardship_context"].get("hardship_reason", "")).strip()
@@ -336,6 +351,16 @@ class NegotiationClassificationNode(BaseGraphNode):
                 raw.get("active_dialogue_owner"),
                 allowed=self._ALLOWED_DIALOGUE_OWNERS,
                 default=str(prior.get("active_dialogue_owner", "collections")),
+            ),
+            "hold_response": self._normalize_choice(
+                raw.get("hold_response"),
+                allowed=self._ALLOWED_OFFER_RESPONSES,
+                default="none",
+            ),
+            "discount_response": self._normalize_choice(
+                raw.get("discount_response"),
+                allowed=self._ALLOWED_OFFER_RESPONSES,
+                default="none",
             ),
         }
 
@@ -492,6 +517,23 @@ class NegotiationClassificationNode(BaseGraphNode):
         ):
             discount_stage = "closed"
 
+        hold_response = "none"
+        discount_response = "none"
+        if str(prior.get("hardship_hold_stage", "")).strip().lower() == "offered":
+            if self._fallback_is_uncertain(lowered):
+                hold_response = "uncertain"
+            elif self._fallback_is_affirmative(lowered):
+                hold_response = "accepted"
+            elif any(token in lowered for token in ["no", "not helpful", "decline", "do not want"]):
+                hold_response = "rejected"
+        if prior_discount_stage in {"offered", "accepted"}:
+            if amount_present or pct_present:
+                discount_response = "counter"
+            elif self._fallback_is_affirmative(lowered):
+                discount_response = "accepted"
+            elif any(token in lowered for token in ["no", "not helpful", "decline", "do not want", "too high"]):
+                discount_response = "rejected"
+
         willingness = self._fallback_payment_willingness(
             posture=posture,
             lowered_text=lowered,
@@ -522,6 +564,8 @@ class NegotiationClassificationNode(BaseGraphNode):
                 },
                 "response_mode": "empathetic",
                 "active_dialogue_owner": "plan_proposal",
+                "hold_response": hold_response,
+                "discount_response": discount_response,
             }
 
         if not identity_verified:
@@ -544,6 +588,8 @@ class NegotiationClassificationNode(BaseGraphNode):
                 },
                 "response_mode": "compliance",
                 "active_dialogue_owner": "verification",
+                "hold_response": hold_response,
+                "discount_response": discount_response,
             }
 
         return {
@@ -577,6 +623,8 @@ class NegotiationClassificationNode(BaseGraphNode):
                 if posture in {"partial_now", "negotiating"}
                 else "collections"
             ),
+            "hold_response": hold_response,
+            "discount_response": discount_response,
         }
 
     @staticmethod
@@ -651,6 +699,9 @@ class NegotiationClassificationNode(BaseGraphNode):
                 state.get("active_dialogue_owner", memory_state.get("active_dialogue_owner", default_mode))
             ).strip()
             or default_mode,
+            "hold_response": "none",
+            "discount_response": "none",
+            "hardship_hold_stage": str(memory_state.get("hardship_hold_stage", "")).strip().lower(),
         }
 
     @staticmethod
@@ -698,6 +749,7 @@ class NegotiationClassificationNode(BaseGraphNode):
             "active_collection_context",
             "response_mode",
             "active_dialogue_owner",
+            "hardship_hold_stage",
             "identity_verified",
             "verification_missing_fields",
             "verification_verified_fields",
@@ -707,6 +759,39 @@ class NegotiationClassificationNode(BaseGraphNode):
             "last_agent_response",
         }
         return {key: memory_state.get(key) for key in keep if key in memory_state}
+
+    @staticmethod
+    def _fallback_is_affirmative(text: str) -> bool:
+        return any(
+            phrase in text
+            for phrase in (
+                "yes",
+                "that would help",
+                "would really help",
+                "sounds good",
+                "i agree",
+                "please do",
+                "go ahead",
+                "okay",
+                "ok",
+            )
+        )
+
+    @staticmethod
+    def _fallback_is_uncertain(text: str) -> bool:
+        return any(
+            phrase in text
+            for phrase in (
+                "not sure",
+                "unsure",
+                "even after 2 months",
+                "even after two months",
+                "cannot manage after",
+                "can't manage after",
+                "may not manage",
+                "might not manage",
+            )
+        )
 
     @staticmethod
     def _normalize_posture_history(value: Any) -> list[str]:

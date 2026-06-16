@@ -7,6 +7,7 @@ from typing import Any
 
 from agents.collection_agent.nodes.callback_time_extractor import extract_callback_time
 from agents.collection_agent.nodes.collection_intent_node import CollectionIntentNode
+from agents.collection_agent.nodes.partial_payment_utils import partial_payment_from_llm_amount
 from src.nodes.types import AgentState
 
 
@@ -173,9 +174,34 @@ class PrePlanIntentNode(CollectionIntentNode):
         memory_state = self._get_memory_state(state)
         right_party_status = str(memory_state.get("right_party_status", "")).strip().lower()
         lowered = str(state.get("user_input", "")).lower()
+        partial_stage = str(memory_state.get("partial_payment_stage", "")).strip().lower()
+        if partial_stage == "link_offered" and self._is_affirmative(lowered):
+            return {
+                "skip_llm": True,
+                "reason": "Accepted partial-payment link requires tool execution.",
+                "intent": {
+                    "intent": "decide",
+                    "confidence": 1.0,
+                    "reason": "Create and send the partial-payment link.",
+                },
+            }
+        if partial_stage == "collecting_amount" and partial_payment_from_llm_amount(
+            state=state,
+            memory_state=memory_state,
+            total_due=float(memory_state.get("active_overdue_amount", 0) or 0),
+        ):
+            return {
+                "skip_llm": True,
+                "reason": "LLM-extracted partial-payment capacity is ready for policy validation.",
+                "intent": {
+                    "intent": "plan",
+                    "confidence": 1.0,
+                    "reason": "Validate and present the partial-payment amount.",
+                },
+            }
         if (
             str(memory_state.get("hardship_hold_stage", "")).strip().lower() == "offered"
-            and self._is_post_hold_uncertain(str(state.get("user_input", "")))
+            and str(memory_state.get("hold_response", "")).strip().lower() == "uncertain"
         ):
             return {
                 "skip_llm": True,
@@ -188,7 +214,7 @@ class PrePlanIntentNode(CollectionIntentNode):
             }
         if (
             str(memory_state.get("discount_stage", "")).strip().lower() in {"offered", "accepted"}
-            and self._is_affirmative(str(state.get("user_input", "")))
+            and str(memory_state.get("discount_response", "")).strip().lower() == "accepted"
         ):
             return {
                 "skip_llm": True,
@@ -202,7 +228,7 @@ class PrePlanIntentNode(CollectionIntentNode):
         if (
             str(memory_state.get("hardship_hold_stage", "")).strip().lower() == "offered"
             and not self._has_active_discount_branch(memory_state)
-            and self._is_affirmative(str(state.get("user_input", "")))
+            and str(memory_state.get("hold_response", "")).strip().lower() == "accepted"
         ):
             return {
                 "skip_llm": True,
@@ -324,24 +350,6 @@ class PrePlanIntentNode(CollectionIntentNode):
                 "go ahead",
                 "okay",
                 "ok",
-            )
-        )
-
-    @staticmethod
-    def _is_post_hold_uncertain(text: str) -> bool:
-        normalized = re.sub(r"[^a-z0-9\s]", " ", str(text).lower())
-        normalized = re.sub(r"\s+", " ", normalized).strip()
-        return any(
-            phrase in normalized
-            for phrase in (
-                "not sure",
-                "unsure",
-                "even after 2 months",
-                "even after two months",
-                "cannot manage after",
-                "can't manage after",
-                "may not manage",
-                "might not manage",
             )
         )
 

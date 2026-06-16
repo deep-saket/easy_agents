@@ -107,6 +107,7 @@ class CollectionResponseNode(ResponseNode):
             "wrong_party_closing_acknowledgement",
             "hardship_hold_closing",
             "installment_discount_closing",
+            "partial_payment_closing",
         }:
             update["conversation_complete"] = False
             update["conversation_closing"] = True
@@ -120,6 +121,7 @@ class CollectionResponseNode(ResponseNode):
             if objective in {
                 "hardship_hold_confirmation",
                 "installment_discount_confirmation",
+                "partial_payment_confirmation",
             } and str(update.get("response", "")).strip():
                 advanced_plan = mark_confirmation_delivered(memory)
                 if advanced_plan:
@@ -218,12 +220,12 @@ class CollectionResponseNode(ResponseNode):
             "wrong_party_closing_acknowledgement",
             "conversation_closing",
             "purpose_disclosure",
-            "hardship_hold_offer",
             "hardship_hold_confirmation",
             "hardship_hold_closing",
-            "installment_discount_offer",
             "installment_discount_confirmation",
             "installment_discount_closing",
+            "partial_payment_confirmation",
+            "partial_payment_closing",
         }:
             render_debug["renderer_fallback_used"] = True
             render_debug["policy_filters_applied"] = ["deterministic_compliance_template"]
@@ -516,6 +518,14 @@ class CollectionResponseNode(ResponseNode):
             return "installment_discount_confirmation"
         if objective == "installment_discount_closing" or action == "close_installment_discount_conversation":
             return "installment_discount_closing"
+        if objective == "partial_payment_amount_request" or action == "ask_partial_payment_amount":
+            return "partial_payment_amount_request"
+        if objective == "partial_payment_link_offer" or action == "offer_partial_payment_link":
+            return "partial_payment_link_offer"
+        if objective == "partial_payment_confirmation" or action == "confirm_partial_payment_link":
+            return "partial_payment_confirmation"
+        if objective == "partial_payment_closing" or action == "close_partial_payment_conversation":
+            return "partial_payment_closing"
         if action == "ask_affordable_amount" or objective == "assess_affordability":
             return "capacity_question"
         if action in {"present_offer", "discuss_arrangement"} or objective in {
@@ -761,6 +771,12 @@ class CollectionResponseNode(ResponseNode):
         ).strip() or overdue_amount_text
         revised_amount_text = str(render_variables.get("revised_amount_text", "0.00")).strip() or "0.00"
         review_after_months = int(render_variables.get("review_after_months", 3) or 3)
+        partial_payment_amount_text = str(
+            render_variables.get("partial_payment_amount_text", "0.00")
+        ).strip() or "0.00"
+        remaining_balance_text = str(
+            render_variables.get("remaining_balance_text", "0.00")
+        ).strip() or "0.00"
         opening_turn = bool(render_variables.get("opening_turn", False))
 
         if template_id == "verification_request":
@@ -891,6 +907,28 @@ class CollectionResponseNode(ResponseNode):
             return (
                 f"Thank you for your time, {customer_name}. Take care of yourself, and goodbye."
             ).strip()
+        if template_id == "partial_payment_amount_request":
+            return (
+                "That is helpful, and every contribution makes a difference. "
+                "How much do you think you could comfortably manage right now?"
+            )
+        if template_id == "partial_payment_link_offer":
+            return (
+                f"That works. I can create a secure payment link for {partial_payment_amount_text}. "
+                f"After that payment, the remaining balance will be {remaining_balance_text}. "
+                "Shall I send the secure link to your registered mobile by SMS?"
+            )
+        if template_id == "partial_payment_confirmation":
+            return (
+                f"Done. I have sent a secure payment link for {partial_payment_amount_text} "
+                f"to your registered mobile. Your reference number is {reference_number}. "
+                f"The remaining balance is {remaining_balance_text}. Once the partial payment is received, "
+                "we can agree on a comfortable date for the balance."
+            )
+        if template_id == "partial_payment_closing":
+            return (
+                f"Thank you for working with us on this, {customer_name}. Take care, and goodbye."
+            )
         if template_id == "dues_explanation":
             return (
                 f"Thank you {customer_name}. Your overdue amount is INR {overdue_amount_text}. "
@@ -960,6 +998,50 @@ class CollectionResponseNode(ResponseNode):
             result["forbidden_actions_blocked"].append("repeat_greeting")
         if bool(constraints.get("avoid_internal_terms", True)) and self._contains_internal_processing(rendered):
             result["forbidden_actions_blocked"].append("mention_internal_processing")
+        template_id = str(directive.get("template_id", "")).strip()
+        render_variables = (
+            directive.get("render_variables")
+            if isinstance(directive.get("render_variables"), dict)
+            else {}
+        )
+        lowered = rendered.lower()
+        if template_id == "partial_payment_amount_request":
+            if "?" not in rendered:
+                result["forbidden_actions_blocked"].append("missing_partial_amount_question")
+            if any(token in lowered for token in ["link has been sent", "link is on its way", "payment received"]):
+                result["forbidden_actions_blocked"].append("premature_partial_payment_claim")
+        elif template_id == "partial_payment_link_offer":
+            partial_amount = str(render_variables.get("partial_payment_amount_text", "")).strip()
+            remaining_balance = str(render_variables.get("remaining_balance_text", "")).strip()
+            if partial_amount and partial_amount not in rendered:
+                result["forbidden_actions_blocked"].append("missing_partial_payment_amount")
+            if remaining_balance and remaining_balance not in rendered:
+                result["forbidden_actions_blocked"].append("missing_remaining_balance")
+            if any(token in lowered for token in ["link has been sent", "link is on its way", "payment received"]):
+                result["forbidden_actions_blocked"].append("premature_partial_payment_claim")
+        elif template_id == "hardship_hold_offer":
+            hold_months = str(render_variables.get("hold_months", "")).strip()
+            if hold_months and hold_months not in rendered:
+                result["forbidden_actions_blocked"].append("missing_hold_duration")
+            if any(token in lowered for token in ["hold has been arranged", "hold is active", "confirmation has been sent"]):
+                result["forbidden_actions_blocked"].append("premature_hold_claim")
+            if "?" not in rendered:
+                result["forbidden_actions_blocked"].append("missing_hold_decision_question")
+        elif template_id == "installment_discount_offer":
+            discount_pct = str(render_variables.get("discount_pct_text", "")).strip()
+            original_amount = str(render_variables.get("original_amount_text", "")).strip()
+            revised_amount = str(render_variables.get("revised_amount_text", "")).strip()
+            for value, reason in (
+                (discount_pct, "missing_discount_percentage"),
+                (original_amount, "missing_original_amount"),
+                (revised_amount, "missing_revised_amount"),
+            ):
+                if value and value not in rendered:
+                    result["forbidden_actions_blocked"].append(reason)
+            if any(token in lowered for token in ["discount has been applied", "confirmation has been sent"]):
+                result["forbidden_actions_blocked"].append("premature_discount_claim")
+            if "?" not in rendered:
+                result["forbidden_actions_blocked"].append("missing_discount_decision_question")
         if result["forbidden_actions_blocked"]:
             return result
         result["text"] = rendered
@@ -1074,6 +1156,11 @@ class CollectionResponseNode(ResponseNode):
             if isinstance(memory_state.get("installment_discount_details"), dict)
             else {}
         )
+        partial_details = (
+            memory_state.get("partial_payment_details")
+            if isinstance(memory_state.get("partial_payment_details"), dict)
+            else {}
+        )
         return {
             "customer_name": customer_name,
             "agent_name": agent_name,
@@ -1084,7 +1171,10 @@ class CollectionResponseNode(ResponseNode):
             "reference_number": str(
                 discount_details.get(
                     "reference_number",
-                    hold_details.get("reference_number", reference_number),
+                    partial_details.get(
+                        "payment_reference_id",
+                        hold_details.get("reference_number", reference_number),
+                    ),
                 )
             ).strip(),
             "installment_amount_text": installment_amount,
@@ -1116,6 +1206,8 @@ class CollectionResponseNode(ResponseNode):
             "original_amount_text": f"{float(discount_details.get('original_amount', overdue_amount) or 0):.2f}",
             "revised_amount_text": f"{float(discount_details.get('revised_amount', 0) or 0):.2f}",
             "review_after_months": int(discount_details.get("review_after_months", 3) or 3),
+            "partial_payment_amount_text": f"{float(partial_details.get('partial_payment_amount', 0) or 0):.2f}",
+            "remaining_balance_text": f"{float(partial_details.get('remaining_balance', 0) or 0):.2f}",
             "callback_time": callback_time,
             "case_id": str(facts.get("case_id", memory_state.get("active_case_id", "COLL-1001"))).strip() or "COLL-1001",
             "overdue_amount_text": f"{overdue_amount:.2f}",

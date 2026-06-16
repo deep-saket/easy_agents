@@ -258,7 +258,20 @@ class OutboundCallbackQueue:
     @staticmethod
     def _read_rows(path: Path) -> list[dict[str, Any]]:
         content = path.read_text(encoding="utf-8").strip()
-        payload = json.loads(content) if content else []
+        if not content or not content.strip("\x00").strip():
+            return []
+        try:
+            payload = json.loads(content)
+        except json.JSONDecodeError:
+            corrupt_path = path.with_suffix(
+                path.suffix + f".corrupt-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
+            )
+            try:
+                path.replace(corrupt_path)
+            except OSError:
+                pass
+            path.write_text("[]\n", encoding="utf-8")
+            return []
         return [dict(row) for row in payload if isinstance(row, dict)]
 
     @staticmethod

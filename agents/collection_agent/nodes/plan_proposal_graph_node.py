@@ -226,13 +226,22 @@ class PlanProposalGraphNode(BaseGraphNode):
         elif bool(memory_state.get("identity_verified", False)):
             hold_stage = str(memory_state.get("hardship_hold_stage", "")).strip().lower()
             discount_stage = str(memory_state.get("discount_stage", "")).strip().lower()
+            partial_stage = str(memory_state.get("partial_payment_stage", "")).strip().lower()
             hardship_context = (
                 memory_state.get("hardship_context")
                 if isinstance(memory_state.get("hardship_context"), dict)
                 else {}
             )
             hardship_active = bool(hardship_context.get("hardship_detected", False))
-            if discount_stage == "confirmed" and self._is_hold_closing_reply(user_input):
+            if partial_stage == "confirmed" and self._is_hold_closing_reply(user_input):
+                inferred_next = "close_conversation"
+            elif partial_stage == "confirmed":
+                inferred_next = "confirmation"
+            elif partial_stage == "link_offered":
+                inferred_next = "partial_link"
+            elif partial_stage == "collecting_amount":
+                inferred_next = "partial_amount"
+            elif discount_stage == "confirmed" and self._is_hold_closing_reply(user_input):
                 inferred_next = "close_conversation"
             elif discount_stage == "confirmed":
                 inferred_next = "confirmation"
@@ -286,6 +295,10 @@ class PlanProposalGraphNode(BaseGraphNode):
         self._remove_verify_identity_node_if_verified(
             plan=plan,
             identity_verified=bool(memory_state.get("identity_verified", False)),
+        )
+        self._reconcile_partial_payment_marker_consistency(
+            plan=plan,
+            memory_state=memory_state,
         )
         markers = self._init_or_reconcile_step_markers(plan=plan)
         next_current = self._resolve_next_current_node(
@@ -582,6 +595,8 @@ class PlanProposalGraphNode(BaseGraphNode):
             {"id": "resolution_offer", "label": "Present eligible resolution option", "owner": "collection_agent", "status": "pending"},
             {"id": "assess_after_hold", "label": "Assess ability to resume after hold", "owner": "customer", "status": "pending"},
             {"id": "discount_offer", "label": "Present eligible installment discount", "owner": "collection_agent", "status": "pending"},
+            {"id": "partial_amount", "label": "Identify and validate partial-payment amount", "owner": "customer", "status": "pending"},
+            {"id": "partial_link", "label": "Create and send secure partial-payment link", "owner": "collection_agent", "status": "pending"},
             {"id": "confirmation", "label": "Confirm agreed outcome and reference", "owner": "collection_agent", "status": "pending"},
             {"id": "explain_dues", "label": "Explain standard payment options", "owner": "customer", "status": "pending"},
             {"id": "collect_payment_intent", "label": "Collect payment intent", "owner": "customer", "status": "pending"},
@@ -600,6 +615,9 @@ class PlanProposalGraphNode(BaseGraphNode):
             {"from": "resolution_offer", "to": "assess_after_hold", "condition": "customer_unsure_after_hold"},
             {"from": "assess_after_hold", "to": "discount_offer", "condition": "discount_eligible"},
             {"from": "discount_offer", "to": "confirmation", "condition": "discount_accepted"},
+            {"from": "purpose_disclosure", "to": "partial_amount", "condition": "partial_payment_available"},
+            {"from": "partial_amount", "to": "partial_link", "condition": "amount_validated"},
+            {"from": "partial_link", "to": "confirmation", "condition": "link_sent"},
             {"from": "confirmation", "to": "close_conversation", "condition": "outcome_confirmed"},
             {"from": "explain_dues", "to": "collect_payment_intent", "condition": "dues_explained"},
             {"from": "collect_payment_intent", "to": "resolve_outcome", "condition": "pay_now"},
@@ -680,6 +698,18 @@ class PlanProposalGraphNode(BaseGraphNode):
                 "owner": "collection_agent",
                 "status": "pending",
             },
+            {
+                "id": "partial_amount",
+                "label": "Identify and validate partial-payment amount",
+                "owner": "customer",
+                "status": "pending",
+            },
+            {
+                "id": "partial_link",
+                "label": "Create and send secure partial-payment link",
+                "owner": "collection_agent",
+                "status": "pending",
+            },
         ]
         for node in additions:
             if node["id"] not in node_ids:
@@ -701,6 +731,9 @@ class PlanProposalGraphNode(BaseGraphNode):
             {"from": "resolution_offer", "to": "assess_after_hold", "condition": "customer_unsure_after_hold"},
             {"from": "assess_after_hold", "to": "discount_offer", "condition": "discount_eligible"},
             {"from": "discount_offer", "to": "confirmation", "condition": "discount_accepted"},
+            {"from": "purpose_disclosure", "to": "partial_amount", "condition": "partial_payment_available"},
+            {"from": "partial_amount", "to": "partial_link", "condition": "amount_validated"},
+            {"from": "partial_link", "to": "confirmation", "condition": "link_sent"},
             {"from": "confirmation", "to": "close_conversation", "condition": "outcome_confirmed"},
             {"from": "wrong_party_callback", "to": "close_conversation", "condition": "callback_confirmed"},
             {"from": "resolve_outcome", "to": "close_conversation", "condition": "outcome_confirmed"},
@@ -1081,6 +1114,50 @@ class PlanProposalGraphNode(BaseGraphNode):
         verify_raw["reason"] = "identity_not_verified_in_current_state"
         verify_raw["updated_at"] = datetime.now(UTC).isoformat()
         markers["verify_identity"] = verify_raw
+        plan["step_markers"] = markers
+
+    @staticmethod
+    def _reconcile_partial_payment_marker_consistency(
+        *,
+        plan: dict[str, Any],
+        memory_state: dict[str, Any],
+    ) -> None:
+        if str(memory_state.get("partial_payment_stage", "")).strip().lower() != "confirmed":
+            return
+
+        details = (
+            memory_state.get("partial_payment_details")
+            if isinstance(memory_state.get("partial_payment_details"), dict)
+            else {}
+        )
+        sms = details.get("sms_confirmation") if isinstance(details.get("sms_confirmation"), dict) else {}
+        if (
+            not str(details.get("payment_reference_id", "")).strip()
+            or str(sms.get("status", "")).strip().lower() != "sent"
+        ):
+            return
+
+        now = datetime.now(UTC).isoformat()
+        markers = plan.get("step_markers") if isinstance(plan.get("step_markers"), dict) else {}
+        for node_id in ("partial_amount", "partial_link"):
+            if not any(
+                isinstance(node, dict) and str(node.get("id", "")).strip() == node_id
+                for node in plan.get("nodes", [])
+            ):
+                continue
+            markers[node_id] = {
+                "state": "done",
+                "updated_at": now,
+                "source": "partial_payment_reconciler",
+                "reason": "payment_link_created_and_sms_sent",
+            }
+
+        for node in plan.get("nodes", []):
+            if (
+                isinstance(node, dict)
+                and str(node.get("id", "")).strip() in {"partial_amount", "partial_link"}
+            ):
+                node["status"] = "done"
         plan["step_markers"] = markers
 
     @staticmethod

@@ -48,5 +48,35 @@
     "message": "Your installment discount has been applied. Reference: DISC-3C6B206C2C. Revised amount: 34020.00.",
     "status": "sent",
     "sent_at": "2026-06-12T06:19:17.406532+00:00"
+  },
+  {
+    "message_id": "EMAIL-B789373673",
+    "customer_id": "CUST-2002",
+    "reference_number": "DISC-1618AD653F",
+    "recipient": "rohan.gupta@example.com",
+    "subject": "Installment discount confirmation",
+    "message": "Your installment discount has been applied. Reference: DISC-1618AD653F. Revised amount: 34020.00.",
+    "status": "sent",
+    "sent_at": "2026-06-14T08:44:23.840414+00:00"
+  },
+  {
+    "message_id": "EMAIL-BB22EC348E",
+    "customer_id": "CUST-2002",
+    "reference_number": "HOLD-A72E773F98",
+    "recipient": "rohan.gupta@example.com",
+    "subject": "Premium hold confirmation",
+    "message": "Your premium hold has been arranged. Reference: HOLD-A72E773F98. The hold is active until 2026-08-15.",
+    "status": "sent",
+    "sent_at": "2026-06-15T08:55:53.302108+00:00"
+  },
+  {
+    "message_id": "EMAIL-91BDA8F2C4",
+    "customer_id": "CUST-2002",
+    "reference_number": "HOLD-3EAFDF571B",
+    "recipient": "rohan.gupta@example.com",
+    "subject": "Premium hold confirmation",
+    "message": "Your premium hold has been arranged. Reference: HOLD-3EAFDF571B. The hold is active until 2026-08-16.",
+    "status": "sent",
+    "sent_at": "2026-06-16T05:27:24.396239+00:00"
   }
 ]

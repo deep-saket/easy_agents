@@ -53,6 +53,38 @@ class CollectionReactNode(ReactNode):
         case_id = str(state.get("case_id") or memory_state.get("active_case_id", "")).strip()
         customer_id = str(state.get("user_id") or memory_state.get("active_user_id", "")).strip()
 
+        if latest_tool == "payment_link_create" and tool_completed_this_turn:
+            if str(memory_state.get("partial_payment_stage", "")).strip().lower() == "link_requested":
+                details = (
+                    dict(memory_state.get("partial_payment_details", {}))
+                    if isinstance(memory_state.get("partial_payment_details"), dict)
+                    else {}
+                )
+                details.update(latest_output)
+                if memory is not None:
+                    memory.set_state(
+                        partial_payment_stage="link_created",
+                        partial_payment_details=details,
+                    )
+                reference = str(latest_output.get("payment_reference_id", "")).strip()
+                message = (
+                    f"Your secure partial-payment link for "
+                    f"{float(details.get('partial_payment_amount', 0) or 0):.2f} is "
+                    f"{latest_output.get('payment_url', '')}. Reference: {reference}."
+                )
+                return {
+                    "skip_llm": True,
+                    "reason": "Partial-payment link created; send it by SMS.",
+                    "decision": self._tool_decision(
+                        "sms_confirmation_send",
+                        {
+                            "customer_id": customer_id,
+                            "reference_number": reference,
+                            "message": message,
+                        },
+                    ),
+                }
+
         if latest_tool == "installment_discount_evaluate" and tool_completed_this_turn:
             if not bool(latest_output.get("eligible", False)):
                 return None
@@ -146,6 +178,32 @@ class CollectionReactNode(ReactNode):
             }
 
         if latest_tool == "sms_confirmation_send" and tool_completed_this_turn:
+            if str(memory_state.get("partial_payment_stage", "")).strip().lower() == "link_created":
+                details = (
+                    dict(memory_state.get("partial_payment_details", {}))
+                    if isinstance(memory_state.get("partial_payment_details"), dict)
+                    else {}
+                )
+                details["sms_confirmation"] = dict(latest_output)
+                if memory is not None:
+                    memory.set_state(
+                        partial_payment_stage="confirmed",
+                        partial_payment_details=details,
+                        followup_status="awaiting_partial_payment",
+                    )
+                return {
+                    "skip_llm": True,
+                    "reason": "Partial-payment link sent by SMS.",
+                    "decision": SimpleNamespace(
+                        thought="Partial-payment link delivery is complete.",
+                        tool_call=None,
+                        tool_calls=[],
+                        respond_directly=True,
+                        response_text=None,
+                        done=True,
+                        no_tools_required=True,
+                    ),
+                }
             if str(memory_state.get("discount_stage", "")).strip().lower() == "applied":
                 details = (
                     dict(memory_state.get("installment_discount_details", {}))
@@ -300,7 +358,33 @@ class CollectionReactNode(ReactNode):
         lowered = user_input.lower()
         hold_stage = str(memory_state.get("hardship_hold_stage", "")).strip().lower()
         discount_stage = str(memory_state.get("discount_stage", "")).strip().lower()
-        if hold_stage == "offered" and self._is_post_hold_uncertain(user_input):
+        partial_stage = str(memory_state.get("partial_payment_stage", "")).strip().lower()
+        if partial_stage == "link_offered" and self._is_affirmative(user_input):
+            details = (
+                memory_state.get("partial_payment_details")
+                if isinstance(memory_state.get("partial_payment_details"), dict)
+                else {}
+            )
+            amount = float(details.get("partial_payment_amount", 0) or 0)
+            if case_id and amount > 0:
+                if memory is not None:
+                    memory.set_state(partial_payment_stage="link_requested")
+                return {
+                    "skip_llm": True,
+                    "reason": "Customer accepted the partial-payment link.",
+                    "decision": self._tool_decision(
+                        "payment_link_create",
+                        {
+                            "case_id": case_id,
+                            "amount": amount,
+                            "channel": "sms",
+                        },
+                    ),
+                }
+        if (
+            hold_stage == "offered"
+            and str(memory_state.get("hold_response", "")).strip().lower() == "uncertain"
+        ):
             program = self._eligible_discount_program(memory_state)
             original_amount = float(memory_state.get("active_overdue_amount", 0) or 0)
             if program and case_id and customer_id and original_amount > 0:
@@ -324,7 +408,10 @@ class CollectionReactNode(ReactNode):
                         },
                     ),
                 }
-        if discount_stage in {"offered", "accepted"} and self._is_affirmative(user_input):
+        if (
+            discount_stage in {"offered", "accepted"}
+            and str(memory_state.get("discount_response", "")).strip().lower() == "accepted"
+        ):
             details = (
                 memory_state.get("installment_discount_details")
                 if isinstance(memory_state.get("installment_discount_details"), dict)
@@ -349,7 +436,7 @@ class CollectionReactNode(ReactNode):
         if (
             hold_stage == "offered"
             and not self._has_active_discount_branch(memory_state)
-            and self._is_affirmative(user_input)
+            and str(memory_state.get("hold_response", "")).strip().lower() == "accepted"
         ):
             program = (
                 memory_state.get("hardship_hold_program")
@@ -439,24 +526,6 @@ class CollectionReactNode(ReactNode):
                 "go ahead",
                 "okay",
                 "ok",
-            )
-        )
-
-    @staticmethod
-    def _is_post_hold_uncertain(text: str) -> bool:
-        normalized = re.sub(r"[^a-z0-9\s]", " ", str(text).lower())
-        normalized = re.sub(r"\s+", " ", normalized).strip()
-        return any(
-            phrase in normalized
-            for phrase in (
-                "not sure",
-                "unsure",
-                "even after 2 months",
-                "even after two months",
-                "cannot manage after",
-                "can't manage after",
-                "may not manage",
-                "might not manage",
             )
         )
 

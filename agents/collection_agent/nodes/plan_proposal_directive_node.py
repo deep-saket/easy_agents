@@ -10,6 +10,10 @@ from typing import Any
 
 from agents.collection_agent.llm_structured import StructuredOutputRunner
 from agents.collection_agent.nodes.callback_time_extractor import extract_callback_time
+from agents.collection_agent.nodes.partial_payment_utils import (
+    partial_payment_from_llm_amount,
+    partial_payment_policy,
+)
 from agents.collection_agent.nodes.plan_proposal_models import PlanProposalPayload
 from agents.collection_agent.nodes.plan_proposal_utils import (
     compact_existing_plan_for_prompt,
@@ -461,6 +465,157 @@ class PlanProposalDirectiveNode(BaseGraphNode):
         )
         hardship_active = bool(hardship_context.get("hardship_detected", False))
         discount_stage = str(memory_state.get("discount_stage", "")).strip().lower()
+        partial_stage = str(memory_state.get("partial_payment_stage", "")).strip().lower()
+
+        if (
+            identity_verified
+            and partial_stage == "confirmed"
+            and self._is_hold_closing_reply(user_input)
+        ):
+            if memory is not None:
+                memory.set_state(conversation_complete=False, conversation_closing=True)
+            return with_plan({
+                "route": "continue",
+                "response_target": "customer",
+                "plan_proposal": {
+                    "target": "customer",
+                    "intent": "partial_payment_closing",
+                    "conversation_objective": "partial_payment_closing",
+                    "dialogue_action": "close_partial_payment_conversation",
+                    "response_mode": "empathetic",
+                    "plan_origin": "partial_payment_closing",
+                    "plan_tree_update": {
+                        "operation": "complete",
+                        "selected_next_node_id": "close_conversation",
+                        "mark_done": ["confirmation"],
+                        "status": "active",
+                    },
+                },
+            })
+
+        if identity_verified and partial_stage == "confirmed":
+            details = (
+                memory_state.get("partial_payment_details")
+                if isinstance(memory_state.get("partial_payment_details"), dict)
+                else {}
+            )
+            sms = details.get("sms_confirmation") if isinstance(details.get("sms_confirmation"), dict) else {}
+            if (
+                str(details.get("payment_reference_id", "")).strip()
+                and str(sms.get("status", "")).strip().lower() == "sent"
+            ):
+                return with_plan({
+                    "route": "continue",
+                    "response_target": "customer",
+                    "plan_proposal": {
+                        "target": "customer",
+                        "intent": "partial_payment_confirmation",
+                        "conversation_objective": "partial_payment_confirmation",
+                        "dialogue_action": "confirm_partial_payment_link",
+                        "response_mode": "informational",
+                        "plan_origin": "partial_payment_tools_completed",
+                        "plan_tree_update": {
+                            "operation": "advance",
+                            "selected_next_node_id": "confirmation",
+                            "mark_done": ["partial_amount", "partial_link"],
+                            "status": "active",
+                        },
+                    },
+                })
+
+        if identity_verified and partial_stage == "link_offered":
+            return with_plan({
+                "route": "continue",
+                "response_target": "customer",
+                "plan_proposal": {
+                    "target": "customer",
+                    "intent": "partial_payment_link_offer",
+                    "conversation_objective": "partial_payment_link_offer",
+                    "dialogue_action": "offer_partial_payment_link",
+                    "response_mode": "empathetic",
+                    "plan_origin": "partial_payment_amount_validated",
+                    "plan_tree_update": {
+                        "operation": "advance",
+                        "selected_next_node_id": "partial_link",
+                        "mark_done": ["partial_amount"],
+                        "status": "active",
+                    },
+                },
+            })
+
+        total_due = float(memory_state.get("active_overdue_amount", 0) or 0)
+        parsed_partial = partial_payment_from_llm_amount(
+            state=state,
+            memory_state=memory_state,
+            total_due=total_due,
+        )
+        if (
+            identity_verified
+            and (
+                partial_stage == "collecting_amount"
+                or str(memory_state.get("customer_payment_posture", "")).strip().lower() == "partial_now"
+            )
+            and parsed_partial is not None
+        ):
+            policy = partial_payment_policy(memory_state)
+            minimum_pct = float(policy.get("min_partial_payment_pct", 0) or 0)
+            allowed = bool(policy.get("allow_partial_payment", False))
+            if allowed and parsed_partial["partial_payment_pct"] >= minimum_pct:
+                details = {
+                    "original_amount": total_due,
+                    "minimum_partial_payment_pct": minimum_pct,
+                    **parsed_partial,
+                }
+                if memory is not None:
+                    memory.set_state(
+                        partial_payment_stage="link_offered",
+                        partial_payment_details=details,
+                    )
+                return with_plan({
+                    "route": "continue",
+                    "response_target": "customer",
+                    "plan_proposal": {
+                        "target": "customer",
+                        "intent": "partial_payment_link_offer",
+                        "conversation_objective": "partial_payment_link_offer",
+                        "dialogue_action": "offer_partial_payment_link",
+                        "response_mode": "empathetic",
+                        "plan_origin": "partial_payment_amount_validated",
+                        "plan_tree_update": {
+                            "operation": "advance",
+                            "selected_next_node_id": "partial_link",
+                            "mark_done": ["partial_amount"],
+                            "status": "active",
+                        },
+                    },
+                })
+
+        if (
+            identity_verified
+            and (
+                partial_stage == "collecting_amount"
+                or str(memory_state.get("customer_payment_posture", "")).strip().lower() == "partial_now"
+            )
+        ):
+            if memory is not None:
+                memory.set_state(partial_payment_stage="collecting_amount")
+            return with_plan({
+                "route": "continue",
+                "response_target": "customer",
+                "plan_proposal": {
+                    "target": "customer",
+                    "intent": "partial_payment_amount_request",
+                    "conversation_objective": "partial_payment_amount_request",
+                    "dialogue_action": "ask_partial_payment_amount",
+                    "response_mode": "empathetic",
+                    "plan_origin": "partial_payment_intent",
+                    "plan_tree_update": {
+                        "operation": "advance",
+                        "selected_next_node_id": "partial_amount",
+                        "status": "active",
+                    },
+                },
+            })
 
         if (
             identity_verified
@@ -1564,6 +1719,10 @@ class PlanProposalDirectiveNode(BaseGraphNode):
             "installment_discount_offer",
             "installment_discount_confirmation",
             "installment_discount_closing",
+            "partial_payment_amount_request",
+            "partial_payment_link_offer",
+            "partial_payment_confirmation",
+            "partial_payment_closing",
             "close_conversation",
         }:
             objective = explicit_objective
@@ -1736,6 +1895,10 @@ class PlanProposalDirectiveNode(BaseGraphNode):
             "installment_discount_offer": ["acknowledge_uncertainty", "state_discount", "state_revised_amount", "ask_if_helpful"],
             "installment_discount_confirmation": ["confirm_discount", "give_reference", "state_revised_amount", "state_notification", "state_review_timing"],
             "installment_discount_closing": ["thank_customer_by_name", "warm_signoff", "goodbye"],
+            "partial_payment_amount_request": ["acknowledge_partial_capacity", "ask_comfortable_amount"],
+            "partial_payment_link_offer": ["confirm_partial_amount", "state_remaining_balance", "offer_sms_link"],
+            "partial_payment_confirmation": ["confirm_link_sent", "give_reference", "state_partial_amount", "state_remaining_balance"],
+            "partial_payment_closing": ["thank_customer_by_name", "warm_signoff", "goodbye"],
             "assess_affordability": [
                 "acknowledge_hardship",
                 "ask_affordable_amount",
@@ -1793,6 +1956,10 @@ class PlanProposalDirectiveNode(BaseGraphNode):
             "installment_discount_offer": ["invent_discount", "promise_unapproved_discount", "mention_internal_processing"],
             "installment_discount_confirmation": ["repeat_standard_options", "request_payment", "mention_internal_processing"],
             "installment_discount_closing": ["repeat_discount_details", "restart_conversation"],
+            "partial_payment_amount_request": ["invent_partial_amount", "claim_payment_received"],
+            "partial_payment_link_offer": ["claim_link_sent", "claim_payment_received"],
+            "partial_payment_confirmation": ["claim_payment_received", "invent_balance_date"],
+            "partial_payment_closing": ["repeat_payment_link", "restart_conversation"],
             "assess_affordability": ["restart_collections_menu", "ask_pay_now_or_arrangement", "mention_internal_processing"],
             "present_arrangement_options": ["restart_collections_menu", "ask_pay_now_or_arrangement", "mention_internal_processing"],
             "negotiate_installment": ["restart_collections_menu", "ask_pay_now_or_arrangement", "mention_internal_processing"],
@@ -1821,6 +1988,10 @@ class PlanProposalDirectiveNode(BaseGraphNode):
             "installment_discount_offer": ["offer_installment_discount"],
             "installment_discount_confirmation": ["confirm_installment_discount"],
             "installment_discount_closing": ["close_installment_discount_conversation"],
+            "partial_payment_amount_request": ["ask_partial_payment_amount"],
+            "partial_payment_link_offer": ["offer_partial_payment_link"],
+            "partial_payment_confirmation": ["confirm_partial_payment_link"],
+            "partial_payment_closing": ["close_partial_payment_conversation"],
             "assess_affordability": ["acknowledge_hardship", "ask_affordable_amount"],
             "present_arrangement_options": ["present_offer", "discuss_arrangement"],
             "negotiate_installment": ["discuss_arrangement", "ask_affordable_amount"],
@@ -1850,6 +2021,10 @@ class PlanProposalDirectiveNode(BaseGraphNode):
             "installment_discount_offer": "Offer only the approved installment discount and revised amount, then ask whether it would help.",
             "installment_discount_confirmation": "Confirm the applied discount, revised amount, generated reference, delivered notifications, and next review.",
             "installment_discount_closing": "Thank the customer by name, offer a warm sign-off, and say goodbye.",
+            "partial_payment_amount_request": "Acknowledge that a partial payment helps and ask what amount is comfortable now.",
+            "partial_payment_link_offer": "Confirm the validated partial amount and remaining balance, then ask permission to send an SMS link.",
+            "partial_payment_confirmation": "Confirm the pending payment link was sent, provide its reference, and state the remaining balance.",
+            "partial_payment_closing": "Thank the customer by name and close warmly.",
             "assess_affordability": (
                 "Acknowledge the hardship, understand what is manageable, and avoid repeating the standard policy menu."
             ),

@@ -112,6 +112,7 @@ def test_job_loss_uncertainty_evaluates_and_applies_discount(tmp_path: Path) -> 
         "steps": 0,
         "observations": [],
     }
+    memory.set_state(hold_response="uncertain")
     evaluate_update = react.execute(uncertainty_state)
     uncertainty_state.update(evaluate_update)
     assert evaluate_update["decision"].tool_call.tool_name == "installment_discount_evaluate"
@@ -123,6 +124,7 @@ def test_job_loss_uncertainty_evaluates_and_applies_discount(tmp_path: Path) -> 
     assert memory.state["installment_discount_details"]["revised_amount"] == 34020.0
 
     memory.set_state(discount_stage="accepted", discount_accepted=True)
+    memory.set_state(discount_response="accepted")
     acceptance_state = {
         "session_id": "discount-flow",
         "case_id": "COLL-1002",
@@ -233,6 +235,114 @@ def test_discount_offer_confirmation_and_named_closing() -> None:
     assert "Rohan Gupta" in closing["response"]
     assert closing["conversation_closing"] is True
     assert closing["termination_grace_seconds"] == 3.0
+
+
+def test_llm_classifies_indirect_post_hold_uncertainty() -> None:
+    class OfferResponseLLM:
+        @staticmethod
+        def generate_json(system_prompt: str, user_prompt: str) -> dict[str, object]:
+            del system_prompt, user_prompt
+            return {
+                "conversation_mode": "hardship_negotiation",
+                "negotiation_stage": "evaluating_options",
+                "customer_payment_posture": "cannot_pay",
+                "discount_stage": "none",
+                "hardship_context": {
+                    "hardship_detected": True,
+                    "hardship_reason": "job_loss",
+                    "confidence": 0.96,
+                },
+                "customer_payment_willingness": 0.45,
+                "response_mode": "empathetic",
+                "active_dialogue_owner": "plan_proposal",
+                "hold_response": "uncertain",
+                "discount_response": "none",
+                "reason": "Customer doubts recovery after the offered hold.",
+            }
+
+    memory = WorkingMemory(
+        session_id="hold-response-llm",
+        state={
+            "identity_verified": True,
+            "hardship_hold_stage": "offered",
+            "hardship_context": {
+                "hardship_detected": True,
+                "hardship_reason": "job_loss",
+            },
+        },
+    )
+    node = NegotiationClassificationNode(
+        llm=OfferResponseLLM(),
+        system_prompt="Classify the customer's negotiation response.",
+        user_prompt="Customer: {user_input}",
+        strict_llm_mode=True,
+    )
+
+    update = node.execute(
+        {
+            "user_input": "Things may still be difficult by then, so I cannot promise I can restart.",
+            "memory": memory,
+            "identity_verified": True,
+        }
+    )
+
+    assert update["hold_response"] == "uncertain"
+    assert memory.state["hold_response"] == "uncertain"
+
+
+def test_discount_offer_uses_guarded_llm_wording() -> None:
+    class DiscountOfferLLM:
+        @staticmethod
+        def generate_json(system_prompt: str, user_prompt: str) -> dict[str, str]:
+            del system_prompt, user_prompt
+            return {
+                "message": (
+                    "I understand the uncertainty. An approved 10% reduction would bring "
+                    "37800.00 down to 34020.00. Would that make the installment more manageable?"
+                ),
+                "response_target": "customer",
+            }
+
+    memory = WorkingMemory(
+        session_id="discount-offer-llm",
+        state={
+            "active_customer_name": "Rohan Gupta",
+            "active_overdue_amount": 37800.0,
+            "identity_verified": True,
+            "installment_discount_details": {
+                "discount_pct": 10.0,
+                "original_amount": 37800.0,
+                "revised_amount": 34020.0,
+            },
+        },
+    )
+    node = CollectionResponseNode(
+        llm=DiscountOfferLLM(),
+        strict_llm_mode=False,
+        system_prompt="Respond naturally while following the supplied directive.",
+        render_user_prompt=(
+            "Template: {template_id}\nTone: {tone}\n"
+            "Variables: {render_variables_json}\nConstraints: {response_constraints_json}"
+        ),
+    )
+
+    update = node.execute(
+        {
+            "user_input": "I do not know if I can resume after the hold.",
+            "memory": memory,
+            "plan_proposal": {
+                "target": "customer",
+                "response_directive": {
+                    "conversation_objective": "installment_discount_offer",
+                    "dialogue_action": "offer_installment_discount",
+                    "response_mode": "empathetic",
+                },
+            },
+        }
+    )
+
+    assert update["response"].startswith("I understand the uncertainty.")
+    assert update["response_render_debug"]["renderer_fallback_used"] is False
 
 
 def test_discount_plan_tree_moves_offer_to_confirmation() -> None:
