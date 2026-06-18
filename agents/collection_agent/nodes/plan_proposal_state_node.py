@@ -130,6 +130,14 @@ class PlanProposalStateNode(BaseGraphNode):
         )
         hardship_context = memory_state.get("hardship_context") if isinstance(memory_state.get("hardship_context"), dict) else {}
         if llm_payload is not None:
+            active_discount_stage = str(
+                llm_payload.get("discount_stage") or memory_state.get("discount_stage", "none")
+            ).strip().lower()
+            llm_payload["needs_discount_specialist"] = bool(
+                needs_discount_specialist(user_input)
+                or bool(llm_payload.get("counter_offer_present", False))
+                or active_discount_stage in {"requested", "counter_offer"}
+            )
             if bool(hardship_context.get("hardship_detected", False)):
                 llm_payload["hardship_signal"] = True
                 llm_payload["hardship_reason"] = str(

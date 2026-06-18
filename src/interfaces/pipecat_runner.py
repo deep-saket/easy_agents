@@ -56,10 +56,6 @@ def build_transport_params(
 
     ensure_pipecat_available()
 
-    from pipecat.transports.base_transport import TransportParams
-    from pipecat.transports.daily.transport import DailyParams
-    from pipecat.transports.network.fastapi_websocket import FastAPIWebsocketParams
-
     vad_analyzer = None
     if vad_enabled:
         try:
@@ -69,37 +65,40 @@ def build_transport_params(
         except Exception:
             vad_analyzer = None
 
+    def _webrtc_params() -> Any:
+        from pipecat.transports.base_transport import TransportParams
+
+        return TransportParams(
+            audio_in_enabled=True,
+            audio_out_enabled=True,
+            vad_analyzer=vad_analyzer,
+        )
+
+    def _daily_params() -> Any:
+        from pipecat.transports.daily.transport import DailyParams
+
+        return DailyParams(
+            audio_in_enabled=True,
+            audio_out_enabled=True,
+            vad_analyzer=vad_analyzer,
+        )
+
+    def _websocket_params() -> Any:
+        from pipecat.transports.network.fastapi_websocket import FastAPIWebsocketParams
+
+        return FastAPIWebsocketParams(
+            audio_in_enabled=True,
+            audio_out_enabled=True,
+            vad_analyzer=vad_analyzer,
+        )
+
     return {
-        "daily": lambda: DailyParams(
-            audio_in_enabled=True,
-            audio_out_enabled=True,
-            vad_analyzer=vad_analyzer,
-        ),
-        "webrtc": lambda: TransportParams(
-            audio_in_enabled=True,
-            audio_out_enabled=True,
-            vad_analyzer=vad_analyzer,
-        ),
-        "twilio": lambda: FastAPIWebsocketParams(
-            audio_in_enabled=True,
-            audio_out_enabled=True,
-            vad_analyzer=vad_analyzer,
-        ),
-        "telnyx": lambda: FastAPIWebsocketParams(
-            audio_in_enabled=True,
-            audio_out_enabled=True,
-            vad_analyzer=vad_analyzer,
-        ),
-        "plivo": lambda: FastAPIWebsocketParams(
-            audio_in_enabled=True,
-            audio_out_enabled=True,
-            vad_analyzer=vad_analyzer,
-        ),
-        "exotel": lambda: FastAPIWebsocketParams(
-            audio_in_enabled=True,
-            audio_out_enabled=True,
-            vad_analyzer=vad_analyzer,
-        ),
+        "daily": _daily_params,
+        "webrtc": _webrtc_params,
+        "twilio": _websocket_params,
+        "telnyx": _websocket_params,
+        "plivo": _websocket_params,
+        "exotel": _websocket_params,
     }
 
 

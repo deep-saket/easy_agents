@@ -1,0 +1,29 @@
+flowchart TD
+  subgraph External["Wrapper Architecture"]
+    C["Customer"] --> CM["ConversationManagerAgent"]
+    CM --> CA["CollectionAgent"]
+    CA --> DP["DiscountPlanningAgent (optional)"]
+    DP --> CA
+    CA --> CM
+    CM --> C
+  end
+
+  subgraph Internal["ConversationManager Internal Flow"]
+    I["Customer input"] --> P["InterruptionPolicy"]
+    P -->|repeat request| RB["ResponseBuffer"]
+    RB --> MDT["MessageDeliveryTracker"]
+    MDT --> O["Deliver / replay response"]
+
+    P -->|new business input| CMA["ConversationManagerAgent"]
+    CMA --> LM["LatencyMonitor"]
+    LM --> FM["FillerManager"]
+    CMA --> CAR["CollectionAgent runtime"]
+    CAR --> CMA
+    CMA --> RB
+    CMA --> MDT
+    MDT --> O
+
+    V["Voice barge-in"] --> BI["BargeInHandler"]
+    BI --> MDT
+    BI --> CMA
+  end

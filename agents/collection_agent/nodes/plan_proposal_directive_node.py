@@ -9,6 +9,11 @@ from types import SimpleNamespace
 from typing import Any
 
 from agents.collection_agent.llm_structured import StructuredOutputRunner
+from agents.collection_agent.nodes.callback_time_extractor import extract_callback_time
+from agents.collection_agent.nodes.partial_payment_utils import (
+    partial_payment_from_llm_amount,
+    partial_payment_policy,
+)
 from agents.collection_agent.nodes.plan_proposal_models import PlanProposalPayload
 from agents.collection_agent.nodes.plan_proposal_utils import (
     compact_existing_plan_for_prompt,
@@ -17,13 +22,16 @@ from agents.collection_agent.nodes.plan_proposal_utils import (
     fresh_debug_state,
     get_existing_conversation_plan,
     is_provider_rate_limit_error,
+    is_right_party_denial,
     json_compact,
+    looks_like_callback_time,
     node_label,
     overlay_negotiation_state_from_graph,
     overlay_verification_state_from_graph,
     render_prompt_template,
     truncate_text,
 )
+from agents.collection_agent.services.assistance_program_service import AssistanceProgramService
 from src.nodes.base import BaseGraphNode
 from src.nodes.types import AgentState, NodeUpdate
 
@@ -75,6 +83,21 @@ class PlanProposalDirectiveNode(BaseGraphNode):
         )
         plan_signals = state.get("plan_signals") if isinstance(state.get("plan_signals"), dict) else {}
         identity_verified = bool(memory_state.get("identity_verified", False))
+        right_party_status = str(memory_state.get("right_party_status", "")).strip().lower()
+        wrong_party_callback_stage = str(memory_state.get("wrong_party_callback_stage", "")).strip().lower()
+        if (
+            str(observed_tool).strip().lower() == "outbound_callback_schedule"
+            and isinstance(output, dict)
+            and str(output.get("status", "")).strip().lower() == "expired"
+        ):
+            if memory is not None:
+                memory.set_state(
+                    wrong_party_callback_stage="awaiting_callback",
+                    wrong_party_callback_time=None,
+                    outbound_callback_status="expired",
+                )
+            right_party_status = "wrong_party"
+            wrong_party_callback_stage = "awaiting_callback"
 
         def with_debug(update: NodeUpdate) -> NodeUpdate:
             update.setdefault("prompt", self.last_debug.get("prompt"))
@@ -131,6 +154,33 @@ class PlanProposalDirectiveNode(BaseGraphNode):
                 memory.set_state(**state_persist)
             return with_debug(update)
 
+        if (
+            str(observed_tool).strip().lower() == "outbound_callback_schedule"
+            and isinstance(output, dict)
+            and str(output.get("status", "")).strip().lower() == "expired"
+        ):
+            return with_plan({
+                "route": "continue",
+                "response_target": "customer",
+                "right_party_status": "wrong_party",
+                "wrong_party_callback_stage": "awaiting_callback",
+                "plan_proposal": {
+                    "target": "customer",
+                    "intent": "wrong_party_callback_clarification",
+                    "conversation_objective": "wrong_party_callback_clarification",
+                    "dialogue_action": "wrong_party_callback_clarification",
+                    "response_mode": "compliance",
+                    "customer_facing_goal": "Explain briefly that the requested time has passed and ask for a new callback time.",
+                    "plan_origin": "outbound_callback_expired",
+                    "plan_tree_update": {
+                        "operation": "branch",
+                        "selected_next_node_id": "wrong_party_callback",
+                        "mark_skipped": ["verify_identity"],
+                        "status": "active",
+                    },
+                },
+            })
+
         if bool(memory_state.get("agent_loop_blocked", False)):
             if memory is not None:
                 memory.set_state(agent_loop_blocked=False)
@@ -146,6 +196,241 @@ class PlanProposalDirectiveNode(BaseGraphNode):
                 },
             })
 
+        awaiting_right_party = right_party_status in {"", "awaiting_confirmation"}
+        if not identity_verified and is_right_party_denial(
+            user_input,
+            awaiting_confirmation=awaiting_right_party,
+        ):
+            normalized_input = re.sub(r"\s+", " ", user_input.strip().lower())
+            bare_denial = normalized_input in {"no", "nope", "nah"}
+            callback_time = (
+                extract_callback_time(user_input, llm=self.llm)
+                if looks_like_callback_time(user_input)
+                else ""
+            )
+            callback_stage = (
+                "completed"
+                if callback_time
+                else "privacy_notice_given"
+                if bare_denial
+                else "awaiting_callback"
+            )
+            if memory is not None:
+                memory.set_state(
+                    right_party_status="wrong_party",
+                    wrong_party_callback_stage=callback_stage,
+                    wrong_party_callback_time=callback_time or None,
+                )
+            objective = (
+                "wrong_party_callback_confirmation"
+                if callback_time
+                else "wrong_party_privacy_notice"
+                if bare_denial
+                else "wrong_party_callback_request"
+            )
+            return with_plan({
+                "route": "continue",
+                "response_target": "customer",
+                "right_party_status": "wrong_party",
+                "wrong_party_callback_stage": callback_stage,
+                "plan_proposal": {
+                    "target": "customer",
+                    "intent": objective,
+                    "conversation_objective": objective,
+                    "dialogue_action": objective,
+                    "response_mode": "compliance",
+                    "customer_facing_goal": "Protect customer privacy and arrange a callback without disclosing account information.",
+                    "plan_origin": "wrong_party",
+                    "plan_tree_update": {
+                        "operation": "branch",
+                        "selected_next_node_id": (
+                            "close_conversation" if callback_time else "wrong_party_callback"
+                        ),
+                        "mark_skipped": ["verify_identity"],
+                        "mark_done": (
+                            ["wrong_party_callback"]
+                            if callback_time
+                            else []
+                        ),
+                        "status": "active",
+                    },
+                },
+            })
+
+        if not identity_verified and right_party_status == "wrong_party":
+            if (
+                wrong_party_callback_stage == "completed"
+                and str(memory_state.get("wrong_party_callback_time", "")).strip()
+            ):
+                existing_callback_time = str(memory_state.get("wrong_party_callback_time", "")).strip()
+                revised_callback_time = (
+                    extract_callback_time(user_input, llm=self.llm)
+                    if looks_like_callback_time(user_input)
+                    else ""
+                )
+                if revised_callback_time and revised_callback_time != existing_callback_time:
+                    if memory is not None:
+                        memory.set_state(
+                            wrong_party_callback_stage="completed",
+                            wrong_party_callback_time=revised_callback_time,
+                            conversation_complete=False,
+                            conversation_closing=True,
+                        )
+                    return with_plan({
+                        "route": "continue",
+                        "response_target": "customer",
+                        "right_party_status": "wrong_party",
+                        "wrong_party_callback_stage": "completed",
+                        "plan_proposal": {
+                            "target": "customer",
+                            "intent": "wrong_party_callback_revision_confirmation",
+                            "conversation_objective": "wrong_party_callback_revision_confirmation",
+                            "dialogue_action": "wrong_party_callback_revision_confirmation",
+                            "response_mode": "compliance",
+                            "customer_facing_goal": "Confirm only the revised callback time and close naturally.",
+                            "plan_origin": "wrong_party_callback_revision",
+                            "plan_tree_update": {
+                                "operation": "complete",
+                                "selected_next_node_id": "close_conversation",
+                                "mark_skipped": ["verify_identity"],
+                                "mark_done": ["wrong_party_callback"],
+                                "status": "active",
+                            },
+                        },
+                        "additional_targets": ["collection_memory_helper_agent"],
+                        "memory_helper_trigger": {
+                            "reason": "wrong_party_callback_rescheduled",
+                            "callback_time": revised_callback_time,
+                            "previous_callback_time": existing_callback_time,
+                        },
+                    })
+
+                if memory is not None:
+                    memory.set_state(conversation_complete=False, conversation_closing=True)
+                return with_plan({
+                    "route": "continue",
+                    "response_target": "customer",
+                    "right_party_status": "wrong_party",
+                    "wrong_party_callback_stage": "completed",
+                    "plan_proposal": {
+                        "target": "customer",
+                        "intent": "wrong_party_closing_acknowledgement",
+                        "conversation_objective": "wrong_party_closing_acknowledgement",
+                        "dialogue_action": "wrong_party_closing_acknowledgement",
+                        "response_mode": "compliance",
+                        "customer_facing_goal": "Acknowledge briefly and end the call without repeating callback details.",
+                        "plan_origin": "wrong_party_callback_completed",
+                        "plan_tree_update": {
+                            "operation": "complete",
+                            "selected_next_node_id": "close_conversation",
+                            "mark_skipped": ["verify_identity"],
+                            "mark_done": ["wrong_party_callback"],
+                            "status": "active",
+                        },
+                    },
+                })
+            if wrong_party_callback_stage == "awaiting_callback" and looks_like_callback_time(user_input):
+                callback_time = extract_callback_time(user_input, llm=self.llm)
+                if not callback_time:
+                    return with_plan({
+                        "route": "continue",
+                        "response_target": "customer",
+                        "right_party_status": "wrong_party",
+                        "wrong_party_callback_stage": "awaiting_callback",
+                        "plan_proposal": {
+                            "target": "customer",
+                            "intent": "wrong_party_callback_clarification",
+                            "conversation_objective": "wrong_party_callback_clarification",
+                            "dialogue_action": "wrong_party_callback_clarification",
+                            "response_mode": "compliance",
+                            "customer_facing_goal": "Ask briefly for a clearer callback time without repeating the privacy notice.",
+                            "plan_origin": "wrong_party_callback",
+                            "plan_tree_update": {
+                                "operation": "branch",
+                                "selected_next_node_id": "wrong_party_callback",
+                                "mark_skipped": ["verify_identity"],
+                                "status": "active",
+                            },
+                        },
+                    })
+                if memory is not None:
+                    memory.set_state(
+                        wrong_party_callback_stage="completed",
+                        wrong_party_callback_time=callback_time,
+                        conversation_complete=False,
+                        conversation_closing=True,
+                    )
+                return with_plan({
+                    "route": "continue",
+                    "response_target": "customer",
+                    "right_party_status": "wrong_party",
+                    "wrong_party_callback_stage": "completed",
+                    "plan_proposal": {
+                        "target": "customer",
+                        "intent": "wrong_party_callback_confirmation",
+                        "conversation_objective": "wrong_party_callback_confirmation",
+                        "dialogue_action": "wrong_party_callback_confirmation",
+                        "response_mode": "compliance",
+                        "customer_facing_goal": "Confirm the callback and close respectfully without disclosing account information.",
+                        "plan_origin": "wrong_party_callback",
+                        "plan_tree_update": {
+                            "operation": "complete",
+                            "selected_next_node_id": "close_conversation",
+                            "mark_skipped": ["verify_identity"],
+                            "mark_done": ["wrong_party_callback"],
+                            "status": "active",
+                        },
+                    },
+                    "additional_targets": ["collection_memory_helper_agent"],
+                    "memory_helper_trigger": {
+                        "reason": "wrong_party_callback_scheduled",
+                        "callback_time": callback_time,
+                    },
+                })
+            if wrong_party_callback_stage == "privacy_notice_given":
+                if memory is not None:
+                    memory.set_state(wrong_party_callback_stage="awaiting_callback")
+                return with_plan({
+                    "route": "continue",
+                    "response_target": "customer",
+                    "right_party_status": "wrong_party",
+                    "wrong_party_callback_stage": "awaiting_callback",
+                    "plan_proposal": {
+                        "target": "customer",
+                        "intent": "wrong_party_callback_request",
+                        "conversation_objective": "wrong_party_callback_request",
+                        "dialogue_action": "wrong_party_callback_request",
+                        "response_mode": "compliance",
+                        "customer_facing_goal": "Provide a privacy-safe message, contact number, and request a callback time.",
+                        "plan_origin": "wrong_party_followup",
+                        "plan_tree_update": {
+                            "operation": "branch",
+                            "selected_next_node_id": "wrong_party_callback",
+                            "mark_skipped": ["verify_identity"],
+                        },
+                    },
+                })
+            return with_plan({
+                "route": "continue",
+                "response_target": "customer",
+                "right_party_status": "wrong_party",
+                "wrong_party_callback_stage": "awaiting_callback",
+                "plan_proposal": {
+                    "target": "customer",
+                    "intent": "wrong_party_callback_request",
+                    "conversation_objective": "wrong_party_callback_request",
+                    "dialogue_action": "wrong_party_callback_request",
+                    "response_mode": "compliance",
+                    "customer_facing_goal": "Restate the privacy boundary and request a suitable callback time.",
+                    "plan_origin": "wrong_party",
+                    "plan_tree_update": {
+                        "operation": "branch",
+                        "selected_next_node_id": "wrong_party_callback",
+                        "mark_skipped": ["verify_identity"],
+                    },
+                },
+            })
+
         if self._is_conversation_termination(user_input):
             return with_plan({
                 "route": "continue",
@@ -158,13 +443,384 @@ class PlanProposalDirectiveNode(BaseGraphNode):
                     "plan_tree_update": {
                         "operation": "complete",
                         "status": "completed",
-                        "selected_next_node_id": "resolve_outcome",
+                        "selected_next_node_id": "close_conversation",
+                        "mark_done": ["resolve_outcome"],
                     },
                 },
                 "additional_targets": ["collection_memory_helper_agent"],
                 "memory_helper_trigger": {
                     "reason": "conversation_termination",
                     "final_user_message": user_input,
+                },
+            })
+
+        current_node_id = str(existing_plan.get("current_node_id", "")).strip().lower()
+        active_case_id = str(memory_state.get("active_case_id", "COLL-1001")).strip() or "COLL-1001"
+        eligible_hold = self._eligible_premium_hold(memory_state)
+        hold_stage = str(memory_state.get("hardship_hold_stage", "")).strip().lower()
+        hardship_context = (
+            memory_state.get("hardship_context")
+            if isinstance(memory_state.get("hardship_context"), dict)
+            else {}
+        )
+        hardship_active = bool(hardship_context.get("hardship_detected", False))
+        discount_stage = str(memory_state.get("discount_stage", "")).strip().lower()
+        partial_stage = str(memory_state.get("partial_payment_stage", "")).strip().lower()
+
+        if (
+            identity_verified
+            and partial_stage == "confirmed"
+            and self._is_hold_closing_reply(user_input)
+        ):
+            if memory is not None:
+                memory.set_state(conversation_complete=False, conversation_closing=True)
+            return with_plan({
+                "route": "continue",
+                "response_target": "customer",
+                "plan_proposal": {
+                    "target": "customer",
+                    "intent": "partial_payment_closing",
+                    "conversation_objective": "partial_payment_closing",
+                    "dialogue_action": "close_partial_payment_conversation",
+                    "response_mode": "empathetic",
+                    "plan_origin": "partial_payment_closing",
+                    "plan_tree_update": {
+                        "operation": "complete",
+                        "selected_next_node_id": "close_conversation",
+                        "mark_done": ["confirmation"],
+                        "status": "active",
+                    },
+                },
+            })
+
+        if identity_verified and partial_stage == "confirmed":
+            details = (
+                memory_state.get("partial_payment_details")
+                if isinstance(memory_state.get("partial_payment_details"), dict)
+                else {}
+            )
+            sms = details.get("sms_confirmation") if isinstance(details.get("sms_confirmation"), dict) else {}
+            if (
+                str(details.get("payment_reference_id", "")).strip()
+                and str(sms.get("status", "")).strip().lower() == "sent"
+            ):
+                return with_plan({
+                    "route": "continue",
+                    "response_target": "customer",
+                    "plan_proposal": {
+                        "target": "customer",
+                        "intent": "partial_payment_confirmation",
+                        "conversation_objective": "partial_payment_confirmation",
+                        "dialogue_action": "confirm_partial_payment_link",
+                        "response_mode": "informational",
+                        "plan_origin": "partial_payment_tools_completed",
+                        "plan_tree_update": {
+                            "operation": "advance",
+                            "selected_next_node_id": "confirmation",
+                            "mark_done": ["partial_amount", "partial_link"],
+                            "status": "active",
+                        },
+                    },
+                })
+
+        if identity_verified and partial_stage == "link_offered":
+            return with_plan({
+                "route": "continue",
+                "response_target": "customer",
+                "plan_proposal": {
+                    "target": "customer",
+                    "intent": "partial_payment_link_offer",
+                    "conversation_objective": "partial_payment_link_offer",
+                    "dialogue_action": "offer_partial_payment_link",
+                    "response_mode": "empathetic",
+                    "plan_origin": "partial_payment_amount_validated",
+                    "plan_tree_update": {
+                        "operation": "advance",
+                        "selected_next_node_id": "partial_link",
+                        "mark_done": ["partial_amount"],
+                        "status": "active",
+                    },
+                },
+            })
+
+        total_due = float(memory_state.get("active_overdue_amount", 0) or 0)
+        parsed_partial = partial_payment_from_llm_amount(
+            state=state,
+            memory_state=memory_state,
+            total_due=total_due,
+        )
+        if (
+            identity_verified
+            and (
+                partial_stage == "collecting_amount"
+                or str(memory_state.get("customer_payment_posture", "")).strip().lower() == "partial_now"
+            )
+            and parsed_partial is not None
+        ):
+            policy = partial_payment_policy(memory_state)
+            minimum_pct = float(policy.get("min_partial_payment_pct", 0) or 0)
+            allowed = bool(policy.get("allow_partial_payment", False))
+            if allowed and parsed_partial["partial_payment_pct"] >= minimum_pct:
+                details = {
+                    "original_amount": total_due,
+                    "minimum_partial_payment_pct": minimum_pct,
+                    **parsed_partial,
+                }
+                if memory is not None:
+                    memory.set_state(
+                        partial_payment_stage="link_offered",
+                        partial_payment_details=details,
+                    )
+                return with_plan({
+                    "route": "continue",
+                    "response_target": "customer",
+                    "plan_proposal": {
+                        "target": "customer",
+                        "intent": "partial_payment_link_offer",
+                        "conversation_objective": "partial_payment_link_offer",
+                        "dialogue_action": "offer_partial_payment_link",
+                        "response_mode": "empathetic",
+                        "plan_origin": "partial_payment_amount_validated",
+                        "plan_tree_update": {
+                            "operation": "advance",
+                            "selected_next_node_id": "partial_link",
+                            "mark_done": ["partial_amount"],
+                            "status": "active",
+                        },
+                    },
+                })
+
+        if (
+            identity_verified
+            and (
+                partial_stage == "collecting_amount"
+                or str(memory_state.get("customer_payment_posture", "")).strip().lower() == "partial_now"
+            )
+        ):
+            if memory is not None:
+                memory.set_state(partial_payment_stage="collecting_amount")
+            return with_plan({
+                "route": "continue",
+                "response_target": "customer",
+                "plan_proposal": {
+                    "target": "customer",
+                    "intent": "partial_payment_amount_request",
+                    "conversation_objective": "partial_payment_amount_request",
+                    "dialogue_action": "ask_partial_payment_amount",
+                    "response_mode": "empathetic",
+                    "plan_origin": "partial_payment_intent",
+                    "plan_tree_update": {
+                        "operation": "advance",
+                        "selected_next_node_id": "partial_amount",
+                        "status": "active",
+                    },
+                },
+            })
+
+        if (
+            identity_verified
+            and discount_stage == "confirmed"
+            and self._is_hold_closing_reply(user_input)
+        ):
+            if memory is not None:
+                memory.set_state(conversation_complete=False, conversation_closing=True)
+            return with_plan({
+                "route": "continue",
+                "response_target": "customer",
+                "plan_proposal": {
+                    "target": "customer",
+                    "intent": "installment_discount_closing",
+                    "conversation_objective": "installment_discount_closing",
+                    "dialogue_action": "close_installment_discount_conversation",
+                    "response_mode": "empathetic",
+                    "customer_facing_goal": "Thank the customer by name and close warmly.",
+                    "plan_origin": "installment_discount_closing",
+                    "plan_tree_update": {
+                        "operation": "complete",
+                        "selected_next_node_id": "close_conversation",
+                        "mark_done": ["confirmation"],
+                        "status": "active",
+                    },
+                },
+            })
+
+        if identity_verified and discount_stage == "confirmed":
+            details = (
+                memory_state.get("installment_discount_details")
+                if isinstance(memory_state.get("installment_discount_details"), dict)
+                else {}
+            )
+            sms_status = str((details.get("sms_confirmation") or {}).get("status", "")).lower()
+            email_status = str((details.get("email_confirmation") or {}).get("status", "")).lower()
+            if (
+                str(details.get("status", "")).lower() == "applied"
+                and str(details.get("reference_number", "")).strip()
+                and sms_status == "sent"
+                and email_status == "sent"
+            ):
+                return with_plan({
+                    "route": "continue",
+                    "response_target": "customer",
+                    "plan_proposal": {
+                        "target": "customer",
+                        "intent": "installment_discount_confirmation",
+                        "conversation_objective": "installment_discount_confirmation",
+                        "dialogue_action": "confirm_installment_discount",
+                        "response_mode": "empathetic",
+                        "customer_facing_goal": "Confirm the applied discount, revised amount, reference, notifications, and review timing.",
+                        "plan_origin": "installment_discount_tools_completed",
+                        "plan_tree_update": {
+                            "operation": "advance",
+                            "selected_next_node_id": "confirmation",
+                            "mark_done": ["assess_after_hold", "discount_offer"],
+                            "status": "active",
+                        },
+                    },
+                })
+
+        if identity_verified and discount_stage in {"offered", "accepted"}:
+            return with_plan({
+                "route": "continue",
+                "response_target": "customer",
+                "plan_proposal": {
+                    "target": "customer",
+                    "intent": "installment_discount_offer",
+                    "conversation_objective": "installment_discount_offer",
+                    "dialogue_action": "offer_installment_discount",
+                    "response_mode": "empathetic",
+                    "customer_facing_goal": "Acknowledge the uncertainty and offer the approved installment discount with its revised amount.",
+                    "plan_origin": "installment_discount_eligibility",
+                    "plan_tree_update": {
+                        "operation": "advance",
+                        "selected_next_node_id": "discount_offer",
+                        "mark_done": ["resolution_offer", "assess_after_hold"],
+                        "status": "active",
+                    },
+                },
+            })
+
+        if (
+            identity_verified
+            and eligible_hold
+            and hold_stage == "confirmed"
+            and self._is_hold_closing_reply(user_input)
+        ):
+            if memory is not None:
+                memory.set_state(
+                    conversation_complete=False,
+                    conversation_closing=True,
+                )
+            return with_plan({
+                "route": "continue",
+                "response_target": "customer",
+                "plan_proposal": {
+                    "target": "customer",
+                    "intent": "hardship_hold_closing",
+                    "conversation_objective": "hardship_hold_closing",
+                    "dialogue_action": "close_hardship_hold_conversation",
+                    "response_mode": "empathetic",
+                    "customer_facing_goal": "Thank the customer by name and close warmly after the confirmed hold.",
+                    "plan_origin": "hardship_hold_closing",
+                    "plan_tree_update": {
+                        "operation": "complete",
+                        "selected_next_node_id": "close_conversation",
+                        "mark_done": ["confirmation"],
+                        "status": "active",
+                    },
+                },
+            })
+
+        if identity_verified and eligible_hold and hold_stage == "confirmed":
+            hold_details = (
+                memory_state.get("hardship_hold_details")
+                if isinstance(memory_state.get("hardship_hold_details"), dict)
+                else {}
+            )
+            sms_status = str(
+                (hold_details.get("sms_confirmation") or {}).get("status", "")
+                if isinstance(hold_details.get("sms_confirmation"), dict)
+                else ""
+            ).strip().lower()
+            email_status = str(
+                (hold_details.get("email_confirmation") or {}).get("status", "")
+                if isinstance(hold_details.get("email_confirmation"), dict)
+                else ""
+            ).strip().lower()
+            if (
+                str(hold_details.get("status", "")).strip().lower() == "active"
+                and str(hold_details.get("reference_number", "")).strip()
+                and sms_status == "sent"
+                and email_status == "sent"
+            ):
+                return with_plan({
+                    "route": "continue",
+                    "response_target": "customer",
+                    "plan_proposal": {
+                        "target": "customer",
+                        "intent": "hardship_hold_confirmation",
+                        "conversation_objective": "hardship_hold_confirmation",
+                        "dialogue_action": "confirm_hardship_hold",
+                        "response_mode": "empathetic",
+                        "customer_facing_goal": "Confirm the created hold, generated reference, delivered notifications, and next steps.",
+                        "plan_origin": "hardship_hold_tools_completed",
+                        "plan_tree_update": {
+                            "operation": "advance",
+                            "selected_next_node_id": "confirmation",
+                            "mark_done": ["purpose_disclosure", "discovery_empathy", "resolution_offer"],
+                            "status": "active",
+                        },
+                    },
+                })
+
+        if identity_verified and hardship_active and eligible_hold and hold_stage != "confirmed":
+            if memory is not None:
+                memory.set_state(
+                    hardship_hold_stage="offered",
+                    hardship_hold_program=dict(eligible_hold),
+                    negotiation_stage="awaiting_customer_decision",
+                )
+            return with_plan({
+                "route": "continue",
+                "response_target": "customer",
+                "plan_proposal": {
+                    "target": "customer",
+                    "intent": "hardship_hold_offer",
+                    "conversation_objective": "hardship_hold_offer",
+                    "dialogue_action": "offer_hardship_hold",
+                    "response_mode": "empathetic",
+                    "customer_facing_goal": "Acknowledge the job loss and offer only the eligible temporary premium hold.",
+                    "plan_origin": "hardship_hold_eligibility",
+                    "plan_tree_update": {
+                        "operation": "branch",
+                        "selected_next_node_id": "resolution_offer",
+                        "mark_done": ["purpose_disclosure", "discovery_empathy"],
+                        "status": "active",
+                    },
+                },
+            })
+
+        if identity_verified and current_node_id in {
+            "verify_identity",
+            "purpose_disclosure",
+            "explain_dues",
+        } and not hardship_active:
+            return with_plan({
+                "route": "continue",
+                "response_target": "customer",
+                "plan_proposal": {
+                    "target": "customer",
+                    "intent": "purpose_disclosure",
+                    "conversation_objective": "purpose_disclosure",
+                    "dialogue_action": "disclose_call_purpose",
+                    "response_mode": "informational",
+                    "customer_facing_goal": "State the policy, overdue installment, due date, and invite the customer to explain their situation.",
+                    "plan_origin": "post_verification_purpose_disclosure",
+                    "plan_tree_update": {
+                        "operation": "advance",
+                        "selected_next_node_id": "purpose_disclosure",
+                        "mark_done": ["verify_identity"],
+                        "status": "active",
+                    },
                 },
             })
 
@@ -197,18 +853,12 @@ class PlanProposalDirectiveNode(BaseGraphNode):
         case_id = str(memory_state.get("active_case_id", "COLL-1001"))
         customer_payment_posture = str(memory_state.get("customer_payment_posture", "unknown")).strip().lower() or "unknown"
         discount_stage = str(memory_state.get("discount_stage", "none")).strip().lower() or "none"
-        hardship_active = bool(
-            isinstance(memory_state.get("hardship_context"), dict)
-            and memory_state.get("hardship_context", {}).get("hardship_detected", False)
-        )
         partial_capacity = memory_state.get("customer_payment_capacity")
         partial_capacity_pct = memory_state.get("customer_payment_capacity_pct")
         route_to_discount_planning = bool(plan_signals.get("needs_discount_specialist")) or (
             identity_verified
             and (
                 discount_stage in {"requested", "counter_offer"}
-                or customer_payment_posture in {"partial_now"}
-                or (hardship_active and customer_payment_posture == "cannot_pay")
                 or bool(memory_state.get("counter_offer_present", False))
             )
             and bool(case_id)
@@ -957,7 +1607,20 @@ class PlanProposalDirectiveNode(BaseGraphNode):
 
         # Guardrail: while identity is incomplete, keep customer proposal pinned
         # to verification path and prevent unrelated plan branches.
-        if (not identity_verified) and current_node_id in {"verify_identity", ""}:
+        privacy_safe_intents = {
+            "wrong_party_privacy_notice",
+            "wrong_party_callback_request",
+            "wrong_party_callback_clarification",
+            "wrong_party_callback_confirmation",
+            "wrong_party_callback_revision_confirmation",
+            "wrong_party_closing_acknowledgement",
+            "conversation_termination",
+        }
+        if (
+            (not identity_verified)
+            and current_node_id in {"verify_identity", ""}
+            and intent not in privacy_safe_intents
+        ):
             aligned["intent"] = "verify_identity"
             aligned["plan_outline"] = "Request only remaining verification fields to complete identity verification."
             aligned["next_actions"] = ["verify_identity"]
@@ -1039,8 +1702,41 @@ class PlanProposalDirectiveNode(BaseGraphNode):
         route: str,
         response_target: str,
     ) -> dict[str, Any]:
-        del state, plan, proposal, plan_signals, route
-        objective, action, mode = self._infer_response_objective(memory_state=memory_state, response_target=response_target)
+        del state, plan_signals, route
+        explicit_objective = str(proposal.get("conversation_objective", "")).strip().lower()
+        current_node_id = str(plan.get("current_node_id", "")).strip().lower()
+        if explicit_objective in {
+            "wrong_party_privacy_notice",
+            "wrong_party_callback_request",
+            "wrong_party_callback_clarification",
+            "wrong_party_callback_confirmation",
+            "wrong_party_callback_revision_confirmation",
+            "wrong_party_closing_acknowledgement",
+            "purpose_disclosure",
+            "hardship_hold_offer",
+            "hardship_hold_confirmation",
+            "hardship_hold_closing",
+            "installment_discount_offer",
+            "installment_discount_confirmation",
+            "installment_discount_closing",
+            "partial_payment_amount_request",
+            "partial_payment_link_offer",
+            "partial_payment_confirmation",
+            "partial_payment_closing",
+            "close_conversation",
+        }:
+            objective = explicit_objective
+            action = str(proposal.get("dialogue_action", explicit_objective)).strip().lower() or explicit_objective
+            mode = str(proposal.get("response_mode", "compliance")).strip().lower() or "compliance"
+        elif current_node_id == "close_conversation":
+            objective = "close_conversation"
+            action = "close_conversation"
+            mode = "informational"
+        else:
+            objective, action, mode = self._infer_response_objective(
+                memory_state=memory_state,
+                response_target=response_target,
+            )
         if response_target == "discount_planning_agent":
             objective = "handoff_to_offer_agent"
             action = "handoff"
@@ -1059,6 +1755,83 @@ class PlanProposalDirectiveNode(BaseGraphNode):
             "handoff_target": ("discount_planning_agent" if response_target == "discount_planning_agent" else None),
         }
         return directive
+
+    @staticmethod
+    def _customer_variable(memory_state: dict[str, Any], key: str) -> str:
+        context = (
+            memory_state.get("active_collection_context")
+            if isinstance(memory_state.get("active_collection_context"), dict)
+            else {}
+        )
+        customer = context.get("customer") if isinstance(context.get("customer"), dict) else {}
+        variables = customer.get("variables") if isinstance(customer.get("variables"), dict) else {}
+        return str(variables.get(key, "")).strip()
+
+    @staticmethod
+    def _eligible_premium_hold(memory_state: dict[str, Any]) -> dict[str, Any] | None:
+        context = (
+            memory_state.get("active_collection_context")
+            if isinstance(memory_state.get("active_collection_context"), dict)
+            else {}
+        )
+        case = context.get("case") if isinstance(context.get("case"), dict) else {}
+        hardship_context = (
+            memory_state.get("hardship_context")
+            if isinstance(memory_state.get("hardship_context"), dict)
+            else {}
+        )
+        matches = AssistanceProgramService.match_programs(
+            programs=(
+                [dict(item) for item in memory_state.get("assistance_programs", []) if isinstance(item, dict)]
+                if isinstance(memory_state.get("assistance_programs"), list)
+                else []
+            ),
+            product=str(case.get("product", "")).strip() or None,
+            hardship_reason=str(hardship_context.get("hardship_reason", "")).strip() or None,
+            loan_id=str(case.get("loan_id", memory_state.get("active_loan_id", ""))).strip() or None,
+            program_type="premium_hold",
+        )
+        return dict(matches[0]) if matches else None
+
+    @staticmethod
+    def _is_affirmative(text: str) -> bool:
+        normalized = re.sub(r"[^a-z0-9\s]", " ", str(text).lower())
+        normalized = re.sub(r"\s+", " ", normalized).strip()
+        return any(
+            phrase in normalized
+            for phrase in (
+                "yes",
+                "that would help",
+                "would really help",
+                "sounds good",
+                "i agree",
+                "please do",
+                "go ahead",
+                "okay",
+                "ok",
+            )
+        )
+
+    @staticmethod
+    def _is_hold_closing_reply(text: str) -> bool:
+        normalized = re.sub(r"[^a-z0-9\s]", " ", str(text).lower())
+        normalized = re.sub(r"\s+", " ", normalized).strip()
+        return any(
+            phrase in normalized
+            for phrase in (
+                "no thank",
+                "no thanks",
+                "nothing else",
+                "that is all",
+                "that's all",
+                "thank you",
+                "thankyou",
+                "thanks",
+                "sure",
+                "bye",
+                "goodbye",
+            )
+        )
 
     @staticmethod
     def _infer_response_objective(
@@ -1108,8 +1881,28 @@ class PlanProposalDirectiveNode(BaseGraphNode):
     def _required_response_elements_for_objective(*, objective: str) -> list[str]:
         mapping = {
             "collect_verification": ["ask_only_missing_verification_fields"],
+            "wrong_party_privacy_notice": ["state_privacy_boundary"],
+            "wrong_party_callback_request": ["state_privacy_boundary", "request_callback_time"],
+            "wrong_party_callback_clarification": ["request_clearer_callback_time"],
+            "wrong_party_callback_confirmation": ["confirm_callback_time", "close_conversation"],
+            "wrong_party_callback_revision_confirmation": ["confirm_revised_callback_time", "close_conversation"],
+            "wrong_party_closing_acknowledgement": ["acknowledge_and_close"],
             "explain_dues": ["mention_due_amount", "ask_next_step"],
-            "assess_affordability": ["acknowledge_hardship", "ask_affordable_amount"],
+            "purpose_disclosure": ["mention_policy_number", "mention_due_amount", "mention_due_date", "invite_context"],
+            "hardship_hold_offer": ["acknowledge_hardship", "offer_eligible_hold", "ask_if_hold_helps"],
+            "hardship_hold_confirmation": ["confirm_hold", "give_reference", "state_notification", "state_next_steps"],
+            "hardship_hold_closing": ["thank_customer_by_name", "warm_signoff", "goodbye"],
+            "installment_discount_offer": ["acknowledge_uncertainty", "state_discount", "state_revised_amount", "ask_if_helpful"],
+            "installment_discount_confirmation": ["confirm_discount", "give_reference", "state_revised_amount", "state_notification", "state_review_timing"],
+            "installment_discount_closing": ["thank_customer_by_name", "warm_signoff", "goodbye"],
+            "partial_payment_amount_request": ["acknowledge_partial_capacity", "ask_comfortable_amount"],
+            "partial_payment_link_offer": ["confirm_partial_amount", "state_remaining_balance", "offer_sms_link"],
+            "partial_payment_confirmation": ["confirm_link_sent", "give_reference", "state_partial_amount", "state_remaining_balance"],
+            "partial_payment_closing": ["thank_customer_by_name", "warm_signoff", "goodbye"],
+            "assess_affordability": [
+                "acknowledge_hardship",
+                "ask_affordable_amount",
+            ],
             "present_arrangement_options": ["discuss_arrangement", "ask_next_step"],
             "negotiate_installment": ["ask_affordable_amount", "discuss_arrangement"],
             "confirm_commitment": ["ask_commitment_date", "confirm_amount_or_date"],
@@ -1123,7 +1916,50 @@ class PlanProposalDirectiveNode(BaseGraphNode):
     def _forbidden_dialogue_actions_for_objective(*, objective: str) -> list[str]:
         mapping = {
             "collect_verification": ["disclose_dues_before_verification", "restart_collections_menu", "mention_internal_processing"],
+            "wrong_party_privacy_notice": [
+                "disclose_account_details",
+                "request_verification_from_third_party",
+                "mention_dues_or_policy_number",
+            ],
+            "wrong_party_callback_request": [
+                "disclose_account_details",
+                "request_verification_from_third_party",
+                "mention_dues_or_policy_number",
+            ],
+            "wrong_party_callback_clarification": [
+                "disclose_account_details",
+                "request_verification_from_third_party",
+                "mention_dues_or_policy_number",
+                "repeat_privacy_notice",
+            ],
+            "wrong_party_callback_revision_confirmation": [
+                "disclose_account_details",
+                "request_verification_from_third_party",
+                "mention_dues_or_policy_number",
+                "repeat_previous_callback_time",
+            ],
+            "wrong_party_closing_acknowledgement": [
+                "disclose_account_details",
+                "repeat_callback_details",
+                "restart_conversation",
+            ],
+            "wrong_party_callback_confirmation": [
+                "disclose_account_details",
+                "request_verification_from_third_party",
+                "mention_dues_or_policy_number",
+            ],
             "explain_dues": ["disclose_dues_before_verification", "mention_internal_processing"],
+            "purpose_disclosure": ["present_resolution_menu", "offer_discount", "offer_restructure", "mention_internal_processing"],
+            "hardship_hold_offer": ["repeat_standard_options", "ask_affordable_amount", "mention_internal_processing"],
+            "hardship_hold_confirmation": ["repeat_standard_options", "request_payment", "mention_internal_processing"],
+            "hardship_hold_closing": ["repeat_hold_details", "restart_conversation", "mention_internal_processing"],
+            "installment_discount_offer": ["invent_discount", "promise_unapproved_discount", "mention_internal_processing"],
+            "installment_discount_confirmation": ["repeat_standard_options", "request_payment", "mention_internal_processing"],
+            "installment_discount_closing": ["repeat_discount_details", "restart_conversation"],
+            "partial_payment_amount_request": ["invent_partial_amount", "claim_payment_received"],
+            "partial_payment_link_offer": ["claim_link_sent", "claim_payment_received"],
+            "partial_payment_confirmation": ["claim_payment_received", "invent_balance_date"],
+            "partial_payment_closing": ["repeat_payment_link", "restart_conversation"],
             "assess_affordability": ["restart_collections_menu", "ask_pay_now_or_arrangement", "mention_internal_processing"],
             "present_arrangement_options": ["restart_collections_menu", "ask_pay_now_or_arrangement", "mention_internal_processing"],
             "negotiate_installment": ["restart_collections_menu", "ask_pay_now_or_arrangement", "mention_internal_processing"],
@@ -1138,7 +1974,24 @@ class PlanProposalDirectiveNode(BaseGraphNode):
     def _allowed_dialogue_actions_for_objective(*, objective: str) -> list[str]:
         mapping = {
             "collect_verification": ["ask_verification"],
+            "wrong_party_privacy_notice": ["state_privacy_boundary"],
+            "wrong_party_callback_request": ["state_privacy_boundary", "request_callback_time"],
+            "wrong_party_callback_clarification": ["request_clearer_callback_time"],
+            "wrong_party_callback_confirmation": ["confirm_callback_time", "close_conversation"],
+            "wrong_party_callback_revision_confirmation": ["confirm_revised_callback_time", "close_conversation"],
+            "wrong_party_closing_acknowledgement": ["acknowledge_and_close"],
             "explain_dues": ["present_due_amount", "ask_next_step"],
+            "purpose_disclosure": ["disclose_call_purpose", "invite_context"],
+            "hardship_hold_offer": ["acknowledge_hardship", "offer_hardship_hold"],
+            "hardship_hold_confirmation": ["confirm_hardship_hold"],
+            "hardship_hold_closing": ["close_hardship_hold_conversation"],
+            "installment_discount_offer": ["offer_installment_discount"],
+            "installment_discount_confirmation": ["confirm_installment_discount"],
+            "installment_discount_closing": ["close_installment_discount_conversation"],
+            "partial_payment_amount_request": ["ask_partial_payment_amount"],
+            "partial_payment_link_offer": ["offer_partial_payment_link"],
+            "partial_payment_confirmation": ["confirm_partial_payment_link"],
+            "partial_payment_closing": ["close_partial_payment_conversation"],
             "assess_affordability": ["acknowledge_hardship", "ask_affordable_amount"],
             "present_arrangement_options": ["present_offer", "discuss_arrangement"],
             "negotiate_installment": ["discuss_arrangement", "ask_affordable_amount"],
@@ -1154,8 +2007,27 @@ class PlanProposalDirectiveNode(BaseGraphNode):
         name = str(memory_state.get("active_customer_name", "Customer")).strip() or "Customer"
         goals = {
             "collect_verification": "Ask only for the missing verification details needed to continue securely.",
+            "wrong_party_privacy_notice": "State that details can only be discussed directly with the customer.",
+            "wrong_party_callback_request": "Protect privacy, provide the company callback number, and ask for a suitable callback time.",
+            "wrong_party_callback_clarification": "Ask briefly for a more specific callback time without repeating prior wording.",
+            "wrong_party_callback_confirmation": "Confirm the callback time and close the call respectfully.",
+            "wrong_party_callback_revision_confirmation": "Confirm the updated callback time and close without repeating the previous time.",
+            "wrong_party_closing_acknowledgement": "Acknowledge politely and end the call without repeating callback details.",
             "explain_dues": "Explain the overdue amount clearly and ask the next useful payment question.",
-            "assess_affordability": "Ask what monthly amount is realistically manageable after hardship disclosure.",
+            "purpose_disclosure": "State the policy number, overdue installment, and original due date, then ask how you can help.",
+            "hardship_hold_offer": "Acknowledge the hardship and offer the eligible temporary hold without repeating generic payment options.",
+            "hardship_hold_confirmation": "Confirm the hold, generated reference number, completed notifications, and next steps.",
+            "hardship_hold_closing": "Thank the customer by name, offer a warm sign-off, and say goodbye.",
+            "installment_discount_offer": "Offer only the approved installment discount and revised amount, then ask whether it would help.",
+            "installment_discount_confirmation": "Confirm the applied discount, revised amount, generated reference, delivered notifications, and next review.",
+            "installment_discount_closing": "Thank the customer by name, offer a warm sign-off, and say goodbye.",
+            "partial_payment_amount_request": "Acknowledge that a partial payment helps and ask what amount is comfortable now.",
+            "partial_payment_link_offer": "Confirm the validated partial amount and remaining balance, then ask permission to send an SMS link.",
+            "partial_payment_confirmation": "Confirm the pending payment link was sent, provide its reference, and state the remaining balance.",
+            "partial_payment_closing": "Thank the customer by name and close warmly.",
+            "assess_affordability": (
+                "Acknowledge the hardship, understand what is manageable, and avoid repeating the standard policy menu."
+            ),
             "present_arrangement_options": "Continue arrangement discussion with practical repayment options.",
             "negotiate_installment": "Refine the repayment arrangement toward a manageable installment.",
             "confirm_commitment": "Confirm the amount and payment date the customer can commit to.",

@@ -23,15 +23,21 @@ Optional voice runtime dependencies:
 pip install ".[voice-realtime]"
 ```
 
+Optional local embedding-backed TTS dependencies:
+
+```bash
+pip install ".[voice-realtime,voice-local-tts]"
+```
+
 ### 2) Environment variables
 
-Collection Agent reads API keys from environment variables.
+Collection Agent reads API keys from environment variables when the selected backend needs them.
 
 Create or update `.env` at repo root:
 
 ```bash
-NVIDIA_API_KEY=nvapi-...
-NVIDIA_BASE_URL=https://integrate.api.nvidia.com
+# Only needed if you use remote Ollama Cloud instead of local Ollama.
+OLLAMA_API_KEY=ollama-...
 
 # Only needed if you switch config to llm.provider=openai
 OPENAI_API_KEY=sk-...
@@ -47,8 +53,11 @@ set +a
 
 Notes:
 
-- Current default config uses `llm.provider: nvidia` in `agents/collection_agent/config.yml`.
+- Current default config uses local `llm.provider: ollama` with `gemma4:31b-cloud` in `agents/collection_agent/config.yml`.
+- Local Ollama requests use the existing OpenAI-compatible route at `http://localhost:11434/v1/chat/completions` and do not require an API key.
 - If `llm.provider=openai`, `OPENAI_API_KEY` becomes required.
+- If `llm.provider=groq`, `GROQ_API_KEY` becomes required.
+- `NVIDIA_API_KEY` is only required if you switch `voice_runtime.stt_backend` or `voice_runtime.tts_backend` to `nvidia`, or if you switch the main LLM provider to NVIDIA.
 
 ### 3) Run Collection Agent (interactive CLI)
 
@@ -338,13 +347,17 @@ Graph assets:
 
 Default dataset:
 
-- `agents/collection_agent/eval_dataset/collection_agent_golden_dataset_950.jsonl`
+- `agents/collection_agent/eval_dataset/collection_agent_golden_dataset_v3.jsonl`
+- supporting files:
+  - `agents/collection_agent/eval_dataset/collection_agent_manifest.csv`
+  - `agents/collection_agent/eval_dataset/collection_agent_eda.csv`
 
 Behavior:
 
 - auto-discover all `*.jsonl` files under `eval_dataset/`
 - allow explicit `dataset_path` override
 - load one script per JSONL record
+- treat each JSONL record as a full conversation trajectory with per-turn state transitions, node outputs, and tool calls
 - preserve all fields from the source dataset in execution artifacts
 - include `script_id` and `run_id` in every trace artifact
 
@@ -354,7 +367,7 @@ Example:
 from agents.collection_agent.evaluation import BatchExecutionRunner
 
 runner = BatchExecutionRunner(
-    dataset_path="agents/collection_agent/eval_dataset/collection_agent_golden_dataset_950.jsonl"
+    dataset_path="agents/collection_agent/eval_dataset/collection_agent_golden_dataset_v3.jsonl"
 )
 result = runner.run()
 ```
@@ -690,20 +703,158 @@ Pipecat integration is added as a runtime adapter, not as an internal graph node
 ### What this does
 
 - Pipecat handles transport/session/audio IO (WebRTC, Daily, telephony transports).
-- OpenAI STT converts caller audio to text.
+- The configured STT backend converts caller audio to text.
 - Text is routed to existing collection orchestration (`_route_internal_turn`) with discount and memory-helper handoffs unchanged.
-- Returned text is converted back to speech via OpenAI TTS.
+- Returned text is converted back to speech via the configured TTS backend.
 
 ### Runtime config
 
 Defined in `agents/collection_agent/config.yml` under `voice_runtime`:
 
+- `provider`
+- `stt_backend`
 - `stt_model`
 - `tts_model`
 - `tts_voice`
+- `tts_backend`
+- `local_stt.model`
+- `local_stt.device`
+- `local_stt.compute_type`
+- `local_stt.language`
+- `local_stt.no_speech_prob`
+- `local_tts.model_name`
+- `local_tts.vocoder_name`
+- `local_tts.model_sample_rate`
+- `local_tts.device`
+- `local_tts.speaker_embedding_path`
+- `local_tts.speaker_embedding_dataset`
+- `local_tts.speaker_embedding_split`
+- `local_tts.speaker_embedding_index`
+- `local_tts.speaker_embedding_field`
 - `pipecat.vad_enabled`
 - `pipecat.audio_in_sample_rate`
 - `pipecat.audio_out_sample_rate`
+
+### Voice backends
+
+The voice runtime now supports configurable local and hosted backends:
+
+Available STT backends:
+
+- `whisper_local`
+- `nvidia`
+
+Available TTS backends:
+
+- `nvidia`
+- `speecht5_local`
+
+The default stack is now aligned with `deep-saket/smruti`:
+
+- STT: local Faster-Whisper
+- TTS: local SpeechT5 plus a speaker embedding
+
+`speecht5_local` uses local Hugging Face SpeechT5 synthesis with an optional speaker embedding, following the same embedding-backed pattern used in `deep-saket/smruti`.
+
+`whisper_local` uses Pipecat's local Whisper service backed by `faster-whisper`, which matches Smruti's offline voice assistant direction.
+
+### Smruti-aligned local voice setup
+
+Install the local realtime voice stack:
+
+```bash
+pip install ".[voice-realtime,voice-local-tts]"
+```
+
+Recommended defaults for Apple Silicon are already checked into `agents/collection_agent/config.yml`:
+
+```yaml
+voice_runtime:
+  stt_backend: whisper_local
+  tts_backend: speecht5_local
+  local_stt:
+    model: medium
+    device: auto
+    compute_type: int8
+    language: en
+  local_tts:
+    model_name: microsoft/speecht5_tts
+    vocoder_name: microsoft/speecht5_hifigan
+    device: auto
+```
+
+### Local SpeechT5 setup
+
+If you want a stable specific speaker identity, download or generate a speaker embedding.
+
+To download one from the same Hugging Face xvector source Smruti documents:
+
+```bash
+mkdir -p agents/collection_agent/runtime/voice
+curl -L \
+  -o agents/collection_agent/runtime/voice/cmu_us_slt_arctic-wav-arctic_a0001.npy \
+  https://huggingface.co/matthijs/cmu-arctic-xvectors/resolve/main/cmu_us_slt_arctic-wav-arctic_a0001.npy
+```
+
+Then point config at it:
+
+```yaml
+voice_runtime:
+  local_tts:
+    speaker_embedding_path: ./runtime/voice/cmu_us_slt_arctic-wav-arctic_a0001.npy
+```
+
+Or compute a custom speaker embedding from a reference audio sample:
+
+```bash
+collection-speech-tools from-audio /path/to/reference.wav agents/collection_agent/runtime/voice/tts_speaker_embedding.npy
+```
+
+or download one from a Hugging Face dataset:
+
+```bash
+collection-speech-tools from-hf-dataset agents/collection_agent/runtime/voice/tts_speaker_embedding.npy
+```
+
+Enable the backend in `agents/collection_agent/config.yml`:
+
+```yaml
+voice_runtime:
+  stt_backend: whisper_local
+  tts_backend: speecht5_local
+  local_stt:
+    model: medium
+    device: auto
+    compute_type: int8
+  local_tts:
+    model_name: microsoft/speecht5_tts
+    vocoder_name: microsoft/speecht5_hifigan
+    model_sample_rate: 16000
+    device: auto
+    speaker_embedding_path: ./runtime/voice/tts_speaker_embedding.npy
+```
+
+If `speaker_embedding_path` is left empty, the runtime falls back to the configured Hugging Face dataset embedding fields.
+
+### Switching back to NVIDIA later
+
+If you want hosted speech later, change only config:
+
+```yaml
+voice_runtime:
+  stt_backend: nvidia
+  tts_backend: nvidia
+  stt_model: nvidia_default
+  tts_model: nvidia_default
+  tts_voice: nvidia_default
+```
+
+Then export:
+
+```bash
+export NVIDIA_API_KEY="nvapi-..."
+export NVIDIA_BASE_URL="https://integrate.api.nvidia.com"
+```
 
 ### Verification pipeline config
 
@@ -722,7 +873,7 @@ Defined in `agents/collection_agent/config.yml` under `verification`:
 
 ```bash
 # install optional dependencies
-pip install ".[voice-realtime]"
+pip install ".[voice-realtime,voice-local-tts]"
 
 # local browser WebRTC
 python agents/collection_agent/pipecat_bot.py -t webrtc
@@ -733,6 +884,12 @@ python agents/collection_agent/pipecat_bot.py -t daily
 # telephony transport via twilio (public proxy required)
 python agents/collection_agent/pipecat_bot.py -t twilio -x <your-ngrok-domain>
 ```
+
+Latency note for the default local stack:
+
+- local Whisper and local SpeechT5 both have model startup and inference overhead
+- first-response TTS latency will usually be higher than hosted NVIDIA TTS
+- interruption is still supported, but spoken progress is estimated from message length rather than exact TTS playback callbacks
 
 ## NVIDIA model setup (LLM provider)
 
@@ -760,6 +917,22 @@ Optional override at runtime:
 python agents/collection_agent/main.py --interactive --nvidia-api-key "nvapi-..."
 ```
 
+## Ollama Cloud model setup (LLM provider)
+
+Collection agent supports `llm.provider: ollama` by mapping Ollama onto the existing OpenAI-compatible LLM route. The current default model is `gemma4:31b-cloud`.
+
+For local Ollama, no API key is needed. If you use remote Ollama Cloud instead, set:
+
+```bash
+OLLAMA_API_KEY=ollama-...
+```
+
+Optional override at runtime:
+
+```bash
+python agents/collection_agent/main.py --interactive --ollama-api-key "ollama-..."
+```
+
 ## Key-event memory stores
 
 Both stores are physically under collection agent runtime so collection logic can read them directly:
@@ -778,3 +951,27 @@ Both stores are physically under collection agent runtime so collection logic ca
 npx -y @mermaid-js/mermaid-cli -i agents/collection_agent/graph.mmd -o agents/collection_agent/graph.png -b white -s 2
 python3 -c "from PIL import Image; Image.open('agents/collection_agent/graph.png').convert('RGB').save('agents/collection_agent/graph.jpg', 'JPEG', quality=92)"
 ```
+
+# Outbound callback scheduler
+
+Wrong-party callback confirmations invoke the `outbound_callback_schedule` tool. Jobs are stored in
+`runtime/outbound_callback_jobs.json`, and dispatch attempts are stored in
+`runtime/outbound_call_attempts.json`. The in-process scheduler checks due jobs automatically while
+the collection agent process is running.
+
+Configure one outbound provider:
+
+```text
+# Generic outbound-call service
+COLLECTION_OUTBOUND_CALL_WEBHOOK=https://your-service.example/outbound-calls
+
+# Or Twilio Voice
+TWILIO_ACCOUNT_SID=...
+TWILIO_AUTH_TOKEN=...
+EASY_AGENT_TWILIO_VOICE_FROM=+1...
+EASY_AGENT_TWILIO_VOICE_URL=https://your-public-host.example/twilio/voice
+```
+
+If no provider is configured, due jobs remain auditable and move through retry/failure states; the
+system does not falsely mark a call as dispatched. Use `outbound_callback_cancel` to cancel an active
+job by callback job ID or case ID.

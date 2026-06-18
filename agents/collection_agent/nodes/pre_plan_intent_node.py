@@ -5,7 +5,9 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from agents.collection_agent.nodes.callback_time_extractor import extract_callback_time
 from agents.collection_agent.nodes.collection_intent_node import CollectionIntentNode
+from agents.collection_agent.nodes.partial_payment_utils import partial_payment_from_llm_amount
 from src.nodes.types import AgentState
 
 
@@ -169,6 +171,100 @@ class PrePlanIntentNode(CollectionIntentNode):
         state: AgentState,
         context: dict[str, Any],
     ) -> dict[str, Any] | None:
+        memory_state = self._get_memory_state(state)
+        right_party_status = str(memory_state.get("right_party_status", "")).strip().lower()
+        lowered = str(state.get("user_input", "")).lower()
+        partial_stage = str(memory_state.get("partial_payment_stage", "")).strip().lower()
+        if partial_stage == "link_offered" and self._is_affirmative(lowered):
+            return {
+                "skip_llm": True,
+                "reason": "Accepted partial-payment link requires tool execution.",
+                "intent": {
+                    "intent": "decide",
+                    "confidence": 1.0,
+                    "reason": "Create and send the partial-payment link.",
+                },
+            }
+        if partial_stage == "collecting_amount" and partial_payment_from_llm_amount(
+            state=state,
+            memory_state=memory_state,
+            total_due=float(memory_state.get("active_overdue_amount", 0) or 0),
+        ):
+            return {
+                "skip_llm": True,
+                "reason": "LLM-extracted partial-payment capacity is ready for policy validation.",
+                "intent": {
+                    "intent": "plan",
+                    "confidence": 1.0,
+                    "reason": "Validate and present the partial-payment amount.",
+                },
+            }
+        if (
+            str(memory_state.get("hardship_hold_stage", "")).strip().lower() == "offered"
+            and str(memory_state.get("hold_response", "")).strip().lower() == "uncertain"
+        ):
+            return {
+                "skip_llm": True,
+                "reason": "Post-hold uncertainty requires discount eligibility evaluation.",
+                "intent": {
+                    "intent": "decide",
+                    "confidence": 1.0,
+                    "reason": "Evaluate the configured installment discount.",
+                },
+            }
+        if (
+            str(memory_state.get("discount_stage", "")).strip().lower() in {"offered", "accepted"}
+            and str(memory_state.get("discount_response", "")).strip().lower() == "accepted"
+        ):
+            return {
+                "skip_llm": True,
+                "reason": "Accepted installment discount requires application tools.",
+                "intent": {
+                    "intent": "decide",
+                    "confidence": 1.0,
+                    "reason": "Apply the accepted discount and send confirmations.",
+                },
+            }
+        if (
+            str(memory_state.get("hardship_hold_stage", "")).strip().lower() == "offered"
+            and not self._has_active_discount_branch(memory_state)
+            and str(memory_state.get("hold_response", "")).strip().lower() == "accepted"
+        ):
+            return {
+                "skip_llm": True,
+                "reason": "Accepted premium hold requires tool execution.",
+                "intent": {
+                    "intent": "decide",
+                    "confidence": 1.0,
+                    "reason": "Create the accepted hold and send its confirmations.",
+                },
+            }
+        if right_party_status == "wrong_party" and "callback" in lowered and any(
+            token in lowered for token in ("cancel", "remove", "do not call", "don't call")
+        ):
+            return {
+                "skip_llm": True,
+                "reason": "Callback cancellation requires tool execution.",
+                "intent": {
+                    "intent": "decide",
+                    "confidence": 1.0,
+                    "reason": "Cancel the queued outbound callback.",
+                },
+            }
+        if right_party_status == "wrong_party" and extract_callback_time(
+            str(state.get("user_input", "")),
+            llm=self.llm,
+        ):
+            return {
+                "skip_llm": True,
+                "reason": "Wrong-party callback time requires scheduler tool execution.",
+                "intent": {
+                    "intent": "decide",
+                    "confidence": 1.0,
+                    "reason": "A concrete callback time was provided.",
+                },
+            }
+
         identity_verified = bool(context.get("identity_verified", False))
         if identity_verified:
             return None
@@ -237,3 +333,39 @@ class PrePlanIntentNode(CollectionIntentNode):
         if len(digits) >= 10:
             fields.add("phone")
         return fields
+
+    @staticmethod
+    def _is_affirmative(text: str) -> bool:
+        normalized = re.sub(r"[^a-z0-9\s]", " ", str(text).lower())
+        normalized = re.sub(r"\s+", " ", normalized).strip()
+        return any(
+            phrase in normalized
+            for phrase in (
+                "yes",
+                "that would help",
+                "would really help",
+                "sounds good",
+                "i agree",
+                "please do",
+                "go ahead",
+                "okay",
+                "ok",
+            )
+        )
+
+    @staticmethod
+    def _has_active_discount_branch(memory_state: dict[str, Any]) -> bool:
+        stage = str(memory_state.get("discount_stage", "")).strip().lower()
+        details = memory_state.get("installment_discount_details")
+        return stage in {
+            "evaluating",
+            "offered",
+            "accepted",
+            "applied",
+            "sms_sent",
+            "confirmed",
+        } or (
+            isinstance(details, dict)
+            and bool(details.get("eligible", False))
+            and str(details.get("approval_status", "")).strip().lower() == "approved"
+        )

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-05-01T11:50:52.746650+00:00",
+  "updated_at": "2026-06-11T10:23:33.673671+00:00",
   "users": {
     "CUST-2001": {
       "user_id": "CUST-2001",
@@ -56,20 +56,24 @@
           "COLL-1002"
         ],
         "preferred_channel": "voice",
-        "risk_band": "high"
+        "risk_band": "unknown"
       },
       "memory": {
-        "latest_conversation_summary": "User cited temporary hardship and asked for lower EMI options before committing.",
+        "latest_conversation_summary": "customer: no he is not here | agent: I am unable to share what the call is about, but please let Rohan Gupta know that EasySecure Financial Services called and would like to speak with them. They can also reach EasySecure Financial Services at +91-1800-555-2002 at their convenience. When would be a good time to try again? | customer: try this evening | agent: Certainly. I will try to reach Rohan Gupta this evening. Please let them know that EasySecure Financial Services called. Thank you for your help. Have a good day. Goodbye.",
         "procedural_key_points": [
           "Lead with hardship acknowledgement before proposing collections action.",
           "Evaluate discount/restructure options before requesting immediate payment."
         ],
         "follow_up_considerations": [
-          "Begin next call with revised EMI options and promise capture path."
+          "Begin next turn with dues summary and one clear next action."
         ],
-        "last_outcome": "unsuccessful",
+        "last_outcome": "neutral",
         "last_case_id": "COLL-1002",
-        "updated_at": "2026-05-01T00:00:00+00:00"
+        "updated_at": "2026-06-11T10:23:33.673671+00:00",
+        "last_trigger": {
+          "reason": "wrong_party_callback_scheduled",
+          "callback_time": "this evening"
+        }
       },
       "history": [
         {
@@ -80,6 +84,41 @@
           ],
           "outcome": "unsuccessful",
           "created_at": "2026-05-01T00:00:00+00:00"
+        },
+        {
+          "session_id": "collection-user_b",
+          "summary": "customer: no | agent: Thank you. For privacy reasons, I can only discuss this directly with Rohan Gupta. I am unable to share any details with anyone else. | customer: They're not here right now. Can I take a message? What's it about? | agent: I am unable to share what the call is about, but please let Rohan Gupta know that EasySecure Financial Services called and would like to speak with them. They can also reach EasySecure Financial Services at +91-1800-555-2002 at their convenience. When would be a good time to try again? | customer: try this evening | agent: I am unable to share what the call is about, but please let Rohan Gupta know that EasySecure Financial Services called and would like to speak with them. They can also reach EasySecure Financial Services at +91-1800-555-2002 at their convenience. When would be a good time to try again?",
+          "procedural_key_points": [],
+          "outcome": "neutral",
+          "created_at": "2026-06-10T05:31:33.512280+00:00"
+        },
+        {
+          "session_id": "collection-user_b",
+          "summary": "customer: no | agent: Thank you. For privacy reasons, I can only discuss this directly with Rohan Gupta. I am unable to share any details with anyone else. | customer: They're not here right now. Can I take a message? What's it about? | agent: I am unable to share what the call is about, but please let Rohan Gupta know that EasySecure Financial Services called and would like to speak with them. They can also reach EasySecure Financial Services at +91-1800-555-2002 at their convenience. When would be a good time to try again? | customer: try this evening | agent: Thank you. I will try to reach Rohan Gupta this evening. Please let them know that EasySecure Financial Services called. Thank you for your help, and have a good day. Goodbye.",
+          "procedural_key_points": [],
+          "outcome": "neutral",
+          "created_at": "2026-06-10T05:44:46.297394+00:00"
+        },
+        {
+          "session_id": "collection-user_b",
+          "summary": "customer: no | agent: Thank you. For privacy reasons, I can only discuss this directly with Rohan Gupta. I am unable to share any details with anyone else. | customer: he is not here now, please try at 5:30pm in evening today | agent: Thank you. I will try to reach Rohan Gupta he is not here now, please try at 5:30pm in evening today. Please let them know that EasySecure Financial Services called. Thank you for your help, and have a good day. Goodbye. | customer: no | agent: Thank you. I will try to reach Rohan Gupta he is not here now, please try at 5:30pm in evening today. Please let them know that EasySecure Financial Services called. Thank you for your help, and have a good day. Goodbye.",
+          "procedural_key_points": [],
+          "outcome": "neutral",
+          "created_at": "2026-06-11T03:06:28.084564+00:00"
+        },
+        {
+          "session_id": "collection-user_b",
+          "summary": "customer: no | agent: Thank you. For privacy reasons, I can only discuss this directly with Rohan Gupta. I am unable to share any details with anyone else. | customer: he is not here, try at 5 today in evening | agent: Certainly. I will try to reach Rohan Gupta at 5 today in evening. Please let them know that EasySecure Financial Services called. Thank you for your help. Have a good day. Goodbye. | customer: sure, thankyou | agent: Certainly. I will try to reach Rohan Gupta at 5 today in evening. Please let them know that EasySecure Financial Services called. Thank you for your help. Have a good day. Goodbye.",
+          "procedural_key_points": [],
+          "outcome": "neutral",
+          "created_at": "2026-06-11T03:11:59.433596+00:00"
+        },
+        {
+          "session_id": "collection-user_b",
+          "summary": "customer: no he is not here | agent: I am unable to share what the call is about, but please let Rohan Gupta know that EasySecure Financial Services called and would like to speak with them. They can also reach EasySecure Financial Services at +91-1800-555-2002 at their convenience. When would be a good time to try again? | customer: try this evening | agent: Certainly. I will try to reach Rohan Gupta this evening. Please let them know that EasySecure Financial Services called. Thank you for your help. Have a good day. Goodbye.",
+          "procedural_key_points": [],
+          "outcome": "neutral",
+          "created_at": "2026-06-11T10:23:33.673671+00:00"
         }
       ]
     }

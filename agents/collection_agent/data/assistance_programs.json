@@ -1,5 +1,29 @@
 [
   {
+    "program_id": "PREMIUM_HOLD_001",
+    "program_type": "premium_hold",
+    "eligible_products": ["personal_loan"],
+    "eligible_loan_ids": ["LOAN-3002"],
+    "hardship_reasons": ["job_loss"],
+    "max_hold_months": 2,
+    "benefits_remain_active": true,
+    "requires_manager_approval": false,
+    "confirmation_channels": ["sms", "email"],
+    "confirmation_sla_hours": 24
+  },
+  {
+    "program_id": "JOB_LOSS_INSTALLMENT_DISCOUNT_001",
+    "program_type": "installment_discount",
+    "eligible_products": ["personal_loan"],
+    "eligible_loan_ids": ["LOAN-3002"],
+    "hardship_reasons": ["job_loss"],
+    "discount_pct": 10,
+    "requires_manager_approval": false,
+    "confirmation_channels": ["sms", "email"],
+    "confirmation_sla_hours": 24,
+    "review_after_months": 3
+  },
+  {
     "program_id": "HARDSHIP_001",
     "eligible_products": ["personal_loan"],
     "hardship_reasons": ["job_loss", "medical_emergency", "reduced_income"],

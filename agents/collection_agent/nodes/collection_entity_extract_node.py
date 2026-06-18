@@ -92,6 +92,7 @@ class CollectionEntityExtractNode(BaseGraphNode):
                 existing_entities=existing_entities,
                 existing_entity_descriptions=existing_descriptions,
                 active_customer_name=str(memory_state.get("active_customer_name", "")).strip(),
+                active_overdue_amount=memory_state.get("active_overdue_amount"),
                 conversation_history_compact=conversation_history_compact,
             )
             if extracted is not None:
@@ -229,6 +230,7 @@ class CollectionEntityExtractNode(BaseGraphNode):
         existing_entities: dict[str, str],
         existing_entity_descriptions: dict[str, str],
         active_customer_name: str,
+        active_overdue_amount: Any,
         conversation_history_compact: str,
     ) -> tuple[_EntityPayload | None, dict[str, Any]]:
         debug_payload: dict[str, Any] = {
@@ -244,6 +246,7 @@ class CollectionEntityExtractNode(BaseGraphNode):
                     "user_input": user_input,
                     "required_fields_json": json.dumps(required_fields, ensure_ascii=True),
                     "active_customer_name": active_customer_name,
+                    "active_overdue_amount": str(active_overdue_amount or ""),
                     "existing_entities_json": json.dumps(existing_entities, ensure_ascii=True),
                     "existing_entity_descriptions_json": json.dumps(existing_entity_descriptions, ensure_ascii=True),
                     "conversation_history_compact": conversation_history_compact,

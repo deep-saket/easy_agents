@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Any
 
+from agents.collection_agent.nodes.callback_time_extractor import extract_callback_time
 from src.nodes.react_node import ReactNode
 from src.nodes.types import AgentState
 from src.tools.registry import ToolRegistry
@@ -33,6 +35,548 @@ class CollectionReactNode(ReactNode):
     """
 
     tool_registry: ToolRegistry | None = None
+
+    def _apply_pre_llm_override(self, *, state: AgentState, context: dict[str, Any]) -> dict[str, Any] | None:
+        queued = ReactNode._apply_pre_llm_override(self, state=state, context=context)
+        if queued is not None:
+            return queued
+
+        memory = state.get("memory")
+        memory_state = dict(getattr(memory, "state", {})) if memory is not None else {}
+        observations = context.get("observations") if isinstance(context.get("observations"), list) else []
+        latest = observations[-1] if observations and isinstance(observations[-1], dict) else {}
+        if isinstance(latest.get("tool_phase"), dict):
+            latest = latest["tool_phase"]
+        latest_tool = str(latest.get("tool_name", "")).strip().lower()
+        latest_output = latest.get("output") if isinstance(latest.get("output"), dict) else {}
+        tool_completed_this_turn = int(state.get("steps", 0) or 0) > 0
+        case_id = str(state.get("case_id") or memory_state.get("active_case_id", "")).strip()
+        customer_id = str(state.get("user_id") or memory_state.get("active_user_id", "")).strip()
+
+        if latest_tool == "payment_link_create" and tool_completed_this_turn:
+            if str(memory_state.get("partial_payment_stage", "")).strip().lower() == "link_requested":
+                details = (
+                    dict(memory_state.get("partial_payment_details", {}))
+                    if isinstance(memory_state.get("partial_payment_details"), dict)
+                    else {}
+                )
+                details.update(latest_output)
+                if memory is not None:
+                    memory.set_state(
+                        partial_payment_stage="link_created",
+                        partial_payment_details=details,
+                    )
+                reference = str(latest_output.get("payment_reference_id", "")).strip()
+                message = (
+                    f"Your secure partial-payment link for "
+                    f"{float(details.get('partial_payment_amount', 0) or 0):.2f} is "
+                    f"{latest_output.get('payment_url', '')}. Reference: {reference}."
+                )
+                return {
+                    "skip_llm": True,
+                    "reason": "Partial-payment link created; send it by SMS.",
+                    "decision": self._tool_decision(
+                        "sms_confirmation_send",
+                        {
+                            "customer_id": customer_id,
+                            "reference_number": reference,
+                            "message": message,
+                        },
+                    ),
+                }
+
+        if latest_tool == "installment_discount_evaluate" and tool_completed_this_turn:
+            if not bool(latest_output.get("eligible", False)):
+                return None
+            if memory is not None:
+                memory.set_state(
+                    discount_stage="offered",
+                    discount_offered=True,
+                    installment_discount_details=dict(latest_output),
+                    post_hold_capacity="uncertain",
+                    hardship_hold_stage="superseded",
+                )
+            return {
+                "skip_llm": True,
+                "reason": "Approved installment discount is ready to present.",
+                "decision": SimpleNamespace(
+                    thought="Present the approved installment discount.",
+                    tool_call=None,
+                    tool_calls=[],
+                    respond_directly=True,
+                    response_text=None,
+                    done=True,
+                    no_tools_required=True,
+                ),
+            }
+
+        if latest_tool == "installment_discount_apply" and tool_completed_this_turn:
+            details = {
+                **(
+                    dict(memory_state.get("installment_discount_details", {}))
+                    if isinstance(memory_state.get("installment_discount_details"), dict)
+                    else {}
+                ),
+                **latest_output,
+            }
+            if memory is not None:
+                memory.set_state(
+                    discount_stage="applied",
+                    discount_accepted=True,
+                    installment_discount_details=details,
+                )
+            reference_number = str(latest_output.get("reference_number", "")).strip()
+            message = (
+                f"Your installment discount has been applied. Reference: {reference_number}. "
+                f"Revised amount: {float(latest_output.get('revised_amount', 0) or 0):.2f}."
+            )
+            return {
+                "skip_llm": True,
+                "reason": "Installment discount applied; send SMS confirmation.",
+                "decision": self._tool_decision(
+                    "sms_confirmation_send",
+                    {
+                        "customer_id": customer_id,
+                        "reference_number": reference_number,
+                        "message": message,
+                    },
+                ),
+            }
+
+        if latest_tool == "premium_hold_create" and tool_completed_this_turn:
+            reference_number = str(latest_output.get("reference_number", "")).strip()
+            if not reference_number:
+                return None
+            hold_details = {
+                **(
+                    dict(memory_state.get("hardship_hold_details", {}))
+                    if isinstance(memory_state.get("hardship_hold_details"), dict)
+                    else {}
+                ),
+                **latest_output,
+            }
+            if memory is not None:
+                memory.set_state(
+                    hardship_hold_stage="created",
+                    hardship_hold_details=hold_details,
+                )
+            message = (
+                f"Your premium hold has been arranged. Reference: {reference_number}. "
+                f"The hold is active until {latest_output.get('effective_until', '')}."
+            )
+            return {
+                "skip_llm": True,
+                "reason": "Premium hold created; send SMS confirmation.",
+                "decision": self._tool_decision(
+                    "sms_confirmation_send",
+                    {
+                        "customer_id": customer_id,
+                        "reference_number": reference_number,
+                        "message": message,
+                    },
+                ),
+            }
+
+        if latest_tool == "sms_confirmation_send" and tool_completed_this_turn:
+            if str(memory_state.get("partial_payment_stage", "")).strip().lower() == "link_created":
+                details = (
+                    dict(memory_state.get("partial_payment_details", {}))
+                    if isinstance(memory_state.get("partial_payment_details"), dict)
+                    else {}
+                )
+                details["sms_confirmation"] = dict(latest_output)
+                if memory is not None:
+                    memory.set_state(
+                        partial_payment_stage="confirmed",
+                        partial_payment_details=details,
+                        followup_status="awaiting_partial_payment",
+                    )
+                return {
+                    "skip_llm": True,
+                    "reason": "Partial-payment link sent by SMS.",
+                    "decision": SimpleNamespace(
+                        thought="Partial-payment link delivery is complete.",
+                        tool_call=None,
+                        tool_calls=[],
+                        respond_directly=True,
+                        response_text=None,
+                        done=True,
+                        no_tools_required=True,
+                    ),
+                }
+            if str(memory_state.get("discount_stage", "")).strip().lower() == "applied":
+                details = (
+                    dict(memory_state.get("installment_discount_details", {}))
+                    if isinstance(memory_state.get("installment_discount_details"), dict)
+                    else {}
+                )
+                details["sms_confirmation"] = dict(latest_output)
+                if memory is not None:
+                    memory.set_state(
+                        discount_stage="sms_sent",
+                        installment_discount_details=details,
+                    )
+                reference_number = str(latest_output.get("reference_number", "")).strip()
+                message = (
+                    f"Your installment discount has been applied. Reference: {reference_number}. "
+                    f"Revised amount: {float(details.get('revised_amount', 0) or 0):.2f}."
+                )
+                return {
+                    "skip_llm": True,
+                    "reason": "Discount SMS sent; send email confirmation.",
+                    "decision": self._tool_decision(
+                        "email_confirmation_send",
+                        {
+                            "customer_id": customer_id,
+                            "reference_number": reference_number,
+                            "subject": "Installment discount confirmation",
+                            "message": message,
+                        },
+                    ),
+                }
+            reference_number = str(latest_output.get("reference_number", "")).strip()
+            hold_details = (
+                dict(memory_state.get("hardship_hold_details", {}))
+                if isinstance(memory_state.get("hardship_hold_details"), dict)
+                else {}
+            )
+            hold_details["sms_confirmation"] = dict(latest_output)
+            if memory is not None:
+                memory.set_state(
+                    hardship_hold_stage="sms_sent",
+                    hardship_hold_details=hold_details,
+                )
+            message = (
+                f"Your premium hold has been arranged. Reference: {reference_number}. "
+                f"The hold is active until {hold_details.get('effective_until', '')}."
+            )
+            return {
+                "skip_llm": True,
+                "reason": "SMS confirmation sent; send email confirmation.",
+                "decision": self._tool_decision(
+                    "email_confirmation_send",
+                    {
+                        "customer_id": customer_id,
+                        "reference_number": reference_number,
+                        "subject": "Premium hold confirmation",
+                        "message": message,
+                    },
+                ),
+            }
+
+        if latest_tool == "email_confirmation_send" and tool_completed_this_turn:
+            if str(memory_state.get("discount_stage", "")).strip().lower() == "sms_sent":
+                details = (
+                    dict(memory_state.get("installment_discount_details", {}))
+                    if isinstance(memory_state.get("installment_discount_details"), dict)
+                    else {}
+                )
+                details["email_confirmation"] = dict(latest_output)
+                if memory is not None:
+                    memory.set_state(
+                        discount_stage="confirmed",
+                        installment_discount_details=details,
+                        negotiation_stage="confirming_commitment",
+                    )
+                return {
+                    "skip_llm": True,
+                    "reason": "Discount and both confirmations completed.",
+                    "decision": SimpleNamespace(
+                        thought="Discount application and notifications are complete.",
+                        tool_call=None,
+                        tool_calls=[],
+                        respond_directly=True,
+                        response_text=None,
+                        done=True,
+                        no_tools_required=True,
+                    ),
+                }
+            hold_details = (
+                dict(memory_state.get("hardship_hold_details", {}))
+                if isinstance(memory_state.get("hardship_hold_details"), dict)
+                else {}
+            )
+            hold_details["email_confirmation"] = dict(latest_output)
+            if memory is not None:
+                memory.set_state(
+                    hardship_hold_stage="confirmed",
+                    hardship_hold_details=hold_details,
+                    negotiation_stage="confirming_commitment",
+                )
+            return {
+                "skip_llm": True,
+                "reason": "Premium hold and both confirmations completed.",
+                "decision": SimpleNamespace(
+                    thought="Hold creation and notifications are complete; continue to customer confirmation.",
+                    tool_call=None,
+                    tool_calls=[],
+                    respond_directly=True,
+                    response_text=None,
+                    done=True,
+                    no_tools_required=True,
+                ),
+            }
+
+        if latest_tool == "outbound_callback_schedule" and tool_completed_this_turn:
+            if memory is not None:
+                memory.set_state(
+                    outbound_callback_job_id=latest_output.get("job_id"),
+                    outbound_callback_scheduled_for=latest_output.get("scheduled_for"),
+                    outbound_callback_status=latest_output.get("status"),
+                )
+            return {
+                "skip_llm": True,
+                "reason": "Outbound callback scheduling tool completed.",
+                "decision": SimpleNamespace(
+                    thought="Callback scheduling is complete; continue to customer confirmation.",
+                    tool_call=None,
+                    tool_calls=[],
+                    respond_directly=True,
+                    response_text=None,
+                    done=True,
+                    no_tools_required=True,
+                ),
+            }
+        if latest_tool == "outbound_callback_cancel" and tool_completed_this_turn:
+            if memory is not None:
+                memory.set_state(outbound_callback_status=latest_output.get("status"))
+            return {
+                "skip_llm": True,
+                "reason": "Outbound callback cancellation tool completed.",
+                "decision": SimpleNamespace(
+                    thought="Callback cancellation is complete.",
+                    tool_call=None,
+                    tool_calls=[],
+                    respond_directly=True,
+                    response_text=None,
+                    done=True,
+                    no_tools_required=True,
+                ),
+            }
+
+        user_input = str(state.get("user_input", ""))
+        lowered = user_input.lower()
+        hold_stage = str(memory_state.get("hardship_hold_stage", "")).strip().lower()
+        discount_stage = str(memory_state.get("discount_stage", "")).strip().lower()
+        partial_stage = str(memory_state.get("partial_payment_stage", "")).strip().lower()
+        if partial_stage == "link_offered" and self._is_affirmative(user_input):
+            details = (
+                memory_state.get("partial_payment_details")
+                if isinstance(memory_state.get("partial_payment_details"), dict)
+                else {}
+            )
+            amount = float(details.get("partial_payment_amount", 0) or 0)
+            if case_id and amount > 0:
+                if memory is not None:
+                    memory.set_state(partial_payment_stage="link_requested")
+                return {
+                    "skip_llm": True,
+                    "reason": "Customer accepted the partial-payment link.",
+                    "decision": self._tool_decision(
+                        "payment_link_create",
+                        {
+                            "case_id": case_id,
+                            "amount": amount,
+                            "channel": "sms",
+                        },
+                    ),
+                }
+        if (
+            hold_stage == "offered"
+            and str(memory_state.get("hold_response", "")).strip().lower() == "uncertain"
+        ):
+            program = self._eligible_discount_program(memory_state)
+            original_amount = float(memory_state.get("active_overdue_amount", 0) or 0)
+            if program and case_id and customer_id and original_amount > 0:
+                if memory is not None:
+                    memory.set_state(
+                        discount_stage="evaluating",
+                        post_hold_capacity="uncertain",
+                        installment_discount_program=dict(program),
+                        hardship_hold_stage="superseded",
+                    )
+                return {
+                    "skip_llm": True,
+                    "reason": "Customer is unsure after the hold; evaluate installment discount.",
+                    "decision": self._tool_decision(
+                        "installment_discount_evaluate",
+                        {
+                            "case_id": case_id,
+                            "customer_id": customer_id,
+                            "program_id": str(program.get("program_id", "")),
+                            "original_amount": original_amount,
+                        },
+                    ),
+                }
+        if (
+            discount_stage in {"offered", "accepted"}
+            and str(memory_state.get("discount_response", "")).strip().lower() == "accepted"
+        ):
+            details = (
+                memory_state.get("installment_discount_details")
+                if isinstance(memory_state.get("installment_discount_details"), dict)
+                else {}
+            )
+            if case_id and customer_id and details:
+                return {
+                    "skip_llm": True,
+                    "reason": "Customer accepted the approved installment discount.",
+                    "decision": self._tool_decision(
+                        "installment_discount_apply",
+                        {
+                            "case_id": case_id,
+                            "customer_id": customer_id,
+                            "program_id": str(details.get("program_id", "")),
+                            "original_amount": float(memory_state.get("active_overdue_amount", 0) or 0),
+                            "discount_pct": float(details.get("discount_pct", 0) or 0),
+                            "revised_amount": float(details.get("revised_amount", 0) or 0),
+                        },
+                    ),
+                }
+        if (
+            hold_stage == "offered"
+            and not self._has_active_discount_branch(memory_state)
+            and str(memory_state.get("hold_response", "")).strip().lower() == "accepted"
+        ):
+            program = (
+                memory_state.get("hardship_hold_program")
+                if isinstance(memory_state.get("hardship_hold_program"), dict)
+                else {}
+            )
+            program_id = str(program.get("program_id", "")).strip()
+            hold_months = int(program.get("max_hold_months", 0) or 0)
+            if case_id and customer_id and program_id and hold_months > 0:
+                return {
+                    "skip_llm": True,
+                    "reason": "Customer accepted the eligible premium hold.",
+                    "decision": self._tool_decision(
+                        "premium_hold_create",
+                        {
+                            "case_id": case_id,
+                            "customer_id": customer_id,
+                            "program_id": program_id,
+                            "hold_months": hold_months,
+                        },
+                    ),
+                }
+        if "callback" in lowered and any(token in lowered for token in ("cancel", "remove", "do not call", "don't call")):
+            return {
+                "skip_llm": True,
+                "reason": "Customer requested callback cancellation.",
+                "decision": self._tool_decision(
+                    "outbound_callback_cancel",
+                    {
+                        "job_id": memory_state.get("outbound_callback_job_id"),
+                        "case_id": case_id or None,
+                        "reason": "customer_requested_cancellation",
+                    },
+                ),
+            }
+
+        right_party_status = str(memory_state.get("right_party_status", "")).strip().lower()
+        callback_stage = str(memory_state.get("wrong_party_callback_stage", "")).strip().lower()
+        if right_party_status != "wrong_party" or callback_stage not in {
+            "privacy_notice_given",
+            "awaiting_callback",
+        }:
+            return None
+        callback_time = extract_callback_time(user_input, llm=self.llm)
+        if not callback_time or not case_id or not customer_id:
+            return None
+
+        for observation in reversed(observations):
+            if not isinstance(observation, dict):
+                continue
+            payload = observation.get("tool_phase") if isinstance(observation.get("tool_phase"), dict) else observation
+            if str(payload.get("tool_name", "")).strip().lower() != "outbound_callback_schedule":
+                continue
+            tool_input = payload.get("input") if isinstance(payload.get("input"), dict) else {}
+            if tool_input.get("case_id") == case_id and tool_input.get("callback_time") == callback_time:
+                return None
+
+        return {
+            "skip_llm": True,
+            "reason": "Schedule privacy-safe outbound callback.",
+            "decision": self._tool_decision(
+                "outbound_callback_schedule",
+                {
+                    "case_id": case_id,
+                    "customer_id": customer_id,
+                    "session_id": str(state.get("session_id", "")).strip() or "collection-session",
+                    "callback_time": callback_time,
+                    "timezone": str(memory_state.get("timezone", "Asia/Kolkata")).strip() or "Asia/Kolkata",
+                    "max_retries": 3,
+                },
+            ),
+        }
+
+    @staticmethod
+    def _is_affirmative(text: str) -> bool:
+        normalized = re.sub(r"[^a-z0-9\s]", " ", str(text).lower())
+        normalized = re.sub(r"\s+", " ", normalized).strip()
+        return any(
+            phrase in normalized
+            for phrase in (
+                "yes",
+                "that would help",
+                "would really help",
+                "sounds good",
+                "i agree",
+                "please do",
+                "go ahead",
+                "okay",
+                "ok",
+            )
+        )
+
+    @staticmethod
+    def _eligible_discount_program(memory_state: dict[str, Any]) -> dict[str, Any]:
+        hardship = (
+            memory_state.get("hardship_context")
+            if isinstance(memory_state.get("hardship_context"), dict)
+            else {}
+        )
+        reason = str(hardship.get("hardship_reason", "")).strip().lower()
+        context = (
+            memory_state.get("active_collection_context")
+            if isinstance(memory_state.get("active_collection_context"), dict)
+            else {}
+        )
+        case = context.get("case") if isinstance(context.get("case"), dict) else {}
+        loan_id = str(case.get("loan_id", memory_state.get("active_loan_id", ""))).strip().upper()
+        programs = (
+            memory_state.get("assistance_programs")
+            if isinstance(memory_state.get("assistance_programs"), list)
+            else []
+        )
+        for item in programs:
+            if not isinstance(item, dict) or str(item.get("program_type", "")).strip() != "installment_discount":
+                continue
+            loan_ids = {str(value).strip().upper() for value in item.get("eligible_loan_ids", [])}
+            reasons = {str(value).strip().lower() for value in item.get("hardship_reasons", [])}
+            if loan_ids and loan_id not in loan_ids:
+                continue
+            if reasons and reason not in reasons:
+                continue
+            return dict(item)
+        return {}
+
+    @staticmethod
+    def _has_active_discount_branch(memory_state: dict[str, Any]) -> bool:
+        stage = str(memory_state.get("discount_stage", "")).strip().lower()
+        details = memory_state.get("installment_discount_details")
+        return stage in {
+            "evaluating",
+            "offered",
+            "accepted",
+            "applied",
+            "sms_sent",
+            "confirmed",
+        } or (
+            isinstance(details, dict)
+            and bool(details.get("eligible", False))
+            and str(details.get("approval_status", "")).strip().lower() == "approved"
+        )
 
     def _build_context_for_react(self, state: AgentState) -> dict[str, Any]:
         memory = state.get("memory")

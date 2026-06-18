@@ -26,6 +26,7 @@ from pydantic import BaseModel, Field
 
 from agents.collection_agent.agent import CollectionAgent
 from agents.collection_agent.main import DEFAULT_CONFIG_PATH, build_llm, load_collection_config, load_env_file
+from agents.collection_agent.nodes.plan_proposal_utils import finalize_conversation_memory
 from agents.collection_agent.repository import CollectionRepository
 from agents.collection_agent.tools.data_store import CollectionDataStore
 from agents.collection_memory_helper_agent.agent import CollectionMemoryHelperAgent
@@ -73,6 +74,7 @@ class RunTurnRequest(BaseModel):
     hard_cap: int = Field(default=50, ge=1)
     timeout_seconds: float = Field(default=20.0, ge=1.0)
     sender: str = Field(default="customer", description="customer|admin")
+    client_request_id: str | None = Field(default=None)
 
 
 class SessionStateResponse(BaseModel):
@@ -81,6 +83,7 @@ class SessionStateResponse(BaseModel):
     session_id: str
     conversation_state: dict[str, Any]
     working_memory_state: dict[str, Any]
+    conversation_manager: dict[str, Any] | None = None
 
 
 class StartConversationRequest(BaseModel):
@@ -347,24 +350,34 @@ class CollectionDebugRuntime:
             f"Customer={matched['customer']['name']} "
             f"customer_id={matched['customer']['customer_id']} "
             f"case_id={matched['case']['case_id']} "
-            f"overdue_amount={matched['case']['overdue_amount']} "
-            "Generate the first call pitch by introducing yourself and requesting identity verification only. "
-            "Do not disclose overdue amount, dues details, or payment options before verification."
+            "Generate the opening disclosure and ask to speak with the customer. "
+            "Do not disclose the call purpose, account details, dues, payment options, or request verification details yet."
         )
 
         # Keep demo initialization deterministic and fast. The opening pitch is
         # rendered statically here; subsequent turns use full agent execution.
+        customer_variables = (
+            matched["customer"].get("variables", {})
+            if isinstance(matched["customer"].get("variables"), dict)
+            else {}
+        )
+        agent_name = str(
+            customer_variables.get("[AGENT_NAME]", matched["case"].get("assigned_agent", "Collections representative"))
+        ).strip() or "Collections representative"
+        company_name = str(customer_variables.get("[COMPANY_NAME]", "the bank")).strip() or "the bank"
         opener_message = (
-            f"Hello {str(matched['customer']['name'])}, this is Alex from the bank's collections team. "
-            "I am calling regarding your loan account dues. "
-            "Before I share details, please confirm your date of birth (YYYY-MM-DD) "
-            "and your registered phone number."
+            f"Hello. This is {agent_name} calling on behalf of {company_name}. "
+            "This call may be recorded for quality and training purposes. "
+            f"May I please speak with {str(matched['customer']['name'])}?"
         )
         memory.set_state(
             last_agent_response=opener_message,
             last_response_target="customer",
             turn_index=1,
             greeted=True,
+            right_party_status="awaiting_confirmation",
+            wrong_party_callback_stage=None,
+            wrong_party_callback_time=None,
         )
         turn = {
             "session_id": session_id,
@@ -538,6 +551,11 @@ class CollectionDebugRuntime:
                     "session_id": session_id,
                     "final_response": response,
                     "final_target": "customer",
+                    "conversation_complete": bool(state.get("conversation_complete", False)),
+                    "conversation_closing": bool(state.get("conversation_closing", False)),
+                    "conversation_closed": bool(state.get("conversation_closed", False)),
+                    "terminate_call": bool(state.get("terminate_call", False)),
+                    "termination_grace_seconds": float(state.get("termination_grace_seconds", 0.0) or 0.0),
                     "hops": hops,
                     "final_state": self._sanitize_state(state),
                     "final_working_memory_state": self._memory_state(session_id=session_id),
@@ -742,6 +760,10 @@ class CollectionDebugRuntime:
             working_memory_state=self._memory_state(session_id=sid),
         )
 
+    def finalize_conversation(self, session_id: str) -> None:
+        memory = self.collection_agent.session_store.load(session_id)
+        finalize_conversation_memory(memory)
+
     def _run_memory_helper_if_requested(self, *, session_id: str, state: dict[str, Any]) -> dict[str, Any] | None:
         targets = state.get("additional_targets")
         if not isinstance(targets, list):
@@ -889,6 +911,11 @@ def _load_demo_users(base_dir: Path) -> list[dict[str, Any]]:
                     "name": str(customer.get("name", "")),
                     "phone": str(customer.get("phone", "")),
                     "email": str(customer.get("email", "")),
+                    "variables": (
+                        dict(customer.get("variables", {}))
+                        if isinstance(customer.get("variables"), dict)
+                        else {}
+                    ),
                     "dob": str(challenge.get("dob", "")),
                     "zip": str(challenge.get("zip", "")),
                     "last4_pan": str(challenge.get("last4_pan", "")),
@@ -902,13 +929,14 @@ def _load_demo_users(base_dir: Path) -> list[dict[str, Any]]:
                     "overdue_amount": case_row.get("overdue_amount"),
                     "late_fee": case_row.get("late_fee"),
                     "risk_band": str(case_row.get("risk_band", "")),
+                    "assigned_agent": str(case_row.get("assigned_agent", "")),
                 },
             }
         )
     return result
 
 
-def create_router(runtime: CollectionDebugRuntime) -> APIRouter:
+def create_router(runtime: Any) -> APIRouter:
     router = APIRouter(prefix="/api", tags=["collection_agent_ui"])
 
     @router.post("/run-turn")
@@ -985,12 +1013,24 @@ def create_router(runtime: CollectionDebugRuntime) -> APIRouter:
             "trace": runtime.latest_trace_for_session(session_id=session_id),
         }
 
+    @router.get("/session/{session_id}/conversation-manager")
+    async def session_conversation_manager(session_id: str, limit: int = 30) -> dict[str, Any]:
+        if hasattr(runtime, "conversation_manager_debug"):
+            return runtime.conversation_manager_debug(session_id=session_id, limit=limit)
+        return {
+            "session_id": session_id,
+            "state": None,
+            "logs": [],
+        }
+
     return router
 
 
 def create_app(base_dir: Path | None = None) -> FastAPI:
     resolved_base_dir = (base_dir or Path(__file__).resolve().parents[1]).resolve()
-    runtime = CollectionDebugRuntime.create(resolved_base_dir)
+    from agents.collection_agent.conversation_manager.runtime import ConversationManagedRuntime
+
+    runtime = ConversationManagedRuntime.create(base_dir=resolved_base_dir, collection_base_dir=resolved_base_dir)
 
     app = FastAPI(title="Collection Agent Debug UI")
     app.include_router(create_router(runtime))

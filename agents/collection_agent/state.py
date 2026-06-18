@@ -56,6 +56,13 @@ class CollectionGraphState(AgentState, total=False):
     verified_dob: bool
     verified_mobile: bool
     identity_verified: bool
+    right_party_status: str
+    wrong_party_callback_stage: str | None
+    wrong_party_callback_time: str | None
+    conversation_complete: bool
+    conversation_closing: bool
+    terminate_call: bool
+    termination_grace_seconds: float
     conversation_mode: str
     negotiation_stage: str
     customer_payment_posture: str
@@ -63,6 +70,12 @@ class CollectionGraphState(AgentState, total=False):
     customer_payment_capacity: float | None
     customer_payment_capacity_pct: float | None
     discount_stage: str
+    post_hold_capacity: str
+    installment_discount_program: dict[str, Any]
+    installment_discount_details: dict[str, Any]
+    partial_payment_stage: str
+    partial_payment_details: dict[str, Any]
+    followup_status: str
     customer_payment_willingness: float
     hardship_context: dict[str, Any]
     discount_requested: bool
@@ -72,6 +85,8 @@ class CollectionGraphState(AgentState, total=False):
     counter_offer_present: bool
     response_mode: str
     active_dialogue_owner: str
+    hold_response: str
+    discount_response: str
     reflection_retry_count: int
     reflection_plan_retry_count: int
     reflection_feedback: dict[str, Any]

@@ -14,12 +14,15 @@ from typing import Any
 
 from agents.collection_agent.agent import CollectionAgent
 from agents.collection_agent.main import _route_internal_turn, build_llm, load_collection_config
+from agents.collection_agent.nodes.plan_proposal_utils import finalize_conversation_memory
 from agents.collection_agent.repository import CollectionRepository
 from agents.collection_agent.tools.data_store import CollectionDataStore
 from agents.collection_memory_helper_agent.agent import CollectionMemoryHelperAgent
 from agents.collection_memory_helper_agent.repository import CollectionMemoryRepository
 from agents.discount_planning_agent.agent import DiscountPlanningAgent
-from src.interfaces import PipecatRunnerConfig, build_runner_bot, run_pipecat_main
+from speech.pipecat_stt import build_collection_stt_service
+from speech.pipecat_tts import build_collection_tts_service
+from src.interfaces import PipecatNotInstalledError, PipecatRunnerConfig, build_runner_bot, run_pipecat_main
 
 BASE_DIR = Path(__file__).resolve().parent
 CONFIG_PATH = BASE_DIR / "config.yml"
@@ -57,6 +60,19 @@ class CollectionVoiceOrchestrator:
             timeout_seconds=20.0,
             trace_readable=False,
         )
+
+    def lifecycle_state(self, *, session_id: str) -> dict[str, Any]:
+        memory_state = dict(self._collection_agent.session_store.load(session_id).state)
+        return {
+            "conversation_complete": bool(memory_state.get("conversation_complete", False)),
+            "conversation_closing": bool(memory_state.get("conversation_closing", False)),
+            "conversation_closed": bool(memory_state.get("conversation_closed", False)),
+            "terminate_call": bool(memory_state.get("terminate_call", False)),
+            "termination_grace_seconds": float(memory_state.get("termination_grace_seconds", 0.0) or 0.0),
+        }
+
+    def finalize_conversation(self, *, session_id: str) -> None:
+        finalize_conversation_memory(self._collection_agent.session_store.load(session_id))
 
 
 def _build_runtime() -> tuple[CollectionVoiceOrchestrator, PipecatRunnerConfig, dict[str, Any]]:
@@ -108,9 +124,6 @@ async def _run_bot(transport: Any, runner_args: Any) -> None:
     from pipecat.pipeline.runner import PipelineRunner
     from pipecat.pipeline.task import PipelineParams, PipelineTask
     from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
-    from pipecat.services.nvidia.stt import NvidiaSTTService
-    from pipecat.services.nvidia.tts import NvidiaTTSService
-
     orchestrator, runtime_cfg, config = _build_runtime()
 
     class CollectionTurnProcessor(FrameProcessor):
@@ -138,12 +151,15 @@ async def _run_bot(transport: Any, runner_args: Any) -> None:
 
             await self.push_frame(frame, direction)
 
-    nvidia_api_key = os.getenv("NVIDIA_API_KEY", "").strip()
-    if not nvidia_api_key:
-        raise ValueError("NVIDIA_API_KEY is required for Pipecat Collection bot.")
-
-    stt = NvidiaSTTService(api_key=nvidia_api_key)
-    tts = NvidiaTTSService(api_key=nvidia_api_key)
+    stt = build_collection_stt_service(
+        config=config,
+        base_dir=BASE_DIR,
+    )
+    tts = build_collection_tts_service(
+        config=config,
+        output_sample_rate=runtime_cfg.audio_out_sample_rate,
+        base_dir=BASE_DIR,
+    )
 
     runner_body = getattr(runner_args, "body", None)
     env_session_id = str(os.getenv("COLLECTION_VOICE_SESSION_ID", "")).strip()
@@ -212,8 +228,16 @@ def _build_bot() -> Any:
     return build_runner_bot(run_bot=_run_bot, transport_params=transport_params)
 
 
-bot = _build_bot()
+try:
+    bot = _build_bot()
+except PipecatNotInstalledError:
+    # Keep helper imports such as `_build_runtime()` usable even when voice
+    # dependencies are absent. The actual voice entrypoint still fails fast in
+    # `__main__` if Pipecat is required but not installed.
+    bot = None
 
 
 if __name__ == "__main__":
+    if bot is None:
+        bot = _build_bot()
     run_pipecat_main()
