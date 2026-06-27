@@ -108,6 +108,7 @@ class CollectionResponseNode(ResponseNode):
             "hardship_hold_closing",
             "installment_discount_closing",
             "partial_payment_closing",
+            "full_payment_closing",
         }:
             update["conversation_complete"] = False
             update["conversation_closing"] = True
@@ -122,6 +123,7 @@ class CollectionResponseNode(ResponseNode):
                 "hardship_hold_confirmation",
                 "installment_discount_confirmation",
                 "partial_payment_confirmation",
+                "full_payment_confirmation",
             } and str(update.get("response", "")).strip():
                 advanced_plan = mark_confirmation_delivered(memory)
                 if advanced_plan:
@@ -534,6 +536,12 @@ class CollectionResponseNode(ResponseNode):
             return "partial_payment_confirmation"
         if objective == "partial_payment_closing" or action == "close_partial_payment_conversation":
             return "partial_payment_closing"
+        if objective == "full_payment_link_offer" or action == "offer_full_payment_link":
+            return "full_payment_link_offer"
+        if objective == "full_payment_confirmation" or action == "confirm_full_payment_link":
+            return "full_payment_confirmation"
+        if objective == "full_payment_closing" or action == "close_full_payment_conversation":
+            return "full_payment_closing"
         if action == "ask_affordable_amount" or objective == "assess_affordability":
             return "capacity_question"
         if action in {"present_offer", "discuss_arrangement"} or objective in {
@@ -954,6 +962,22 @@ class CollectionResponseNode(ResponseNode):
             return (
                 f"Thank you for working with us on this, {customer_name}. Take care, and goodbye."
             )
+        if template_id == "full_payment_link_offer":
+            return (
+                "Wonderful. I can send you a secure payment link by SMS, or I can guide you "
+                "through paying right now, whichever you prefer."
+            )
+        if template_id == "full_payment_confirmation":
+            return (
+                "The link is on its way to your registered mobile. Once payment is received "
+                f"you will get an instant receipt, and your reference number is {reference_number}. "
+                "Would you also like to set up auto-pay so future installments are never missed?"
+            )
+        if template_id == "full_payment_closing":
+            return (
+                f"No problem at all. Thank you for taking care of this so quickly, {customer_name}. "
+                "Have a great day, and goodbye."
+            )
         if template_id == "dues_explanation":
             return (
                 f"Thank you {customer_name}. Your overdue amount is INR {overdue_amount_text}. "
@@ -1196,6 +1220,11 @@ class CollectionResponseNode(ResponseNode):
             if isinstance(memory_state.get("partial_payment_details"), dict)
             else {}
         )
+        full_payment_details = (
+            memory_state.get("full_payment_details")
+            if isinstance(memory_state.get("full_payment_details"), dict)
+            else {}
+        )
         human_escalation_id = str(memory_state.get("human_escalation_id", "") or "").strip()
         return {
             "customer_name": customer_name,
@@ -1208,9 +1237,12 @@ class CollectionResponseNode(ResponseNode):
             "reference_number": str(
                 discount_details.get(
                     "reference_number",
-                    partial_details.get(
+                    full_payment_details.get(
                         "payment_reference_id",
-                        hold_details.get("reference_number", reference_number),
+                        partial_details.get(
+                            "payment_reference_id",
+                            hold_details.get("reference_number", reference_number),
+                        ),
                     ),
                 )
             ).strip(),
@@ -1245,6 +1277,7 @@ class CollectionResponseNode(ResponseNode):
             "review_after_months": int(discount_details.get("review_after_months", 3) or 3),
             "partial_payment_amount_text": f"{float(partial_details.get('partial_payment_amount', 0) or 0):.2f}",
             "remaining_balance_text": f"{float(partial_details.get('remaining_balance', 0) or 0):.2f}",
+            "full_payment_amount_text": f"{float(full_payment_details.get('amount', overdue_amount) or 0):.2f}",
             "callback_time": callback_time,
             "case_id": str(facts.get("case_id", memory_state.get("active_case_id", "COLL-1001"))).strip() or "COLL-1001",
             "overdue_amount_text": f"{overdue_amount:.2f}",

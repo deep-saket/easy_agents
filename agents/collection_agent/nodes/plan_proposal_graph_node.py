@@ -230,6 +230,9 @@ class PlanProposalGraphNode(BaseGraphNode):
             hold_stage = str(memory_state.get("hardship_hold_stage", "")).strip().lower()
             discount_stage = str(memory_state.get("discount_stage", "")).strip().lower()
             partial_stage = str(memory_state.get("partial_payment_stage", "")).strip().lower()
+            payment_stage = str(memory_state.get("payment_resolution_stage", "")).strip().lower()
+            payment_commitment_type = str(memory_state.get("payment_commitment_type", "NONE")).strip().upper()
+            autopay_response = str(memory_state.get("autopay_response", "none")).strip().lower()
             hardship_context = (
                 memory_state.get("hardship_context")
                 if isinstance(memory_state.get("hardship_context"), dict)
@@ -255,6 +258,16 @@ class PlanProposalGraphNode(BaseGraphNode):
                 inferred_next = "transfer_to_specialist"
             elif hardship_options_exhausted:
                 inferred_next = "human_escalation"
+            elif payment_commitment_type == "FULL_PAYMENT" and autopay_response == "declined":
+                inferred_next = "close_conversation"
+            elif payment_commitment_type == "FULL_PAYMENT" and payment_stage in {"confirmed", "link_sent", "autopay_offered"}:
+                inferred_next = "autopay_offer"
+            elif payment_commitment_type == "FULL_PAYMENT" and payment_stage in {"link_requested", "link_created"}:
+                inferred_next = "full_payment_link"
+            elif payment_commitment_type == "FULL_PAYMENT" and payment_stage in {"options_offered", "link_offered"}:
+                inferred_next = "full_payment_options"
+            elif payment_commitment_type == "FULL_PAYMENT":
+                inferred_next = "collect_payment_intent"
             elif (
                 discount_stage in {"counter_offer", "rejected"}
                 and bool(memory_state.get("discount_offered", False))
@@ -339,7 +352,16 @@ class PlanProposalGraphNode(BaseGraphNode):
         )
         if (
             bool(memory_state.get("identity_verified", False))
-            and inferred_next in {"discount_offer", "explain_dues", "human_escalation", "transfer_to_specialist"}
+            and inferred_next in {
+                "discount_offer",
+                "explain_dues",
+                "collect_payment_intent",
+                "full_payment_options",
+                "full_payment_link",
+                "autopay_offer",
+                "human_escalation",
+                "transfer_to_specialist",
+            }
             and any(
                 isinstance(node, dict) and str(node.get("id", "")).strip() == inferred_next
                 for node in plan.get("nodes", [])
@@ -624,7 +646,19 @@ class PlanProposalGraphNode(BaseGraphNode):
                 "source": "canonical_flow",
                 "reason": "right_party_verified",
             }
-        if candidate in {"discovery_empathy", "resolution_offer", "discount_offer", "explain_dues", "collect_payment_intent", "confirmation", "human_escalation", "transfer_to_specialist"}:
+        if candidate in {
+            "discovery_empathy",
+            "resolution_offer",
+            "discount_offer",
+            "explain_dues",
+            "collect_payment_intent",
+            "full_payment_options",
+            "full_payment_link",
+            "autopay_offer",
+            "confirmation",
+            "human_escalation",
+            "transfer_to_specialist",
+        }:
             mark_done("purpose_disclosure", "purpose_disclosed_before_resolution")
         if candidate in {"resolution_offer", "discount_offer", "confirmation", "human_escalation", "transfer_to_specialist"}:
             mark_done("discovery_empathy", "hardship_acknowledged")
@@ -634,6 +668,14 @@ class PlanProposalGraphNode(BaseGraphNode):
             mark_done("assess_after_hold", "post_hold_resume_assessed")
         if candidate in {"explain_dues", "collect_payment_intent", "human_escalation", "transfer_to_specialist"}:
             mark_done("discount_offer", "discount_offer_presented")
+        if candidate in {"full_payment_options", "full_payment_link", "autopay_offer", "confirmation", "close_conversation"}:
+            mark_done("collect_payment_intent", "full_payment_intent_captured")
+        if candidate in {"full_payment_link", "autopay_offer", "confirmation", "close_conversation"}:
+            mark_done("full_payment_options", "full_payment_method_offered")
+        if candidate in {"autopay_offer", "confirmation", "close_conversation"}:
+            mark_done("full_payment_link", "full_payment_link_created_and_sent")
+        if candidate == "close_conversation":
+            mark_done("autopay_offer", "autopay_declined_or_later")
         if candidate in {"human_escalation", "transfer_to_specialist"} and "confirmation" in {
             str(node.get("id", "")).strip()
             for node in plan.get("nodes", [])
@@ -705,6 +747,9 @@ class PlanProposalGraphNode(BaseGraphNode):
             {"id": "discount_offer", "label": "Present eligible installment discount", "owner": "collection_agent", "status": "pending"},
             {"id": "partial_amount", "label": "Identify and validate partial-payment amount", "owner": "customer", "status": "pending"},
             {"id": "partial_link", "label": "Create and send secure partial-payment link", "owner": "collection_agent", "status": "pending"},
+            {"id": "full_payment_options", "label": "Offer full-payment method", "owner": "collection_agent", "status": "pending"},
+            {"id": "full_payment_link", "label": "Create and send secure full-payment link", "owner": "collection_agent", "status": "pending"},
+            {"id": "autopay_offer", "label": "Offer auto-pay setup", "owner": "customer", "status": "pending"},
             {"id": "confirmation", "label": "Confirm agreed outcome and reference", "owner": "collection_agent", "status": "pending"},
             {"id": "explain_dues", "label": "Explain standard payment options", "owner": "customer", "status": "pending"},
             {"id": "collect_payment_intent", "label": "Collect payment intent", "owner": "customer", "status": "pending"},
@@ -726,6 +771,11 @@ class PlanProposalGraphNode(BaseGraphNode):
             {"from": "purpose_disclosure", "to": "partial_amount", "condition": "partial_payment_available"},
             {"from": "partial_amount", "to": "partial_link", "condition": "amount_validated"},
             {"from": "partial_link", "to": "confirmation", "condition": "link_sent"},
+            {"from": "collect_payment_intent", "to": "full_payment_options", "condition": "pay_now"},
+            {"from": "full_payment_options", "to": "full_payment_link", "condition": "payment_link_requested"},
+            {"from": "full_payment_link", "to": "confirmation", "condition": "link_sent"},
+            {"from": "confirmation", "to": "autopay_offer", "condition": "autopay_offered"},
+            {"from": "autopay_offer", "to": "close_conversation", "condition": "autopay_declined_or_later"},
             {"from": "confirmation", "to": "close_conversation", "condition": "outcome_confirmed"},
             {"from": "explain_dues", "to": "collect_payment_intent", "condition": "dues_explained"},
             {"from": "collect_payment_intent", "to": "resolve_outcome", "condition": "pay_now"},
@@ -818,6 +868,24 @@ class PlanProposalGraphNode(BaseGraphNode):
                 "owner": "collection_agent",
                 "status": "pending",
             },
+            {
+                "id": "full_payment_options",
+                "label": "Offer full-payment method",
+                "owner": "collection_agent",
+                "status": "pending",
+            },
+            {
+                "id": "full_payment_link",
+                "label": "Create and send secure full-payment link",
+                "owner": "collection_agent",
+                "status": "pending",
+            },
+            {
+                "id": "autopay_offer",
+                "label": "Offer auto-pay setup",
+                "owner": "customer",
+                "status": "pending",
+            },
         ]
         for node in additions:
             if node["id"] not in node_ids:
@@ -842,6 +910,12 @@ class PlanProposalGraphNode(BaseGraphNode):
             {"from": "purpose_disclosure", "to": "partial_amount", "condition": "partial_payment_available"},
             {"from": "partial_amount", "to": "partial_link", "condition": "amount_validated"},
             {"from": "partial_link", "to": "confirmation", "condition": "link_sent"},
+            {"from": "explain_dues", "to": "collect_payment_intent", "condition": "dues_explained"},
+            {"from": "collect_payment_intent", "to": "full_payment_options", "condition": "pay_now"},
+            {"from": "full_payment_options", "to": "full_payment_link", "condition": "payment_link_requested"},
+            {"from": "full_payment_link", "to": "confirmation", "condition": "link_sent"},
+            {"from": "confirmation", "to": "autopay_offer", "condition": "autopay_offered"},
+            {"from": "autopay_offer", "to": "close_conversation", "condition": "autopay_declined_or_later"},
             {"from": "confirmation", "to": "close_conversation", "condition": "outcome_confirmed"},
             {"from": "wrong_party_callback", "to": "close_conversation", "condition": "callback_confirmed"},
             {"from": "resolve_outcome", "to": "close_conversation", "condition": "outcome_confirmed"},
@@ -997,6 +1071,9 @@ class PlanProposalGraphNode(BaseGraphNode):
             "resolution_offer",
             "explain_dues",
             "collect_payment_intent",
+            "full_payment_options",
+            "full_payment_link",
+            "autopay_offer",
             "confirmation",
             "human_escalation",
             "transfer_to_specialist",

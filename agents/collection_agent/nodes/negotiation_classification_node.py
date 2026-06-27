@@ -543,7 +543,21 @@ class NegotiationClassificationNode(BaseGraphNode):
         )
         if any(token in lowered for token in ["not paying", "won't pay", "will not pay", "never pay", "refuse to pay"]):
             posture = "refuses_to_pay"
-        elif any(token in lowered for token in ["pay in full", "pay full", "clear all dues", "send payment link", "i can pay now"]) and not amount_present:
+        elif any(
+            token in lowered
+            for token in [
+                "pay in full",
+                "pay full",
+                "full amount",
+                "clear all dues",
+                "clear it today",
+                "pay it now",
+                "pay now",
+                "send payment link",
+                "i can pay now",
+                "i can pay it now",
+            ]
+        ) and not amount_present:
             posture = "pay_now"
         elif amount_present or pct_present:
             if any(token in lowered for token in ["today", "now", "right now", "this week", "immediately", "can pay"]):
@@ -589,6 +603,28 @@ class NegotiationClassificationNode(BaseGraphNode):
 
         hold_response = "none"
         discount_response = "none"
+        payment_commitment_type = "NONE"
+        payment_option_response = "none"
+        autopay_response = "none"
+        prior_payment_stage = str(prior.get("payment_resolution_stage", "")).strip().lower()
+        if posture == "pay_now":
+            payment_commitment_type = "FULL_PAYMENT"
+        elif posture == "partial_now":
+            payment_commitment_type = "PARTIAL_PAYMENT"
+        elif posture == "promise_to_pay":
+            payment_commitment_type = "PROMISE_TO_PAY"
+        if prior_payment_stage in {"options_offered", "link_offered"}:
+            if any(token in lowered for token in ["send me the link", "send the link", "payment link", "link please", "send it", "sms"]):
+                payment_option_response = "payment_link"
+            elif any(token in lowered for token in ["guide me", "walk me", "through paying", "pay by phone"]):
+                payment_option_response = "guided_payment"
+            elif any(token in lowered for token in ["no", "not now", "later", "maybe later", "decline"]):
+                payment_option_response = "declined"
+        if prior_payment_stage in {"confirmed", "link_sent", "autopay_offered"}:
+            if self._fallback_is_affirmative(lowered) and any(token in lowered for token in ["auto", "autopay", "auto pay"]):
+                autopay_response = "accepted"
+            elif any(token in lowered for token in ["maybe later", "later", "not now", "no thanks", "no thank", "decline"]):
+                autopay_response = "declined"
         if str(prior.get("hardship_hold_stage", "")).strip().lower() == "offered":
             if self._fallback_is_uncertain(lowered):
                 hold_response = "uncertain"
@@ -635,6 +671,9 @@ class NegotiationClassificationNode(BaseGraphNode):
                 "customer_payment_capacity_pct": self._normalize_optional_pct(
                     extracted_entities_turn.get("customer_payment_capacity_pct")
                 ),
+                "payment_commitment_type": payment_commitment_type,
+                "payment_option_response": payment_option_response,
+                "autopay_response": autopay_response,
                 "discount_stage": discount_stage,
                 "customer_payment_willingness": willingness,
                 "hardship_context": {
@@ -664,6 +703,9 @@ class NegotiationClassificationNode(BaseGraphNode):
                 "customer_payment_capacity_pct": self._normalize_optional_pct(
                     extracted_entities_turn.get("customer_payment_capacity_pct")
                 ),
+                "payment_commitment_type": payment_commitment_type,
+                "payment_option_response": payment_option_response,
+                "autopay_response": autopay_response,
                 "discount_stage": discount_stage,
                 "customer_payment_willingness": willingness,
                 "hardship_context": {
@@ -687,6 +729,9 @@ class NegotiationClassificationNode(BaseGraphNode):
             "customer_payment_capacity_pct": self._normalize_optional_pct(
                 extracted_entities_turn.get("customer_payment_capacity_pct")
             ),
+            "payment_commitment_type": payment_commitment_type,
+            "payment_option_response": payment_option_response,
+            "autopay_response": autopay_response,
             "discount_stage": discount_stage,
             "customer_payment_willingness": willingness,
             "hardship_context": {
@@ -743,6 +788,18 @@ class NegotiationClassificationNode(BaseGraphNode):
             or "NONE",
             "payment_option_response": "none",
             "autopay_response": "none",
+            "payment_resolution_stage": str(
+                state.get("payment_resolution_stage", memory_state.get("payment_resolution_stage", ""))
+            ).strip().lower(),
+            "payment_resolution_details": (
+                dict(state.get("payment_resolution_details"))
+                if isinstance(state.get("payment_resolution_details"), dict)
+                else (
+                    dict(memory_state.get("payment_resolution_details"))
+                    if isinstance(memory_state.get("payment_resolution_details"), dict)
+                    else {}
+                )
+            ),
             "customer_payment_capacity": NegotiationClassificationNode._normalize_optional_float(
                 state.get("customer_payment_capacity", memory_state.get("customer_payment_capacity"))
             ),

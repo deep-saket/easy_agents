@@ -33,5 +33,12 @@
     "disposition_code": "PAID_IN_FULL",
     "notes": "Full-payment link delivered. Reference: PAY-3FF169036ED8",
     "updated_at": "2026-06-22T16:45:31.065436+00:00"
+  },
+  {
+    "audit_id": "AUD-CAFBF59D78",
+    "case_id": "COLL-1002",
+    "disposition_code": "PAID_IN_FULL",
+    "notes": "Full-payment link delivered. Reference: PAY-E0A0BF6747BC",
+    "updated_at": "2026-06-27T19:54:26.371427+00:00"
   }
 ]

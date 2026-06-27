@@ -175,6 +175,20 @@ class PrePlanIntentNode(CollectionIntentNode):
         right_party_status = str(memory_state.get("right_party_status", "")).strip().lower()
         lowered = str(state.get("user_input", "")).lower()
         partial_stage = str(memory_state.get("partial_payment_stage", "")).strip().lower()
+        if (
+            str(memory_state.get("payment_resolution_stage", "")).strip().lower() in {"options_offered", "link_offered"}
+            and str(memory_state.get("payment_commitment_type", "")).strip().upper() == "FULL_PAYMENT"
+            and str(memory_state.get("payment_option_response", "")).strip().lower() == "payment_link"
+        ):
+            return {
+                "skip_llm": True,
+                "reason": "Accepted full-payment link requires tool execution.",
+                "intent": {
+                    "intent": "decide",
+                    "confidence": 1.0,
+                    "reason": "Create and send the full-payment link.",
+                },
+            }
         if partial_stage == "link_offered" and self._is_affirmative(lowered):
             return {
                 "skip_llm": True,

@@ -214,5 +214,14 @@
     "message": "Your premium hold has been arranged. Reference: HOLD-531102AD72. The hold is active until 2026-08-26.",
     "status": "sent",
     "sent_at": "2026-06-26T20:52:45.056292+00:00"
+  },
+  {
+    "message_id": "SMS-355F51483D",
+    "customer_id": "CUST-2002",
+    "reference_number": "PAY-E0A0BF6747BC",
+    "recipient": "+919900001002",
+    "message": "Your secure payment link for 37800.00 is https://payments.example.local/pay/pay-e0a0bf6747bc. Reference: PAY-E0A0BF6747BC.",
+    "status": "sent",
+    "sent_at": "2026-06-27T19:54:26.235899+00:00"
   }
 ]

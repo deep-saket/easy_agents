@@ -558,6 +558,107 @@ class PlanProposalDirectiveNode(BaseGraphNode):
         hardship_active = bool(hardship_context.get("hardship_detected", False))
         discount_stage = str(memory_state.get("discount_stage", "")).strip().lower()
         partial_stage = str(memory_state.get("partial_payment_stage", "")).strip().lower()
+        payment_resolution_stage = str(memory_state.get("payment_resolution_stage", "")).strip().lower()
+        payment_commitment_type = str(memory_state.get("payment_commitment_type", "NONE")).strip().upper()
+        payment_option_response = str(memory_state.get("payment_option_response", "none")).strip().lower()
+        autopay_response = str(memory_state.get("autopay_response", "none")).strip().lower()
+
+        if (
+            identity_verified
+            and payment_commitment_type == "FULL_PAYMENT"
+            and payment_resolution_stage in {"confirmed", "link_sent", "autopay_offered"}
+            and autopay_response == "declined"
+        ):
+            if memory is not None:
+                memory.set_state(
+                    conversation_complete=False,
+                    conversation_closing=True,
+                )
+            return with_plan({
+                "route": "continue",
+                "response_target": "customer",
+                "plan_proposal": {
+                    "target": "customer",
+                    "intent": "full_payment_closing",
+                    "conversation_objective": "full_payment_closing",
+                    "dialogue_action": "close_full_payment_conversation",
+                    "response_mode": "informational",
+                    "customer_facing_goal": "Thank the customer by name for taking care of the payment and close warmly.",
+                    "plan_origin": "full_payment_autopay_declined",
+                },
+            })
+
+        if (
+            identity_verified
+            and payment_commitment_type == "FULL_PAYMENT"
+            and payment_resolution_stage == "confirmed"
+        ):
+            details = (
+                memory_state.get("full_payment_details")
+                if isinstance(memory_state.get("full_payment_details"), dict)
+                else {}
+            )
+            sms = details.get("sms_confirmation") if isinstance(details.get("sms_confirmation"), dict) else {}
+            if (
+                str(details.get("payment_reference_id", "")).strip()
+                and str(sms.get("status", "")).strip().lower() == "sent"
+            ):
+                if memory is not None:
+                    memory.set_state(payment_resolution_stage="autopay_offered")
+                return with_plan({
+                    "route": "continue",
+                    "response_target": "customer",
+                    "plan_proposal": {
+                        "target": "customer",
+                        "intent": "full_payment_confirmation",
+                        "conversation_objective": "full_payment_confirmation",
+                        "dialogue_action": "confirm_full_payment_link",
+                        "response_mode": "informational",
+                        "customer_facing_goal": "Confirm the full-payment link was sent, provide the reference, and ask whether auto-pay should be set up.",
+                        "plan_origin": "full_payment_link_sent",
+                    },
+                })
+
+        if (
+            identity_verified
+            and payment_commitment_type == "FULL_PAYMENT"
+            and payment_resolution_stage in {"options_offered", "link_offered"}
+            and payment_option_response in {"payment_link", "guided_payment"}
+        ):
+            return with_plan({
+                "route": "continue",
+                "response_target": "customer",
+                "plan_proposal": {
+                    "target": "customer",
+                    "intent": "full_payment_link_offer",
+                    "conversation_objective": "full_payment_link_offer",
+                    "dialogue_action": "offer_full_payment_link",
+                    "response_mode": "informational",
+                    "customer_facing_goal": "Offer a secure SMS payment link or guided payment for the full overdue amount.",
+                    "plan_origin": "full_payment_option_selected",
+                },
+            })
+
+        if (
+            identity_verified
+            and payment_commitment_type == "FULL_PAYMENT"
+            and payment_resolution_stage not in {"link_requested", "link_created", "confirmed", "link_sent", "autopay_offered"}
+        ):
+            if memory is not None:
+                memory.set_state(payment_resolution_stage="options_offered")
+            return with_plan({
+                "route": "continue",
+                "response_target": "customer",
+                "plan_proposal": {
+                    "target": "customer",
+                    "intent": "full_payment_link_offer",
+                    "conversation_objective": "full_payment_link_offer",
+                    "dialogue_action": "offer_full_payment_link",
+                    "response_mode": "informational",
+                    "customer_facing_goal": "Offer a secure SMS payment link or guided payment for the full overdue amount.",
+                    "plan_origin": "full_payment_commitment",
+                },
+            })
 
         if (
             identity_verified
@@ -1969,6 +2070,9 @@ class PlanProposalDirectiveNode(BaseGraphNode):
             "partial_payment_link_offer",
             "partial_payment_confirmation",
             "partial_payment_closing",
+            "full_payment_link_offer",
+            "full_payment_confirmation",
+            "full_payment_closing",
             "close_conversation",
         }:
             objective = explicit_objective
@@ -2097,6 +2201,9 @@ class PlanProposalDirectiveNode(BaseGraphNode):
         generic_options_after_discount = bool(memory_state.get("generic_options_offered_after_discount", False))
         human_escalation_status = str(memory_state.get("human_escalation_status", "")).strip().lower()
         human_transfer_status = str(memory_state.get("human_transfer_status", "")).strip().lower()
+        payment_commitment_type = str(memory_state.get("payment_commitment_type", "NONE")).strip().upper()
+        payment_resolution_stage = str(memory_state.get("payment_resolution_stage", "")).strip().lower()
+        autopay_response = str(memory_state.get("autopay_response", "none")).strip().lower()
         hardship_context = (
             memory_state.get("hardship_context")
             if isinstance(memory_state.get("hardship_context"), dict)
@@ -2107,6 +2214,12 @@ class PlanProposalDirectiveNode(BaseGraphNode):
             return "collect_verification", "ask_verification", "compliance"
         if human_transfer_status == "pending" or human_escalation_status == "queued":
             return "human_transfer_pending", "confirm_live_human_transfer", "empathetic"
+        if payment_commitment_type == "FULL_PAYMENT" and autopay_response == "declined":
+            return "full_payment_closing", "close_full_payment_conversation", "informational"
+        if payment_commitment_type == "FULL_PAYMENT" and payment_resolution_stage in {"confirmed", "link_sent", "autopay_offered"}:
+            return "full_payment_confirmation", "confirm_full_payment_link", "informational"
+        if payment_commitment_type == "FULL_PAYMENT":
+            return "full_payment_link_offer", "offer_full_payment_link", "informational"
         if conversation_mode == "promise_capture" or customer_payment_posture in {"pay_now", "promise_to_pay"}:
             return "capture_promise", "confirm_payment_intent", "negotiation"
         if (
@@ -2162,6 +2275,9 @@ class PlanProposalDirectiveNode(BaseGraphNode):
             "partial_payment_link_offer": ["confirm_partial_amount", "state_remaining_balance", "offer_sms_link"],
             "partial_payment_confirmation": ["confirm_link_sent", "give_reference", "state_partial_amount", "state_remaining_balance"],
             "partial_payment_closing": ["thank_customer_by_name", "warm_signoff", "goodbye"],
+            "full_payment_link_offer": ["offer_sms_link", "offer_guided_payment"],
+            "full_payment_confirmation": ["confirm_link_sent", "give_reference", "state_receipt_after_payment", "ask_autopay"],
+            "full_payment_closing": ["thank_customer_by_name", "warm_signoff", "goodbye"],
             "assess_affordability": [
                 "acknowledge_hardship",
                 "ask_affordable_amount",
@@ -2225,6 +2341,9 @@ class PlanProposalDirectiveNode(BaseGraphNode):
             "partial_payment_link_offer": ["claim_link_sent", "claim_payment_received"],
             "partial_payment_confirmation": ["claim_payment_received", "invent_balance_date"],
             "partial_payment_closing": ["repeat_payment_link", "restart_conversation"],
+            "full_payment_link_offer": ["claim_link_sent", "claim_payment_received", "offer_discount"],
+            "full_payment_confirmation": ["claim_payment_received", "invent_payment_status"],
+            "full_payment_closing": ["repeat_payment_link", "restart_conversation"],
             "assess_affordability": ["restart_collections_menu", "ask_pay_now_or_arrangement", "mention_internal_processing"],
             "present_arrangement_options": ["restart_collections_menu", "ask_pay_now_or_arrangement", "mention_internal_processing"],
             "negotiate_installment": ["restart_collections_menu", "ask_pay_now_or_arrangement", "mention_internal_processing"],
@@ -2259,6 +2378,9 @@ class PlanProposalDirectiveNode(BaseGraphNode):
             "partial_payment_link_offer": ["offer_partial_payment_link"],
             "partial_payment_confirmation": ["confirm_partial_payment_link"],
             "partial_payment_closing": ["close_partial_payment_conversation"],
+            "full_payment_link_offer": ["offer_full_payment_link"],
+            "full_payment_confirmation": ["confirm_full_payment_link"],
+            "full_payment_closing": ["close_full_payment_conversation"],
             "assess_affordability": ["acknowledge_hardship", "ask_affordable_amount"],
             "present_arrangement_options": ["present_offer", "discuss_arrangement"],
             "negotiate_installment": ["discuss_arrangement", "ask_affordable_amount"],
@@ -2294,6 +2416,9 @@ class PlanProposalDirectiveNode(BaseGraphNode):
             "partial_payment_link_offer": "Confirm the validated partial amount and remaining balance, then ask permission to send an SMS link.",
             "partial_payment_confirmation": "Confirm the pending payment link was sent, provide its reference, and state the remaining balance.",
             "partial_payment_closing": "Thank the customer by name and close warmly.",
+            "full_payment_link_offer": "Offer a secure SMS payment link or guided payment for the full overdue amount.",
+            "full_payment_confirmation": "Confirm the full-payment link was sent, provide its reference, and ask about auto-pay.",
+            "full_payment_closing": "Thank the customer by name for taking care of the payment and close warmly.",
             "assess_affordability": (
                 "Acknowledge the hardship, understand what is manageable, and avoid repeating the standard policy menu."
             ),

@@ -277,6 +277,8 @@ def mark_confirmation_delivered(memory: Any) -> dict[str, Any]:
     now = datetime.now(UTC).isoformat()
     markers = dict(plan.get("step_markers", {})) if isinstance(plan.get("step_markers"), dict) else {}
     completed_prerequisites: list[str] = []
+    next_current = "close_conversation"
+    next_reason = "awaiting_customer_closing_reply"
     if str(memory_state.get("partial_payment_stage", "")).strip().lower() == "confirmed":
         details = (
             memory_state.get("partial_payment_details")
@@ -296,6 +298,27 @@ def mark_confirmation_delivered(memory: Any) -> dict[str, Any]:
                     "source": "response_render",
                     "reason": "payment_link_created_and_sms_sent",
                 }
+    if str(memory_state.get("payment_resolution_stage", "")).strip().lower() in {"confirmed", "link_sent", "autopay_offered"}:
+        details = (
+            memory_state.get("full_payment_details")
+            if isinstance(memory_state.get("full_payment_details"), dict)
+            else {}
+        )
+        sms = details.get("sms_confirmation") if isinstance(details.get("sms_confirmation"), dict) else {}
+        if (
+            str(details.get("payment_reference_id", "")).strip()
+            and str(sms.get("status", "")).strip().lower() == "sent"
+        ):
+            completed_prerequisites = ["collect_payment_intent", "full_payment_options", "full_payment_link"]
+            next_current = "autopay_offer"
+            next_reason = "awaiting_autopay_response"
+            for node_id in completed_prerequisites:
+                markers[node_id] = {
+                    "state": "done",
+                    "updated_at": now,
+                    "source": "response_render",
+                    "reason": "full_payment_link_created_and_sms_sent",
+                }
     markers["confirmation"] = {
         "state": "done",
         "updated_at": now,
@@ -306,22 +329,29 @@ def mark_confirmation_delivered(memory: Any) -> dict[str, Any]:
         "state": "pending",
         "updated_at": now,
         "source": "response_render",
-        "reason": "awaiting_customer_closing_reply",
+        "reason": next_reason,
     }
+    if next_current == "autopay_offer":
+        markers["autopay_offer"] = {
+            "state": "pending",
+            "updated_at": now,
+            "source": "response_render",
+            "reason": "awaiting_autopay_response",
+        }
 
     nodes = [dict(node) for node in plan.get("nodes", []) if isinstance(node, dict)]
     for node in nodes:
         node_id = str(node.get("id", "")).strip()
         if node_id in completed_prerequisites or node_id == "confirmation":
             node["status"] = "done"
-        elif node_id == "close_conversation":
+        elif node_id == next_current:
             node["status"] = "in_progress"
 
     plan["nodes"] = nodes
     plan["step_markers"] = markers
     plan["previous_node_id"] = "confirmation"
-    plan["current_node_id"] = "close_conversation"
-    plan["next_node_ids"] = []
+    plan["current_node_id"] = next_current
+    plan["next_node_ids"] = ["close_conversation"] if next_current == "autopay_offer" else []
     plan["status"] = "active"
     plan["updated_from"] = "response_render"
     transition_update = {

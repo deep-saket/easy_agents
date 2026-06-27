@@ -6,8 +6,10 @@ import re
 from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Any
+from uuid import uuid4
 
 from agents.collection_agent.nodes.callback_time_extractor import extract_callback_time
+from agents.collection_agent.tools.common import utc_now
 from src.nodes.react_node import ReactNode
 from src.nodes.types import AgentState
 from src.tools.registry import ToolRegistry
@@ -54,6 +56,36 @@ class CollectionReactNode(ReactNode):
         customer_id = str(state.get("user_id") or memory_state.get("active_user_id", "")).strip()
 
         if latest_tool == "payment_link_create" and tool_completed_this_turn:
+            if str(memory_state.get("payment_resolution_stage", "")).strip().lower() == "link_requested":
+                details = (
+                    dict(memory_state.get("full_payment_details", {}))
+                    if isinstance(memory_state.get("full_payment_details"), dict)
+                    else {}
+                )
+                details.update(latest_output)
+                if memory is not None:
+                    memory.set_state(
+                        payment_resolution_stage="link_created",
+                        full_payment_details=details,
+                    )
+                reference = str(latest_output.get("payment_reference_id", "")).strip()
+                message = (
+                    f"Your secure payment link for "
+                    f"{float(latest_output.get('amount', details.get('amount', 0)) or 0):.2f} is "
+                    f"{latest_output.get('payment_url', '')}. Reference: {reference}."
+                )
+                return {
+                    "skip_llm": True,
+                    "reason": "Full-payment link created; send it by SMS.",
+                    "decision": self._tool_decision(
+                        "sms_confirmation_send",
+                        {
+                            "customer_id": customer_id,
+                            "reference_number": reference,
+                            "message": message,
+                        },
+                    ),
+                }
             if str(memory_state.get("partial_payment_stage", "")).strip().lower() == "link_requested":
                 details = (
                     dict(memory_state.get("partial_payment_details", {}))
@@ -178,6 +210,39 @@ class CollectionReactNode(ReactNode):
             }
 
         if latest_tool == "sms_confirmation_send" and tool_completed_this_turn:
+            if str(memory_state.get("payment_resolution_stage", "")).strip().lower() == "link_created":
+                details = (
+                    dict(memory_state.get("full_payment_details", {}))
+                    if isinstance(memory_state.get("full_payment_details"), dict)
+                    else {}
+                )
+                details["sms_confirmation"] = dict(latest_output)
+                reference = str(details.get("payment_reference_id", latest_output.get("reference_number", ""))).strip()
+                if memory is not None:
+                    memory.set_state(
+                        payment_resolution_stage="confirmed",
+                        full_payment_details=details,
+                        followup_status="awaiting_full_payment",
+                        final_disposition="PAID_IN_FULL",
+                    )
+                self._append_disposition(
+                    case_id=case_id,
+                    disposition_code="PAID_IN_FULL",
+                    notes=f"Full-payment link delivered. Reference: {reference}",
+                )
+                return {
+                    "skip_llm": True,
+                    "reason": "Full-payment link sent by SMS.",
+                    "decision": SimpleNamespace(
+                        thought="Full-payment link delivery is complete.",
+                        tool_call=None,
+                        tool_calls=[],
+                        respond_directly=True,
+                        response_text=None,
+                        done=True,
+                        no_tools_required=True,
+                    ),
+                }
             if str(memory_state.get("partial_payment_stage", "")).strip().lower() == "link_created":
                 details = (
                     dict(memory_state.get("partial_payment_details", {}))
@@ -455,6 +520,27 @@ class CollectionReactNode(ReactNode):
                     ),
                 }
         if (
+            str(memory_state.get("payment_resolution_stage", "")).strip().lower() in {"options_offered", "link_offered"}
+            and str(memory_state.get("payment_commitment_type", "")).strip().upper() == "FULL_PAYMENT"
+            and str(memory_state.get("payment_option_response", "")).strip().lower() == "payment_link"
+        ):
+            amount = float(memory_state.get("active_overdue_amount", 0) or 0)
+            if case_id and amount > 0:
+                if memory is not None:
+                    memory.set_state(payment_resolution_stage="link_requested")
+                return {
+                    "skip_llm": True,
+                    "reason": "Customer requested the full-payment link.",
+                    "decision": self._tool_decision(
+                        "payment_link_create",
+                        {
+                            "case_id": case_id,
+                            "amount": amount,
+                            "channel": "sms",
+                        },
+                    ),
+                }
+        if (
             hold_stage == "offered"
             and str(memory_state.get("hold_response", "")).strip().lower() == "uncertain"
         ):
@@ -633,6 +719,28 @@ class CollectionReactNode(ReactNode):
                 continue
             return dict(item)
         return {}
+
+    def _append_disposition(self, *, case_id: str, disposition_code: str, notes: str) -> None:
+        if not self.tool_registry or not case_id:
+            return
+        store = None
+        for tool in self.tool_registry.list_tools():
+            candidate = getattr(tool, "store", None)
+            if candidate is not None:
+                store = candidate
+                break
+        if store is None:
+            return
+        store.append_runtime(
+            "dispositions.json",
+            {
+                "audit_id": f"AUD-{uuid4().hex[:10].upper()}",
+                "case_id": case_id,
+                "disposition_code": disposition_code,
+                "notes": notes,
+                "updated_at": utc_now().isoformat(),
+            },
+        )
 
     @staticmethod
     def _has_active_discount_branch(memory_state: dict[str, Any]) -> bool:
