@@ -66,6 +66,14 @@ class CollectionGraphState(AgentState, total=False):
     conversation_mode: str
     negotiation_stage: str
     customer_payment_posture: str
+    payment_commitment_type: str
+    payment_option_response: str
+    autopay_response: str
+    payment_resolution_stage: str
+    payment_resolution_details: dict[str, Any]
+    final_disposition: str
+    call_summary: dict[str, Any]
+    analytics_events: list[dict[str, Any]]
     customer_payment_posture_history: list[str]
     customer_payment_capacity: float | None
     customer_payment_capacity_pct: float | None

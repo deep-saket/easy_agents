@@ -9,6 +9,7 @@ from agents.collection_agent.services.outbound_callback_queue import (
     resolve_callback_datetime,
 )
 from agents.collection_agent.nodes.collection_react_node import CollectionReactNode
+from agents.collection_agent.nodes.plan_proposal_directive_node import PlanProposalDirectiveNode
 from agents.collection_agent.tools.data_store import CollectionDataStore
 from agents.collection_agent.tools.outbound_callback_cancel_tool import OutboundCallbackCancelTool
 from agents.collection_agent.tools.outbound_callback_schedule_tool import OutboundCallbackScheduleTool
@@ -235,6 +236,61 @@ def test_wrong_party_callback_turn_selects_scheduler_tool() -> None:
         assert completion_update["decision"].done is True
         assert memory.state["outbound_callback_job_id"]
         assert memory.state["outbound_callback_status"] == "scheduled"
+
+
+def test_scheduled_callback_tool_result_leads_to_confirmation_directive() -> None:
+    memory = WorkingMemory(
+        session_id="session-1",
+        state={
+            "active_case_id": "COLL-1002",
+            "active_user_id": "CUST-2002",
+            "active_customer_name": "Rohan Gupta",
+            "identity_verified": False,
+            "right_party_status": "wrong_party",
+            "wrong_party_callback_stage": "awaiting_callback",
+        },
+    )
+    node = PlanProposalDirectiveNode(llm=None, strict_llm_mode=False)
+
+    update = node.execute(
+        {
+            "user_input": "try at 11AM today",
+            "memory": memory,
+            "observations": [
+                {
+                    "tool_phase": {
+                        "tool_name": "outbound_callback_schedule",
+                        "input": {
+                            "case_id": "COLL-1002",
+                            "customer_id": "CUST-2002",
+                            "session_id": "session-1",
+                            "callback_time": "at 11 AM today",
+                            "timezone": "Asia/Kolkata",
+                            "phone": None,
+                            "max_retries": 3,
+                        },
+                        "output": {
+                            "job_id": "CALL-123",
+                            "case_id": "COLL-1002",
+                            "customer_id": "CUST-2002",
+                            "session_id": "session-1",
+                            "scheduled_for": "2026-06-24T11:00:00+05:30",
+                            "timezone": "Asia/Kolkata",
+                            "phone": "+919900001002",
+                            "status": "scheduled",
+                            "retry_count": 0,
+                        },
+                    }
+                }
+            ],
+            "steps": 1,
+        }
+    )
+
+    directive = update["plan_proposal"]["response_directive"]
+    assert directive["conversation_objective"] == "wrong_party_callback_confirmation"
+    assert memory.state["wrong_party_callback_stage"] == "completed"
+    assert memory.state["wrong_party_callback_time"] == "at 11 AM today"
 
 
 def test_wrong_party_callback_cancellation_selects_cancel_tool() -> None:

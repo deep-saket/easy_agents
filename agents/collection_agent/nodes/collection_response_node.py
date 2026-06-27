@@ -220,8 +220,12 @@ class CollectionResponseNode(ResponseNode):
             "wrong_party_closing_acknowledgement",
             "conversation_closing",
             "purpose_disclosure",
+            "hardship_hold_offer",
             "hardship_hold_confirmation",
             "hardship_hold_closing",
+            "human_escalation_pending",
+            "human_transfer_pending",
+            "installment_discount_offer",
             "installment_discount_confirmation",
             "installment_discount_closing",
             "partial_payment_confirmation",
@@ -512,6 +516,10 @@ class CollectionResponseNode(ResponseNode):
             return "hardship_hold_confirmation"
         if objective == "hardship_hold_closing" or action == "close_hardship_hold_conversation":
             return "hardship_hold_closing"
+        if objective == "hardship_human_escalation" or action == "queue_human_escalation":
+            return "human_escalation_pending"
+        if objective == "human_transfer_pending" or action == "confirm_live_human_transfer":
+            return "human_transfer_pending"
         if objective == "installment_discount_offer" or action == "offer_installment_discount":
             return "installment_discount_offer"
         if objective == "installment_discount_confirmation" or action == "confirm_installment_discount":
@@ -747,6 +755,7 @@ class CollectionResponseNode(ResponseNode):
         company_name = str(render_variables.get("company_name", "the bank")).strip() or "the bank"
         contact_number = str(render_variables.get("contact_number", "")).strip()
         callback_time = str(render_variables.get("callback_time", "")).strip()
+        escalation_id = str(render_variables.get("escalation_id", "")).strip()
         missing_fields = str(render_variables.get("missing_fields", self.verification_default_missing_text)).strip()
         overdue_amount_text = str(render_variables.get("overdue_amount_text", "0.00")).strip() or "0.00"
         customer_facing_goal = str(render_variables.get("customer_facing_goal", "")).strip()
@@ -810,7 +819,7 @@ class CollectionResponseNode(ResponseNode):
         if template_id == "wrong_party_privacy_notice":
             return (
                 f"Thank you. For privacy reasons, I can only discuss this directly with {customer_name}. "
-                "I am unable to share any details with anyone else."
+                "I am unable to share any details with anyone else. When would be a good time to try again? "
             ).strip()
         if template_id == "wrong_party_callback_request":
             contact_sentence = (
@@ -889,6 +898,22 @@ class CollectionResponseNode(ResponseNode):
             return (
                 f"Thank you for your time, {customer_name}. Take care, and we wish you all the best. Goodbye."
             ).strip()
+        if template_id == "human_escalation_pending":
+            return (
+                "I understand, and I'm sorry I couldn't find a suitable option for you. "
+                "I'll now connect you with one of our specialists, who can review your situation "
+                "and assist you further. Please stay on the line while I transfer your call."
+            ).strip()
+        if template_id == "human_transfer_pending":
+            normalized_user = re.sub(r"[^a-z0-9\s]", " ", str(context.get("user_input", "")).lower())
+            normalized_user = re.sub(r"\s+", " ", normalized_user).strip()
+            if normalized_user in {"sure", "ok", "okay", "thanks", "thank you", "thankyou"}:
+                return "Thank you. Please stay on the line while I transfer your call."
+            return (
+                "I understand, and I'm sorry I couldn't find a suitable option for you. "
+                "I'll now connect you with one of our specialists, who can review your situation "
+                "and assist you further. Please stay on the line while I transfer your call."
+            ).strip()
         if template_id == "installment_discount_offer":
             return (
                 "That is completely understandable, and thank you for being honest. "
@@ -941,6 +966,12 @@ class CollectionResponseNode(ResponseNode):
                 "What amount or payment date would realistically work for you?"
             ).strip()
         if template_id == "arrangement_discussion":
+            if bool(render_variables.get("generic_options_after_discount", False)):
+                return (
+                    "I understand the discount may still not be enough. "
+                    f"The other standard options available are {policy_options_text}. "
+                    "Would any of these work for you?"
+                ).strip()
             return customer_facing_goal or "Let us work toward a practical repayment option. What installment amount would be manageable for you?"
         if template_id == "commitment_confirmation":
             return customer_facing_goal or "Thank you. What amount and payment date can you confidently commit to for the next step?"
@@ -1023,6 +1054,8 @@ class CollectionResponseNode(ResponseNode):
             hold_months = str(render_variables.get("hold_months", "")).strip()
             if hold_months and hold_months not in rendered:
                 result["forbidden_actions_blocked"].append("missing_hold_duration")
+            if "discount" in lowered:
+                result["forbidden_actions_blocked"].append("mixed_offer_with_discount")
             if any(token in lowered for token in ["hold has been arranged", "hold is active", "confirmation has been sent"]):
                 result["forbidden_actions_blocked"].append("premature_hold_claim")
             if "?" not in rendered:
@@ -1038,6 +1071,8 @@ class CollectionResponseNode(ResponseNode):
             ):
                 if value and value not in rendered:
                     result["forbidden_actions_blocked"].append(reason)
+            if "hold" in lowered:
+                result["forbidden_actions_blocked"].append("mixed_offer_with_hold")
             if any(token in lowered for token in ["discount has been applied", "confirmation has been sent"]):
                 result["forbidden_actions_blocked"].append("premature_discount_claim")
             if "?" not in rendered:
@@ -1161,11 +1196,13 @@ class CollectionResponseNode(ResponseNode):
             if isinstance(memory_state.get("partial_payment_details"), dict)
             else {}
         )
+        human_escalation_id = str(memory_state.get("human_escalation_id", "") or "").strip()
         return {
             "customer_name": customer_name,
             "agent_name": agent_name,
             "company_name": company_name,
             "contact_number": contact_number,
+            "escalation_id": human_escalation_id,
             "policy_number": policy_number,
             "due_date": due_date,
             "reference_number": str(
@@ -1215,6 +1252,7 @@ class CollectionResponseNode(ResponseNode):
             "customer_facing_goal": str(raw_directive.get("customer_facing_goal", "")).strip(),
             "message_hint": str(raw_directive.get("draft_response", proposal.get("draft_response", ""))).strip(),
             "policy_options_text": self._policy_options_text(policy),
+            "generic_options_after_discount": bool(memory_state.get("generic_options_offered_after_discount", False)),
             "opening_turn": (turn_index <= 0) and not greeted,
         }
 

@@ -18,6 +18,9 @@ negotiation_classification:
     - conversation_mode
     - negotiation_stage
     - customer_payment_posture
+    - payment_commitment_type
+    - payment_option_response
+    - autopay_response
     - discount_stage
     - hardship_context
     - customer_payment_willingness
@@ -51,6 +54,23 @@ negotiation_classification:
     - cannot_pay
     - refuses_to_pay
     - negotiating
+
+    Allowed payment_commitment_type values:
+    - NONE
+    - FULL_PAYMENT
+    - PARTIAL_PAYMENT
+    - PROMISE_TO_PAY
+
+    Allowed payment_option_response values:
+    - none
+    - payment_link
+    - guided_payment
+    - declined
+
+    Allowed autopay_response values:
+    - none
+    - accepted
+    - declined
 
     Allowed discount_stage values:
     - none
@@ -93,6 +113,15 @@ negotiation_classification:
     - "I lost my job" -> cannot_pay
     - "I am not paying anything" -> refuses_to_pay
     - "Can we work something out?" -> negotiating
+
+    Payment commitment guidance:
+    - Set payment_commitment_type=FULL_PAYMENT only when the customer commits to clearing the full overdue amount immediately.
+    - Set payment_commitment_type=PARTIAL_PAYMENT when the customer commits to paying less than the full overdue amount now.
+    - Set payment_commitment_type=PROMISE_TO_PAY for a future-dated commitment.
+    - Use NONE when no payment commitment is made in the current or retained conversation state.
+    - When payment options have been offered, classify the customer's current choice as payment_link, guided_payment, declined, or none.
+    - When auto-pay has been offered, classify the current response as accepted, declined, or none.
+    - Determine these values semantically from the conversation; do not depend on exact phrases.
 
     Discount lifecycle guidance:
     - first ask for discount / settlement / waiver -> requested

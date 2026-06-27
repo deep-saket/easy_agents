@@ -206,6 +206,8 @@ class PlanProposalGraphNode(BaseGraphNode):
             plan_update=plan_update,
             previous_current=previous_current,
         )
+        if is_conversation_termination(user_input):
+            inferred_next = "close_conversation"
         right_party_status = str(memory_state.get("right_party_status", "")).strip().lower()
         wrong_party_callback_stage = str(memory_state.get("wrong_party_callback_stage", "")).strip().lower()
         callback_confirmed_now = (
@@ -213,7 +215,8 @@ class PlanProposalGraphNode(BaseGraphNode):
             and wrong_party_callback_stage == "awaiting_callback"
             and looks_like_callback_time(user_input)
         )
-        if right_party_status == "wrong_party":
+        termination_requested = is_conversation_termination(user_input)
+        if right_party_status == "wrong_party" and not termination_requested:
             callback_already_completed = (
                 wrong_party_callback_stage == "completed"
                 and bool(str(memory_state.get("wrong_party_callback_time", "")).strip())
@@ -223,7 +226,7 @@ class PlanProposalGraphNode(BaseGraphNode):
                 if callback_confirmed_now or callback_already_completed
                 else "wrong_party_callback"
             )
-        elif bool(memory_state.get("identity_verified", False)):
+        elif bool(memory_state.get("identity_verified", False)) and not termination_requested:
             hold_stage = str(memory_state.get("hardship_hold_stage", "")).strip().lower()
             discount_stage = str(memory_state.get("discount_stage", "")).strip().lower()
             partial_stage = str(memory_state.get("partial_payment_stage", "")).strip().lower()
@@ -233,7 +236,32 @@ class PlanProposalGraphNode(BaseGraphNode):
                 else {}
             )
             hardship_active = bool(hardship_context.get("hardship_detected", False))
-            if partial_stage == "confirmed" and self._is_hold_closing_reply(user_input):
+            human_escalation_status = str(memory_state.get("human_escalation_status", "")).strip().lower()
+            human_transfer_status = str(memory_state.get("human_transfer_status", "")).strip().lower()
+            hardship_options_exhausted = (
+                str(memory_state.get("negotiation_stage", "")).strip().lower() == "hardship_options_exhausted"
+                or (
+                    discount_stage in {"counter_offer", "rejected"}
+                    and bool(memory_state.get("discount_offered", False))
+                    and bool(memory_state.get("generic_options_offered_after_discount", False))
+                )
+                or (
+                    str(memory_state.get("discount_response", "")).strip().lower() in {"counter", "rejected"}
+                    and bool(memory_state.get("discount_offered", False))
+                    and bool(memory_state.get("generic_options_offered_after_discount", False))
+                )
+            )
+            if human_escalation_status == "queued" or human_transfer_status == "pending":
+                inferred_next = "transfer_to_specialist"
+            elif hardship_options_exhausted:
+                inferred_next = "human_escalation"
+            elif (
+                discount_stage in {"counter_offer", "rejected"}
+                and bool(memory_state.get("discount_offered", False))
+                and not bool(memory_state.get("generic_options_offered_after_discount", False))
+            ):
+                inferred_next = "explain_dues"
+            elif partial_stage == "confirmed" and self._is_hold_closing_reply(user_input):
                 inferred_next = "close_conversation"
             elif partial_stage == "confirmed":
                 inferred_next = "confirmation"
@@ -287,6 +315,8 @@ class PlanProposalGraphNode(BaseGraphNode):
             observed_tool=observed_tool,
             observed_output=(observed_output if isinstance(observed_output, dict) else {}),
         )
+        if inferred_next in {"human_escalation", "transfer_to_specialist"}:
+            self._ensure_handoff_branch(plan=plan)
         self._reconcile_canonical_stage_markers(
             plan=plan,
             candidate=inferred_next,
@@ -307,6 +337,15 @@ class PlanProposalGraphNode(BaseGraphNode):
             candidate=inferred_next,
             markers=markers,
         )
+        if (
+            bool(memory_state.get("identity_verified", False))
+            and inferred_next in {"discount_offer", "explain_dues", "human_escalation", "transfer_to_specialist"}
+            and any(
+                isinstance(node, dict) and str(node.get("id", "")).strip() == inferred_next
+                for node in plan.get("nodes", [])
+            )
+        ):
+            next_current = inferred_next
         callback_flow_completed = (
             callback_confirmed_now
             or (
@@ -574,13 +613,82 @@ class PlanProposalGraphNode(BaseGraphNode):
                 "reason": reason,
             }
 
-        if candidate in {"discovery_empathy", "resolution_offer", "confirmation"}:
+        if "wrong_party_callback" in {
+            str(node.get("id", "")).strip()
+            for node in plan.get("nodes", [])
+            if isinstance(node, dict)
+        }:
+            markers["wrong_party_callback"] = {
+                "state": "skipped",
+                "updated_at": now,
+                "source": "canonical_flow",
+                "reason": "right_party_verified",
+            }
+        if candidate in {"discovery_empathy", "resolution_offer", "discount_offer", "explain_dues", "collect_payment_intent", "confirmation", "human_escalation", "transfer_to_specialist"}:
             mark_done("purpose_disclosure", "purpose_disclosed_before_resolution")
-        if candidate in {"resolution_offer", "confirmation"}:
+        if candidate in {"resolution_offer", "discount_offer", "confirmation", "human_escalation", "transfer_to_specialist"}:
             mark_done("discovery_empathy", "hardship_acknowledged")
+        if candidate in {"discount_offer", "human_escalation", "transfer_to_specialist"}:
+            mark_done("resolution_offer", "resolution_offer_presented")
+        if candidate in {"discount_offer", "human_escalation", "transfer_to_specialist"}:
+            mark_done("assess_after_hold", "post_hold_resume_assessed")
+        if candidate in {"explain_dues", "collect_payment_intent", "human_escalation", "transfer_to_specialist"}:
+            mark_done("discount_offer", "discount_offer_presented")
+        if candidate in {"human_escalation", "transfer_to_specialist"} and "confirmation" in {
+            str(node.get("id", "")).strip()
+            for node in plan.get("nodes", [])
+            if isinstance(node, dict)
+        }:
+            markers["confirmation"] = {
+                "state": "skipped",
+                "updated_at": now,
+                "source": "canonical_flow",
+                "reason": "handoff_replaces_standard_confirmation",
+            }
+        if candidate == "transfer_to_specialist":
+            mark_done("human_escalation", "escalation_queued")
         if candidate == "confirmation":
             mark_done("resolution_offer", "eligible_offer_accepted")
         plan["step_markers"] = markers
+
+    @staticmethod
+    def _ensure_handoff_branch(*, plan: dict[str, Any]) -> None:
+        nodes = [dict(node) for node in plan.get("nodes", []) if isinstance(node, dict)]
+        node_map = {str(node.get("id", "")).strip(): node for node in nodes if str(node.get("id", "")).strip()}
+        for node_id, label in (
+            ("human_escalation", "Queue human specialist escalation"),
+            ("transfer_to_specialist", "Transfer call to specialist"),
+        ):
+            if node_id not in node_map:
+                node_map[node_id] = {
+                    "id": node_id,
+                    "label": label,
+                    "owner": "collection_agent",
+                    "status": "pending",
+                }
+
+        edge_set: set[tuple[str, str, str]] = set()
+        for edge in plan.get("edges", []):
+            if not isinstance(edge, dict):
+                continue
+            src = str(edge.get("from", "")).strip()
+            dst = str(edge.get("to", "")).strip()
+            cond = str(edge.get("condition", "")).strip()
+            if src and dst and src in node_map and dst in node_map:
+                edge_set.add((src, dst, cond))
+        for src, dst, cond in (
+            ("resolution_offer", "human_escalation", "hardship_options_exhausted"),
+            ("discount_offer", "human_escalation", "hardship_options_exhausted"),
+            ("human_escalation", "transfer_to_specialist", "escalation_queued"),
+        ):
+            if src in node_map and dst in node_map:
+                edge_set.add((src, dst, cond))
+
+        plan["nodes"] = list(node_map.values())
+        plan["edges"] = [
+            {"from": src, "to": dst, "condition": cond}
+            for src, dst, cond in sorted(edge_set)
+        ]
 
     @staticmethod
     def _create_initial_plan_graph(*, memory_state: dict[str, Any], mode: str) -> dict[str, Any]:
@@ -887,7 +995,11 @@ class PlanProposalGraphNode(BaseGraphNode):
             "purpose_disclosure",
             "discovery_empathy",
             "resolution_offer",
+            "explain_dues",
+            "collect_payment_intent",
             "confirmation",
+            "human_escalation",
+            "transfer_to_specialist",
         } and is_actionable(candidate):
             return candidate
         if not allowed_next:

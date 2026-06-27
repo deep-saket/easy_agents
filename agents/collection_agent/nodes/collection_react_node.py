@@ -318,11 +318,24 @@ class CollectionReactNode(ReactNode):
             }
 
         if latest_tool == "outbound_callback_schedule" and tool_completed_this_turn:
+            scheduled_callback_time = ""
+            latest_input = latest.get("input") if isinstance(latest.get("input"), dict) else {}
+            if isinstance(latest_input, dict):
+                scheduled_callback_time = str(latest_input.get("callback_time", "")).strip()
             if memory is not None:
                 memory.set_state(
                     outbound_callback_job_id=latest_output.get("job_id"),
                     outbound_callback_scheduled_for=latest_output.get("scheduled_for"),
                     outbound_callback_status=latest_output.get("status"),
+                    wrong_party_callback_stage=(
+                        "completed"
+                        if str(latest_output.get("status", "")).strip().lower() == "scheduled"
+                        else str(memory_state.get("wrong_party_callback_stage", "")).strip().lower() or None
+                    ),
+                    wrong_party_callback_time=(
+                        scheduled_callback_time
+                        or memory_state.get("wrong_party_callback_time")
+                    ),
                 )
             return {
                 "skip_llm": True,
@@ -353,12 +366,72 @@ class CollectionReactNode(ReactNode):
                     no_tools_required=True,
                 ),
             }
+        if latest_tool == "human_escalation" and tool_completed_this_turn:
+            if memory is not None:
+                memory.set_state(
+                    human_escalation_id=latest_output.get("escalation_id"),
+                    human_escalation_queue=latest_output.get("queue"),
+                    human_escalation_priority=latest_output.get("priority"),
+                    human_escalation_status=latest_output.get("status"),
+                    human_transfer_status="pending",
+                    conversation_handoff="human_specialist",
+                )
+            return {
+                "skip_llm": True,
+                "reason": "Human escalation queued; continue to live transfer response.",
+                "decision": SimpleNamespace(
+                    thought="Human escalation has been queued; transfer customer to specialist.",
+                    tool_call=None,
+                    tool_calls=[],
+                    respond_directly=True,
+                    response_text=None,
+                    done=True,
+                    no_tools_required=True,
+                ),
+            }
 
         user_input = str(state.get("user_input", ""))
         lowered = user_input.lower()
         hold_stage = str(memory_state.get("hardship_hold_stage", "")).strip().lower()
         discount_stage = str(memory_state.get("discount_stage", "")).strip().lower()
         partial_stage = str(memory_state.get("partial_payment_stage", "")).strip().lower()
+        if (
+            (
+                str(memory_state.get("negotiation_stage", "")).strip().lower() == "hardship_options_exhausted"
+                or bool(
+                    (
+                        memory_state.get("hardship_context", {})
+                        if isinstance(memory_state.get("hardship_context"), dict)
+                        else {}
+                    ).get("hardship_detected", False)
+                )
+            )
+            and (
+                discount_stage in {"counter_offer", "rejected"}
+                or str(memory_state.get("discount_response", "")).strip().lower() in {"counter", "rejected"}
+            )
+            and bool(memory_state.get("discount_offered", False))
+            and bool(memory_state.get("generic_options_offered_after_discount", False))
+            and str(memory_state.get("human_escalation_status", "")).strip().lower() != "queued"
+            and case_id
+        ):
+            if memory is not None:
+                memory.set_state(negotiation_stage="hardship_options_exhausted")
+            return {
+                "skip_llm": True,
+                "reason": "Exhausted hardship options require human specialist escalation.",
+                "decision": self._tool_decision(
+                    "human_escalation",
+                    {
+                        "case_id": case_id,
+                        "reason": "hardship_options_exhausted",
+                        "evidence_summary": (
+                            "Customer rejected the premium hold and installment discount; "
+                            "no additional approved hardship option is available in the current policy."
+                        ),
+                    },
+                ),
+            }
         if partial_stage == "link_offered" and self._is_affirmative(user_input):
             details = (
                 memory_state.get("partial_payment_details")

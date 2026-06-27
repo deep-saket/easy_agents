@@ -565,6 +565,8 @@ class CollectionDebugRuntime:
             if target == "discount_planning_agent":
                 handoff_payload = state.get("handoff_payload") if isinstance(state.get("handoff_payload"), dict) else {}
                 recommendation = self.discount_agent.run(handoff_payload)
+                if not isinstance(recommendation, dict):
+                    recommendation = {}
                 self.collection_agent.session_store.load(session_id).set_state(
                     discount_recommendation=recommendation,
                     last_tool_used="discount_planning_handoff",

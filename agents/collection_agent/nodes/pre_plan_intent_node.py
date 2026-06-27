@@ -239,6 +239,34 @@ class PrePlanIntentNode(CollectionIntentNode):
                     "reason": "Create the accepted hold and send its confirmations.",
                 },
             }
+        if (
+            (
+                str(memory_state.get("negotiation_stage", "")).strip().lower() == "hardship_options_exhausted"
+                or bool(
+                    (
+                        memory_state.get("hardship_context", {})
+                        if isinstance(memory_state.get("hardship_context"), dict)
+                        else {}
+                    ).get("hardship_detected", False)
+                )
+            )
+            and (
+                str(memory_state.get("discount_stage", "")).strip().lower() in {"counter_offer", "rejected"}
+                or str(memory_state.get("discount_response", "")).strip().lower() in {"counter", "rejected"}
+            )
+            and bool(memory_state.get("discount_offered", False))
+            and bool(memory_state.get("generic_options_offered_after_discount", False))
+            and str(memory_state.get("human_escalation_status", "")).strip().lower() != "queued"
+        ):
+            return {
+                "skip_llm": True,
+                "reason": "Exhausted hardship options require human specialist escalation.",
+                "intent": {
+                    "intent": "decide",
+                    "confidence": 1.0,
+                    "reason": "Queue human escalation for exhausted hardship options.",
+                },
+            }
         if right_party_status == "wrong_party" and "callback" in lowered and any(
             token in lowered for token in ("cancel", "remove", "do not call", "don't call")
         ):

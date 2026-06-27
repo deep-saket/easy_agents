@@ -26,6 +26,9 @@ class HumanEscalationTool(BaseTool[HumanEscalationInput, HumanEscalationOutput])
         elif "dispute" in reason:
             queue = "dispute_resolution"
             priority = "medium"
+        elif "hardship_options_exhausted" in reason or "hardship" in reason:
+            queue = "supervisor_review"
+            priority = "medium"
         else:
             queue = "supervisor_review"
             priority = "low"

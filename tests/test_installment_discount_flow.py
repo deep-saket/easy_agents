@@ -11,6 +11,7 @@ from agents.collection_agent.nodes.plan_proposal_graph_node import PlanProposalG
 from agents.collection_agent.nodes.plan_proposal_state_node import PlanProposalStateNode
 from agents.collection_agent.tools.data_store import CollectionDataStore
 from agents.collection_agent.tools.email_confirmation_send_tool import EmailConfirmationSendTool
+from agents.collection_agent.tools.human_escalation_tool import HumanEscalationTool
 from agents.collection_agent.tools.installment_discount_apply_tool import InstallmentDiscountApplyTool
 from agents.collection_agent.tools.installment_discount_evaluate_tool import InstallmentDiscountEvaluateTool
 from agents.collection_agent.tools.sms_confirmation_send_tool import SMSConfirmationSendTool
@@ -72,6 +73,7 @@ def _registry(store: CollectionDataStore) -> ToolRegistry:
     registry.register(InstallmentDiscountApplyTool(store=store))
     registry.register(SMSConfirmationSendTool(store=store))
     registry.register(EmailConfirmationSendTool(store=store))
+    registry.register(HumanEscalationTool(store=store))
     return registry
 
 
@@ -290,7 +292,215 @@ def test_llm_classifies_indirect_post_hold_uncertainty() -> None:
     assert memory.state["hold_response"] == "uncertain"
 
 
-def test_discount_offer_uses_guarded_llm_wording() -> None:
+def test_rules_first_classify_post_hold_uncertainty() -> None:
+    memory = WorkingMemory(
+        session_id="hold-response-rules",
+        state={
+            "identity_verified": True,
+            "hardship_hold_stage": "offered",
+            "hardship_context": {
+                "hardship_detected": True,
+                "hardship_reason": "job_loss",
+            },
+        },
+    )
+    node = NegotiationClassificationNode(llm=None, strict_llm_mode=False)
+
+    update = node.execute(
+        {
+            "user_input": "sorry but i think, it will also be difficult for me for now",
+            "memory": memory,
+            "identity_verified": True,
+        }
+    )
+
+    assert update["hold_response"] == "uncertain"
+    assert memory.state["hold_response"] == "uncertain"
+
+
+def test_rules_first_hold_uncertainty_beats_llm_none_response() -> None:
+    class HoldNoneLLM:
+        @staticmethod
+        def generate_json(system_prompt: str, user_prompt: str) -> dict[str, object]:
+            return {
+                "conversation_mode": "hardship_negotiation",
+                "negotiation_stage": "awaiting_customer_decision",
+                "customer_payment_posture": "cannot_pay",
+                "payment_commitment_type": "NONE",
+                "payment_option_response": "none",
+                "autopay_response": "none",
+                "discount_stage": "none",
+                "hardship_context": {
+                    "hardship_detected": True,
+                    "hardship_reason": "job_loss",
+                    "confidence": 0.8,
+                },
+                "customer_payment_willingness": 0.2,
+                "response_mode": "empathetic",
+                "active_dialogue_owner": "plan_proposal",
+                "hold_response": "none",
+                "discount_response": "none",
+            }
+
+    memory = WorkingMemory(
+        session_id="hold-response-llm-override",
+        state={
+            "identity_verified": True,
+            "hardship_hold_stage": "offered",
+            "hardship_context": {
+                "hardship_detected": True,
+                "hardship_reason": "job_loss",
+            },
+        },
+    )
+    node = NegotiationClassificationNode(
+        llm=HoldNoneLLM(),
+        system_prompt="classify",
+        user_prompt="{user_input}",
+        strict_llm_mode=False,
+    )
+
+    update = node.execute(
+        {
+            "user_input": "i will not able to pay even after 2 months",
+            "memory": memory,
+            "identity_verified": True,
+        }
+    )
+
+    assert update["hold_response"] == "uncertain"
+    assert memory.state["hold_response"] == "uncertain"
+
+
+def test_hold_uncertainty_guardrail_avoids_generic_payment_options() -> None:
+    memory = WorkingMemory(
+        session_id="hold-uncertainty-guardrail",
+        state={
+            "identity_verified": True,
+            "conversation_mode": "hardship_negotiation",
+            "negotiation_stage": "awaiting_customer_decision",
+            "hardship_hold_stage": "offered",
+            "hold_response": "uncertain",
+            "hardship_context": {
+                "hardship_detected": True,
+                "hardship_reason": "job_loss",
+            },
+            "payment_commitment_type": "NONE",
+            "payment_resolution_stage": "",
+            "discount_stage": "none",
+            "discount_offered": False,
+            "active_collection_context": {
+                "case": {"loan_id": "LOAN-3002", "product": "personal_loan"}
+            },
+            "hardship_hold_program": {
+                "program_id": "JOB_LOSS_HOLD_001",
+                "max_hold_months": 2,
+            },
+        },
+    )
+    state_node = PlanProposalStateNode(llm=None, strict_llm_mode=False)
+    graph_node = PlanProposalGraphNode(llm=None, strict_llm_mode=False)
+    directive_node = PlanProposalDirectiveNode(llm=None, strict_llm_mode=False)
+    state = {
+        "user_input": "sorry but i think, it will also be difficult for me for now",
+        "memory": memory,
+        "steps": 0,
+    }
+
+    prepared = state_node.execute(state)
+    graph = graph_node.execute({**state, **prepared})
+    directive = directive_node.execute({**state, **prepared, **graph})
+
+    assert (
+        directive["plan_proposal"]["conversation_objective"]
+        == "installment_discount_evaluation_pending"
+    )
+
+    response_node = CollectionResponseNode(llm=None, strict_llm_mode=False)
+    rendered = response_node.execute(
+        {
+            **state,
+            "plan_proposal": {
+                "target": "customer",
+                "response_directive": directive["plan_proposal"],
+            },
+        }
+    )["response"]
+    assert "eligible installment discount" in rendered
+    assert "partial payment" not in rendered.lower()
+    assert "5 days" not in rendered.lower()
+
+
+def test_discount_not_useful_shows_standard_options_before_escalation() -> None:
+    memory = WorkingMemory(
+        session_id="discount-not-useful-standard-options",
+        state={
+            "identity_verified": True,
+            "right_party_status": "confirmed",
+            "active_customer_name": "Rohan Gupta",
+            "conversation_mode": "hardship_negotiation",
+            "negotiation_stage": "awaiting_customer_decision",
+            "customer_payment_posture": "cannot_pay",
+            "hardship_context": {
+                "hardship_detected": True,
+                "hardship_reason": "job_loss",
+            },
+            "hardship_hold_stage": "superseded",
+            "discount_stage": "offered",
+            "discount_requested": True,
+            "discount_offered": True,
+            "generic_options_offered_after_discount": False,
+            "active_case_id": "COLL-1002",
+            "active_user_id": "CUST-2002",
+            "installment_discount_details": {
+                "discount_pct": 10.0,
+                "original_amount": 37800.0,
+                "revised_amount": 34020.0,
+            },
+        },
+    )
+    classifier = NegotiationClassificationNode(llm=None, strict_llm_mode=False)
+    classification = classifier.execute(
+        {
+            "user_input": "it will be not useful for me",
+            "memory": memory,
+            "identity_verified": True,
+        }
+    )
+    assert classification["discount_response"] == "rejected"
+    assert memory.state["discount_stage"] == "rejected"
+
+    state_node = PlanProposalStateNode(llm=None, strict_llm_mode=False)
+    graph_node = PlanProposalGraphNode(llm=None, strict_llm_mode=False)
+    directive_node = PlanProposalDirectiveNode(llm=None, strict_llm_mode=False)
+    response_node = CollectionResponseNode(llm=None, strict_llm_mode=False)
+    state = {
+        "user_input": "it will be not useful for me",
+        "memory": memory,
+        "steps": 0,
+        **classification,
+    }
+
+    prepared = state_node.execute(state)
+    graph = graph_node.execute({**state, **prepared})
+    directive = directive_node.execute({**state, **prepared, **graph})
+    rendered = response_node.execute(
+        {
+            **state,
+            "plan_proposal": {
+                "target": "customer",
+                "response_directive": directive["plan_proposal"],
+            },
+        }
+    )
+
+    assert directive["plan_proposal"]["conversation_objective"] == "present_arrangement_options"
+    assert memory.state["generic_options_offered_after_discount"] is True
+    assert "standard options" in rendered["response"].lower()
+    assert "specialist" not in rendered["response"].lower()
+
+
+def test_discount_offer_uses_deterministic_guarded_template() -> None:
     class DiscountOfferLLM:
         @staticmethod
         def generate_json(system_prompt: str, user_prompt: str) -> dict[str, str]:
@@ -341,8 +551,509 @@ def test_discount_offer_uses_guarded_llm_wording() -> None:
         }
     )
 
-    assert update["response"].startswith("I understand the uncertainty.")
-    assert update["response_render_debug"]["renderer_fallback_used"] is False
+    assert "10% discount" in update["response"]
+    assert "37800.00" in update["response"]
+    assert "34020.00" in update["response"]
+    assert update["response_render_debug"]["renderer_fallback_used"] is True
+
+
+def test_rejected_discount_escalates_to_human_transfer(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    registry = _registry(store)
+    react = CollectionReactNode(
+        llm=None,
+        available_tools=registry.build_catalog(),
+        tool_registry=registry,
+        max_steps=8,
+    )
+    executor = ToolExecutionNode(executor=ToolExecutor(registry=registry))
+    memory = WorkingMemory(
+        session_id="discount-rejected-close",
+        state={
+            "identity_verified": True,
+            "active_case_id": "COLL-1002",
+            "active_customer_name": "Rohan Gupta",
+            "conversation_mode": "hardship_negotiation",
+            "negotiation_stage": "awaiting_customer_decision",
+            "hardship_context": {
+                "hardship_detected": True,
+                "hardship_reason": "job_loss",
+            },
+            "hardship_hold_stage": "offered",
+            "discount_stage": "rejected",
+            "discount_requested": True,
+            "discount_offered": True,
+            "generic_options_offered_after_discount": True,
+            "active_collection_context": {
+                "customer": {
+                    "variables": {
+                        "[COMPANY_NAME]": "EasySecure Financial Services",
+                        "[CONTACT_NUMBER]": "+91-1800-555-2002",
+                    }
+                }
+            },
+        },
+    )
+    state_node = PlanProposalStateNode(llm=None, strict_llm_mode=False)
+    graph_node = PlanProposalGraphNode(llm=None, strict_llm_mode=False)
+    directive_node = PlanProposalDirectiveNode(llm=None, strict_llm_mode=False)
+    response_node = CollectionResponseNode(llm=None, strict_llm_mode=False)
+
+    state = {
+        "user_input": "no, it is even not helpful that much",
+        "memory": memory,
+        "steps": 0,
+    }
+    prepared = state_node.execute(state)
+    graph = graph_node.execute({**state, **prepared})
+    directive = directive_node.execute({**state, **prepared, **graph})
+
+    assert directive["plan_proposal"]["conversation_objective"] == "hardship_human_escalation"
+    assert memory.state["negotiation_stage"] == "hardship_options_exhausted"
+
+    tool_state = {
+        **state,
+        "session_id": "discount-rejected-close",
+        "case_id": "COLL-1002",
+        "steps": 0,
+        "observations": [],
+    }
+    react_update = react.execute(tool_state)
+    assert react_update["decision"].tool_call.tool_name == "human_escalation"
+    tool_state.update(react_update)
+    tool_state.update(executor.execute(tool_state))
+    final_react = react.execute(tool_state)
+    assert final_react["decision"].done is True
+    assert memory.state["human_escalation_id"].startswith("ESC-")
+    assert memory.state["human_escalation_status"] == "queued"
+    assert memory.state["human_transfer_status"] == "pending"
+    assert store.load_runtime("escalations.json")[0]["reason"] == "hardship_options_exhausted"
+
+    prepared_after_tool = state_node.execute(tool_state)
+    graph_after_tool = graph_node.execute({**tool_state, **prepared_after_tool})
+    directive_after_tool = directive_node.execute(
+        {**tool_state, **prepared_after_tool, **graph_after_tool}
+    )
+    assert directive_after_tool["plan_proposal"]["conversation_objective"] == "human_transfer_pending"
+    transfer_plan = directive_after_tool["conversation_plan"]
+    transfer_status = {
+        str(node.get("id", "")): str(node.get("status", ""))
+        for node in transfer_plan.get("nodes", [])
+        if isinstance(node, dict)
+    }
+    assert transfer_plan["current_node_id"] == "transfer_to_specialist"
+    assert transfer_status["human_escalation"] == "done"
+    assert transfer_status["transfer_to_specialist"] == "in_progress"
+
+    rendered = response_node.execute(
+        {
+            **tool_state,
+            "plan_proposal": {
+                "target": "customer",
+                "response_directive": directive_after_tool["plan_proposal"],
+            },
+        }
+    )
+    response = rendered["response"].lower()
+    assert "specialist" in response
+    assert "stay on the line" in response
+    assert "transfer your call" in response
+    assert "goodbye" not in response
+    assert "partial payment" not in response
+    assert "combined" not in response
+    assert rendered.get("terminate_call") is not True
+
+
+def test_discount_counter_request_shows_standard_options_before_handoff() -> None:
+    memory = WorkingMemory(
+        session_id="discount-counter-no-hold-repeat",
+        state={
+            "identity_verified": True,
+            "active_customer_name": "Rohan Gupta",
+            "conversation_mode": "hardship_negotiation",
+            "negotiation_stage": "awaiting_customer_decision",
+            "customer_payment_posture": "negotiating",
+            "hardship_context": {
+                "hardship_detected": True,
+                "hardship_reason": "job_loss",
+            },
+            "hardship_hold_stage": "superseded",
+            "discount_stage": "offered",
+            "discount_requested": True,
+            "discount_offered": True,
+            "active_case_id": "COLL-1002",
+            "active_user_id": "CUST-2002",
+            "active_collection_context": {
+                "case": {"loan_id": "LOAN-3002", "product": "personal_loan"}
+            },
+            "installment_discount_details": {
+                "discount_pct": 10.0,
+                "original_amount": 37800.0,
+                "revised_amount": 34020.0,
+            },
+        },
+    )
+    classifier = NegotiationClassificationNode(llm=None, strict_llm_mode=False)
+    classification = classifier.execute(
+        {
+            "user_input": "can you please give some more discount or is there any more options available?",
+            "memory": memory,
+            "identity_verified": True,
+        }
+    )
+    assert classification["discount_stage"] == "counter_offer"
+    assert classification["discount_response"] == "counter"
+
+    state_node = PlanProposalStateNode(llm=None, strict_llm_mode=False)
+    graph_node = PlanProposalGraphNode(llm=None, strict_llm_mode=False)
+    directive_node = PlanProposalDirectiveNode(llm=None, strict_llm_mode=False)
+    state = {
+        "user_input": "can you please give some more discount or is there any more options available?",
+        "memory": memory,
+        "steps": 0,
+        **classification,
+    }
+    prepared = state_node.execute(state)
+    graph = graph_node.execute({**state, **prepared})
+    directive = directive_node.execute({**state, **prepared, **graph})
+
+    assert directive["response_target"] == "customer"
+    assert directive["plan_proposal"]["conversation_objective"] == "present_arrangement_options"
+    assert memory.state["negotiation_stage"] == "reviewing_standard_options"
+    assert memory.state["generic_options_offered_after_discount"] is True
+    assert directive["plan_proposal"]["plan_origin"] != "hardship_hold_eligibility"
+
+
+def test_increase_discount_request_shows_standard_options_before_handoff() -> None:
+    memory = WorkingMemory(
+        session_id="discount-increase-request",
+        state={
+            "identity_verified": True,
+            "active_customer_name": "Rohan Gupta",
+            "conversation_mode": "hardship_negotiation",
+            "negotiation_stage": "awaiting_customer_decision",
+            "customer_payment_posture": "negotiating",
+            "hardship_context": {
+                "hardship_detected": True,
+                "hardship_reason": "job_loss",
+            },
+            "hardship_hold_stage": "superseded",
+            "discount_stage": "offered",
+            "discount_requested": True,
+            "discount_offered": True,
+            "active_case_id": "COLL-1002",
+            "active_user_id": "CUST-2002",
+            "installment_discount_details": {
+                "discount_pct": 10.0,
+                "original_amount": 37800.0,
+                "revised_amount": 34020.0,
+            },
+        },
+    )
+    classifier = NegotiationClassificationNode(llm=None, strict_llm_mode=False)
+    classification = classifier.execute(
+        {
+            "user_input": "no, can you please increase this discount a little bit",
+            "memory": memory,
+            "identity_verified": True,
+        }
+    )
+    assert classification["discount_stage"] == "counter_offer"
+    assert classification["discount_response"] == "counter"
+
+    state_node = PlanProposalStateNode(llm=None, strict_llm_mode=False)
+    graph_node = PlanProposalGraphNode(llm=None, strict_llm_mode=False)
+    directive_node = PlanProposalDirectiveNode(llm=None, strict_llm_mode=False)
+    state = {
+        "user_input": "no, can you please increase this discount a little bit",
+        "memory": memory,
+        "steps": 0,
+        **classification,
+    }
+    prepared = state_node.execute(state)
+    graph = graph_node.execute({**state, **prepared})
+    directive = directive_node.execute({**state, **prepared, **graph})
+
+    assert directive["plan_proposal"]["conversation_objective"] == "present_arrangement_options"
+    assert memory.state["negotiation_stage"] == "reviewing_standard_options"
+    assert memory.state["generic_options_offered_after_discount"] is True
+
+
+def test_increase_discount_request_does_not_close_or_repeat_discount() -> None:
+    memory = WorkingMemory(
+        session_id="discount-increase-no-close",
+        state={
+            "identity_verified": True,
+            "right_party_status": "confirmed",
+            "active_customer_name": "Rohan Gupta",
+            "conversation_mode": "hardship_negotiation",
+            "negotiation_stage": "awaiting_customer_decision",
+            "customer_payment_posture": "cannot_pay",
+            "hardship_context": {
+                "hardship_detected": True,
+                "hardship_reason": "job_loss",
+            },
+            "hardship_hold_stage": "superseded",
+            "discount_stage": "offered",
+            "discount_requested": True,
+            "discount_offered": True,
+            "active_case_id": "COLL-1002",
+            "active_user_id": "CUST-2002",
+            "installment_discount_details": {
+                "discount_pct": 10.0,
+                "original_amount": 37800.0,
+                "revised_amount": 34020.0,
+            },
+        },
+    )
+    classifier = NegotiationClassificationNode(llm=None, strict_llm_mode=False)
+    user_input = "i am still not able to manage it, can you increase the discount a bit"
+    classification = classifier.execute(
+        {
+            "user_input": user_input,
+            "memory": memory,
+            "identity_verified": True,
+        }
+    )
+    state_node = PlanProposalStateNode(llm=None, strict_llm_mode=False)
+    graph_node = PlanProposalGraphNode(llm=None, strict_llm_mode=False)
+    directive_node = PlanProposalDirectiveNode(llm=None, strict_llm_mode=False)
+    response_node = CollectionResponseNode(llm=None, strict_llm_mode=False)
+    state = {
+        "user_input": user_input,
+        "memory": memory,
+        "steps": 0,
+        **classification,
+    }
+
+    prepared = state_node.execute(state)
+    graph = graph_node.execute({**state, **prepared})
+    directive = directive_node.execute({**state, **prepared, **graph})
+    rendered = response_node.execute(
+        {
+            **state,
+            "plan_proposal": {
+                "target": "customer",
+                "response_directive": directive["plan_proposal"],
+            },
+        }
+    )
+
+    response = rendered["response"].lower()
+    assert classification["discount_response"] == "counter"
+    assert directive["plan_proposal"]["conversation_objective"] == "present_arrangement_options"
+    assert "goodbye" not in response
+    assert "10% discount" not in response
+    assert rendered.get("terminate_call") is not True
+
+
+def test_discount_rejection_moves_plan_to_standard_options_before_handoff() -> None:
+    memory = WorkingMemory(
+        session_id="discount-reject-standard-options-tree",
+        state={
+            "identity_verified": True,
+            "right_party_status": "confirmed",
+            "active_customer_name": "Rohan Gupta",
+            "conversation_mode": "hardship_negotiation",
+            "negotiation_stage": "awaiting_customer_decision",
+            "customer_payment_posture": "cannot_pay",
+            "hardship_context": {
+                "hardship_detected": True,
+                "hardship_reason": "job_loss",
+            },
+            "hardship_hold_stage": "superseded",
+            "discount_stage": "rejected",
+            "discount_response": "rejected",
+            "discount_requested": True,
+            "discount_offered": True,
+            "generic_options_offered_after_discount": False,
+            "active_case_id": "COLL-1002",
+            "active_user_id": "CUST-2002",
+            "installment_discount_details": {
+                "discount_pct": 10.0,
+                "original_amount": 37800.0,
+                "revised_amount": 34020.0,
+            },
+        },
+    )
+    state_node = PlanProposalStateNode(llm=None, strict_llm_mode=False)
+    graph_node = PlanProposalGraphNode(llm=None, strict_llm_mode=False)
+    state = {
+        "user_input": "I dont think it would be helpful for me",
+        "memory": memory,
+        "steps": 0,
+    }
+
+    prepared = state_node.execute(state)
+    graph = graph_node.execute({**state, **prepared})
+    plan = graph["conversation_plan"]
+    node_status = {
+        str(node.get("id", "")): str(node.get("status", ""))
+        for node in plan.get("nodes", [])
+        if isinstance(node, dict)
+    }
+
+    assert plan["current_node_id"] == "explain_dues"
+    assert node_status["discount_offer"] == "done"
+    assert node_status["explain_dues"] == "in_progress"
+    assert node_status["confirmation"] == "pending"
+
+
+def test_more_discount_after_offered_discount_routes_to_human_escalation() -> None:
+    memory = WorkingMemory(
+        session_id="discount-extra-request-exhausted",
+        state={
+            "identity_verified": True,
+            "active_customer_name": "Rohan Gupta",
+            "conversation_mode": "hardship_negotiation",
+            "negotiation_stage": "awaiting_customer_decision",
+            "customer_payment_posture": "cannot_pay",
+            "hardship_context": {
+                "hardship_detected": True,
+                "hardship_reason": "job_loss",
+            },
+            "hardship_hold_stage": "superseded",
+            "discount_stage": "counter_offer",
+            "discount_requested": True,
+            "discount_offered": True,
+            "generic_options_offered_after_discount": True,
+            "active_case_id": "COLL-1002",
+            "active_user_id": "CUST-2002",
+            "active_collection_context": {
+                "customer": {
+                    "variables": {
+                        "[COMPANY_NAME]": "EasySecure Financial Services",
+                        "[CONTACT_NUMBER]": "+91-1800-555-2002",
+                    }
+                },
+                "case": {"loan_id": "LOAN-3002", "product": "personal_loan"},
+            },
+        },
+    )
+    state_node = PlanProposalStateNode(llm=None, strict_llm_mode=False)
+    graph_node = PlanProposalGraphNode(llm=None, strict_llm_mode=False)
+    directive_node = PlanProposalDirectiveNode(llm=None, strict_llm_mode=False)
+
+    state = {
+        "user_input": "I think it wouldn't help that much. can you give more discount",
+        "memory": memory,
+        "steps": 0,
+    }
+    prepared = state_node.execute(state)
+    graph = graph_node.execute({**state, **prepared})
+    directive = directive_node.execute({**state, **prepared, **graph})
+
+    assert directive["response_target"] == "customer"
+    assert directive["plan_proposal"]["conversation_objective"] == "hardship_human_escalation"
+    assert "plan_tree_update" not in directive["plan_proposal"]
+    plan = directive["conversation_plan"]
+    node_ids = {str(node.get("id", "")) for node in plan.get("nodes", []) if isinstance(node, dict)}
+    node_status = {
+        str(node.get("id", "")): str(node.get("status", ""))
+        for node in plan.get("nodes", [])
+        if isinstance(node, dict)
+    }
+    assert "human_escalation" in node_ids
+    assert "transfer_to_specialist" in node_ids
+    assert plan["current_node_id"] == "human_escalation"
+    assert node_status["human_escalation"] == "in_progress"
+    assert node_status["resolution_offer"] == "done"
+    assert node_status["assess_after_hold"] == "done"
+    assert node_status["discount_offer"] == "done"
+    assert node_status["confirmation"] == "skipped"
+    assert any(
+        edge.get("from") == "resolution_offer" and edge.get("to") == "human_escalation"
+        for edge in plan.get("edges", [])
+        if isinstance(edge, dict)
+    )
+    assert memory.state["negotiation_stage"] == "hardship_options_exhausted"
+
+
+def test_transfer_acknowledgement_does_not_reopen_discount_offer() -> None:
+    memory = WorkingMemory(
+        session_id="transfer-ack-no-discount-repeat",
+        state={
+            "identity_verified": True,
+            "right_party_status": "confirmed",
+            "conversation_mode": "hardship_negotiation",
+            "human_escalation_status": "queued",
+            "human_transfer_status": "pending",
+            "discount_stage": "counter_offer",
+            "discount_response": "counter",
+            "discount_offered": True,
+            "generic_options_offered_after_discount": True,
+            "hardship_context": {
+                "hardship_detected": True,
+                "hardship_reason": "job_loss",
+            },
+        },
+    )
+    node = CollectionResponseNode(llm=None, strict_llm_mode=False)
+
+    rendered = node.execute(
+        {
+            "user_input": "sure",
+            "memory": memory,
+            "plan_proposal": {
+                "target": "customer",
+                "response_directive": {
+                    "conversation_objective": "human_transfer_pending",
+                    "dialogue_action": "confirm_live_human_transfer",
+                    "response_mode": "empathetic",
+                },
+            },
+        }
+    )
+
+    response = rendered["response"].lower()
+    assert "transfer your call" in response
+    assert "10% discount" not in response
+    assert "would that help" not in response
+    assert "goodbye" not in response
+
+
+def test_counter_offer_after_standard_options_queues_human_escalation(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    registry = _registry(store)
+    react = CollectionReactNode(
+        llm=None,
+        available_tools=registry.build_catalog(),
+        tool_registry=registry,
+        max_steps=8,
+    )
+    memory = WorkingMemory(
+        session_id="counter-offer-escalates",
+        state={
+            "identity_verified": True,
+            "right_party_status": "confirmed",
+            "active_case_id": "COLL-1002",
+            "active_user_id": "CUST-2002",
+            "conversation_mode": "hardship_negotiation",
+            "negotiation_stage": "reviewing_standard_options",
+            "hardship_context": {
+                "hardship_detected": True,
+                "hardship_reason": "job_loss",
+            },
+            "hardship_hold_stage": "superseded",
+            "discount_stage": "counter_offer",
+            "discount_response": "counter",
+            "discount_offered": True,
+            "generic_options_offered_after_discount": True,
+        },
+    )
+
+    update = react.execute(
+        {
+            "user_input": "i am still not able to manage it, can you increase the discount a bit",
+            "memory": memory,
+            "case_id": "COLL-1002",
+            "steps": 0,
+            "observations": [],
+        }
+    )
+
+    assert update["decision"].tool_call.tool_name == "human_escalation"
+    assert update["decision"].tool_call.arguments["reason"] == "hardship_options_exhausted"
 
 
 def test_discount_plan_tree_moves_offer_to_confirmation() -> None:
@@ -361,6 +1072,7 @@ def test_discount_plan_tree_moves_offer_to_confirmation() -> None:
             "active_customer_name": "Rohan Gupta",
             "active_overdue_amount": 37800.0,
             "identity_verified": True,
+            "right_party_status": "confirmed",
             "conversation_mode": "hardship_negotiation",
             "hardship_context": {
                 "hardship_detected": True,
@@ -398,6 +1110,16 @@ def test_discount_plan_tree_moves_offer_to_confirmation() -> None:
     assert prepared["plan_prepared_memory_state"]["discount_stage"] == "offered"
     assert prepared["plan_prepared_memory_state"]["discount_offered"] is True
     graph = graph_node.execute({**state, **prepared})
+    graph_plan = graph["conversation_plan"]
+    graph_status = {
+        str(node.get("id", "")): str(node.get("status", ""))
+        for node in graph_plan.get("nodes", [])
+        if isinstance(node, dict)
+    }
+    assert graph_plan["current_node_id"] == "discount_offer"
+    assert graph_status["assess_after_hold"] == "done"
+    assert graph_status["discount_offer"] == "in_progress"
+    assert graph_status["confirmation"] == "pending"
     directive = directive_node.execute({**state, **prepared, **graph})
     assert directive["plan_proposal"]["conversation_objective"] == "installment_discount_offer"
 
@@ -484,4 +1206,45 @@ def test_completed_discount_cannot_reopen_on_thank_you() -> None:
     assert (
         directive["plan_proposal"]["conversation_objective"]
         == "installment_discount_closing"
+    )
+
+
+def test_confirmed_discount_beats_stale_full_payment_options() -> None:
+    memory = WorkingMemory(
+        session_id="discount-vs-payment-options",
+        state={
+            "identity_verified": True,
+            "active_overdue_amount": 37800.0,
+            "discount_stage": "confirmed",
+            "discount_offered": True,
+            "discount_accepted": True,
+            "payment_commitment_type": "FULL_PAYMENT",
+            "payment_resolution_stage": "options_offered",
+            "installment_discount_details": {
+                "reference_number": "DISC-A1B2C3D4E5",
+                "status": "applied",
+                "discount_pct": 10.0,
+                "revised_amount": 34020.0,
+                "sms_confirmation": {"status": "sent"},
+                "email_confirmation": {"status": "sent"},
+            },
+        },
+    )
+    state_node = PlanProposalStateNode(llm=None, strict_llm_mode=False)
+    graph_node = PlanProposalGraphNode(llm=None, strict_llm_mode=False)
+    directive_node = PlanProposalDirectiveNode(llm=None, strict_llm_mode=False)
+    state = {
+        "user_input": "okk that is fine",
+        "memory": memory,
+        "steps": 0,
+    }
+
+    prepared = state_node.execute(state)
+    graph = graph_node.execute({**state, **prepared})
+    directive = directive_node.execute({**state, **prepared, **graph})
+
+    assert graph["conversation_plan"]["current_node_id"] == "confirmation"
+    assert (
+        directive["plan_proposal"]["conversation_objective"]
+        == "installment_discount_confirmation"
     )

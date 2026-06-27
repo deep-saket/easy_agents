@@ -34,5 +34,101 @@
     "revised_amount": 34020.0,
     "status": "applied",
     "applied_at": "2026-06-14T08:44:22.662622+00:00"
+  },
+  {
+    "reference_number": "DISC-A5E24B1C77",
+    "case_id": "COLL-1002",
+    "customer_id": "CUST-2002",
+    "program_id": "JOB_LOSS_INSTALLMENT_DISCOUNT_001",
+    "original_amount": 37800.0,
+    "discount_pct": 10.0,
+    "discount_amount": 3780.0,
+    "revised_amount": 34020.0,
+    "status": "applied",
+    "applied_at": "2026-06-23T06:54:59.649276+00:00"
+  },
+  {
+    "reference_number": "DISC-DF3F50D4A0",
+    "case_id": "COLL-1002",
+    "customer_id": "CUST-2002",
+    "program_id": "JOB_LOSS_INSTALLMENT_DISCOUNT_001",
+    "original_amount": 37800.0,
+    "discount_pct": 10.0,
+    "discount_amount": 3780.0,
+    "revised_amount": 34020.0,
+    "status": "applied",
+    "applied_at": "2026-06-23T07:29:50.503994+00:00"
+  },
+  {
+    "reference_number": "DISC-A3E71AB8E2",
+    "case_id": "COLL-1002",
+    "customer_id": "CUST-2002",
+    "program_id": "JOB_LOSS_INSTALLMENT_DISCOUNT_001",
+    "original_amount": 37800.0,
+    "discount_pct": 10.0,
+    "discount_amount": 3780.0,
+    "revised_amount": 34020.0,
+    "status": "applied",
+    "applied_at": "2026-06-23T09:21:02.487197+00:00"
+  },
+  {
+    "reference_number": "DISC-81882AB202",
+    "case_id": "COLL-1002",
+    "customer_id": "CUST-2002",
+    "program_id": "JOB_LOSS_INSTALLMENT_DISCOUNT_001",
+    "original_amount": 37800.0,
+    "discount_pct": 10.0,
+    "discount_amount": 3780.0,
+    "revised_amount": 34020.0,
+    "status": "applied",
+    "applied_at": "2026-06-23T12:29:54.526152+00:00"
+  },
+  {
+    "reference_number": "DISC-B253898645",
+    "case_id": "COLL-1002",
+    "customer_id": "CUST-2002",
+    "program_id": "JOB_LOSS_INSTALLMENT_DISCOUNT_001",
+    "original_amount": 37800.0,
+    "discount_pct": 10.0,
+    "discount_amount": 3780.0,
+    "revised_amount": 34020.0,
+    "status": "applied",
+    "applied_at": "2026-06-23T14:41:42.819012+00:00"
+  },
+  {
+    "reference_number": "DISC-59F4B6B7FE",
+    "case_id": "COLL-1002",
+    "customer_id": "CUST-2002",
+    "program_id": "JOB_LOSS_INSTALLMENT_DISCOUNT_001",
+    "original_amount": 37800.0,
+    "discount_pct": 10.0,
+    "discount_amount": 3780.0,
+    "revised_amount": 34020.0,
+    "status": "applied",
+    "applied_at": "2026-06-24T02:59:08.497897+00:00"
+  },
+  {
+    "reference_number": "DISC-C80489F5BB",
+    "case_id": "COLL-1002",
+    "customer_id": "CUST-2002",
+    "program_id": "JOB_LOSS_INSTALLMENT_DISCOUNT_001",
+    "original_amount": 37800.0,
+    "discount_pct": 10.0,
+    "discount_amount": 3780.0,
+    "revised_amount": 34020.0,
+    "status": "applied",
+    "applied_at": "2026-06-24T03:05:11.102619+00:00"
+  },
+  {
+    "reference_number": "DISC-6556429249",
+    "case_id": "COLL-1002",
+    "customer_id": "CUST-2002",
+    "program_id": "JOB_LOSS_INSTALLMENT_DISCOUNT_001",
+    "original_amount": 37800.0,
+    "discount_pct": 10.0,
+    "discount_amount": 3780.0,
+    "revised_amount": 34020.0,
+    "status": "applied",
+    "applied_at": "2026-06-25T06:07:40.652512+00:00"
   }
 ]

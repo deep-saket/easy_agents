@@ -88,5 +88,131 @@
     "message": "Your premium hold has been arranged. Reference: HOLD-3EAFDF571B. The hold is active until 2026-08-16.",
     "status": "sent",
     "sent_at": "2026-06-16T05:27:24.244536+00:00"
+  },
+  {
+    "message_id": "SMS-967DE13788",
+    "customer_id": "CUST-2002",
+    "reference_number": "PAY-A99CE0D9352F",
+    "recipient": "+919900001002",
+    "message": "Your secure payment link for 37800.00 is https://payments.example.local/pay/pay-a99ce0d9352f. Reference: PAY-A99CE0D9352F.",
+    "status": "sent",
+    "sent_at": "2026-06-22T08:19:47.731928+00:00"
+  },
+  {
+    "message_id": "SMS-3296AFE375",
+    "customer_id": "CUST-2002",
+    "reference_number": "PAY-3FF169036ED8",
+    "recipient": "+919900001002",
+    "message": "Your secure payment link for 37800.00 is https://payments.example.local/pay/pay-3ff169036ed8. Reference: PAY-3FF169036ED8.",
+    "status": "sent",
+    "sent_at": "2026-06-22T16:45:30.443276+00:00"
+  },
+  {
+    "message_id": "SMS-21AB9B626D",
+    "customer_id": "CUST-2002",
+    "reference_number": "DISC-A5E24B1C77",
+    "recipient": "+919900001002",
+    "message": "Your installment discount has been applied. Reference: DISC-A5E24B1C77. Revised amount: 34020.00.",
+    "status": "sent",
+    "sent_at": "2026-06-23T06:54:59.811410+00:00"
+  },
+  {
+    "message_id": "SMS-436095470A",
+    "customer_id": "CUST-2002",
+    "reference_number": "DISC-DF3F50D4A0",
+    "recipient": "+919900001002",
+    "message": "Your installment discount has been applied. Reference: DISC-DF3F50D4A0. Revised amount: 34020.00.",
+    "status": "sent",
+    "sent_at": "2026-06-23T07:29:51.189287+00:00"
+  },
+  {
+    "message_id": "SMS-8857B8F95C",
+    "customer_id": "CUST-2002",
+    "reference_number": "HOLD-30F1D4F5F4",
+    "recipient": "+919900001002",
+    "message": "Your premium hold has been arranged. Reference: HOLD-30F1D4F5F4. The hold is active until 2026-08-23.",
+    "status": "sent",
+    "sent_at": "2026-06-23T07:44:18.486307+00:00"
+  },
+  {
+    "message_id": "SMS-D8CCA95514",
+    "customer_id": "CUST-2002",
+    "reference_number": "DISC-A3E71AB8E2",
+    "recipient": "+919900001002",
+    "message": "Your installment discount has been applied. Reference: DISC-A3E71AB8E2. Revised amount: 34020.00.",
+    "status": "sent",
+    "sent_at": "2026-06-23T09:21:02.961108+00:00"
+  },
+  {
+    "message_id": "SMS-DE7E094CAA",
+    "customer_id": "CUST-2002",
+    "reference_number": "DISC-81882AB202",
+    "recipient": "+919900001002",
+    "message": "Your installment discount has been applied. Reference: DISC-81882AB202. Revised amount: 34020.00.",
+    "status": "sent",
+    "sent_at": "2026-06-23T12:29:55.326546+00:00"
+  },
+  {
+    "message_id": "SMS-28FD3D7EDE",
+    "customer_id": "CUST-2002",
+    "reference_number": "HOLD-29672DC9B6",
+    "recipient": "+919900001002",
+    "message": "Your premium hold has been arranged. Reference: HOLD-29672DC9B6. The hold is active until 2026-08-23.",
+    "status": "sent",
+    "sent_at": "2026-06-23T14:32:04.919337+00:00"
+  },
+  {
+    "message_id": "SMS-2C4973C750",
+    "customer_id": "CUST-2002",
+    "reference_number": "DISC-B253898645",
+    "recipient": "+919900001002",
+    "message": "Your installment discount has been applied. Reference: DISC-B253898645. Revised amount: 34020.00.",
+    "status": "sent",
+    "sent_at": "2026-06-23T14:41:42.995249+00:00"
+  },
+  {
+    "message_id": "SMS-ED16BD94DA",
+    "customer_id": "CUST-2002",
+    "reference_number": "PAY-4D8B3262DCAB",
+    "recipient": "+919900001002",
+    "message": "Your secure partial-payment link for 18900.00 is https://payments.example.local/pay/pay-4d8b3262dcab. Reference: PAY-4D8B3262DCAB.",
+    "status": "sent",
+    "sent_at": "2026-06-23T19:48:47.201778+00:00"
+  },
+  {
+    "message_id": "SMS-0B79A94B65",
+    "customer_id": "CUST-2002",
+    "reference_number": "DISC-59F4B6B7FE",
+    "recipient": "+919900001002",
+    "message": "Your installment discount has been applied. Reference: DISC-59F4B6B7FE. Revised amount: 34020.00.",
+    "status": "sent",
+    "sent_at": "2026-06-24T02:59:08.645948+00:00"
+  },
+  {
+    "message_id": "SMS-2B12FF238E",
+    "customer_id": "CUST-2002",
+    "reference_number": "DISC-C80489F5BB",
+    "recipient": "+919900001002",
+    "message": "Your installment discount has been applied. Reference: DISC-C80489F5BB. Revised amount: 34020.00.",
+    "status": "sent",
+    "sent_at": "2026-06-24T03:05:11.284575+00:00"
+  },
+  {
+    "message_id": "SMS-2E24678774",
+    "customer_id": "CUST-2002",
+    "reference_number": "DISC-6556429249",
+    "recipient": "+919900001002",
+    "message": "Your installment discount has been applied. Reference: DISC-6556429249. Revised amount: 34020.00.",
+    "status": "sent",
+    "sent_at": "2026-06-25T06:07:40.844883+00:00"
+  },
+  {
+    "message_id": "SMS-41DE816E0C",
+    "customer_id": "CUST-2002",
+    "reference_number": "HOLD-531102AD72",
+    "recipient": "+919900001002",
+    "message": "Your premium hold has been arranged. Reference: HOLD-531102AD72. The hold is active until 2026-08-26.",
+    "status": "sent",
+    "sent_at": "2026-06-26T20:52:45.056292+00:00"
   }
 ]

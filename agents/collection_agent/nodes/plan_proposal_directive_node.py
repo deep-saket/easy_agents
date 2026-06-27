@@ -75,6 +75,7 @@ class PlanProposalDirectiveNode(BaseGraphNode):
         user_input = str(state.get("user_input", ""))
         observed_tool = str(observation.get("tool_name", "")) if isinstance(observation, dict) else str(state.get("observed_tool", ""))
         output = observation.get("output", {}) if isinstance(observation, dict) else (state.get("observed_tool_output") if isinstance(state.get("observed_tool_output"), dict) else {})
+        observed_input = observation.get("input", {}) if isinstance(observation, dict) and isinstance(observation.get("input"), dict) else {}
         decision = state.get("decision")
         existing_plan = (
             state.get("conversation_plan")
@@ -128,6 +129,7 @@ class PlanProposalDirectiveNode(BaseGraphNode):
                     route=route,
                     response_target=response_target,
                 )
+                proposal.pop("plan_tree_update", None)
                 current_id = str(plan.get("current_node_id", ""))
                 proposal["conversation_plan_id"] = plan.get("plan_id")
                 proposal["conversation_plan_version"] = plan.get("version")
@@ -254,6 +256,96 @@ class PlanProposalDirectiveNode(BaseGraphNode):
                         ),
                         "status": "active",
                     },
+                },
+            })
+
+        if (
+            str(observed_tool).strip().lower() == "human_escalation"
+            and isinstance(output, dict)
+            and str(output.get("status", "")).strip().lower() == "queued"
+        ):
+            if memory is not None:
+                memory.set_state(
+                    human_escalation_id=output.get("escalation_id"),
+                    human_escalation_queue=output.get("queue"),
+                    human_escalation_priority=output.get("priority"),
+                    human_escalation_status=output.get("status"),
+                    human_transfer_status="pending",
+                    conversation_handoff="human_specialist",
+                )
+            return with_plan({
+                "route": "continue",
+                "response_target": "customer",
+                "plan_proposal": {
+                    "target": "customer",
+                    "intent": "human_transfer_pending",
+                    "conversation_objective": "human_transfer_pending",
+                    "dialogue_action": "confirm_live_human_transfer",
+                    "response_mode": "empathetic",
+                    "customer_facing_goal": "Confirm that the customer will be connected to a human specialist and ask them to stay on the line.",
+                    "plan_origin": "human_escalation_queued",
+                },
+            })
+
+        if (
+            not identity_verified
+            and right_party_status == "wrong_party"
+            and str(observed_tool).strip().lower() == "outbound_callback_schedule"
+            and isinstance(output, dict)
+            and str(output.get("status", "")).strip().lower() == "scheduled"
+        ):
+            scheduled_callback_time = str(observed_input.get("callback_time", "")).strip()
+            existing_callback_time = str(memory_state.get("wrong_party_callback_time", "")).strip()
+            callback_objective = (
+                "wrong_party_callback_revision_confirmation"
+                if existing_callback_time and scheduled_callback_time and scheduled_callback_time != existing_callback_time
+                else "wrong_party_callback_confirmation"
+            )
+            if memory is not None:
+                memory.set_state(
+                    wrong_party_callback_stage="completed",
+                    wrong_party_callback_time=scheduled_callback_time or existing_callback_time or None,
+                    conversation_complete=False,
+                    conversation_closing=True,
+                )
+            return with_plan({
+                "route": "continue",
+                "response_target": "customer",
+                "right_party_status": "wrong_party",
+                "wrong_party_callback_stage": "completed",
+                "plan_proposal": {
+                    "target": "customer",
+                    "intent": callback_objective,
+                    "conversation_objective": callback_objective,
+                    "dialogue_action": callback_objective,
+                    "response_mode": "compliance",
+                    "customer_facing_goal": (
+                        "Confirm only the revised callback time and close naturally."
+                        if callback_objective == "wrong_party_callback_revision_confirmation"
+                        else "Confirm the callback time and close respectfully without disclosing account information."
+                    ),
+                    "plan_origin": "outbound_callback_scheduled",
+                    "plan_tree_update": {
+                        "operation": "complete",
+                        "selected_next_node_id": "close_conversation",
+                        "mark_skipped": ["verify_identity"],
+                        "mark_done": ["wrong_party_callback"],
+                        "status": "active",
+                    },
+                },
+                "additional_targets": ["collection_memory_helper_agent"],
+                "memory_helper_trigger": {
+                    "reason": (
+                        "wrong_party_callback_rescheduled"
+                        if callback_objective == "wrong_party_callback_revision_confirmation"
+                        else "wrong_party_callback_scheduled"
+                    ),
+                    "callback_time": scheduled_callback_time or existing_callback_time,
+                    **(
+                        {"previous_callback_time": existing_callback_time}
+                        if callback_objective == "wrong_party_callback_revision_confirmation"
+                        else {}
+                    ),
                 },
             })
 
@@ -431,7 +523,7 @@ class PlanProposalDirectiveNode(BaseGraphNode):
                 },
             })
 
-        if self._is_conversation_termination(user_input):
+        if self._is_conversation_termination(user_input) and not self._has_unresolved_hardship_branch(memory_state):
             return with_plan({
                 "route": "continue",
                 "response_target": "customer",
@@ -699,6 +791,50 @@ class PlanProposalDirectiveNode(BaseGraphNode):
                 },
             })
 
+        if identity_verified and hardship_active and discount_stage == "rejected":
+            if not bool(memory_state.get("generic_options_offered_after_discount", False)):
+                if memory is not None:
+                    memory.set_state(
+                        generic_options_offered_after_discount=True,
+                        negotiation_stage="reviewing_standard_options",
+                    )
+                return with_plan({
+                    "route": "continue",
+                    "response_target": "customer",
+                    "plan_proposal": {
+                        "target": "customer",
+                        "intent": "present_arrangement_options",
+                        "conversation_objective": "present_arrangement_options",
+                        "dialogue_action": "present_offer",
+                        "response_mode": "negotiation",
+                        "customer_facing_goal": "",
+                        "plan_origin": "discount_rejected_standard_options",
+                        "plan_tree_update": {
+                            "operation": "advance",
+                            "selected_next_node_id": "collect_payment_intent",
+                            "mark_done": ["assess_after_hold", "discount_offer"],
+                            "status": "active",
+                        },
+                    },
+                })
+            if memory is not None:
+                memory.set_state(
+                    negotiation_stage="hardship_options_exhausted",
+                )
+            return with_plan({
+                "route": "continue",
+                "response_target": "customer",
+                "plan_proposal": {
+                    "target": "customer",
+                    "intent": "hardship_human_escalation",
+                    "conversation_objective": "hardship_human_escalation",
+                    "dialogue_action": "queue_human_escalation",
+                    "response_mode": "empathetic",
+                    "customer_facing_goal": "Route exhausted hardship options to a human specialist escalation.",
+                    "plan_origin": "hardship_options_exhausted",
+                },
+            })
+
         if (
             identity_verified
             and eligible_hold
@@ -772,7 +908,13 @@ class PlanProposalDirectiveNode(BaseGraphNode):
                     },
                 })
 
-        if identity_verified and hardship_active and eligible_hold and hold_stage != "confirmed":
+        if (
+            identity_verified
+            and hardship_active
+            and eligible_hold
+            and hold_stage not in {"confirmed", "superseded"}
+            and discount_stage in {"", "none"}
+        ):
             if memory is not None:
                 memory.set_state(
                     hardship_hold_stage="offered",
@@ -855,6 +997,75 @@ class PlanProposalDirectiveNode(BaseGraphNode):
         discount_stage = str(memory_state.get("discount_stage", "none")).strip().lower() or "none"
         partial_capacity = memory_state.get("customer_payment_capacity")
         partial_capacity_pct = memory_state.get("customer_payment_capacity_pct")
+        if (
+            identity_verified
+            and hardship_active
+            and bool(memory_state.get("discount_offered", False))
+            and discount_stage in {"requested", "counter_offer"}
+            and any(
+                phrase in user_input.lower()
+                for phrase in (
+                    "more discount",
+                    "some more discount",
+                    "little more discount",
+                    "a little more discount",
+                    "increase discount",
+                    "increase this discount",
+                    "increase the discount",
+                    "raise discount",
+                    "raise the discount",
+                    "better discount",
+                    "higher discount",
+                    "give more discount",
+                    "any more options",
+                    "more options",
+                    "other options",
+                )
+            )
+        ):
+            if not bool(memory_state.get("generic_options_offered_after_discount", False)):
+                if memory is not None:
+                    memory.set_state(
+                        generic_options_offered_after_discount=True,
+                        negotiation_stage="reviewing_standard_options",
+                    )
+                return with_plan({
+                    "route": "continue",
+                    "response_target": "customer",
+                    "plan_proposal": {
+                        "target": "customer",
+                        "intent": "present_arrangement_options",
+                        "conversation_objective": "present_arrangement_options",
+                        "dialogue_action": "present_offer",
+                        "response_mode": "negotiation",
+                        "customer_facing_goal": "",
+                        "plan_origin": "discount_counter_standard_options",
+                        "plan_tree_update": {
+                            "operation": "advance",
+                            "selected_next_node_id": "collect_payment_intent",
+                            "mark_done": ["assess_after_hold", "discount_offer"],
+                            "status": "active",
+                        },
+                    },
+                })
+            if memory is not None:
+                memory.set_state(
+                    negotiation_stage="hardship_options_exhausted",
+                    discount_rejected=True,
+                )
+            return with_plan({
+                "route": "continue",
+                "response_target": "customer",
+                "plan_proposal": {
+                    "target": "customer",
+                    "intent": "hardship_human_escalation",
+                    "conversation_objective": "hardship_human_escalation",
+                    "dialogue_action": "queue_human_escalation",
+                    "response_mode": "empathetic",
+                    "customer_facing_goal": "Route exhausted hardship options to a human specialist escalation.",
+                    "plan_origin": "hardship_discount_counter_exhausted",
+                },
+            })
         route_to_discount_planning = bool(plan_signals.get("needs_discount_specialist")) or (
             identity_verified
             and (
@@ -1582,6 +1793,32 @@ class PlanProposalDirectiveNode(BaseGraphNode):
         return any(signal in lowered for signal in signals)
 
     @staticmethod
+    def _has_unresolved_hardship_branch(memory_state: dict[str, Any]) -> bool:
+        if str(memory_state.get("human_transfer_status", "")).strip().lower() == "pending":
+            return True
+        if str(memory_state.get("human_escalation_status", "")).strip().lower() == "queued":
+            return True
+        hardship_context = (
+            memory_state.get("hardship_context")
+            if isinstance(memory_state.get("hardship_context"), dict)
+            else {}
+        )
+        hardship_active = (
+            str(memory_state.get("conversation_mode", "")).strip().lower() == "hardship_negotiation"
+            or bool(hardship_context.get("hardship_detected", False))
+        )
+        if not hardship_active:
+            return False
+        discount_stage = str(memory_state.get("discount_stage", "")).strip().lower()
+        discount_response = str(memory_state.get("discount_response", "")).strip().lower()
+        negotiation_stage = str(memory_state.get("negotiation_stage", "")).strip().lower()
+        return (
+            discount_stage in {"offered", "requested", "counter_offer", "rejected"}
+            or discount_response in {"counter", "rejected"}
+            or negotiation_stage in {"reviewing_standard_options", "hardship_options_exhausted"}
+        )
+
+    @staticmethod
     def _align_customer_proposal_with_plan(
         *,
         proposal: dict[str, Any],
@@ -1705,7 +1942,14 @@ class PlanProposalDirectiveNode(BaseGraphNode):
         del state, plan_signals, route
         explicit_objective = str(proposal.get("conversation_objective", "")).strip().lower()
         current_node_id = str(plan.get("current_node_id", "")).strip().lower()
-        if explicit_objective in {
+        if (
+            str(memory_state.get("human_transfer_status", "")).strip().lower() == "pending"
+            or str(memory_state.get("human_escalation_status", "")).strip().lower() == "queued"
+        ):
+            objective = "human_transfer_pending"
+            action = "confirm_live_human_transfer"
+            mode = "empathetic"
+        elif explicit_objective in {
             "wrong_party_privacy_notice",
             "wrong_party_callback_request",
             "wrong_party_callback_clarification",
@@ -1716,6 +1960,8 @@ class PlanProposalDirectiveNode(BaseGraphNode):
             "hardship_hold_offer",
             "hardship_hold_confirmation",
             "hardship_hold_closing",
+            "hardship_human_escalation",
+            "human_transfer_pending",
             "installment_discount_offer",
             "installment_discount_confirmation",
             "installment_discount_closing",
@@ -1728,7 +1974,7 @@ class PlanProposalDirectiveNode(BaseGraphNode):
             objective = explicit_objective
             action = str(proposal.get("dialogue_action", explicit_objective)).strip().lower() or explicit_objective
             mode = str(proposal.get("response_mode", "compliance")).strip().lower() or "compliance"
-        elif current_node_id == "close_conversation":
+        elif current_node_id == "close_conversation" and not self._has_unresolved_hardship_branch(memory_state):
             objective = "close_conversation"
             action = "close_conversation"
             mode = "informational"
@@ -1847,6 +2093,10 @@ class PlanProposalDirectiveNode(BaseGraphNode):
         negotiation_stage = str(memory_state.get("negotiation_stage", "none")).strip().lower()
         customer_payment_posture = str(memory_state.get("customer_payment_posture", "unknown")).strip().lower()
         discount_stage = str(memory_state.get("discount_stage", "none")).strip().lower()
+        discount_response = str(memory_state.get("discount_response", "none")).strip().lower()
+        generic_options_after_discount = bool(memory_state.get("generic_options_offered_after_discount", False))
+        human_escalation_status = str(memory_state.get("human_escalation_status", "")).strip().lower()
+        human_transfer_status = str(memory_state.get("human_transfer_status", "")).strip().lower()
         hardship_context = (
             memory_state.get("hardship_context")
             if isinstance(memory_state.get("hardship_context"), dict)
@@ -1855,8 +2105,19 @@ class PlanProposalDirectiveNode(BaseGraphNode):
         hardship_active = conversation_mode == "hardship_negotiation" or bool(hardship_context.get("hardship_detected", False))
         if not identity_verified:
             return "collect_verification", "ask_verification", "compliance"
+        if human_transfer_status == "pending" or human_escalation_status == "queued":
+            return "human_transfer_pending", "confirm_live_human_transfer", "empathetic"
         if conversation_mode == "promise_capture" or customer_payment_posture in {"pay_now", "promise_to_pay"}:
             return "capture_promise", "confirm_payment_intent", "negotiation"
+        if (
+            hardship_active
+            and generic_options_after_discount
+            and (discount_stage in {"counter_offer", "rejected"} or discount_response in {"counter", "rejected"})
+            and negotiation_stage != "reviewing_standard_options"
+        ):
+            return "hardship_human_escalation", "queue_human_escalation", "empathetic"
+        if hardship_active and discount_stage == "rejected" and generic_options_after_discount:
+            return "hardship_human_escalation", "queue_human_escalation", "empathetic"
         if discount_stage in {"offered", "counter_offer"}:
             return "present_arrangement_options", "present_offer", "negotiation"
         if hardship_active:
@@ -1895,6 +2156,8 @@ class PlanProposalDirectiveNode(BaseGraphNode):
             "installment_discount_offer": ["acknowledge_uncertainty", "state_discount", "state_revised_amount", "ask_if_helpful"],
             "installment_discount_confirmation": ["confirm_discount", "give_reference", "state_revised_amount", "state_notification", "state_review_timing"],
             "installment_discount_closing": ["thank_customer_by_name", "warm_signoff", "goodbye"],
+            "hardship_human_escalation": ["queue_human_escalation"],
+            "human_transfer_pending": ["confirm_live_transfer", "ask_customer_to_stay_on_line"],
             "partial_payment_amount_request": ["acknowledge_partial_capacity", "ask_comfortable_amount"],
             "partial_payment_link_offer": ["confirm_partial_amount", "state_remaining_balance", "offer_sms_link"],
             "partial_payment_confirmation": ["confirm_link_sent", "give_reference", "state_partial_amount", "state_remaining_balance"],
@@ -1956,6 +2219,8 @@ class PlanProposalDirectiveNode(BaseGraphNode):
             "installment_discount_offer": ["invent_discount", "promise_unapproved_discount", "mention_internal_processing"],
             "installment_discount_confirmation": ["repeat_standard_options", "request_payment", "mention_internal_processing"],
             "installment_discount_closing": ["repeat_discount_details", "restart_conversation"],
+            "hardship_human_escalation": ["invent_new_offer", "combine_hold_and_discount", "restart_collections_menu"],
+            "human_transfer_pending": ["invent_new_offer", "combine_hold_and_discount", "say_goodbye"],
             "partial_payment_amount_request": ["invent_partial_amount", "claim_payment_received"],
             "partial_payment_link_offer": ["claim_link_sent", "claim_payment_received"],
             "partial_payment_confirmation": ["claim_payment_received", "invent_balance_date"],
@@ -1988,6 +2253,8 @@ class PlanProposalDirectiveNode(BaseGraphNode):
             "installment_discount_offer": ["offer_installment_discount"],
             "installment_discount_confirmation": ["confirm_installment_discount"],
             "installment_discount_closing": ["close_installment_discount_conversation"],
+            "hardship_human_escalation": ["queue_human_escalation"],
+            "human_transfer_pending": ["confirm_live_human_transfer"],
             "partial_payment_amount_request": ["ask_partial_payment_amount"],
             "partial_payment_link_offer": ["offer_partial_payment_link"],
             "partial_payment_confirmation": ["confirm_partial_payment_link"],
@@ -2021,6 +2288,8 @@ class PlanProposalDirectiveNode(BaseGraphNode):
             "installment_discount_offer": "Offer only the approved installment discount and revised amount, then ask whether it would help.",
             "installment_discount_confirmation": "Confirm the applied discount, revised amount, generated reference, delivered notifications, and next review.",
             "installment_discount_closing": "Thank the customer by name, offer a warm sign-off, and say goodbye.",
+            "hardship_human_escalation": "Queue a human specialist escalation because approved hardship options are exhausted.",
+            "human_transfer_pending": "Tell the customer they are being connected to a human specialist and ask them to stay on the line.",
             "partial_payment_amount_request": "Acknowledge that a partial payment helps and ask what amount is comfortable now.",
             "partial_payment_link_offer": "Confirm the validated partial amount and remaining balance, then ask permission to send an SMS link.",
             "partial_payment_confirmation": "Confirm the pending payment link was sent, provide its reference, and state the remaining balance.",

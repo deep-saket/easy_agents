@@ -158,8 +158,28 @@ def test_repeat_request_replays_buffer_without_recomputing(tmp_path: Path) -> No
 
     assert first["final_response"] == "handled: tell me"
     assert replay["conversation_manager"]["replayed_from_buffer"] is True
+    assert replay["conversation_manager"]["customer_input"] == "Can you repeat that?"
     assert replay["final_response"] == "handled: tell me"
     assert runtime.calls == ["tell me"]
+
+
+def test_repeat_phrase_with_new_payment_information_is_not_replayed(tmp_path: Path) -> None:
+    runtime = _FakeRuntime(delay_seconds=0.0)
+    manager = ConversationManagerAgent(config=_config(tmp_path), downstream_runtime=runtime)
+
+    manager.run_turn(SimpleNamespace(message="Your overdue amount is 37800.", session_id="s4-pay"))
+    result = manager.run_turn(
+        SimpleNamespace(
+            message="Oh, I missed that. Yes, I can pay it now.",
+            session_id="s4-pay",
+        )
+    )
+
+    assert result["conversation_manager"]["replayed_from_buffer"] is False
+    assert runtime.calls == [
+        "Your overdue amount is 37800.",
+        "Oh, I missed that. Yes, I can pay it now.",
+    ]
 
 
 def test_new_business_input_recomputes_collection_agent(tmp_path: Path) -> None:

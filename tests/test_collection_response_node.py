@@ -669,6 +669,36 @@ def test_response_node_validator_blocks_dues_before_verification() -> None:
     assert "disclose_dues_before_verification" in validation["forbidden_actions_blocked"]
 
 
+def test_response_node_validator_blocks_mixed_discount_hold_offer() -> None:
+    node = _build_node()
+
+    validation = node._validate_response_against_directive(
+        text=(
+            "I can offer a 10% discount and also place the premium on hold for 2 months. "
+            "Would that help?"
+        ),
+        directive={
+            "template_id": "installment_discount_offer",
+            "response_target": "customer",
+            "tone": "empathetic",
+            "render_variables": {
+                "discount_pct_text": "10",
+                "original_amount_text": "37800.00",
+                "revised_amount_text": "34020.00",
+            },
+            "response_constraints": {},
+            "fallback_template_id": "installment_discount_offer",
+        },
+        context={
+            "response_target": "customer",
+            "verification_context": {"identity_verified": True},
+        },
+    )
+
+    assert validation["text"] is None
+    assert "mixed_offer_with_hold" in validation["forbidden_actions_blocked"]
+
+
 def test_response_node_negotiation_mode_does_not_add_empathy_language() -> None:
     node = _build_node()
     memory = WorkingMemory(

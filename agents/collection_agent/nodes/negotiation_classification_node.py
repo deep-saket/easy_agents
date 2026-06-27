@@ -24,6 +24,9 @@ class _NegotiationPayload(BaseModel):
     conversation_mode: str = "collections"
     negotiation_stage: str = "none"
     customer_payment_posture: str = "unknown"
+    payment_commitment_type: str = "NONE"
+    payment_option_response: str = "none"
+    autopay_response: str = "none"
     discount_stage: str = "none"
     hardship_context: _HardshipContextPayload = Field(default_factory=_HardshipContextPayload)
     customer_payment_willingness: float = 0.5
@@ -95,6 +98,9 @@ class NegotiationClassificationNode(BaseGraphNode):
         "plan_proposal",
         "promise_capture",
     }
+    _ALLOWED_PAYMENT_COMMITMENT_TYPES = {"NONE", "FULL_PAYMENT", "PARTIAL_PAYMENT", "PROMISE_TO_PAY"}
+    _ALLOWED_PAYMENT_OPTION_RESPONSES = {"none", "payment_link", "guided_payment", "declined"}
+    _ALLOWED_AUTOPAY_RESPONSES = {"none", "accepted", "declined"}
     _ALLOWED_OFFER_RESPONSES = {
         "none",
         "accepted",
@@ -202,6 +208,9 @@ class NegotiationClassificationNode(BaseGraphNode):
                 "conversation_mode": merged["conversation_mode"],
                 "negotiation_stage": merged["negotiation_stage"],
                 "customer_payment_posture": merged["customer_payment_posture"],
+                "payment_commitment_type": merged["payment_commitment_type"],
+                "payment_option_response": merged["payment_option_response"],
+                "autopay_response": merged["autopay_response"],
                 "discount_stage": merged["discount_stage"],
                 "customer_payment_willingness": merged["customer_payment_willingness"],
                 "hardship_context": dict(merged["hardship_context"]),
@@ -218,6 +227,9 @@ class NegotiationClassificationNode(BaseGraphNode):
             "conversation_mode": merged["conversation_mode"],
             "negotiation_stage": merged["negotiation_stage"],
             "customer_payment_posture": merged["customer_payment_posture"],
+            "payment_commitment_type": merged["payment_commitment_type"],
+            "payment_option_response": merged["payment_option_response"],
+            "autopay_response": merged["autopay_response"],
             "discount_stage": merged["discount_stage"],
             "customer_payment_willingness": merged["customer_payment_willingness"],
             "hardship_context": dict(merged["hardship_context"]),
@@ -240,6 +252,9 @@ class NegotiationClassificationNode(BaseGraphNode):
                 conversation_mode=merged["conversation_mode"],
                 negotiation_stage=merged["negotiation_stage"],
                 customer_payment_posture=merged["customer_payment_posture"],
+                payment_commitment_type=merged["payment_commitment_type"],
+                payment_option_response=merged["payment_option_response"],
+                autopay_response=merged["autopay_response"],
                 discount_stage=merged["discount_stage"],
                 customer_payment_willingness=merged["customer_payment_willingness"],
                 hardship_context=dict(merged["hardship_context"]),
@@ -352,6 +367,21 @@ class NegotiationClassificationNode(BaseGraphNode):
                 allowed=self._ALLOWED_DIALOGUE_OWNERS,
                 default=str(prior.get("active_dialogue_owner", "collections")),
             ),
+            "payment_commitment_type": self._normalize_upper_choice(
+                raw.get("payment_commitment_type"),
+                allowed=self._ALLOWED_PAYMENT_COMMITMENT_TYPES,
+                default=str(prior.get("payment_commitment_type", "NONE")),
+            ),
+            "payment_option_response": self._normalize_choice(
+                raw.get("payment_option_response"),
+                allowed=self._ALLOWED_PAYMENT_OPTION_RESPONSES,
+                default="none",
+            ),
+            "autopay_response": self._normalize_choice(
+                raw.get("autopay_response"),
+                allowed=self._ALLOWED_AUTOPAY_RESPONSES,
+                default="none",
+            ),
             "hold_response": self._normalize_choice(
                 raw.get("hold_response"),
                 allowed=self._ALLOWED_OFFER_RESPONSES,
@@ -363,6 +393,42 @@ class NegotiationClassificationNode(BaseGraphNode):
                 default="none",
             ),
         }
+        fallback_hold_response = self._normalize_choice(
+            fallback.get("hold_response"),
+            allowed=self._ALLOWED_OFFER_RESPONSES,
+            default="none",
+        )
+        fallback_discount_response = self._normalize_choice(
+            fallback.get("discount_response"),
+            allowed=self._ALLOWED_OFFER_RESPONSES,
+            default="none",
+        )
+        if str(prior.get("hardship_hold_stage", "")).strip().lower() == "offered" and fallback_hold_response != "none":
+            merged["hold_response"] = fallback_hold_response
+        if (
+            str(prior.get("discount_stage", "")).strip().lower()
+            in {"offered", "accepted", "requested", "counter_offer"}
+            and fallback_discount_response != "none"
+        ):
+            merged["discount_response"] = fallback_discount_response
+            if fallback_discount_response == "rejected":
+                merged["discount_stage"] = "rejected"
+            elif fallback_discount_response == "counter":
+                merged["discount_stage"] = "counter_offer"
+            elif (
+                fallback_discount_response == "accepted"
+                and str(prior.get("discount_stage", "")).strip().lower() == "offered"
+            ):
+                merged["discount_stage"] = "accepted"
+
+        prior_resolution_stage = str(prior.get("payment_resolution_stage", "")).strip().lower()
+        prior_commitment = str(prior.get("payment_commitment_type", "NONE")).strip().upper()
+        if (
+            merged["payment_commitment_type"] == "NONE"
+            and prior_commitment == "FULL_PAYMENT"
+            and prior_resolution_stage
+        ):
+            merged["payment_commitment_type"] = "FULL_PAYMENT"
 
         prior_hardship = (
             dict(prior.get("hardship_context", {}))
@@ -506,11 +572,15 @@ class NegotiationClassificationNode(BaseGraphNode):
             token in lowered for token in ["can pay", "what if", "instead", "counter", "offer"]
         ):
             discount_stage = "counter_offer"
+        elif prior_discount_stage in {"offered", "requested", "counter_offer"} and self._fallback_is_discount_counter_request(lowered):
+            discount_stage = "counter_offer"
         elif any(token in lowered for token in ["discount", "settlement", "waiver", "one time settlement", "ots"]):
             discount_stage = "requested"
         elif prior_discount_stage == "offered" and any(token in lowered for token in ["accept", "okay", "agreed", "sounds good"]):
             discount_stage = "accepted"
-        elif prior_discount_stage == "offered" and any(token in lowered for token in ["reject", "no", "not possible", "too high"]):
+        elif prior_discount_stage in {"offered", "counter_offer"} and any(
+            token in lowered for token in ["reject", "no", "not possible", "too high", "not helpful", "not suitable"]
+        ):
             discount_stage = "rejected"
         elif prior_discount_stage in {"accepted", "rejected"} and any(
             token in lowered for token in ["thanks", "thankyou", "thank you", "okay", "done", "close"]
@@ -524,14 +594,29 @@ class NegotiationClassificationNode(BaseGraphNode):
                 hold_response = "uncertain"
             elif self._fallback_is_affirmative(lowered):
                 hold_response = "accepted"
-            elif any(token in lowered for token in ["no", "not helpful", "decline", "do not want"]):
+            elif self._fallback_is_hold_rejected(lowered):
                 hold_response = "rejected"
-        if prior_discount_stage in {"offered", "accepted"}:
+        if prior_discount_stage in {"offered", "accepted", "requested", "counter_offer"}:
             if amount_present or pct_present:
+                discount_response = "counter"
+            elif self._fallback_is_discount_counter_request(lowered):
                 discount_response = "counter"
             elif self._fallback_is_affirmative(lowered):
                 discount_response = "accepted"
-            elif any(token in lowered for token in ["no", "not helpful", "decline", "do not want", "too high"]):
+            elif any(
+                token in lowered
+                for token in [
+                    "no",
+                    "not helpful",
+                    "not useful",
+                    "will be not useful",
+                    "would not be useful",
+                    "won't be useful",
+                    "decline",
+                    "do not want",
+                    "too high",
+                ]
+            ):
                 discount_response = "rejected"
 
         willingness = self._fallback_payment_willingness(
@@ -652,6 +737,12 @@ class NegotiationClassificationNode(BaseGraphNode):
                 state.get("customer_payment_posture", memory_state.get("customer_payment_posture", "unknown"))
             ).strip()
             or "unknown",
+            "payment_commitment_type": str(
+                state.get("payment_commitment_type", memory_state.get("payment_commitment_type", "NONE"))
+            ).strip().upper()
+            or "NONE",
+            "payment_option_response": "none",
+            "autopay_response": "none",
             "customer_payment_capacity": NegotiationClassificationNode._normalize_optional_float(
                 state.get("customer_payment_capacity", memory_state.get("customer_payment_capacity"))
             ),
@@ -732,6 +823,9 @@ class NegotiationClassificationNode(BaseGraphNode):
             "conversation_mode",
             "negotiation_stage",
             "customer_payment_posture",
+            "payment_commitment_type",
+            "payment_resolution_stage",
+            "payment_resolution_details",
             "customer_payment_capacity",
             "customer_payment_capacity_pct",
             "discount_stage",
@@ -790,6 +884,67 @@ class NegotiationClassificationNode(BaseGraphNode):
                 "can't manage after",
                 "may not manage",
                 "might not manage",
+                "difficult for me",
+                "still be difficult",
+                "will also be difficult",
+                "will be difficult",
+                "for now it will be difficult",
+                "for now it would be difficult",
+                "do not think i can manage",
+                "don't think i can manage",
+                "will not able to pay",
+                "will not be able to pay",
+                "not able to manage",
+                "not able to pay",
+                "hard for me for now",
+                "hard for me even then",
+                "not able to pay even after",
+                "also be hard for me",
+            )
+        )
+
+    @staticmethod
+    def _fallback_is_hold_rejected(text: str) -> bool:
+        return any(
+            phrase in text
+            for phrase in (
+                "not helpful",
+                "decline",
+                "do not want",
+                "don't want",
+                "do not proceed",
+                "do not set it up",
+                "don't set it up",
+                "i do not want that",
+                "i don't want that",
+                "that will not help",
+                "that won't help",
+                "no thanks",
+                "no thank you",
+            )
+        )
+
+    @staticmethod
+    def _fallback_is_discount_counter_request(text: str) -> bool:
+        normalized = re.sub(r"[^a-z0-9\s]", " ", str(text or "").lower())
+        normalized = re.sub(r"\s+", " ", normalized).strip()
+        return any(
+            phrase in normalized
+            for phrase in (
+                "more discount",
+                "some more discount",
+                "little more discount",
+                "a little more discount",
+                "increase discount",
+                "increase this discount",
+                "increase the discount",
+                "raise discount",
+                "raise the discount",
+                "better discount",
+                "higher discount",
+                "more options",
+                "any more options",
+                "other options",
             )
         )
 
@@ -818,6 +973,12 @@ class NegotiationClassificationNode(BaseGraphNode):
     def _normalize_choice(value: Any, *, allowed: set[str], default: str) -> str:
         text = str(value or "").strip().lower()
         return text if text in allowed else default
+
+    @staticmethod
+    def _normalize_upper_choice(value: Any, *, allowed: set[str], default: str) -> str:
+        text = str(value or "").strip().upper()
+        fallback = str(default or "").strip().upper()
+        return text if text in allowed else fallback
 
     @staticmethod
     def _normalize_optional_text(value: Any) -> str | None:
