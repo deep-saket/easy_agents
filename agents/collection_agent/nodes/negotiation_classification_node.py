@@ -211,6 +211,8 @@ class NegotiationClassificationNode(BaseGraphNode):
                 "payment_commitment_type": merged["payment_commitment_type"],
                 "payment_option_response": merged["payment_option_response"],
                 "autopay_response": merged["autopay_response"],
+                "autopay_setup_requested": bool(merged["autopay_setup_requested"]),
+                "autopay_stage": merged["autopay_stage"],
                 "discount_stage": merged["discount_stage"],
                 "customer_payment_willingness": merged["customer_payment_willingness"],
                 "hardship_context": dict(merged["hardship_context"]),
@@ -230,6 +232,8 @@ class NegotiationClassificationNode(BaseGraphNode):
             "payment_commitment_type": merged["payment_commitment_type"],
             "payment_option_response": merged["payment_option_response"],
             "autopay_response": merged["autopay_response"],
+            "autopay_setup_requested": bool(merged["autopay_setup_requested"]),
+            "autopay_stage": merged["autopay_stage"],
             "discount_stage": merged["discount_stage"],
             "customer_payment_willingness": merged["customer_payment_willingness"],
             "hardship_context": dict(merged["hardship_context"]),
@@ -255,6 +259,8 @@ class NegotiationClassificationNode(BaseGraphNode):
                 payment_commitment_type=merged["payment_commitment_type"],
                 payment_option_response=merged["payment_option_response"],
                 autopay_response=merged["autopay_response"],
+                autopay_setup_requested=bool(merged["autopay_setup_requested"]),
+                autopay_stage=merged["autopay_stage"],
                 discount_stage=merged["discount_stage"],
                 customer_payment_willingness=merged["customer_payment_willingness"],
                 hardship_context=dict(merged["hardship_context"]),
@@ -382,6 +388,12 @@ class NegotiationClassificationNode(BaseGraphNode):
                 allowed=self._ALLOWED_AUTOPAY_RESPONSES,
                 default="none",
             ),
+            "autopay_setup_requested": bool(
+                raw.get("autopay_setup_requested", prior.get("autopay_setup_requested", False))
+            ),
+            "autopay_stage": str(
+                raw.get("autopay_stage", prior.get("autopay_stage", ""))
+            ).strip().lower(),
             "hold_response": self._normalize_choice(
                 raw.get("hold_response"),
                 allowed=self._ALLOWED_OFFER_RESPONSES,
@@ -403,6 +415,37 @@ class NegotiationClassificationNode(BaseGraphNode):
             allowed=self._ALLOWED_OFFER_RESPONSES,
             default="none",
         )
+        fallback_commitment = self._normalize_upper_choice(
+            fallback.get("payment_commitment_type"),
+            allowed=self._ALLOWED_PAYMENT_COMMITMENT_TYPES,
+            default="NONE",
+        )
+        fallback_payment_option = self._normalize_choice(
+            fallback.get("payment_option_response"),
+            allowed=self._ALLOWED_PAYMENT_OPTION_RESPONSES,
+            default="none",
+        )
+        fallback_autopay_response = self._normalize_choice(
+            fallback.get("autopay_response"),
+            allowed=self._ALLOWED_AUTOPAY_RESPONSES,
+            default="none",
+        )
+        fallback_autopay_requested = bool(fallback.get("autopay_setup_requested", False))
+        fallback_autopay_stage = str(fallback.get("autopay_stage", "")).strip().lower()
+
+        if fallback_commitment != "NONE" and merged["payment_commitment_type"] == "NONE":
+            merged["payment_commitment_type"] = fallback_commitment
+        if fallback_payment_option != "none" and merged["payment_option_response"] == "none":
+            merged["payment_option_response"] = fallback_payment_option
+        if fallback_autopay_requested:
+            merged["autopay_setup_requested"] = True
+            if merged["autopay_response"] == "none" and fallback_autopay_response != "none":
+                merged["autopay_response"] = fallback_autopay_response
+            if merged["autopay_stage"] in {"", "none"}:
+                merged["autopay_stage"] = fallback_autopay_stage or "requested"
+            if merged["payment_commitment_type"] == "FULL_PAYMENT" and merged["payment_option_response"] == "none":
+                merged["payment_option_response"] = "payment_link"
+
         if str(prior.get("hardship_hold_stage", "")).strip().lower() == "offered" and fallback_hold_response != "none":
             merged["hold_response"] = fallback_hold_response
         if (
@@ -525,6 +568,7 @@ class NegotiationClassificationNode(BaseGraphNode):
             if isinstance(prior.get("hardship_context"), dict)
             else False
         )
+        autopay_requested = self._fallback_is_autopay_request(lowered)
 
         posture = str(prior.get("customer_payment_posture", "unknown")).strip().lower() or "unknown"
         prior_discount_stage = str(prior.get("discount_stage", "none")).strip().lower() or "none"
@@ -558,6 +602,8 @@ class NegotiationClassificationNode(BaseGraphNode):
                 "i can pay it now",
             ]
         ) and not amount_present:
+            posture = "pay_now"
+        elif autopay_requested and any(token in lowered for token in ["yes", "clear", "pay", "dues", "premium"]):
             posture = "pay_now"
         elif amount_present or pct_present:
             if any(token in lowered for token in ["today", "now", "right now", "this week", "immediately", "can pay"]):
@@ -607,6 +653,8 @@ class NegotiationClassificationNode(BaseGraphNode):
         payment_option_response = "none"
         autopay_response = "none"
         prior_payment_stage = str(prior.get("payment_resolution_stage", "")).strip().lower()
+        prior_autopay_requested = bool(prior.get("autopay_setup_requested", False))
+        autopay_stage = str(prior.get("autopay_stage", "")).strip().lower()
         if posture == "pay_now":
             payment_commitment_type = "FULL_PAYMENT"
         elif posture == "partial_now":
@@ -620,11 +668,26 @@ class NegotiationClassificationNode(BaseGraphNode):
                 payment_option_response = "guided_payment"
             elif any(token in lowered for token in ["no", "not now", "later", "maybe later", "decline"]):
                 payment_option_response = "declined"
+        if autopay_requested:
+            autopay_response = "accepted"
+            autopay_stage = "requested" if autopay_stage in {"", "none"} else autopay_stage
+            if payment_commitment_type == "FULL_PAYMENT":
+                payment_option_response = "payment_link"
+        if (prior_autopay_requested or autopay_stage in {"offered", "requested"}) and self._fallback_is_affirmative(lowered):
+            autopay_response = "accepted"
+            payment_option_response = "payment_link"
         if prior_payment_stage in {"confirmed", "link_sent", "autopay_offered"}:
-            if self._fallback_is_affirmative(lowered) and any(token in lowered for token in ["auto", "autopay", "auto pay"]):
+            if prior_payment_stage == "autopay_offered" and self._fallback_is_affirmative(lowered):
                 autopay_response = "accepted"
+                autopay_stage = "offered" if autopay_stage in {"", "none"} else autopay_stage
+                prior_autopay_requested = True
+            elif self._fallback_is_affirmative(lowered) and any(token in lowered for token in ["auto", "autopay", "auto pay"]):
+                autopay_response = "accepted"
+                prior_autopay_requested = True
             elif any(token in lowered for token in ["maybe later", "later", "not now", "no thanks", "no thank", "decline"]):
                 autopay_response = "declined"
+            elif self._fallback_is_affirmative(lowered) and prior_autopay_requested:
+                autopay_response = "accepted"
         if str(prior.get("hardship_hold_stage", "")).strip().lower() == "offered":
             if self._fallback_is_uncertain(lowered):
                 hold_response = "uncertain"
@@ -674,6 +737,8 @@ class NegotiationClassificationNode(BaseGraphNode):
                 "payment_commitment_type": payment_commitment_type,
                 "payment_option_response": payment_option_response,
                 "autopay_response": autopay_response,
+                "autopay_setup_requested": autopay_requested or prior_autopay_requested,
+                "autopay_stage": autopay_stage or ("requested" if autopay_requested else ""),
                 "discount_stage": discount_stage,
                 "customer_payment_willingness": willingness,
                 "hardship_context": {
@@ -706,6 +771,8 @@ class NegotiationClassificationNode(BaseGraphNode):
                 "payment_commitment_type": payment_commitment_type,
                 "payment_option_response": payment_option_response,
                 "autopay_response": autopay_response,
+                "autopay_setup_requested": autopay_requested or prior_autopay_requested,
+                "autopay_stage": autopay_stage or ("requested" if autopay_requested else ""),
                 "discount_stage": discount_stage,
                 "customer_payment_willingness": willingness,
                 "hardship_context": {
@@ -732,6 +799,8 @@ class NegotiationClassificationNode(BaseGraphNode):
             "payment_commitment_type": payment_commitment_type,
             "payment_option_response": payment_option_response,
             "autopay_response": autopay_response,
+            "autopay_setup_requested": autopay_requested or prior_autopay_requested,
+            "autopay_stage": autopay_stage or ("requested" if autopay_requested else ""),
             "discount_stage": discount_stage,
             "customer_payment_willingness": willingness,
             "hardship_context": {
@@ -788,6 +857,12 @@ class NegotiationClassificationNode(BaseGraphNode):
             or "NONE",
             "payment_option_response": "none",
             "autopay_response": "none",
+            "autopay_setup_requested": bool(
+                state.get("autopay_setup_requested", memory_state.get("autopay_setup_requested", False))
+            ),
+            "autopay_stage": str(
+                state.get("autopay_stage", memory_state.get("autopay_stage", ""))
+            ).strip().lower(),
             "payment_resolution_stage": str(
                 state.get("payment_resolution_stage", memory_state.get("payment_resolution_stage", ""))
             ).strip().lower(),
@@ -883,6 +958,8 @@ class NegotiationClassificationNode(BaseGraphNode):
             "payment_commitment_type",
             "payment_resolution_stage",
             "payment_resolution_details",
+            "autopay_setup_requested",
+            "autopay_stage",
             "customer_payment_capacity",
             "customer_payment_capacity_pct",
             "discount_stage",
@@ -920,6 +997,8 @@ class NegotiationClassificationNode(BaseGraphNode):
                 "that would help",
                 "would really help",
                 "sounds good",
+                "sounds perfect",
+                "that sounds perfect",
                 "i agree",
                 "please do",
                 "go ahead",
@@ -1002,6 +1081,27 @@ class NegotiationClassificationNode(BaseGraphNode):
                 "more options",
                 "any more options",
                 "other options",
+            )
+        )
+
+    @staticmethod
+    def _fallback_is_autopay_request(text: str) -> bool:
+        normalized = re.sub(r"[^a-z0-9\s]", " ", str(text or "").lower())
+        normalized = re.sub(r"\s+", " ", normalized).strip()
+        return any(
+            phrase in normalized
+            for phrase in (
+                "auto pay",
+                "autopay",
+                "automatic payment",
+                "make it automatic",
+                "standing instruction",
+                "standing instructions",
+                "deduct automatically",
+                "automatically deducted",
+                "future installments are deducted",
+                "keep forgetting",
+                "never missed",
             )
         )
 

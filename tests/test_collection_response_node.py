@@ -12,6 +12,128 @@ def _build_node() -> CollectionResponseNode:
     )
 
 
+class _FailingRenderLLM:
+    def generate_json(self, system_prompt: str, user_prompt: str) -> dict[str, object]:
+        raise AssertionError("LLM renderer should not be called for deterministic workflow templates.")
+
+
+class _ScriptedRenderLLM:
+    def generate_json(self, system_prompt: str, user_prompt: str) -> dict[str, object]:
+        return {
+            "message": "I can talk through a practical arrangement based on what works for you.",
+            "response_target": "customer",
+        }
+
+
+def test_response_node_prefers_deterministic_full_payment_templates() -> None:
+    node = CollectionResponseNode(
+        llm=_FailingRenderLLM(),
+        strict_llm_mode=True,
+        system_prompt="render",
+        render_user_prompt="{template_id}",
+    )
+    memory = WorkingMemory(
+        session_id="response-full-payment",
+        state={
+            "active_customer_name": "Rohan Gupta",
+            "active_case_id": "COLL-1002",
+            "active_overdue_amount": 37800.0,
+            "identity_verified": True,
+            "payment_commitment_type": "FULL_PAYMENT",
+            "payment_resolution_stage": "confirmed",
+            "full_payment_details": {
+                "payment_reference_id": "PAY-123",
+                "sms_confirmation": {"status": "sent"},
+            },
+        },
+    )
+
+    update = node.execute(
+        {
+            "user_input": "Send me the link, please.",
+            "memory": memory,
+            "plan_proposal": {
+                "target": "customer",
+                "response_directive": {
+                    "conversation_objective": "full_payment_confirmation",
+                    "dialogue_action": "confirm_full_payment_link",
+                    "response_mode": "informational",
+                },
+            },
+        }
+    )
+
+    assert update["response_render_debug"]["renderer_fallback_used"] is True
+    assert update["response_render_debug"]["policy_filters_applied"] == ["deterministic_compliance_template"]
+    assert "reference number is PAY-123" in update["response"]
+    assert "auto-pay" in update["response"]
+
+
+def test_response_node_allows_llm_for_arrangement_reasoning() -> None:
+    node = CollectionResponseNode(
+        llm=_ScriptedRenderLLM(),
+        strict_llm_mode=True,
+        system_prompt="render",
+        render_user_prompt="{template_id}",
+    )
+    memory = WorkingMemory(
+        session_id="response-arrangement",
+        state={
+            "active_customer_name": "Rohan Gupta",
+            "active_case_id": "COLL-1002",
+            "active_overdue_amount": 37800.0,
+            "identity_verified": True,
+        },
+    )
+
+    update = node.execute(
+        {
+            "user_input": "Can we discuss another option?",
+            "memory": memory,
+            "plan_proposal": {
+                "target": "customer",
+                "response_directive": {
+                    "conversation_objective": "present_arrangement_options",
+                    "dialogue_action": "discuss_arrangement",
+                    "response_mode": "negotiation",
+                },
+            },
+        }
+    )
+
+    assert update["response"] == "I can talk through a practical arrangement based on what works for you."
+    assert update["response_render_debug"]["renderer_fallback_used"] is False
+
+
+def test_response_node_generic_closing_uses_customer_name() -> None:
+    node = _build_node()
+    memory = WorkingMemory(
+        session_id="response-generic-close",
+        state={
+            "active_customer_name": "Rohan Gupta",
+            "active_case_id": "COLL-1002",
+            "identity_verified": True,
+        },
+    )
+
+    update = node.execute(
+        {
+            "user_input": "No, thanks",
+            "memory": memory,
+            "plan_proposal": {
+                "target": "customer",
+                "response_directive": {
+                    "conversation_objective": "close_conversation",
+                    "dialogue_action": "close_conversation",
+                    "response_mode": "informational",
+                },
+            },
+        }
+    )
+
+    assert "Thank you for your time, Rohan Gupta." in update["response"]
+
+
 def test_response_node_renders_from_hardship_response_directive() -> None:
     node = _build_node()
     memory = WorkingMemory(

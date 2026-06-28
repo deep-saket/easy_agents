@@ -73,6 +73,30 @@ class CollectionResponseNode(ResponseNode):
     recent_conversation_turns: int = 3
     last_render_debug: dict[str, Any] = field(default_factory=dict, init=False, repr=False)
 
+    _DETERMINISTIC_TEMPLATE_IDS = frozenset({
+        "wrong_party_privacy_notice",
+        "wrong_party_callback_request",
+        "wrong_party_callback_clarification",
+        "wrong_party_callback_confirmation",
+        "wrong_party_callback_revision_confirmation",
+        "wrong_party_closing_acknowledgement",
+        "conversation_closing",
+        "purpose_disclosure",
+        "hardship_hold_offer",
+        "hardship_hold_confirmation",
+        "hardship_hold_closing",
+        "human_escalation_pending",
+        "human_transfer_pending",
+        "installment_discount_offer",
+        "installment_discount_confirmation",
+        "installment_discount_closing",
+        "partial_payment_confirmation",
+        "partial_payment_closing",
+        "full_payment_link_offer",
+        "full_payment_confirmation",
+        "full_payment_closing",
+    })
+
     def execute(self, state: AgentState) -> NodeUpdate:
         self.last_render_debug = {
             "prompt": None,
@@ -213,26 +237,7 @@ class CollectionResponseNode(ResponseNode):
                 context=render_context,
                 response_target=response_target,
             )
-        if str(directive.get("template_id", "")).strip() in {
-            "wrong_party_privacy_notice",
-            "wrong_party_callback_request",
-            "wrong_party_callback_clarification",
-            "wrong_party_callback_confirmation",
-            "wrong_party_callback_revision_confirmation",
-            "wrong_party_closing_acknowledgement",
-            "conversation_closing",
-            "purpose_disclosure",
-            "hardship_hold_offer",
-            "hardship_hold_confirmation",
-            "hardship_hold_closing",
-            "human_escalation_pending",
-            "human_transfer_pending",
-            "installment_discount_offer",
-            "installment_discount_confirmation",
-            "installment_discount_closing",
-            "partial_payment_confirmation",
-            "partial_payment_closing",
-        }:
+        if self._should_prefer_deterministic_template(directive=directive, context=render_context):
             render_debug["renderer_fallback_used"] = True
             render_debug["policy_filters_applied"] = ["deterministic_compliance_template"]
             self.last_render_debug["response_render_debug"] = render_debug
@@ -282,6 +287,11 @@ class CollectionResponseNode(ResponseNode):
             context=render_context,
             response_target=response_target,
         )
+
+    def _should_prefer_deterministic_template(self, *, directive: dict[str, Any], context: dict[str, Any]) -> bool:
+        del context
+        template_id = str(directive.get("template_id", "")).strip()
+        return template_id in self._DETERMINISTIC_TEMPLATE_IDS
 
     def _resolve_render_context(self, *, state: AgentState, proposal: dict[str, Any]) -> dict[str, Any]:
         memory = state.get("memory")
@@ -865,7 +875,7 @@ class CollectionResponseNode(ResponseNode):
         if template_id == "wrong_party_closing_acknowledgement":
             return "You're welcome. Goodbye."
         if template_id == "conversation_closing":
-            return "Thank you for your time. Have a good day. Goodbye."
+            return f"Thank you for your time, {customer_name}. Have a good day. Goodbye."
         if template_id == "purpose_disclosure":
             policy_text = f" policy {policy_number}" if policy_number else " policy"
             due_text = f", due on {due_date}," if due_date else ""
@@ -963,17 +973,34 @@ class CollectionResponseNode(ResponseNode):
                 f"Thank you for working with us on this, {customer_name}. Take care, and goodbye."
             )
         if template_id == "full_payment_link_offer":
+            if bool(render_variables.get("autopay_setup_requested", False)):
+                return (
+                    "Absolutely. I will send a secure link to pay the current dues, and on the same link "
+                    "you can set up auto-pay so future installments are deducted automatically on the due date. "
+                    "That way you will not have to remember each one manually."
+                )
             return (
                 "Wonderful. I can send you a secure payment link by SMS, or I can guide you "
                 "through paying right now, whichever you prefer."
             )
         if template_id == "full_payment_confirmation":
+            if bool(render_variables.get("autopay_setup_requested", False)):
+                return (
+                    "The link is on its way to your registered mobile, "
+                    f"and your reference number is {reference_number}. Once you complete the dues and "
+                    "confirm the standing instruction, you will receive a confirmation for both."
+                )
             return (
                 "The link is on its way to your registered mobile. Once payment is received "
                 f"you will get an instant receipt, and your reference number is {reference_number}. "
                 "Would you also like to set up auto-pay so future installments are never missed?"
             )
         if template_id == "full_payment_closing":
+            if bool(render_variables.get("autopay_setup_requested", False)):
+                return (
+                    f"Great choice, that will save you the hassle going forward. Thank you, {customer_name}. "
+                    "Have a wonderful day, goodbye."
+                )
             return (
                 f"No problem at all. Thank you for taking care of this so quickly, {customer_name}. "
                 "Have a great day, and goodbye."
@@ -1286,6 +1313,8 @@ class CollectionResponseNode(ResponseNode):
             "message_hint": str(raw_directive.get("draft_response", proposal.get("draft_response", ""))).strip(),
             "policy_options_text": self._policy_options_text(policy),
             "generic_options_after_discount": bool(memory_state.get("generic_options_offered_after_discount", False)),
+            "autopay_setup_requested": bool(memory_state.get("autopay_setup_requested", False)),
+            "autopay_stage": str(memory_state.get("autopay_stage", "")).strip().lower(),
             "opening_turn": (turn_index <= 0) and not greeted,
         }
 

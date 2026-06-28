@@ -279,6 +279,7 @@ def mark_confirmation_delivered(memory: Any) -> dict[str, Any]:
     completed_prerequisites: list[str] = []
     next_current = "close_conversation"
     next_reason = "awaiting_customer_closing_reply"
+    confirmation_reason = "agreed_outcome_and_reference_delivered"
     if str(memory_state.get("partial_payment_stage", "")).strip().lower() == "confirmed":
         details = (
             memory_state.get("partial_payment_details")
@@ -310,8 +311,14 @@ def mark_confirmation_delivered(memory: Any) -> dict[str, Any]:
             and str(sms.get("status", "")).strip().lower() == "sent"
         ):
             completed_prerequisites = ["collect_payment_intent", "full_payment_options", "full_payment_link"]
-            next_current = "autopay_offer"
-            next_reason = "awaiting_autopay_response"
+            if str(memory_state.get("autopay_stage", "")).strip().lower() == "enabled":
+                completed_prerequisites.append("autopay_offer")
+                next_current = "close_conversation"
+                next_reason = "autopay_enabled_confirmation_delivered"
+                confirmation_reason = "autopay_enabled_confirmation_delivered"
+            else:
+                next_current = "autopay_offer"
+                next_reason = "awaiting_autopay_response"
             for node_id in completed_prerequisites:
                 markers[node_id] = {
                     "state": "done",
@@ -323,7 +330,7 @@ def mark_confirmation_delivered(memory: Any) -> dict[str, Any]:
         "state": "done",
         "updated_at": now,
         "source": "response_render",
-        "reason": "agreed_outcome_and_reference_delivered",
+        "reason": confirmation_reason,
     }
     markers["close_conversation"] = {
         "state": "pending",

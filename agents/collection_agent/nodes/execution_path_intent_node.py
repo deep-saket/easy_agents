@@ -200,6 +200,21 @@ class ExecutionPathIntentNode(CollectionIntentNode):
                 },
             }
         if (
+            str(memory_state.get("payment_resolution_stage", "")).strip().lower() in {"confirmed", "autopay_offered"}
+            and str(memory_state.get("payment_commitment_type", "")).strip().upper() == "FULL_PAYMENT"
+            and str(memory_state.get("autopay_response", "")).strip().lower() == "accepted"
+            and str(memory_state.get("autopay_stage", "")).strip().lower() != "enabled"
+        ):
+            return {
+                "skip_llm": True,
+                "reason": "Accepted auto-pay setup should complete the shared auto-pay workflow.",
+                "intent": {
+                    "intent": "need_tool",
+                    "confidence": 1.0,
+                    "reason": "Record auto-pay enrollment on the existing full-payment link.",
+                },
+            }
+        if (
             str(memory_state.get("partial_payment_stage", "")).strip().lower() == "link_offered"
             and self._is_affirmative(lowered)
         ):

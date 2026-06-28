@@ -233,6 +233,7 @@ class PlanProposalGraphNode(BaseGraphNode):
             payment_stage = str(memory_state.get("payment_resolution_stage", "")).strip().lower()
             payment_commitment_type = str(memory_state.get("payment_commitment_type", "NONE")).strip().upper()
             autopay_response = str(memory_state.get("autopay_response", "none")).strip().lower()
+            autopay_stage = str(memory_state.get("autopay_stage", "")).strip().lower()
             hardship_context = (
                 memory_state.get("hardship_context")
                 if isinstance(memory_state.get("hardship_context"), dict)
@@ -258,6 +259,20 @@ class PlanProposalGraphNode(BaseGraphNode):
                 inferred_next = "transfer_to_specialist"
             elif hardship_options_exhausted:
                 inferred_next = "human_escalation"
+            elif payment_commitment_type == "FULL_PAYMENT" and autopay_stage == "enabled":
+                markers = (
+                    memory_state.get("active_conversation_plan", {}).get("step_markers", {})
+                    if isinstance(memory_state.get("active_conversation_plan"), dict)
+                    else {}
+                )
+                confirmation_marker = markers.get("confirmation") if isinstance(markers, dict) else {}
+                confirmation_reason = (
+                    str(confirmation_marker.get("reason", "")).strip().lower()
+                    if isinstance(confirmation_marker, dict)
+                    else ""
+                )
+                confirmation_delivered = confirmation_reason == "autopay_enabled_confirmation_delivered"
+                inferred_next = "close_conversation" if confirmation_delivered else "confirmation"
             elif payment_commitment_type == "FULL_PAYMENT" and autopay_response == "declined":
                 inferred_next = "close_conversation"
             elif payment_commitment_type == "FULL_PAYMENT" and payment_stage in {"confirmed", "link_sent", "autopay_offered"}:
@@ -342,6 +357,11 @@ class PlanProposalGraphNode(BaseGraphNode):
         self._reconcile_partial_payment_marker_consistency(
             plan=plan,
             memory_state=memory_state,
+        )
+        self._reopen_autopay_confirmation_if_needed(
+            plan=plan,
+            memory_state=memory_state,
+            candidate=inferred_next,
         )
         markers = self._init_or_reconcile_step_markers(plan=plan)
         next_current = self._resolve_next_current_node(
@@ -444,6 +464,31 @@ class PlanProposalGraphNode(BaseGraphNode):
             },
         )
         return plan
+
+    @staticmethod
+    def _reopen_autopay_confirmation_if_needed(
+        *,
+        plan: dict[str, Any],
+        memory_state: dict[str, Any],
+        candidate: str,
+    ) -> None:
+        if candidate != "confirmation":
+            return
+        if str(memory_state.get("payment_commitment_type", "NONE")).strip().upper() != "FULL_PAYMENT":
+            return
+        if str(memory_state.get("autopay_stage", "")).strip().lower() != "enabled":
+            return
+        markers = plan.get("step_markers") if isinstance(plan.get("step_markers"), dict) else {}
+        confirmation_marker = markers.get("confirmation") if isinstance(markers.get("confirmation"), dict) else {}
+        if str(confirmation_marker.get("reason", "")).strip().lower() == "autopay_enabled_confirmation_delivered":
+            return
+        markers["confirmation"] = {
+            "state": "pending",
+            "updated_at": datetime.now(UTC).isoformat(),
+            "source": "canonical_flow",
+            "reason": "awaiting_autopay_enabled_confirmation",
+        }
+        plan["step_markers"] = markers
 
     @staticmethod
     def _overlay_wrong_party_state(*, memory_state: dict[str, Any], user_input: str) -> None:

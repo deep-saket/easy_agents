@@ -562,6 +562,32 @@ class PlanProposalDirectiveNode(BaseGraphNode):
         payment_commitment_type = str(memory_state.get("payment_commitment_type", "NONE")).strip().upper()
         payment_option_response = str(memory_state.get("payment_option_response", "none")).strip().lower()
         autopay_response = str(memory_state.get("autopay_response", "none")).strip().lower()
+        autopay_stage = str(memory_state.get("autopay_stage", "")).strip().lower()
+
+        if (
+            identity_verified
+            and payment_commitment_type == "FULL_PAYMENT"
+            and autopay_stage == "enabled"
+            and current_node_id in {"autopay_offer", "close_conversation"}
+        ):
+            if memory is not None:
+                memory.set_state(
+                    conversation_complete=False,
+                    conversation_closing=True,
+                )
+            return with_plan({
+                "route": "continue",
+                "response_target": "customer",
+                "plan_proposal": {
+                    "target": "customer",
+                    "intent": "full_payment_closing",
+                    "conversation_objective": "full_payment_closing",
+                    "dialogue_action": "close_full_payment_conversation",
+                    "response_mode": "informational",
+                    "customer_facing_goal": "Thank the customer by name for setting up auto-pay and close warmly.",
+                    "plan_origin": "autopay_enabled",
+                },
+            })
 
         if (
             identity_verified

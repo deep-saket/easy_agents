@@ -55,24 +55,80 @@ class CollectionReactNode(ReactNode):
         case_id = str(state.get("case_id") or memory_state.get("active_case_id", "")).strip()
         customer_id = str(state.get("user_id") or memory_state.get("active_user_id", "")).strip()
 
+        if (
+            str(memory_state.get("payment_resolution_stage", "")).strip().lower() in {"confirmed", "autopay_offered"}
+            and str(memory_state.get("payment_commitment_type", "")).strip().upper() == "FULL_PAYMENT"
+            and str(memory_state.get("autopay_response", "")).strip().lower() == "accepted"
+            and str(memory_state.get("autopay_stage", "")).strip().lower() != "enabled"
+        ):
+            details = (
+                dict(memory_state.get("full_payment_details", {}))
+                if isinstance(memory_state.get("full_payment_details"), dict)
+                else {}
+            )
+            reference = str(details.get("payment_reference_id", "")).strip()
+            details["autopay_stage"] = "enabled"
+            if memory is not None:
+                memory.set_state(
+                    autopay_setup_requested=True,
+                    autopay_stage="enabled",
+                    full_payment_details=details,
+                    final_disposition="AUTOPAY_ENABLED",
+                )
+            self._append_disposition(
+                case_id=case_id,
+                disposition_code="AUTOPAY_ENABLED",
+                notes=(
+                    f"Auto-pay enrollment accepted on full-payment link. Reference: {reference}"
+                    if reference
+                    else "Auto-pay enrollment accepted on full-payment link."
+                ),
+            )
+            return {
+                "skip_llm": True,
+                "reason": "Auto-pay enrollment accepted.",
+                "decision": SimpleNamespace(
+                    thought="Auto-pay enrollment has been recorded.",
+                    tool_call=None,
+                    tool_calls=[],
+                    respond_directly=True,
+                    response_text=None,
+                    done=True,
+                    no_tools_required=True,
+                ),
+            }
+
         if latest_tool == "payment_link_create" and tool_completed_this_turn:
             if str(memory_state.get("payment_resolution_stage", "")).strip().lower() == "link_requested":
+                autopay_requested = bool(memory_state.get("autopay_setup_requested", False)) or str(
+                    memory_state.get("autopay_response", "")
+                ).strip().lower() == "accepted"
                 details = (
                     dict(memory_state.get("full_payment_details", {}))
                     if isinstance(memory_state.get("full_payment_details"), dict)
                     else {}
                 )
                 details.update(latest_output)
+                if autopay_requested:
+                    details["autopay_setup_requested"] = True
+                    details["autopay_stage"] = "link_created"
                 if memory is not None:
                     memory.set_state(
                         payment_resolution_stage="link_created",
                         full_payment_details=details,
+                        autopay_setup_requested=autopay_requested,
+                        autopay_stage=("link_created" if autopay_requested else memory_state.get("autopay_stage")),
                     )
                 reference = str(latest_output.get("payment_reference_id", "")).strip()
-                message = (
+                base_message = (
                     f"Your secure payment link for "
                     f"{float(latest_output.get('amount', details.get('amount', 0)) or 0):.2f} is "
                     f"{latest_output.get('payment_url', '')}. Reference: {reference}."
+                )
+                message = (
+                    f"{base_message} You can also confirm auto-pay/standing instruction on the same link."
+                    if autopay_requested
+                    else base_message
                 )
                 return {
                     "skip_llm": True,
@@ -211,25 +267,38 @@ class CollectionReactNode(ReactNode):
 
         if latest_tool == "sms_confirmation_send" and tool_completed_this_turn:
             if str(memory_state.get("payment_resolution_stage", "")).strip().lower() == "link_created":
+                autopay_requested = bool(memory_state.get("autopay_setup_requested", False)) or str(
+                    memory_state.get("autopay_response", "")
+                ).strip().lower() == "accepted"
                 details = (
                     dict(memory_state.get("full_payment_details", {}))
                     if isinstance(memory_state.get("full_payment_details"), dict)
                     else {}
                 )
                 details["sms_confirmation"] = dict(latest_output)
+                if autopay_requested:
+                    details["autopay_stage"] = "enabled"
                 reference = str(details.get("payment_reference_id", latest_output.get("reference_number", ""))).strip()
                 if memory is not None:
                     memory.set_state(
                         payment_resolution_stage="confirmed",
                         full_payment_details=details,
                         followup_status="awaiting_full_payment",
-                        final_disposition="PAID_IN_FULL",
+                        final_disposition=("AUTOPAY_ENABLED" if autopay_requested else "PAID_IN_FULL"),
+                        autopay_setup_requested=autopay_requested,
+                        autopay_stage=("enabled" if autopay_requested else memory_state.get("autopay_stage")),
                     )
                 self._append_disposition(
                     case_id=case_id,
                     disposition_code="PAID_IN_FULL",
                     notes=f"Full-payment link delivered. Reference: {reference}",
                 )
+                if autopay_requested:
+                    self._append_disposition(
+                        case_id=case_id,
+                        disposition_code="AUTOPAY_ENABLED",
+                        notes=f"Auto-pay enrollment link delivered. Reference: {reference}",
+                    )
                 return {
                     "skip_llm": True,
                     "reason": "Full-payment link sent by SMS.",

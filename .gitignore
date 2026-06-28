@@ -21,6 +21,9 @@ agents/collection_agent/runtime/conversation_messages.json
 agents/collection_agent/runtime/conversation_states.json
 agents/collection_agent/runtime/tool_logs.json
 agents/collection_agent/runtime/verification_attempts.json
+agents/collection_agent/runtime/dispositions.json
+agents/collection_agent/runtime/payment_links.json
+agents/collection_agent/runtime/sms_confirmations.json
 agents/collection_agent/conversation_manager/runtime/logs/conversation_manager.jsonl
 agents/collection_agent/data/runtime/
 agents/collection_agent/runtime/outbound_callback_jobs.json

@@ -69,6 +69,8 @@ class CollectionGraphState(AgentState, total=False):
     payment_commitment_type: str
     payment_option_response: str
     autopay_response: str
+    autopay_setup_requested: bool
+    autopay_stage: str
     payment_resolution_stage: str
     payment_resolution_details: dict[str, Any]
     final_disposition: str
