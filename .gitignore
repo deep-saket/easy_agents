@@ -28,3 +28,7 @@ agents/collection_agent/conversation_manager/runtime/logs/conversation_manager.j
 agents/collection_agent/data/runtime/
 agents/collection_agent/runtime/outbound_callback_jobs.json
 agents/collection_agent/runtime/outbound_call_attempts.json
+agents/collection_agent/runtime/email_confirmations.json
+agents/collection_agent/runtime/followups.json
+agents/collection_agent/runtime/installment_discounts.json
+agents/collection_agent/runtime/promises.json

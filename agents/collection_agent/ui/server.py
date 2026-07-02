@@ -26,7 +26,7 @@ from pydantic import BaseModel, Field
 
 from agents.collection_agent.agent import CollectionAgent
 from agents.collection_agent.main import DEFAULT_CONFIG_PATH, build_llm, load_collection_config, load_env_file
-from agents.collection_agent.nodes.plan_proposal_utils import finalize_conversation_memory
+from agents.collection_agent.utils.plan_proposal_utils import finalize_conversation_memory
 from agents.collection_agent.repository import CollectionRepository
 from agents.collection_agent.tools.data_store import CollectionDataStore
 from agents.collection_memory_helper_agent.agent import CollectionMemoryHelperAgent

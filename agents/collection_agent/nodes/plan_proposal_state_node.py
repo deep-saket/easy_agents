@@ -6,8 +6,8 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from agents.collection_agent.llm_structured import StructuredOutputRunner
-from agents.collection_agent.nodes.plan_proposal_models import PlanSignalPayload
-from agents.collection_agent.nodes.plan_proposal_utils import (
+from agents.collection_agent.utils.plan_proposal_models import PlanSignalPayload
+from agents.collection_agent.utils.plan_proposal_utils import (
     compact_existing_plan_for_prompt,
     compact_memory_state_for_prompt,
     effective_mode,

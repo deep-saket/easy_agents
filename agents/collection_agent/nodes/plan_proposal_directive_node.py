@@ -9,13 +9,13 @@ from types import SimpleNamespace
 from typing import Any
 
 from agents.collection_agent.llm_structured import StructuredOutputRunner
-from agents.collection_agent.nodes.callback_time_extractor import extract_callback_time
-from agents.collection_agent.nodes.partial_payment_utils import (
+from agents.collection_agent.utils.callback_time_extractor import extract_callback_time
+from agents.collection_agent.utils.partial_payment_utils import (
     partial_payment_from_llm_amount,
     partial_payment_policy,
 )
-from agents.collection_agent.nodes.plan_proposal_models import PlanProposalPayload
-from agents.collection_agent.nodes.plan_proposal_utils import (
+from agents.collection_agent.utils.plan_proposal_models import PlanProposalPayload
+from agents.collection_agent.utils.plan_proposal_utils import (
     compact_existing_plan_for_prompt,
     effective_mode,
     extract_amount,
@@ -789,6 +789,7 @@ class PlanProposalDirectiveNode(BaseGraphNode):
                     memory.set_state(
                         partial_payment_stage="link_offered",
                         partial_payment_details=details,
+                        partial_payment_validation={},
                     )
                 return with_plan({
                     "route": "continue",
@@ -808,6 +809,24 @@ class PlanProposalDirectiveNode(BaseGraphNode):
                         },
                     },
                 })
+            if memory is not None:
+                minimum_amount = round(total_due * minimum_pct / 100, 2) if minimum_pct > 0 else 0.0
+                memory.set_state(
+                    partial_payment_stage="collecting_amount",
+                    partial_payment_validation={
+                        "status": "rejected",
+                        "reason": (
+                            "below_minimum_partial_payment"
+                            if allowed
+                            else "partial_payment_not_allowed"
+                        ),
+                        "offered_amount": float(parsed_partial["partial_payment_amount"]),
+                        "offered_pct": float(parsed_partial["partial_payment_pct"]),
+                        "minimum_partial_payment_pct": minimum_pct,
+                        "minimum_partial_payment_amount": minimum_amount,
+                        "total_due": total_due,
+                    },
+                )
 
         if (
             identity_verified
@@ -2246,6 +2265,17 @@ class PlanProposalDirectiveNode(BaseGraphNode):
             return "full_payment_confirmation", "confirm_full_payment_link", "informational"
         if payment_commitment_type == "FULL_PAYMENT":
             return "full_payment_link_offer", "offer_full_payment_link", "informational"
+        if payment_commitment_type == "PROMISE_TO_PAY":
+            promise_stage = str(memory_state.get("promise_stage", "")).strip().lower()
+            if promise_stage == "followup_scheduled":
+                return "promise_to_pay_confirmation", "confirm_promise_to_pay", "informational"
+            if promise_stage == "confirmed":
+                return "promise_to_pay_closing", "close_promise_to_pay_conversation", "informational"
+            if promise_stage == "date_invalid":
+                return "promise_to_pay_date_request", "ask_commitment_date", "negotiation"
+            if promise_stage in {"date_captured", "recording", "captured"}:
+                return "capture_promise", "confirm_payment_intent", "negotiation"
+            return "promise_to_pay_date_request", "ask_commitment_date", "negotiation"
         if conversation_mode == "promise_capture" or customer_payment_posture in {"pay_now", "promise_to_pay"}:
             return "capture_promise", "confirm_payment_intent", "negotiation"
         if (
@@ -2304,6 +2334,9 @@ class PlanProposalDirectiveNode(BaseGraphNode):
             "full_payment_link_offer": ["offer_sms_link", "offer_guided_payment"],
             "full_payment_confirmation": ["confirm_link_sent", "give_reference", "state_receipt_after_payment", "ask_autopay"],
             "full_payment_closing": ["thank_customer_by_name", "warm_signoff", "goodbye"],
+            "promise_to_pay_date_request": ["acknowledge_timing", "ask_commitment_date"],
+            "promise_to_pay_confirmation": ["confirm_payment_commitment", "give_reference", "state_reminder_and_link", "state_cover_active"],
+            "promise_to_pay_closing": ["thank_customer_by_name", "warm_signoff", "goodbye"],
             "assess_affordability": [
                 "acknowledge_hardship",
                 "ask_affordable_amount",
@@ -2370,6 +2403,9 @@ class PlanProposalDirectiveNode(BaseGraphNode):
             "full_payment_link_offer": ["claim_link_sent", "claim_payment_received", "offer_discount"],
             "full_payment_confirmation": ["claim_payment_received", "invent_payment_status"],
             "full_payment_closing": ["repeat_payment_link", "restart_conversation"],
+            "promise_to_pay_date_request": ["claim_promise_recorded", "invent_reference"],
+            "promise_to_pay_confirmation": ["invent_reference", "claim_payment_received"],
+            "promise_to_pay_closing": ["repeat_promise_confirmation", "restart_conversation"],
             "assess_affordability": ["restart_collections_menu", "ask_pay_now_or_arrangement", "mention_internal_processing"],
             "present_arrangement_options": ["restart_collections_menu", "ask_pay_now_or_arrangement", "mention_internal_processing"],
             "negotiate_installment": ["restart_collections_menu", "ask_pay_now_or_arrangement", "mention_internal_processing"],
@@ -2407,6 +2443,9 @@ class PlanProposalDirectiveNode(BaseGraphNode):
             "full_payment_link_offer": ["offer_full_payment_link"],
             "full_payment_confirmation": ["confirm_full_payment_link"],
             "full_payment_closing": ["close_full_payment_conversation"],
+            "promise_to_pay_date_request": ["ask_commitment_date"],
+            "promise_to_pay_confirmation": ["confirm_promise_to_pay"],
+            "promise_to_pay_closing": ["close_promise_to_pay_conversation"],
             "assess_affordability": ["acknowledge_hardship", "ask_affordable_amount"],
             "present_arrangement_options": ["present_offer", "discuss_arrangement"],
             "negotiate_installment": ["discuss_arrangement", "ask_affordable_amount"],
@@ -2445,6 +2484,9 @@ class PlanProposalDirectiveNode(BaseGraphNode):
             "full_payment_link_offer": "Offer a secure SMS payment link or guided payment for the full overdue amount.",
             "full_payment_confirmation": "Confirm the full-payment link was sent, provide its reference, and ask about auto-pay.",
             "full_payment_closing": "Thank the customer by name for taking care of the payment and close warmly.",
+            "promise_to_pay_date_request": "Ask for the date the customer can clear the full overdue amount.",
+            "promise_to_pay_confirmation": "Confirm the promise-to-pay, reference, reminder, secure payment link timing, and cover status.",
+            "promise_to_pay_closing": "Thank the customer by name for working out the payment commitment and close warmly.",
             "assess_affordability": (
                 "Acknowledge the hardship, understand what is manageable, and avoid repeating the standard policy menu."
             ),

@@ -10,7 +10,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from agents.collection_agent.llm_structured import StructuredOutputRunner
-from agents.collection_agent.nodes.plan_proposal_utils import mark_confirmation_delivered
+from agents.collection_agent.utils.plan_proposal_utils import mark_confirmation_delivered
 from src.nodes.response_node import ResponseNode
 from src.nodes.types import AgentState, NodeUpdate
 
@@ -95,6 +95,9 @@ class CollectionResponseNode(ResponseNode):
         "full_payment_link_offer",
         "full_payment_confirmation",
         "full_payment_closing",
+        "promise_to_pay_date_request",
+        "promise_to_pay_confirmation",
+        "promise_to_pay_closing",
     })
 
     def execute(self, state: AgentState) -> NodeUpdate:
@@ -133,6 +136,7 @@ class CollectionResponseNode(ResponseNode):
             "installment_discount_closing",
             "partial_payment_closing",
             "full_payment_closing",
+            "promise_to_pay_closing",
         }:
             update["conversation_complete"] = False
             update["conversation_closing"] = True
@@ -148,6 +152,7 @@ class CollectionResponseNode(ResponseNode):
                 "installment_discount_confirmation",
                 "partial_payment_confirmation",
                 "full_payment_confirmation",
+                "promise_to_pay_confirmation",
             } and str(update.get("response", "")).strip():
                 advanced_plan = mark_confirmation_delivered(memory)
                 if advanced_plan:
@@ -289,9 +294,8 @@ class CollectionResponseNode(ResponseNode):
         )
 
     def _should_prefer_deterministic_template(self, *, directive: dict[str, Any], context: dict[str, Any]) -> bool:
-        del context
-        template_id = str(directive.get("template_id", "")).strip()
-        return template_id in self._DETERMINISTIC_TEMPLATE_IDS
+        del directive, context
+        return False
 
     def _resolve_render_context(self, *, state: AgentState, proposal: dict[str, Any]) -> dict[str, Any]:
         memory = state.get("memory")
@@ -552,6 +556,12 @@ class CollectionResponseNode(ResponseNode):
             return "full_payment_confirmation"
         if objective == "full_payment_closing" or action == "close_full_payment_conversation":
             return "full_payment_closing"
+        if objective == "promise_to_pay_date_request":
+            return "promise_to_pay_date_request"
+        if objective == "promise_to_pay_confirmation" or action == "confirm_promise_to_pay":
+            return "promise_to_pay_confirmation"
+        if objective == "promise_to_pay_closing" or action == "close_promise_to_pay_conversation":
+            return "promise_to_pay_closing"
         if action == "ask_affordable_amount" or objective == "assess_affordability":
             return "capacity_question"
         if action in {"present_offer", "discuss_arrangement"} or objective in {
@@ -619,17 +629,27 @@ class CollectionResponseNode(ResponseNode):
             else self._resolve_response_directive(state=state, proposal=proposal, context=context)
         )
         compact_observation = self._compact_observation(observation)
+        verified_response_context = self._build_verified_response_context(
+            state=state,
+            proposal=proposal,
+            context=context,
+            directive=response_directive,
+            observation=compact_observation,
+        )
 
-        system_prompt = (f"{self.system_prompt or ''}\n{self.render_system_prompt or ''}").strip()
+        system_prompt = (f"{self.system_prompt or ''}\n{self.render_system_prompt or self._default_render_system_prompt()}").strip()
+        user_prompt_template = self.render_user_prompt or self._default_render_user_prompt()
         user_prompt = self._render_template(
-            self.render_user_prompt,
+            user_prompt_template,
             {
                 "user_input": user_input,
                 "response_target": str(response_directive.get("response_target", response_target)).strip().lower() or response_target,
                 "recent_conversation_json": self._json_compact(recent_conversation, max_chars=1200),
-                "template_id": str(response_directive.get("template_id", "")).strip(),
+                "template_id": self._customer_safe_objective_label(str(response_directive.get("template_id", "")).strip()),
                 "tone": str(response_directive.get("tone", "")).strip(),
-                "fallback_template_id": str(response_directive.get("fallback_template_id", "")).strip(),
+                "fallback_template_id": self._customer_safe_objective_label(
+                    str(response_directive.get("fallback_template_id", "")).strip()
+                ),
                 "render_variables_json": self._json_compact(
                     response_directive.get("render_variables", {}),
                     max_chars=1200,
@@ -639,7 +659,11 @@ class CollectionResponseNode(ResponseNode):
                     max_chars=700,
                 ),
                 "verification_context_json": self._json_compact(verification_context_merged, max_chars=600),
-                "observation_json": self._json_compact(compact_observation, max_chars=700),
+                "observation_json": self._json_compact(
+                    self._safe_observation_summary(compact_observation),
+                    max_chars=700,
+                ),
+                "verified_response_context_json": self._json_compact(verified_response_context, max_chars=1800),
             },
         )
         if len(user_prompt) > self.max_prompt_chars:
@@ -672,6 +696,199 @@ class CollectionResponseNode(ResponseNode):
         if not response:
             return None
         return response
+
+    def _build_verified_response_context(
+        self,
+        *,
+        state: AgentState,
+        proposal: dict[str, Any],
+        context: dict[str, Any],
+        directive: dict[str, Any],
+        observation: dict[str, Any],
+    ) -> dict[str, Any]:
+        del state, proposal
+        render_variables = (
+            directive.get("render_variables")
+            if isinstance(directive.get("render_variables"), dict)
+            else {}
+        )
+        constraints = (
+            directive.get("response_constraints")
+            if isinstance(directive.get("response_constraints"), dict)
+            else {}
+        )
+        verification_context = (
+            context.get("verification_context")
+            if isinstance(context.get("verification_context"), dict)
+            else {}
+        )
+        wrong_party = bool(constraints.get("wrong_party", False))
+        identity_verified = bool(verification_context.get("identity_verified", False))
+        safe_variables = self._safe_render_variables_for_llm(
+            render_variables=render_variables,
+            identity_verified=identity_verified,
+            wrong_party=wrong_party,
+        )
+        return {
+            "response_target": str(directive.get("response_target", "customer")).strip().lower() or "customer",
+            "current_objective": self._customer_safe_objective_label(str(directive.get("template_id", "")).strip()),
+            "tone": str(directive.get("tone", "informational")).strip().lower() or "informational",
+            "latest_customer_message": str(context.get("user_input", "")).strip(),
+            "recent_conversation": context.get("recent_conversation", [])
+            if isinstance(context.get("recent_conversation"), list)
+            else [],
+            "verified_customer_safe_facts": safe_variables,
+            "tool_result_summary": self._safe_observation_summary(observation),
+            "compliance_constraints": {
+                "no_dues_before_verification": bool(constraints.get("no_dues_before_verification", False)),
+                "wrong_party": wrong_party,
+                "avoid_internal_terms": bool(constraints.get("avoid_internal_terms", True)),
+                "avoid_placeholders": bool(constraints.get("avoid_placeholders", True)),
+                "avoid_repeat_greeting": bool(constraints.get("greeted", False)),
+                "ask_one_question": bool(constraints.get("ask_one_question", False)),
+            },
+        }
+
+    @staticmethod
+    def _safe_render_variables_for_llm(
+        *,
+        render_variables: dict[str, Any],
+        identity_verified: bool,
+        wrong_party: bool,
+    ) -> dict[str, Any]:
+        always_allowed = {
+            "customer_name",
+            "agent_name",
+            "company_name",
+            "contact_number",
+            "missing_fields",
+            "callback_time",
+            "opening_turn",
+            "customer_facing_goal",
+            "message_hint",
+        }
+        verified_only = {
+            "policy_number",
+            "due_date",
+            "reference_number",
+            "installment_amount_text",
+            "hold_months",
+            "benefits_remain_active",
+            "confirmation_sla_hours",
+            "sms_confirmation_sent",
+            "email_confirmation_sent",
+            "discount_pct_text",
+            "original_amount_text",
+            "revised_amount_text",
+            "review_after_months",
+            "discount_review_scheduled",
+            "partial_payment_amount_text",
+            "partial_payment_validation_status",
+            "partial_payment_validation_reason",
+            "partial_payment_offered_amount_text",
+            "partial_payment_offered_pct_text",
+            "minimum_partial_payment_amount_text",
+            "minimum_partial_payment_pct_text",
+            "remaining_balance_text",
+            "full_payment_amount_text",
+            "promised_date",
+            "promise_reference",
+            "promise_schedule_id",
+            "promise_date_rejection_reason",
+            "overdue_amount_text",
+            "policy_options_text",
+            "generic_options_after_discount",
+            "autopay_setup_requested",
+            "autopay_stage",
+        }
+        allowed = set(always_allowed)
+        if identity_verified and not wrong_party:
+            allowed.update(verified_only)
+        if wrong_party:
+            allowed = {"customer_name", "company_name", "contact_number", "callback_time", "customer_facing_goal"}
+        safe: dict[str, Any] = {}
+        for key in sorted(allowed):
+            value = render_variables.get(key)
+            if value is None:
+                continue
+            if isinstance(value, (str, int, float, bool)):
+                safe[key] = value
+        return safe
+
+    @staticmethod
+    def _safe_observation_summary(observation: dict[str, Any]) -> dict[str, Any]:
+        if not isinstance(observation, dict):
+            return {}
+        tool_name = str(observation.get("tool_name", "")).strip()
+        output = observation.get("output") if isinstance(observation.get("output"), dict) else {}
+        summary: dict[str, Any] = {}
+        safe_action = CollectionResponseNode._customer_safe_tool_action(tool_name)
+        if safe_action:
+            summary["completed_action"] = safe_action
+        for key in (
+            "status",
+            "reference_number",
+            "payment_reference_id",
+            "promise_id",
+            "schedule_id",
+            "promised_date",
+            "callback_time",
+        ):
+            value = output.get(key)
+            if isinstance(value, (str, int, float, bool)) and str(value).strip():
+                summary[key] = value
+        return summary
+
+    @staticmethod
+    def _customer_safe_tool_action(tool_name: str) -> str:
+        return {
+            "payment_link_create": "payment link created",
+            "partial_payment_link_create": "partial payment link created",
+            "promise_capture": "payment commitment recorded",
+            "followup_schedule": "follow-up reminder scheduled",
+            "premium_hold_create": "premium hold arranged",
+            "installment_discount_apply": "installment discount applied",
+            "outbound_callback_schedule": "callback scheduled",
+            "human_escalation": "specialist transfer prepared",
+        }.get(str(tool_name or "").strip().lower(), "")
+
+    @staticmethod
+    def _customer_safe_objective_label(template_id: str) -> str:
+        return {
+            "wrong_party_privacy_notice": "Protect privacy for an unverified respondent",
+            "wrong_party_callback_request": "Request a privacy-safe callback time",
+            "wrong_party_callback_clarification": "Ask for a clearer callback time",
+            "wrong_party_callback_confirmation": "Confirm the callback and close politely",
+            "wrong_party_callback_revision_confirmation": "Confirm the revised callback and close politely",
+            "wrong_party_closing_acknowledgement": "Acknowledge and close a wrong-party call",
+            "conversation_closing": "Close the conversation politely",
+            "purpose_disclosure": "Disclose the overdue policy purpose after verification",
+            "hardship_hold_offer": "Offer the eligible premium hold",
+            "hardship_hold_confirmation": "Confirm the premium hold arrangement",
+            "hardship_hold_closing": "Close after confirmed premium hold",
+            "human_escalation_pending": "Transfer the customer to a specialist",
+            "human_transfer_pending": "Transfer the customer to a specialist",
+            "installment_discount_offer": "Offer the eligible installment discount",
+            "installment_discount_confirmation": "Confirm the installment discount",
+            "installment_discount_closing": "Close after confirmed installment discount",
+            "partial_payment_amount_request": "Ask for the manageable partial-payment amount",
+            "partial_payment_link_offer": "Offer to send the partial-payment link",
+            "partial_payment_confirmation": "Confirm the partial-payment link and reference",
+            "partial_payment_closing": "Close after partial-payment setup",
+            "full_payment_link_offer": "Offer a secure full-payment link",
+            "full_payment_confirmation": "Confirm the full-payment link and reference",
+            "full_payment_closing": "Close after full-payment setup",
+            "promise_to_pay_date_request": "Ask for the promised payment date",
+            "promise_to_pay_confirmation": "Confirm the payment commitment and reminder",
+            "promise_to_pay_closing": "Close after confirmed payment commitment",
+            "dues_explanation": "Explain verified overdue details",
+            "capacity_question": "Ask what payment amount or date is manageable",
+            "arrangement_discussion": "Discuss eligible arrangement options",
+            "commitment_confirmation": "Ask for a confident payment commitment",
+            "handoff_payload": "Prepare a specialist handoff message",
+            "safe_follow_up": "Ask how the customer wants to proceed",
+            "verification_request": "Request right-party confirmation or verification details",
+        }.get(str(template_id or "").strip(), "Respond to the current verified objective")
 
     def _build_verification_context(
         self,
@@ -797,13 +1014,29 @@ class CollectionResponseNode(ResponseNode):
             render_variables.get("original_amount_text", overdue_amount_text)
         ).strip() or overdue_amount_text
         revised_amount_text = str(render_variables.get("revised_amount_text", "0.00")).strip() or "0.00"
-        review_after_months = int(render_variables.get("review_after_months", 3) or 3)
+        review_after_months = int(render_variables.get("review_after_months", 0) or 0)
+        discount_review_scheduled = bool(render_variables.get("discount_review_scheduled", False))
         partial_payment_amount_text = str(
             render_variables.get("partial_payment_amount_text", "0.00")
         ).strip() or "0.00"
+        partial_payment_validation_reason = str(
+            render_variables.get("partial_payment_validation_reason", "")
+        ).strip()
+        partial_payment_offered_amount_text = str(
+            render_variables.get("partial_payment_offered_amount_text", "0.00")
+        ).strip() or "0.00"
+        minimum_partial_payment_amount_text = str(
+            render_variables.get("minimum_partial_payment_amount_text", "0.00")
+        ).strip() or "0.00"
+        minimum_partial_payment_pct_text = str(
+            render_variables.get("minimum_partial_payment_pct_text", "0")
+        ).strip() or "0"
         remaining_balance_text = str(
             render_variables.get("remaining_balance_text", "0.00")
         ).strip() or "0.00"
+        promised_date = str(render_variables.get("promised_date", "")).strip()
+        promise_reference = str(render_variables.get("promise_reference", reference_number)).strip() or reference_number
+        promise_date_rejection_reason = str(render_variables.get("promise_date_rejection_reason", "")).strip()
         opening_turn = bool(render_variables.get("opening_turn", False))
 
         if template_id == "verification_request":
@@ -940,17 +1173,35 @@ class CollectionResponseNode(ResponseNode):
                 "Would that help ease the pressure?"
             ).strip()
         if template_id == "installment_discount_confirmation":
+            review_text = (
+                f" We will review your situation again in {review_after_months} months."
+                if discount_review_scheduled and review_after_months > 0
+                else ""
+            )
             return (
                 f"I have applied the {discount_pct_text}% discount to this installment. "
                 f"Your revised amount is {revised_amount_text}, and your reference number is {reference_number}. "
-                "Confirmation has been sent by SMS and email. "
-                f"We will review your situation again in {review_after_months} months."
+                f"Confirmation has been sent by SMS and email.{review_text}"
             ).strip()
         if template_id == "installment_discount_closing":
             return (
                 f"Thank you for your time, {customer_name}. Take care of yourself, and goodbye."
             ).strip()
         if template_id == "partial_payment_amount_request":
+            if partial_payment_validation_reason == "below_minimum_partial_payment":
+                return (
+                    f"Thank you for offering {partial_payment_offered_amount_text}. "
+                    "I appreciate your willingness to make a payment. "
+                    f"The minimum partial payment allowed for this account is {minimum_partial_payment_amount_text}, "
+                    f"which is {minimum_partial_payment_pct_text}% of the overdue amount. "
+                    "Would you be able to increase your payment to at least that amount today?"
+                )
+            if partial_payment_validation_reason == "partial_payment_not_allowed":
+                return (
+                    "I appreciate your willingness to make a payment. "
+                    "Partial payment is not available under the current account policy. "
+                    "Would you like to discuss another available option?"
+                )
             return (
                 "That is helpful, and every contribution makes a difference. "
                 "How much do you think you could comfortably manage right now?"
@@ -1004,6 +1255,29 @@ class CollectionResponseNode(ResponseNode):
             return (
                 f"No problem at all. Thank you for taking care of this so quickly, {customer_name}. "
                 "Have a great day, and goodbye."
+            )
+        if template_id == "promise_to_pay_date_request":
+            if promise_date_rejection_reason:
+                return (
+                    "That date is outside the allowed payment-commitment window for this account. "
+                    "What earlier date would work for you to clear the full amount?"
+                )
+            return (
+                "That is completely understandable, and thank you for letting me know your timing. "
+                "I can schedule a payment reminder for your payday. "
+                "What date works best for you to clear the full amount?"
+            )
+        if template_id == "promise_to_pay_confirmation":
+            date_text = f" for {promised_date}" if promised_date else ""
+            ref_text = f" Your reference number is {promise_reference}." if promise_reference else ""
+            return (
+                f"I have noted a payment commitment{date_text}.{ref_text} "
+                "You will get a reminder and a secure payment link a day before, "
+                "and your cover stays active in the meantime. If anything changes, just let us know."
+            ).strip()
+        if template_id == "promise_to_pay_closing":
+            return (
+                f"Thank you for working this out with me, {customer_name}. Take care, and goodbye."
             )
         if template_id == "dues_explanation":
             return (
@@ -1080,6 +1354,12 @@ class CollectionResponseNode(ResponseNode):
             result["forbidden_actions_blocked"].append("repeat_greeting")
         if bool(constraints.get("avoid_internal_terms", True)) and self._contains_internal_processing(rendered):
             result["forbidden_actions_blocked"].append("mention_internal_processing")
+        if not self._matches_verified_response_context(
+            rendered=rendered,
+            directive=directive,
+            context=context,
+        ):
+            result["forbidden_actions_blocked"].append("unverified_or_mismatched_claim")
         template_id = str(directive.get("template_id", "")).strip()
         render_variables = (
             directive.get("render_variables")
@@ -1132,6 +1412,83 @@ class CollectionResponseNode(ResponseNode):
             return result
         result["text"] = rendered
         return result
+
+    def _matches_verified_response_context(
+        self,
+        *,
+        rendered: str,
+        directive: dict[str, Any],
+        context: dict[str, Any],
+    ) -> bool:
+        render_variables = (
+            directive.get("render_variables")
+            if isinstance(directive.get("render_variables"), dict)
+            else {}
+        )
+        lowered = rendered.lower()
+        reference_like = re.findall(r"\b(?:PAY|PTP|HOLD|DISC|ESC)-[A-Z0-9-]+\b", rendered, flags=re.IGNORECASE)
+        if reference_like:
+            verified_refs = {
+                str(render_variables.get(key, "")).strip().lower()
+                for key in ("reference_number", "promise_reference", "escalation_id", "promise_schedule_id")
+            }
+            if any(ref.lower() not in verified_refs for ref in reference_like):
+                return False
+        amount_like = re.findall(r"\b\d+(?:\.\d{2})\b", rendered)
+        if amount_like:
+            allowed_amounts = {
+                str(render_variables.get(key, "")).strip()
+                for key in (
+                    "installment_amount_text",
+                    "original_amount_text",
+                    "revised_amount_text",
+                    "partial_payment_amount_text",
+                    "partial_payment_offered_amount_text",
+                    "minimum_partial_payment_amount_text",
+                    "remaining_balance_text",
+                    "full_payment_amount_text",
+                    "overdue_amount_text",
+                )
+            }
+            allowed_amounts = {value for value in allowed_amounts if value and value != "0.00"}
+            if allowed_amounts and any(amount not in allowed_amounts for amount in amount_like):
+                return False
+        confirmation_claims = (
+            "has been sent",
+            "is on its way",
+            "have arranged",
+            "has been arranged",
+            "have applied",
+            "has been applied",
+            "have noted",
+            "payment commitment",
+        )
+        template_id = str(directive.get("template_id", "")).strip()
+        if any(claim in lowered for claim in confirmation_claims):
+            allowed_confirmation_templates = {
+                "wrong_party_callback_confirmation",
+                "wrong_party_callback_revision_confirmation",
+                "hardship_hold_confirmation",
+                "installment_discount_confirmation",
+                "partial_payment_confirmation",
+                "full_payment_confirmation",
+                "promise_to_pay_confirmation",
+            }
+            if template_id not in allowed_confirmation_templates:
+                return False
+        constraints = directive.get("response_constraints") if isinstance(directive.get("response_constraints"), dict) else {}
+        if bool(constraints.get("ask_one_question", False)) and rendered.count("?") > 1:
+            return False
+        recent = context.get("recent_conversation") if isinstance(context.get("recent_conversation"), list) else []
+        if bool(constraints.get("avoid_verbatim_repeat", False)) and recent:
+            previous_agent = ""
+            for item in reversed(recent):
+                if isinstance(item, dict) and str(item.get("role", "")).strip().lower() == "agent":
+                    previous_agent = str(item.get("content", "")).strip()
+                    break
+            if previous_agent and rendered.strip().lower() == previous_agent.lower():
+                return False
+        return True
 
     def _apply_minimal_safety_cleanup(
         self,
@@ -1247,9 +1604,19 @@ class CollectionResponseNode(ResponseNode):
             if isinstance(memory_state.get("partial_payment_details"), dict)
             else {}
         )
+        partial_validation = (
+            memory_state.get("partial_payment_validation")
+            if isinstance(memory_state.get("partial_payment_validation"), dict)
+            else {}
+        )
         full_payment_details = (
             memory_state.get("full_payment_details")
             if isinstance(memory_state.get("full_payment_details"), dict)
+            else {}
+        )
+        promise_details = (
+            memory_state.get("promise_to_pay_details")
+            if isinstance(memory_state.get("promise_to_pay_details"), dict)
             else {}
         )
         human_escalation_id = str(memory_state.get("human_escalation_id", "") or "").strip()
@@ -1268,7 +1635,10 @@ class CollectionResponseNode(ResponseNode):
                         "payment_reference_id",
                         partial_details.get(
                             "payment_reference_id",
-                            hold_details.get("reference_number", reference_number),
+                            promise_details.get(
+                                "promise_id",
+                                hold_details.get("reference_number", reference_number),
+                            ),
                         ),
                     ),
                 )
@@ -1301,10 +1671,42 @@ class CollectionResponseNode(ResponseNode):
             "discount_pct_text": f"{float(discount_details.get('discount_pct', 0) or 0):g}",
             "original_amount_text": f"{float(discount_details.get('original_amount', overdue_amount) or 0):.2f}",
             "revised_amount_text": f"{float(discount_details.get('revised_amount', 0) or 0):.2f}",
-            "review_after_months": int(discount_details.get("review_after_months", 3) or 3),
+            "review_after_months": int(discount_details.get("review_after_months", 0) or 0),
+            "discount_review_scheduled": (
+                isinstance(discount_details.get("review_followup_schedule"), dict)
+                and bool(str(discount_details.get("review_followup_schedule", {}).get("schedule_id", "")).strip())
+            ),
             "partial_payment_amount_text": f"{float(partial_details.get('partial_payment_amount', 0) or 0):.2f}",
+            "partial_payment_validation_status": str(partial_validation.get("status", "")).strip(),
+            "partial_payment_validation_reason": str(partial_validation.get("reason", "")).strip(),
+            "partial_payment_offered_amount_text": (
+                f"{float(partial_validation.get('offered_amount', 0) or 0):.2f}"
+            ),
+            "partial_payment_offered_pct_text": (
+                f"{float(partial_validation.get('offered_pct', 0) or 0):g}"
+            ),
+            "minimum_partial_payment_amount_text": (
+                f"{float(partial_validation.get('minimum_partial_payment_amount', 0) or 0):.2f}"
+            ),
+            "minimum_partial_payment_pct_text": (
+                f"{float(partial_validation.get('minimum_partial_payment_pct', 0) or 0):g}"
+            ),
             "remaining_balance_text": f"{float(partial_details.get('remaining_balance', 0) or 0):.2f}",
             "full_payment_amount_text": f"{float(full_payment_details.get('amount', overdue_amount) or 0):.2f}",
+            "promised_date": str(
+                promise_details.get("promised_date", memory_state.get("promised_date", ""))
+            ).strip(),
+            "promise_reference": str(
+                promise_details.get("promise_id", memory_state.get("promise_reference", ""))
+            ).strip(),
+            "promise_schedule_id": str(
+                (
+                    promise_details.get("followup_schedule", {})
+                    if isinstance(promise_details.get("followup_schedule"), dict)
+                    else {}
+                ).get("schedule_id", "")
+            ).strip(),
+            "promise_date_rejection_reason": str(memory_state.get("promise_date_rejection_reason", "")).strip(),
             "callback_time": callback_time,
             "case_id": str(facts.get("case_id", memory_state.get("active_case_id", "COLL-1001"))).strip() or "COLL-1001",
             "overdue_amount_text": f"{overdue_amount:.2f}",
@@ -1449,6 +1851,25 @@ class CollectionResponseNode(ResponseNode):
         if len(raw) <= max_chars:
             return raw
         return self._truncate_text(raw, max_chars)
+
+    @staticmethod
+    def _default_render_system_prompt() -> str:
+        return (
+            "You are a bank collections response renderer. Use only the verified response context. "
+            "Do not decide workflow, approve offers, invent facts, invoke tools, or mention internal systems. "
+            "Write only the customer-facing or target-facing message requested by the current objective. "
+            "Keep a professional, concise collections tone. Return strict JSON only: "
+            "{\"message\":\"...\",\"response_target\":\"customer|self\"}."
+        )
+
+    @staticmethod
+    def _default_render_user_prompt() -> str:
+        return (
+            "Verified response context JSON: {verified_response_context_json}\n"
+            "Render a natural response for the current objective using only verified facts. "
+            "Do not add a new objective or claim an action unless it appears in the verified context. "
+            "Generate only structured JSON output."
+        )
 
     @staticmethod
     def _compact_observation(observation: Any) -> dict[str, Any]:

@@ -7,8 +7,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
-from agents.collection_agent.nodes.callback_time_extractor import extract_callback_time
-from agents.collection_agent.nodes.plan_proposal_utils import (
+from agents.collection_agent.utils.callback_time_extractor import extract_callback_time
+from agents.collection_agent.utils.plan_proposal_utils import (
     effective_mode,
     fresh_debug_state,
     get_existing_conversation_plan,
@@ -232,6 +232,7 @@ class PlanProposalGraphNode(BaseGraphNode):
             partial_stage = str(memory_state.get("partial_payment_stage", "")).strip().lower()
             payment_stage = str(memory_state.get("payment_resolution_stage", "")).strip().lower()
             payment_commitment_type = str(memory_state.get("payment_commitment_type", "NONE")).strip().upper()
+            promise_stage = str(memory_state.get("promise_stage", "")).strip().lower()
             autopay_response = str(memory_state.get("autopay_response", "none")).strip().lower()
             autopay_stage = str(memory_state.get("autopay_stage", "")).strip().lower()
             hardship_context = (
@@ -259,6 +260,18 @@ class PlanProposalGraphNode(BaseGraphNode):
                 inferred_next = "transfer_to_specialist"
             elif hardship_options_exhausted:
                 inferred_next = "human_escalation"
+            elif payment_commitment_type == "PROMISE_TO_PAY" and promise_stage == "confirmed":
+                inferred_next = "close_conversation"
+            elif payment_commitment_type == "PROMISE_TO_PAY" and promise_stage == "followup_scheduled":
+                inferred_next = "confirmation"
+            elif payment_commitment_type == "PROMISE_TO_PAY" and promise_stage == "captured":
+                inferred_next = "promise_followup"
+            elif payment_commitment_type == "PROMISE_TO_PAY" and promise_stage == "recording":
+                inferred_next = "promise_capture"
+            elif payment_commitment_type == "PROMISE_TO_PAY" and promise_stage == "date_captured":
+                inferred_next = "promise_capture"
+            elif payment_commitment_type == "PROMISE_TO_PAY":
+                inferred_next = "promise_date"
             elif payment_commitment_type == "FULL_PAYMENT" and autopay_stage == "enabled":
                 markers = (
                     memory_state.get("active_conversation_plan", {}).get("step_markers", {})
@@ -349,6 +362,7 @@ class PlanProposalGraphNode(BaseGraphNode):
             plan=plan,
             candidate=inferred_next,
             identity_verified=bool(memory_state.get("identity_verified", False)),
+            memory_state=memory_state,
         )
         self._remove_verify_identity_node_if_verified(
             plan=plan,
@@ -379,6 +393,9 @@ class PlanProposalGraphNode(BaseGraphNode):
                 "full_payment_options",
                 "full_payment_link",
                 "autopay_offer",
+                "promise_date",
+                "promise_capture",
+                "promise_followup",
                 "human_escalation",
                 "transfer_to_specialist",
             }
@@ -660,18 +677,20 @@ class PlanProposalGraphNode(BaseGraphNode):
         plan: dict[str, Any],
         candidate: str,
         identity_verified: bool,
+        memory_state: dict[str, Any],
     ) -> None:
         if not identity_verified:
             return
         markers = plan.get("step_markers") if isinstance(plan.get("step_markers"), dict) else {}
         now = datetime.now(UTC).isoformat()
+        node_ids = {
+            str(node.get("id", "")).strip()
+            for node in plan.get("nodes", [])
+            if isinstance(node, dict) and str(node.get("id", "")).strip()
+        }
 
         def mark_done(node_id: str, reason: str) -> None:
-            if node_id not in {
-                str(node.get("id", "")).strip()
-                for node in plan.get("nodes", [])
-                if isinstance(node, dict)
-            }:
+            if node_id not in node_ids:
                 return
             markers[node_id] = {
                 "state": "done",
@@ -680,63 +699,167 @@ class PlanProposalGraphNode(BaseGraphNode):
                 "reason": reason,
             }
 
-        if "wrong_party_callback" in {
-            str(node.get("id", "")).strip()
-            for node in plan.get("nodes", [])
-            if isinstance(node, dict)
-        }:
+        def mark_skipped(node_id: str, reason: str) -> None:
+            if node_id not in node_ids:
+                return
+            markers[node_id] = {
+                "state": "skipped",
+                "updated_at": now,
+                "source": "canonical_flow",
+                "reason": reason,
+            }
+
+        if "wrong_party_callback" in node_ids:
             markers["wrong_party_callback"] = {
                 "state": "skipped",
                 "updated_at": now,
                 "source": "canonical_flow",
                 "reason": "right_party_verified",
             }
-        if candidate in {
-            "discovery_empathy",
-            "resolution_offer",
-            "discount_offer",
-            "explain_dues",
-            "collect_payment_intent",
-            "full_payment_options",
-            "full_payment_link",
-            "autopay_offer",
-            "confirmation",
-            "human_escalation",
-            "transfer_to_specialist",
-        }:
-            mark_done("purpose_disclosure", "purpose_disclosed_before_resolution")
-        if candidate in {"resolution_offer", "discount_offer", "confirmation", "human_escalation", "transfer_to_specialist"}:
-            mark_done("discovery_empathy", "hardship_acknowledged")
-        if candidate in {"discount_offer", "human_escalation", "transfer_to_specialist"}:
-            mark_done("resolution_offer", "resolution_offer_presented")
-        if candidate in {"discount_offer", "human_escalation", "transfer_to_specialist"}:
-            mark_done("assess_after_hold", "post_hold_resume_assessed")
-        if candidate in {"explain_dues", "collect_payment_intent", "human_escalation", "transfer_to_specialist"}:
-            mark_done("discount_offer", "discount_offer_presented")
-        if candidate in {"full_payment_options", "full_payment_link", "autopay_offer", "confirmation", "close_conversation"}:
-            mark_done("collect_payment_intent", "full_payment_intent_captured")
-        if candidate in {"full_payment_link", "autopay_offer", "confirmation", "close_conversation"}:
-            mark_done("full_payment_options", "full_payment_method_offered")
-        if candidate in {"autopay_offer", "confirmation", "close_conversation"}:
-            mark_done("full_payment_link", "full_payment_link_created_and_sent")
-        if candidate == "close_conversation":
-            mark_done("autopay_offer", "autopay_declined_or_later")
-        if candidate in {"human_escalation", "transfer_to_specialist"} and "confirmation" in {
-            str(node.get("id", "")).strip()
-            for node in plan.get("nodes", [])
-            if isinstance(node, dict)
-        }:
-            markers["confirmation"] = {
-                "state": "skipped",
-                "updated_at": now,
-                "source": "canonical_flow",
-                "reason": "handoff_replaces_standard_confirmation",
-            }
-        if candidate == "transfer_to_specialist":
-            mark_done("human_escalation", "escalation_queued")
-        if candidate == "confirmation":
-            mark_done("resolution_offer", "eligible_offer_accepted")
+
+        for node_id in sorted(node_ids):
+            projection = PlanProposalGraphNode._project_marker_from_runtime(
+                node_id=node_id,
+                candidate=candidate,
+                memory_state=memory_state,
+            )
+            if not projection:
+                continue
+            state, reason = projection
+            if state == "done":
+                mark_done(node_id, reason)
+            elif state == "skipped":
+                mark_skipped(node_id, reason)
         plan["step_markers"] = markers
+
+    @staticmethod
+    def _project_marker_from_runtime(
+        *,
+        node_id: str,
+        candidate: str,
+        memory_state: dict[str, Any],
+    ) -> tuple[str, str] | None:
+        hold_stage = str(memory_state.get("hardship_hold_stage", "")).strip().lower()
+        hold_response = str(memory_state.get("hold_response", "")).strip().lower()
+        discount_stage = str(memory_state.get("discount_stage", "")).strip().lower()
+        discount_response = str(memory_state.get("discount_response", "")).strip().lower()
+        discount_offered = bool(memory_state.get("discount_offered", False))
+        partial_stage = str(memory_state.get("partial_payment_stage", "")).strip().lower()
+        partial_details = (
+            memory_state.get("partial_payment_details")
+            if isinstance(memory_state.get("partial_payment_details"), dict)
+            else {}
+        )
+        payment_commitment_type = str(memory_state.get("payment_commitment_type", "NONE")).strip().upper()
+        payment_stage = str(memory_state.get("payment_resolution_stage", "")).strip().lower()
+        payment_details = (
+            memory_state.get("full_payment_details")
+            if isinstance(memory_state.get("full_payment_details"), dict)
+            else {}
+        )
+        autopay_response = str(memory_state.get("autopay_response", "none")).strip().lower()
+        autopay_stage = str(memory_state.get("autopay_stage", "")).strip().lower()
+        promise_stage = str(memory_state.get("promise_stage", "")).strip().lower()
+        promise_reference = str(memory_state.get("promise_reference", "")).strip()
+        promise_details = (
+            memory_state.get("promise_to_pay_details")
+            if isinstance(memory_state.get("promise_to_pay_details"), dict)
+            else {}
+        )
+        human_escalation_status = str(memory_state.get("human_escalation_status", "")).strip().lower()
+        human_transfer_status = str(memory_state.get("human_transfer_status", "")).strip().lower()
+        final_disposition = str(memory_state.get("final_disposition", "")).strip().upper()
+
+        hold_evidence = hold_stage in {"offered", "accepted", "confirmed"}
+        discount_evidence = (
+            discount_stage in {"offered", "accepted", "confirmed", "rejected", "counter_offer"}
+            or (discount_response in {"accepted", "rejected", "counter"} and discount_offered)
+        )
+        partial_amount = partial_details.get("partial_payment_amount")
+        partial_sms = partial_details.get("sms_confirmation") if isinstance(partial_details.get("sms_confirmation"), dict) else {}
+        partial_link_done = (
+            str(partial_details.get("payment_reference_id", "")).strip()
+            and str(partial_sms.get("status", "")).strip().lower() == "sent"
+        ) or partial_stage == "confirmed"
+        full_payment_sms = payment_details.get("sms_confirmation") if isinstance(payment_details.get("sms_confirmation"), dict) else {}
+        full_payment_link_done = (
+            str(payment_details.get("payment_reference_id", "")).strip()
+            and str(full_payment_sms.get("status", "")).strip().lower() == "sent"
+        ) or payment_stage in {"confirmed", "link_sent", "autopay_offered"}
+        promise_followup = promise_details.get("followup_schedule") if isinstance(promise_details.get("followup_schedule"), dict) else {}
+        promise_followup_done = (
+            str(promise_followup.get("schedule_id", "")).strip()
+            or promise_stage in {"followup_scheduled", "confirmed"}
+            or final_disposition == "PROMISE_TO_PAY_SCHEDULED"
+        )
+        human_escalation_done = human_escalation_status in {"queued", "completed"} or human_transfer_status in {
+            "pending",
+            "transferred",
+        }
+
+        if node_id == "purpose_disclosure" and candidate not in {
+            "open_and_context",
+            "verify_identity",
+            "purpose_disclosure",
+        }:
+            return "done", "purpose_disclosed_before_current_objective"
+        if node_id == "discovery_empathy" and (hold_evidence or discount_evidence):
+            return "done", "hardship_acknowledged"
+        if node_id == "resolution_offer" and hold_evidence:
+            return "done", "resolution_offer_presented"
+        if node_id == "assess_after_hold" and (
+            hold_response in {"uncertain", "rejected"} or discount_evidence
+        ):
+            return "done", "post_hold_resume_assessed"
+        if node_id == "discount_offer" and discount_evidence:
+            return "done", "discount_offer_presented"
+        if node_id == "collect_payment_intent":
+            if partial_stage in {"collecting_amount", "link_offered", "confirmed"}:
+                return "done", "partial_payment_intent_captured"
+            if payment_commitment_type == "FULL_PAYMENT":
+                return "done", "full_payment_intent_captured"
+            if payment_commitment_type == "PROMISE_TO_PAY":
+                return "done", "promise_to_pay_intent_captured"
+        if node_id == "partial_amount" and (
+            partial_amount not in {None, ""} or partial_stage in {"link_offered", "confirmed"}
+        ):
+            return "done", "partial_amount_validated"
+        if node_id == "partial_link" and partial_link_done:
+            return "done", "partial_payment_link_created_and_sent"
+        if node_id == "full_payment_options" and payment_commitment_type == "FULL_PAYMENT" and payment_stage in {
+            "link_requested",
+            "link_created",
+            "confirmed",
+            "link_sent",
+            "autopay_offered",
+        }:
+            return "done", "full_payment_method_offered"
+        if node_id == "full_payment_link" and full_payment_link_done:
+            return "done", "full_payment_link_created_and_sent"
+        if node_id == "autopay_offer":
+            if autopay_stage == "enabled" or final_disposition == "AUTOPAY_ENABLED":
+                return "done", "autopay_enabled"
+            if autopay_response == "declined":
+                return "skipped", "autopay_declined"
+        if node_id == "promise_date" and promise_stage in {
+            "date_captured",
+            "recording",
+            "captured",
+            "followup_scheduled",
+            "confirmed",
+        }:
+            return "done", "promised_payment_date_captured"
+        if node_id == "promise_capture" and (
+            promise_reference or promise_stage in {"captured", "followup_scheduled", "confirmed"}
+        ):
+            return "done", "promise_to_pay_recorded"
+        if node_id == "promise_followup" and promise_followup_done:
+            return "done", "promise_followup_scheduled"
+        if node_id == "human_escalation" and human_escalation_done:
+            return "done", "escalation_queued"
+        if node_id == "confirmation" and human_escalation_done:
+            return "skipped", "handoff_replaces_standard_confirmation"
+        return None
 
     @staticmethod
     def _ensure_handoff_branch(*, plan: dict[str, Any]) -> None:
@@ -781,11 +904,13 @@ class PlanProposalGraphNode(BaseGraphNode):
     def _create_initial_plan_graph(*, memory_state: dict[str, Any], mode: str) -> dict[str, Any]:
         case_id = str(memory_state.get("active_case_id", "COLL-1001")).strip().upper() or "COLL-1001"
         identity_verified = bool(memory_state.get("identity_verified", False))
+        current_node_id = "purpose_disclosure" if identity_verified else "verify_identity"
+        next_node_ids = ["purpose_disclosure"] if not identity_verified else []
         nodes = [
-            {"id": "open_and_context", "label": "Initialize case context", "owner": "collection_agent", "status": "in_progress"},
-            {"id": "verify_identity", "label": "Verify customer identity", "owner": "customer", "status": ("done" if identity_verified else "pending")},
+            {"id": "open_and_context", "label": "Initialize case context", "owner": "collection_agent", "status": "done"},
+            {"id": "verify_identity", "label": "Verify customer identity", "owner": "customer", "status": ("done" if identity_verified else "in_progress")},
             {"id": "wrong_party_callback", "label": "Arrange privacy-safe callback", "owner": "collection_agent", "status": "pending"},
-            {"id": "purpose_disclosure", "label": "Disclose call purpose and overdue installment", "owner": "collection_agent", "status": "pending"},
+            {"id": "purpose_disclosure", "label": "Disclose call purpose and overdue installment", "owner": "collection_agent", "status": ("in_progress" if identity_verified else "pending")},
             {"id": "discovery_empathy", "label": "Understand and acknowledge customer situation", "owner": "collection_agent", "status": "pending"},
             {"id": "resolution_offer", "label": "Present eligible resolution option", "owner": "collection_agent", "status": "pending"},
             {"id": "assess_after_hold", "label": "Assess ability to resume after hold", "owner": "customer", "status": "pending"},
@@ -795,6 +920,9 @@ class PlanProposalGraphNode(BaseGraphNode):
             {"id": "full_payment_options", "label": "Offer full-payment method", "owner": "collection_agent", "status": "pending"},
             {"id": "full_payment_link", "label": "Create and send secure full-payment link", "owner": "collection_agent", "status": "pending"},
             {"id": "autopay_offer", "label": "Offer auto-pay setup", "owner": "customer", "status": "pending"},
+            {"id": "promise_date", "label": "Capture promised payment date", "owner": "customer", "status": "pending"},
+            {"id": "promise_capture", "label": "Record promise-to-pay commitment", "owner": "collection_agent", "status": "pending"},
+            {"id": "promise_followup", "label": "Schedule promise reminder and payment link", "owner": "collection_agent", "status": "pending"},
             {"id": "confirmation", "label": "Confirm agreed outcome and reference", "owner": "collection_agent", "status": "pending"},
             {"id": "explain_dues", "label": "Explain standard payment options", "owner": "customer", "status": "pending"},
             {"id": "collect_payment_intent", "label": "Collect payment intent", "owner": "customer", "status": "pending"},
@@ -821,6 +949,10 @@ class PlanProposalGraphNode(BaseGraphNode):
             {"from": "full_payment_link", "to": "confirmation", "condition": "link_sent"},
             {"from": "confirmation", "to": "autopay_offer", "condition": "autopay_offered"},
             {"from": "autopay_offer", "to": "close_conversation", "condition": "autopay_declined_or_later"},
+            {"from": "collect_payment_intent", "to": "promise_date", "condition": "promise_to_pay"},
+            {"from": "promise_date", "to": "promise_capture", "condition": "valid_date_captured"},
+            {"from": "promise_capture", "to": "promise_followup", "condition": "promise_recorded"},
+            {"from": "promise_followup", "to": "confirmation", "condition": "followup_scheduled"},
             {"from": "confirmation", "to": "close_conversation", "condition": "outcome_confirmed"},
             {"from": "explain_dues", "to": "collect_payment_intent", "condition": "dues_explained"},
             {"from": "collect_payment_intent", "to": "resolve_outcome", "condition": "pay_now"},
@@ -829,7 +961,6 @@ class PlanProposalGraphNode(BaseGraphNode):
             {"from": "wrong_party_callback", "to": "close_conversation", "condition": "callback_confirmed"},
             {"from": "resolve_outcome", "to": "close_conversation", "condition": "outcome_confirmed"},
         ]
-        next_node_ids = ["verify_identity"] if not identity_verified else ["purpose_disclosure"]
         return {
             "plan_id": f"plan-{case_id}",
             "version": 1,
@@ -837,7 +968,7 @@ class PlanProposalGraphNode(BaseGraphNode):
             "mode": mode,
             "objective": "Move borrower conversation to payment, promise-to-pay, or compliant follow-up.",
             "root_node_id": "open_and_context",
-            "current_node_id": "open_and_context",
+            "current_node_id": current_node_id,
             "previous_node_id": None,
             "next_node_ids": next_node_ids,
             "nodes": nodes,
@@ -931,6 +1062,24 @@ class PlanProposalGraphNode(BaseGraphNode):
                 "owner": "customer",
                 "status": "pending",
             },
+            {
+                "id": "promise_date",
+                "label": "Capture promised payment date",
+                "owner": "customer",
+                "status": "pending",
+            },
+            {
+                "id": "promise_capture",
+                "label": "Record promise-to-pay commitment",
+                "owner": "collection_agent",
+                "status": "pending",
+            },
+            {
+                "id": "promise_followup",
+                "label": "Schedule promise reminder and payment link",
+                "owner": "collection_agent",
+                "status": "pending",
+            },
         ]
         for node in additions:
             if node["id"] not in node_ids:
@@ -961,6 +1110,10 @@ class PlanProposalGraphNode(BaseGraphNode):
             {"from": "full_payment_link", "to": "confirmation", "condition": "link_sent"},
             {"from": "confirmation", "to": "autopay_offer", "condition": "autopay_offered"},
             {"from": "autopay_offer", "to": "close_conversation", "condition": "autopay_declined_or_later"},
+            {"from": "collect_payment_intent", "to": "promise_date", "condition": "promise_to_pay"},
+            {"from": "promise_date", "to": "promise_capture", "condition": "valid_date_captured"},
+            {"from": "promise_capture", "to": "promise_followup", "condition": "promise_recorded"},
+            {"from": "promise_followup", "to": "confirmation", "condition": "followup_scheduled"},
             {"from": "confirmation", "to": "close_conversation", "condition": "outcome_confirmed"},
             {"from": "wrong_party_callback", "to": "close_conversation", "condition": "callback_confirmed"},
             {"from": "resolve_outcome", "to": "close_conversation", "condition": "outcome_confirmed"},
@@ -1119,6 +1272,9 @@ class PlanProposalGraphNode(BaseGraphNode):
             "full_payment_options",
             "full_payment_link",
             "autopay_offer",
+            "promise_date",
+            "promise_capture",
+            "promise_followup",
             "confirmation",
             "human_escalation",
             "transfer_to_specialist",

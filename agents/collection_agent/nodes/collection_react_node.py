@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import re
+from datetime import UTC, date, datetime, timedelta
 from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Any
 from uuid import uuid4
 
-from agents.collection_agent.nodes.callback_time_extractor import extract_callback_time
+from agents.collection_agent.utils.callback_time_extractor import extract_callback_time
 from agents.collection_agent.tools.common import utc_now
 from src.nodes.react_node import ReactNode
 from src.nodes.types import AgentState
@@ -54,6 +55,155 @@ class CollectionReactNode(ReactNode):
         tool_completed_this_turn = int(state.get("steps", 0) or 0) > 0
         case_id = str(state.get("case_id") or memory_state.get("active_case_id", "")).strip()
         customer_id = str(state.get("user_id") or memory_state.get("active_user_id", "")).strip()
+
+        if latest_tool == "promise_capture" and tool_completed_this_turn:
+            promised_date = str(latest_output.get("promised_date", "")).strip()
+            promise_id = str(latest_output.get("promise_id", "")).strip()
+            details = (
+                dict(memory_state.get("promise_to_pay_details", {}))
+                if isinstance(memory_state.get("promise_to_pay_details"), dict)
+                else {}
+            )
+            details.update(latest_output)
+            if memory is not None:
+                memory.set_state(
+                    promise_stage="captured",
+                    promise_reference=promise_id,
+                    promised_date=promised_date or str(memory_state.get("promised_date", "")).strip(),
+                    promise_to_pay_details=details,
+                    promise_date_rejection_reason="",
+                )
+            if case_id and promised_date:
+                scheduled_for = self._reminder_date_for_promise(promised_date)
+                return {
+                    "skip_llm": True,
+                    "reason": "Promise-to-pay captured; schedule reminder follow-up.",
+                    "decision": self._tool_decision(
+                        "followup_schedule",
+                        {
+                            "case_id": case_id,
+                            "scheduled_for": scheduled_for,
+                            "preferred_channel": "sms",
+                            "reason": "promise_to_pay",
+                        },
+                    ),
+                }
+
+        if latest_tool == "followup_schedule" and tool_completed_this_turn:
+            reason = str(latest_output.get("reason", "")).strip().lower()
+            if reason == "installment_discount_review":
+                details = (
+                    dict(memory_state.get("installment_discount_details", {}))
+                    if isinstance(memory_state.get("installment_discount_details"), dict)
+                    else {}
+                )
+                details["review_followup_schedule"] = dict(latest_output)
+                if memory is not None:
+                    memory.set_state(
+                        discount_stage="confirmed",
+                        installment_discount_details=details,
+                        negotiation_stage="confirming_commitment",
+                        followup_status="discount_review_scheduled",
+                    )
+                return {
+                    "skip_llm": True,
+                    "reason": "Installment discount review follow-up scheduled.",
+                    "decision": SimpleNamespace(
+                        thought="Discount application, notifications, and review scheduling are complete.",
+                        tool_call=None,
+                        tool_calls=[],
+                        respond_directly=True,
+                        response_text=None,
+                        done=True,
+                        no_tools_required=True,
+                    ),
+                }
+
+            details = (
+                dict(memory_state.get("promise_to_pay_details", {}))
+                if isinstance(memory_state.get("promise_to_pay_details"), dict)
+                else {}
+            )
+            details["followup_schedule"] = dict(latest_output)
+            promise_id = str(details.get("promise_id", memory_state.get("promise_reference", "")) or "").strip()
+            if memory is not None:
+                memory.set_state(
+                    promise_stage="followup_scheduled",
+                    promise_to_pay_details=details,
+                    final_disposition="PROMISE_TO_PAY_SCHEDULED",
+                    promise_date_rejection_reason="",
+                )
+            self._append_disposition(
+                case_id=case_id,
+                disposition_code="PROMISE_TO_PAY_SCHEDULED",
+                notes=(
+                    f"Promise-to-pay captured and reminder scheduled. Reference: {promise_id}"
+                    if promise_id
+                    else "Promise-to-pay captured and reminder scheduled."
+                ),
+            )
+            return {
+                "skip_llm": True,
+                "reason": "Promise-to-pay follow-up scheduled.",
+                "decision": SimpleNamespace(
+                    thought="Promise-to-pay workflow is ready for customer confirmation.",
+                    tool_call=None,
+                    tool_calls=[],
+                    respond_directly=True,
+                    response_text=None,
+                    done=True,
+                    no_tools_required=True,
+                ),
+            }
+
+        if (
+            str(memory_state.get("payment_commitment_type", "")).strip().upper() == "PROMISE_TO_PAY"
+            and str(memory_state.get("promise_stage", "")).strip().lower() == "date_captured"
+            and not str(memory_state.get("promise_reference", "")).strip()
+            and case_id
+        ):
+            promised_date = str(memory_state.get("promised_date", "")).strip()
+            policy_check = self._validate_promise_date(memory_state=memory_state, promised_date=promised_date)
+            if not policy_check["valid"]:
+                if memory is not None:
+                    memory.set_state(
+                        promise_stage="date_invalid",
+                        promise_date_rejection_reason=policy_check["reason"],
+                    )
+                max_days_text = self._promise_window_text(memory_state)
+                return {
+                    "skip_llm": True,
+                    "reason": "Promised date is outside policy window.",
+                    "decision": SimpleNamespace(
+                        thought="Ask the customer for a valid promise-to-pay date.",
+                        tool_call=None,
+                        tool_calls=[],
+                        respond_directly=True,
+                        response_text=(
+                            f"That date is outside the allowed payment-commitment window{max_days_text}. "
+                            "What earlier date would work for you to clear the full amount?"
+                        ),
+                        done=True,
+                        no_tools_required=True,
+                    ),
+                }
+            amount = float(memory_state.get("active_overdue_amount", 0) or 0)
+            if amount > 0:
+                if memory is not None:
+                    memory.set_state(promise_stage="recording", promise_date_rejection_reason="")
+                return {
+                    "skip_llm": True,
+                    "reason": "Capture full overdue amount promise-to-pay.",
+                    "decision": self._tool_decision(
+                        "promise_capture",
+                        {
+                            "case_id": case_id,
+                            "promised_date": promised_date,
+                            "promised_amount": amount,
+                            "channel": "voice",
+                        },
+                    ),
+                }
 
         if (
             str(memory_state.get("payment_resolution_stage", "")).strip().lower() in {"confirmed", "autopay_offered"}
@@ -406,16 +556,34 @@ class CollectionReactNode(ReactNode):
                     else {}
                 )
                 details["email_confirmation"] = dict(latest_output)
-                if memory is not None:
-                    memory.set_state(
-                        discount_stage="confirmed",
-                        installment_discount_details=details,
-                        negotiation_stage="confirming_commitment",
-                    )
+            if memory is not None:
+                memory.set_state(
+                    discount_stage="review_scheduling",
+                    installment_discount_details=details,
+                    negotiation_stage="confirming_commitment",
+                )
+            review_after_months = int(details.get("review_after_months", 0) or 0)
+            if review_after_months > 0 and case_id:
+                scheduled_for = self._add_months(datetime.now(UTC).date(), review_after_months).isoformat()
                 return {
                     "skip_llm": True,
-                    "reason": "Discount and both confirmations completed.",
-                    "decision": SimpleNamespace(
+                    "reason": "Discount and both confirmations completed; schedule review follow-up.",
+                    "decision": self._tool_decision(
+                        "followup_schedule",
+                        {
+                            "case_id": case_id,
+                            "scheduled_for": scheduled_for,
+                            "preferred_channel": "voice",
+                            "reason": "installment_discount_review",
+                        },
+                    ),
+                }
+            if memory is not None:
+                memory.set_state(discount_stage="confirmed")
+            return {
+                "skip_llm": True,
+                "reason": "Discount and both confirmations completed.",
+                "decision": SimpleNamespace(
                         thought="Discount application and notifications are complete.",
                         tool_call=None,
                         tool_calls=[],
@@ -737,6 +905,113 @@ class CollectionReactNode(ReactNode):
                 },
             ),
         }
+
+    @staticmethod
+    def _validate_promise_date(*, memory_state: dict[str, Any], promised_date: str) -> dict[str, Any]:
+        parsed = CollectionReactNode._parse_promise_date(promised_date)
+        if parsed is None:
+            return {"valid": True, "reason": "unparsed_relative_date"}
+        active_context = (
+            memory_state.get("active_collection_context")
+            if isinstance(memory_state.get("active_collection_context"), dict)
+            else {}
+        )
+        policy = active_context.get("policy") if isinstance(active_context.get("policy"), dict) else {}
+        max_days = int(policy.get("max_promise_days", 0) or 0)
+        if max_days <= 0:
+            return {"valid": True, "reason": "no_policy_limit"}
+        today = datetime.now(UTC).date()
+        delta_days = (parsed - today).days
+        if delta_days < 0:
+            return {"valid": False, "reason": "promised_date_in_past"}
+        if delta_days > max_days:
+            return {"valid": False, "reason": f"promised_date_exceeds_{max_days}_days"}
+        return {"valid": True, "reason": "within_policy"}
+
+    @staticmethod
+    def _promise_window_text(memory_state: dict[str, Any]) -> str:
+        active_context = (
+            memory_state.get("active_collection_context")
+            if isinstance(memory_state.get("active_collection_context"), dict)
+            else {}
+        )
+        policy = active_context.get("policy") if isinstance(active_context.get("policy"), dict) else {}
+        max_days = int(policy.get("max_promise_days", 0) or 0)
+        return f" of {max_days} days for this account" if max_days > 0 else " for this account"
+
+    @staticmethod
+    def _reminder_date_for_promise(promised_date: str) -> str:
+        parsed = CollectionReactNode._parse_promise_date(promised_date)
+        if parsed is None:
+            return promised_date
+        reminder = parsed - timedelta(days=1)
+        if reminder < datetime.now(UTC).date():
+            reminder = parsed
+        return reminder.isoformat()
+
+    @staticmethod
+    def _parse_promise_date(promised_date: str) -> date | None:
+        text = str(promised_date or "").strip().lower()
+        if not text:
+            return None
+        for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y"):
+            try:
+                return datetime.strptime(text, fmt).date()
+            except ValueError:
+                pass
+        today = datetime.now(UTC).date()
+        if text == "tomorrow":
+            return today + timedelta(days=1)
+        match = re.search(r"\b(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)?\b", text)
+        if match:
+            day = int(match.group(1))
+            if 1 <= day <= 31:
+                year = today.year
+                month = today.month
+                for _ in range(2):
+                    try:
+                        candidate = date(year, month, day)
+                    except ValueError:
+                        month += 1
+                        if month > 12:
+                            month = 1
+                            year += 1
+                        continue
+                    if candidate >= today:
+                        return candidate
+                    month += 1
+                    if month > 12:
+                        month = 1
+                        year += 1
+        if "end of the month" in text or "end of month" in text:
+            next_month = date(today.year + (1 if today.month == 12 else 0), 1 if today.month == 12 else today.month + 1, 1)
+            return next_month - timedelta(days=1)
+        weekday_match = re.search(r"\bnext\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b", text)
+        if weekday_match:
+            weekdays = {
+                "monday": 0,
+                "tuesday": 1,
+                "wednesday": 2,
+                "thursday": 3,
+                "friday": 4,
+                "saturday": 5,
+                "sunday": 6,
+            }
+            target = weekdays[weekday_match.group(1)]
+            days = (target - today.weekday()) % 7
+            return today + timedelta(days=days or 7)
+        return None
+
+    @staticmethod
+    def _add_months(value: date, months: int) -> date:
+        month_index = value.month - 1 + max(int(months), 0)
+        year = value.year + month_index // 12
+        month = month_index % 12 + 1
+        last_day = (
+            date(year + (1 if month == 12 else 0), 1 if month == 12 else month + 1, 1)
+            - timedelta(days=1)
+        ).day
+        return date(year, month, min(value.day, last_day))
 
     @staticmethod
     def _is_affirmative(text: str) -> bool:

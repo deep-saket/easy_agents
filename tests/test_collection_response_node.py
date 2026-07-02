@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from agents.collection_agent.nodes.collection_response_node import CollectionResponseNode
-from agents.collection_agent.nodes.plan_proposal_utils import finalize_conversation_memory
+from agents.collection_agent.utils.plan_proposal_utils import finalize_conversation_memory
 from src.memory.types import WorkingMemory
 
 
@@ -14,7 +14,7 @@ def _build_node() -> CollectionResponseNode:
 
 class _FailingRenderLLM:
     def generate_json(self, system_prompt: str, user_prompt: str) -> dict[str, object]:
-        raise AssertionError("LLM renderer should not be called for deterministic workflow templates.")
+        raise RuntimeError("LLM renderer failed.")
 
 
 class _ScriptedRenderLLM:
@@ -25,12 +25,33 @@ class _ScriptedRenderLLM:
         }
 
 
-def test_response_node_prefers_deterministic_full_payment_templates() -> None:
+class _FullPaymentNaturalLLM:
+    def generate_json(self, system_prompt: str, user_prompt: str) -> dict[str, object]:
+        assert "Verified response context JSON" in user_prompt
+        return {
+            "message": (
+                "The payment link is on its way to your registered mobile. "
+                "Your reference number is PAY-123. Once payment is received, you will get an instant receipt. "
+                "Would you like to set up auto-pay so future installments are not missed?"
+            ),
+            "response_target": "customer",
+        }
+
+
+class _HallucinatedReferenceLLM:
+    def generate_json(self, system_prompt: str, user_prompt: str) -> dict[str, object]:
+        return {
+            "message": "The link is on its way, and your reference number is PAY-FAKE999.",
+            "response_target": "customer",
+        }
+
+
+def test_response_node_uses_llm_first_for_full_payment_objective() -> None:
     node = CollectionResponseNode(
-        llm=_FailingRenderLLM(),
+        llm=_FullPaymentNaturalLLM(),
         strict_llm_mode=True,
         system_prompt="render",
-        render_user_prompt="{template_id}",
+        render_user_prompt="Verified response context JSON: {verified_response_context_json}",
     )
     memory = WorkingMemory(
         session_id="response-full-payment",
@@ -63,10 +84,137 @@ def test_response_node_prefers_deterministic_full_payment_templates() -> None:
         }
     )
 
-    assert update["response_render_debug"]["renderer_fallback_used"] is True
-    assert update["response_render_debug"]["policy_filters_applied"] == ["deterministic_compliance_template"]
+    assert update["response_render_debug"]["renderer_fallback_used"] is False
     assert "reference number is PAY-123" in update["response"]
     assert "auto-pay" in update["response"]
+
+
+def test_response_node_falls_back_when_llm_fails_for_full_payment_objective() -> None:
+    node = CollectionResponseNode(
+        llm=_FailingRenderLLM(),
+        strict_llm_mode=True,
+        system_prompt="render",
+        render_user_prompt="Verified response context JSON: {verified_response_context_json}",
+    )
+    memory = WorkingMemory(
+        session_id="response-full-payment-fallback",
+        state={
+            "active_customer_name": "Rohan Gupta",
+            "active_case_id": "COLL-1002",
+            "active_overdue_amount": 37800.0,
+            "identity_verified": True,
+            "payment_commitment_type": "FULL_PAYMENT",
+            "payment_resolution_stage": "confirmed",
+            "full_payment_details": {
+                "payment_reference_id": "PAY-123",
+                "sms_confirmation": {"status": "sent"},
+            },
+        },
+    )
+
+    update = node.execute(
+        {
+            "user_input": "Send me the link, please.",
+            "memory": memory,
+            "plan_proposal": {
+                "target": "customer",
+                "response_directive": {
+                    "conversation_objective": "full_payment_confirmation",
+                    "dialogue_action": "confirm_full_payment_link",
+                    "response_mode": "informational",
+                },
+            },
+        }
+    )
+
+    assert update["response_render_debug"]["renderer_fallback_used"] is True
+    assert "reference number is PAY-123" in update["response"]
+
+
+def test_response_node_falls_back_when_llm_invents_reference() -> None:
+    node = CollectionResponseNode(
+        llm=_HallucinatedReferenceLLM(),
+        strict_llm_mode=True,
+        system_prompt="render",
+        render_user_prompt="Verified response context JSON: {verified_response_context_json}",
+    )
+    memory = WorkingMemory(
+        session_id="response-full-payment-hallucinated-reference",
+        state={
+            "active_customer_name": "Rohan Gupta",
+            "active_case_id": "COLL-1002",
+            "active_overdue_amount": 37800.0,
+            "identity_verified": True,
+            "payment_commitment_type": "FULL_PAYMENT",
+            "payment_resolution_stage": "confirmed",
+            "full_payment_details": {
+                "payment_reference_id": "PAY-123",
+                "sms_confirmation": {"status": "sent"},
+            },
+        },
+    )
+
+    update = node.execute(
+        {
+            "user_input": "Send me the link, please.",
+            "memory": memory,
+            "plan_proposal": {
+                "target": "customer",
+                "response_directive": {
+                    "conversation_objective": "full_payment_confirmation",
+                    "dialogue_action": "confirm_full_payment_link",
+                    "response_mode": "informational",
+                },
+            },
+        }
+    )
+
+    assert update["response_render_debug"]["renderer_fallback_used"] is True
+    assert "PAY-FAKE999" not in update["response"]
+    assert "PAY-123" in update["response"]
+
+
+def test_response_node_explains_below_minimum_partial_payment_validation() -> None:
+    node = _build_node()
+    memory = WorkingMemory(
+        session_id="response-partial-validation",
+        state={
+            "active_customer_name": "Rohan Gupta",
+            "active_case_id": "COLL-1002",
+            "active_overdue_amount": 37800.0,
+            "identity_verified": True,
+            "partial_payment_stage": "collecting_amount",
+            "partial_payment_validation": {
+                "status": "rejected",
+                "reason": "below_minimum_partial_payment",
+                "offered_amount": 7000.0,
+                "offered_pct": 18.52,
+                "minimum_partial_payment_pct": 20.0,
+                "minimum_partial_payment_amount": 7560.0,
+                "total_due": 37800.0,
+            },
+        },
+    )
+
+    update = node.execute(
+        {
+            "user_input": "I can pay 7000 today.",
+            "memory": memory,
+            "plan_proposal": {
+                "target": "customer",
+                "response_directive": {
+                    "conversation_objective": "partial_payment_amount_request",
+                    "dialogue_action": "ask_partial_payment_amount",
+                    "response_mode": "empathetic",
+                },
+            },
+        }
+    )
+
+    assert "7000.00" in update["response"]
+    assert "7560.00" in update["response"]
+    assert "20%" in update["response"]
+    assert "How much do you think" not in update["response"]
 
 
 def test_response_node_allows_llm_for_arrangement_reasoning() -> None:

@@ -8,6 +8,7 @@ from agents.collection_agent.tools.email_confirmation_send_tool import EmailConf
 from agents.collection_agent.tools.installment_discount_apply_tool import InstallmentDiscountApplyTool
 from agents.collection_agent.tools.installment_discount_evaluate_tool import InstallmentDiscountEvaluateTool
 from agents.collection_agent.tools.entity_extract_tool import EntityExtractTool
+from agents.collection_agent.tools.followup_schedule_tool import FollowupScheduleTool
 from agents.collection_agent.tools.human_escalation_tool import HumanEscalationTool
 from agents.collection_agent.tools.loan_policy_lookup_tool import LoanPolicyLookupTool
 from agents.collection_agent.tools.offer_eligibility_tool import OfferEligibilityTool
@@ -27,6 +28,8 @@ from agents.collection_agent.tools.schemas import (
     EntityExtractOutput,
     EmailConfirmationSendInput,
     EmailConfirmationSendOutput,
+    FollowupScheduleInput,
+    FollowupScheduleOutput,
     InstallmentDiscountApplyInput,
     InstallmentDiscountApplyOutput,
     InstallmentDiscountEvaluateInput,
@@ -69,6 +72,7 @@ __all__ = [
     "InstallmentDiscountEvaluateTool",
     "InstallmentDiscountApplyTool",
     "EntityExtractTool",
+    "FollowupScheduleTool",
     "HumanEscalationTool",
     "LoanPolicyLookupTool",
     "OfferEligibilityTool",
@@ -87,6 +91,8 @@ __all__ = [
     "EntityExtractOutput",
     "EmailConfirmationSendInput",
     "EmailConfirmationSendOutput",
+    "FollowupScheduleInput",
+    "FollowupScheduleOutput",
     "InstallmentDiscountEvaluateInput",
     "InstallmentDiscountEvaluateOutput",
     "InstallmentDiscountApplyInput",

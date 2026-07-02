@@ -11,6 +11,7 @@ from agents.collection_agent.nodes.plan_proposal_graph_node import PlanProposalG
 from agents.collection_agent.nodes.plan_proposal_state_node import PlanProposalStateNode
 from agents.collection_agent.tools.data_store import CollectionDataStore
 from agents.collection_agent.tools.email_confirmation_send_tool import EmailConfirmationSendTool
+from agents.collection_agent.tools.followup_schedule_tool import FollowupScheduleTool
 from agents.collection_agent.tools.human_escalation_tool import HumanEscalationTool
 from agents.collection_agent.tools.installment_discount_apply_tool import InstallmentDiscountApplyTool
 from agents.collection_agent.tools.installment_discount_evaluate_tool import InstallmentDiscountEvaluateTool
@@ -73,6 +74,7 @@ def _registry(store: CollectionDataStore) -> ToolRegistry:
     registry.register(InstallmentDiscountApplyTool(store=store))
     registry.register(SMSConfirmationSendTool(store=store))
     registry.register(EmailConfirmationSendTool(store=store))
+    registry.register(FollowupScheduleTool(store=store))
     registry.register(HumanEscalationTool(store=store))
     return registry
 
@@ -137,7 +139,7 @@ def test_job_loss_uncertainty_evaluates_and_applies_discount(tmp_path: Path) -> 
         "observations": [],
     }
     executed: list[str] = []
-    for _ in range(3):
+    for _ in range(4):
         react_update = react.execute(acceptance_state)
         acceptance_state.update(react_update)
         executed.append(react_update["decision"].tool_call.tool_name)
@@ -149,6 +151,7 @@ def test_job_loss_uncertainty_evaluates_and_applies_discount(tmp_path: Path) -> 
         "installment_discount_apply",
         "sms_confirmation_send",
         "email_confirmation_send",
+        "followup_schedule",
     ]
     assert "premium_hold_create" not in executed
     assert final_update["decision"].done is True
@@ -159,7 +162,11 @@ def test_job_loss_uncertainty_evaluates_and_applies_discount(tmp_path: Path) -> 
     assert details["revised_amount"] == 34020.0
     assert details["sms_confirmation"]["status"] == "sent"
     assert details["email_confirmation"]["status"] == "sent"
+    assert details["review_followup_schedule"]["reason"] == "installment_discount_review"
+    assert details["review_followup_schedule"]["schedule_id"].startswith("SCH-")
+    assert memory.state["followup_status"] == "discount_review_scheduled"
     assert store.load_runtime("installment_discounts.json")[0]["reference_number"] == details["reference_number"]
+    assert store.load_runtime("followups.json")[0]["reason"] == "installment_discount_review"
 
 
 def test_discount_offer_confirmation_and_named_closing() -> None:
@@ -179,6 +186,10 @@ def test_discount_offer_confirmation_and_named_closing() -> None:
                 "review_after_months": 3,
                 "sms_confirmation": {"status": "sent"},
                 "email_confirmation": {"status": "sent"},
+                "review_followup_schedule": {
+                    "schedule_id": "SCH-A1B2C3D4E5",
+                    "reason": "installment_discount_review",
+                },
             },
         },
     )

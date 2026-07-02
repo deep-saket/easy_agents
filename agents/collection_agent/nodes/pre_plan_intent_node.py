@@ -5,9 +5,10 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from agents.collection_agent.nodes.callback_time_extractor import extract_callback_time
+from agents.collection_agent.utils.callback_time_extractor import extract_callback_time
 from agents.collection_agent.nodes.collection_intent_node import CollectionIntentNode
-from agents.collection_agent.nodes.partial_payment_utils import partial_payment_from_llm_amount
+from agents.collection_agent.utils.partial_payment_utils import partial_payment_from_llm_amount
+from agents.collection_agent.utils.plan_proposal_utils import promise_to_pay_ready_for_capture
 from src.nodes.types import AgentState
 
 
@@ -175,6 +176,16 @@ class PrePlanIntentNode(CollectionIntentNode):
         right_party_status = str(memory_state.get("right_party_status", "")).strip().lower()
         lowered = str(state.get("user_input", "")).lower()
         partial_stage = str(memory_state.get("partial_payment_stage", "")).strip().lower()
+        if promise_to_pay_ready_for_capture(memory_state):
+            return {
+                "skip_llm": True,
+                "reason": "Promise-to-pay date captured; route to execution before customer response.",
+                "intent": {
+                    "intent": "decide",
+                    "confidence": 1.0,
+                    "reason": "Validate and record the promise-to-pay commitment.",
+                },
+            }
         if (
             str(memory_state.get("payment_resolution_stage", "")).strip().lower() in {"options_offered", "link_offered"}
             and str(memory_state.get("payment_commitment_type", "")).strip().upper() == "FULL_PAYMENT"

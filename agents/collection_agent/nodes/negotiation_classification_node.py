@@ -186,15 +186,19 @@ class NegotiationClassificationNode(BaseGraphNode):
                 elif self.strict_llm_mode:
                     raise
 
+        turn_entities = (
+            dict(state.get("extracted_entities_turn", {}))
+            if isinstance(state.get("extracted_entities_turn"), dict)
+            else {}
+        )
+        if not turn_entities and isinstance(memory_state.get("extracted_entities_turn"), dict):
+            turn_entities = dict(memory_state.get("extracted_entities_turn", {}))
+
         merged = self._merge_with_prior_state(
             prior=prior,
             payload=(payload.model_dump(mode="json") if payload is not None else None),
             user_input=str(state.get("user_input", "")),
-            extracted_entities_turn=(
-                dict(state.get("extracted_entities_turn", {}))
-                if isinstance(state.get("extracted_entities_turn"), dict)
-                else {}
-            ),
+            extracted_entities_turn=turn_entities,
             identity_verified=identity_verified,
         )
         if self._discount_operationally_confirmed(memory_state):
@@ -210,6 +214,8 @@ class NegotiationClassificationNode(BaseGraphNode):
                 "customer_payment_posture": merged["customer_payment_posture"],
                 "payment_commitment_type": merged["payment_commitment_type"],
                 "payment_option_response": merged["payment_option_response"],
+                "promise_stage": merged["promise_stage"],
+                "promised_date": merged["promised_date"],
                 "autopay_response": merged["autopay_response"],
                 "autopay_setup_requested": bool(merged["autopay_setup_requested"]),
                 "autopay_stage": merged["autopay_stage"],
@@ -231,6 +237,8 @@ class NegotiationClassificationNode(BaseGraphNode):
             "customer_payment_posture": merged["customer_payment_posture"],
             "payment_commitment_type": merged["payment_commitment_type"],
             "payment_option_response": merged["payment_option_response"],
+            "promise_stage": merged["promise_stage"],
+            "promised_date": merged["promised_date"],
             "autopay_response": merged["autopay_response"],
             "autopay_setup_requested": bool(merged["autopay_setup_requested"]),
             "autopay_stage": merged["autopay_stage"],
@@ -258,6 +266,8 @@ class NegotiationClassificationNode(BaseGraphNode):
                 customer_payment_posture=merged["customer_payment_posture"],
                 payment_commitment_type=merged["payment_commitment_type"],
                 payment_option_response=merged["payment_option_response"],
+                promise_stage=merged["promise_stage"],
+                promised_date=merged["promised_date"],
                 autopay_response=merged["autopay_response"],
                 autopay_setup_requested=bool(merged["autopay_setup_requested"]),
                 autopay_stage=merged["autopay_stage"],
@@ -327,6 +337,17 @@ class NegotiationClassificationNode(BaseGraphNode):
         )
         raw = {**fallback, **payload} if isinstance(payload, dict) else fallback
         hardship_payload = raw.get("hardship_context") if isinstance(raw.get("hardship_context"), dict) else {}
+        waiting_for_promise_date = self._is_waiting_for_promise_date(prior)
+        promised_date = (
+            self._promised_date_from_entities(
+                user_input=user_input,
+                raw=raw,
+                prior=prior,
+                extracted_entities_turn=extracted_entities_turn,
+            )
+            if waiting_for_promise_date
+            else ""
+        )
 
         merged = {
             "conversation_mode": self._normalize_choice(
@@ -383,6 +404,8 @@ class NegotiationClassificationNode(BaseGraphNode):
                 allowed=self._ALLOWED_PAYMENT_OPTION_RESPONSES,
                 default="none",
             ),
+            "promised_date": promised_date,
+            "promise_stage": str(raw.get("promise_stage", prior.get("promise_stage", ""))).strip().lower(),
             "autopay_response": self._normalize_choice(
                 raw.get("autopay_response"),
                 allowed=self._ALLOWED_AUTOPAY_RESPONSES,
@@ -437,6 +460,29 @@ class NegotiationClassificationNode(BaseGraphNode):
             merged["payment_commitment_type"] = fallback_commitment
         if fallback_payment_option != "none" and merged["payment_option_response"] == "none":
             merged["payment_option_response"] = fallback_payment_option
+        if (
+            self._is_verification_only_text(user_input)
+            and str(prior.get("payment_commitment_type", "NONE")).strip().upper() != "PROMISE_TO_PAY"
+        ):
+            merged["payment_commitment_type"] = "NONE"
+            merged["customer_payment_posture"] = (
+                str(prior.get("customer_payment_posture", "unknown")).strip().lower() or "unknown"
+            )
+            merged["promise_stage"] = ""
+            merged["promised_date"] = ""
+        prior_promise_stage = str(prior.get("promise_stage", "")).strip().lower()
+        if prior_promise_stage in {"captured", "followup_scheduled", "confirmed"}:
+            merged["payment_commitment_type"] = "PROMISE_TO_PAY"
+            merged["customer_payment_posture"] = "promise_to_pay"
+            merged["conversation_mode"] = "promise_capture"
+            merged["active_dialogue_owner"] = "promise_capture"
+            merged["promise_stage"] = prior_promise_stage
+            if not str(merged.get("promised_date", "")).strip():
+                merged["promised_date"] = str(prior.get("promised_date", "")).strip()
+        elif merged["payment_commitment_type"] == "PROMISE_TO_PAY":
+            merged["promise_stage"] = "date_captured" if str(merged.get("promised_date", "")).strip() else "date_required"
+            merged["conversation_mode"] = "promise_capture"
+            merged["active_dialogue_owner"] = "promise_capture"
         if fallback_autopay_requested:
             merged["autopay_setup_requested"] = True
             if merged["autopay_response"] == "none" and fallback_autopay_response != "none":
@@ -472,6 +518,18 @@ class NegotiationClassificationNode(BaseGraphNode):
             and prior_resolution_stage
         ):
             merged["payment_commitment_type"] = "FULL_PAYMENT"
+        if (
+            merged["payment_commitment_type"] == "NONE"
+            and prior_commitment == "PROMISE_TO_PAY"
+            and str(prior.get("promise_stage", "")).strip().lower()
+        ):
+            merged["payment_commitment_type"] = "PROMISE_TO_PAY"
+            merged["customer_payment_posture"] = "promise_to_pay"
+            merged["conversation_mode"] = "promise_capture"
+            merged["active_dialogue_owner"] = "promise_capture"
+            merged["promise_stage"] = str(prior.get("promise_stage", "")).strip().lower()
+            if not str(merged.get("promised_date", "")).strip():
+                merged["promised_date"] = str(prior.get("promised_date", "")).strip()
 
         prior_hardship = (
             dict(prior.get("hardship_context", {}))
@@ -855,6 +913,15 @@ class NegotiationClassificationNode(BaseGraphNode):
                 state.get("payment_commitment_type", memory_state.get("payment_commitment_type", "NONE"))
             ).strip().upper()
             or "NONE",
+            "promise_stage": str(
+                state.get("promise_stage", memory_state.get("promise_stage", ""))
+            ).strip().lower(),
+            "promised_date": str(
+                state.get("promised_date", memory_state.get("promised_date", ""))
+            ).strip(),
+            "promise_reference": str(
+                state.get("promise_reference", memory_state.get("promise_reference", ""))
+            ).strip(),
             "payment_option_response": "none",
             "autopay_response": "none",
             "autopay_setup_requested": bool(
@@ -956,6 +1023,9 @@ class NegotiationClassificationNode(BaseGraphNode):
             "negotiation_stage",
             "customer_payment_posture",
             "payment_commitment_type",
+            "promise_stage",
+            "promised_date",
+            "promise_reference",
             "payment_resolution_stage",
             "payment_resolution_details",
             "autopay_setup_requested",
@@ -987,6 +1057,141 @@ class NegotiationClassificationNode(BaseGraphNode):
             "last_agent_response",
         }
         return {key: memory_state.get(key) for key in keep if key in memory_state}
+
+    @staticmethod
+    def _promised_date_from_entities(
+        *,
+        user_input: str,
+        raw: dict[str, Any],
+        prior: dict[str, Any],
+        extracted_entities_turn: dict[str, Any],
+    ) -> str:
+        date_text = NegotiationClassificationNode._promised_date_from_text(user_input)
+        if date_text:
+            return date_text
+        for source in (raw, extracted_entities_turn, prior):
+            if not isinstance(source, dict):
+                continue
+            for key in ("promised_date", "payment_date", "commitment_date"):
+                value = str(source.get(key, "") or "").strip()
+                if value:
+                    return value
+        return ""
+
+    @staticmethod
+    def _promised_date_from_text(text: str) -> str:
+        original = str(text or "").strip()
+        normalized = re.sub(r"\s+", " ", original.lower())
+        if not normalized:
+            return ""
+        month_pattern = (
+            r"(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|"
+            r"jul(?:y)?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)"
+        )
+        day_with_month = re.search(
+            rf"\b(?:the\s+)?\d{{1,2}}(?:st|nd|rd|th)?\s+{month_pattern}\b",
+            normalized,
+        )
+        if day_with_month:
+            return original[day_with_month.start() : day_with_month.end()].strip()
+        month_names = (
+            "jan",
+            "january",
+            "feb",
+            "february",
+            "mar",
+            "march",
+            "apr",
+            "april",
+            "may",
+            "jun",
+            "june",
+            "jul",
+            "july",
+            "aug",
+            "august",
+            "sep",
+            "sept",
+            "september",
+            "oct",
+            "october",
+            "nov",
+            "november",
+            "dec",
+            "december",
+        )
+        iso_match = re.search(r"\b\d{4}-\d{1,2}-\d{1,2}\b", normalized)
+        if iso_match:
+            return original[iso_match.start() : iso_match.end()].strip()
+        slash_match = re.search(r"\b\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?\b", normalized)
+        if slash_match:
+            return original[slash_match.start() : slash_match.end()].strip()
+        day_match = re.search(r"\b(?:the\s+)?\d{1,2}(?:st|nd|rd|th)?\b", normalized)
+        if day_match:
+            return original[day_match.start() : day_match.end()].strip()
+        relative_match = re.search(
+            r"\b(?:tomorrow|next\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday))\b",
+            normalized,
+        )
+        if relative_match:
+            return original[relative_match.start() : relative_match.end()].strip()
+        if any(re.search(rf"\b{re.escape(month)}\b", normalized) for month in month_names):
+            return original
+        return ""
+
+    @staticmethod
+    def _is_waiting_for_promise_date(prior: dict[str, Any]) -> bool:
+        commitment = str(prior.get("payment_commitment_type", "NONE")).strip().upper()
+        promise_stage = str(prior.get("promise_stage", "")).strip().lower()
+        conversation_mode = str(prior.get("conversation_mode", "")).strip().lower()
+        dialogue_owner = str(prior.get("active_dialogue_owner", "")).strip().lower()
+        posture = str(prior.get("customer_payment_posture", "")).strip().lower()
+        return (
+            promise_stage in {"date_required", "date_invalid"}
+            and (
+                commitment == "PROMISE_TO_PAY"
+                or posture == "promise_to_pay"
+                or conversation_mode == "promise_capture"
+                or dialogue_owner == "promise_capture"
+            )
+        )
+
+    @staticmethod
+    def _is_verification_only_text(text: str) -> bool:
+        lowered = re.sub(r"\s+", " ", str(text or "").strip().lower())
+        if not lowered:
+            return False
+        has_verification = any(
+            token in lowered
+            for token in (
+                "date of birth",
+                "dob",
+                "birth date",
+                "phone number",
+                "mobile number",
+                "mob. no",
+                "registered phone",
+                "registered mobile",
+            )
+        )
+        has_payment_intent = any(
+            token in lowered
+            for token in (
+                "pay",
+                "payment",
+                "paid",
+                "clear",
+                "dues",
+                "premium",
+                "salary",
+                "payday",
+                "end of month",
+                "end of the month",
+                "next week",
+                "next friday",
+            )
+        )
+        return has_verification and not has_payment_intent
 
     @staticmethod
     def _fallback_is_affirmative(text: str) -> bool:

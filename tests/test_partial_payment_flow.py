@@ -8,7 +8,7 @@ from agents.collection_agent.nodes.collection_response_node import CollectionRes
 from agents.collection_agent.nodes.plan_proposal_directive_node import PlanProposalDirectiveNode
 from agents.collection_agent.nodes.plan_proposal_graph_node import PlanProposalGraphNode
 from agents.collection_agent.nodes.plan_proposal_state_node import PlanProposalStateNode
-from agents.collection_agent.nodes.partial_payment_utils import partial_payment_from_llm_amount
+from agents.collection_agent.utils.partial_payment_utils import partial_payment_from_llm_amount
 from agents.collection_agent.tools.data_store import CollectionDataStore
 from agents.collection_agent.tools.payment_link_create_tool import PaymentLinkCreateTool
 from agents.collection_agent.tools.sms_confirmation_send_tool import SMSConfirmationSendTool
@@ -95,6 +95,32 @@ def test_partial_payment_ignores_capacity_not_extracted_in_current_turn() -> Non
         total_due=37800.0,
     )
     assert parsed is None
+
+
+def test_below_minimum_partial_payment_records_validation_reason() -> None:
+    memory = _memory()
+    memory.set_state(partial_payment_stage="collecting_amount")
+    directive_node = PlanProposalDirectiveNode(llm=None, strict_llm_mode=False)
+
+    update = directive_node.execute(
+        {
+            "user_input": "I can pay 7000 today.",
+            "memory": memory,
+            "steps": 0,
+            "identity_verified": True,
+            "customer_payment_capacity": 7000.0,
+            "extracted_entities_turn": {"customer_payment_capacity": "7000"},
+        }
+    )
+
+    assert update["plan_proposal"]["conversation_objective"] == "partial_payment_amount_request"
+    assert memory.state["partial_payment_stage"] == "collecting_amount"
+    validation = memory.state["partial_payment_validation"]
+    assert validation["status"] == "rejected"
+    assert validation["reason"] == "below_minimum_partial_payment"
+    assert validation["offered_amount"] == 7000.0
+    assert validation["minimum_partial_payment_pct"] == 20.0
+    assert validation["minimum_partial_payment_amount"] == 7560.0
 
 
 def test_full_amount_is_not_treated_as_partial_payment() -> None:

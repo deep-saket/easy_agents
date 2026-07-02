@@ -70,6 +70,17 @@ def verification_required_fields(memory_state: dict[str, Any]) -> list[str]:
     return ["dob", "phone"]
 
 
+def promise_to_pay_ready_for_capture(memory_state: dict[str, Any]) -> bool:
+    """Return true when PTP has a date and must execute capture tools."""
+
+    return (
+        str(memory_state.get("payment_commitment_type", "")).strip().upper() == "PROMISE_TO_PAY"
+        and str(memory_state.get("promise_stage", "")).strip().lower() == "date_captured"
+        and bool(str(memory_state.get("promised_date", "")).strip())
+        and not bool(str(memory_state.get("promise_reference", "")).strip())
+    )
+
+
 def overlay_verification_state_from_graph(*, state: AgentState, memory_state: dict[str, Any]) -> dict[str, Any]:
     merged = dict(memory_state)
     if isinstance(state.get("verification_entities"), dict):
@@ -326,6 +337,25 @@ def mark_confirmation_delivered(memory: Any) -> dict[str, Any]:
                     "source": "response_render",
                     "reason": "full_payment_link_created_and_sms_sent",
                 }
+    if str(memory_state.get("promise_stage", "")).strip().lower() == "followup_scheduled":
+        details = (
+            memory_state.get("promise_to_pay_details")
+            if isinstance(memory_state.get("promise_to_pay_details"), dict)
+            else {}
+        )
+        followup = details.get("followup_schedule") if isinstance(details.get("followup_schedule"), dict) else {}
+        if str(details.get("promise_id", "")).strip() and str(followup.get("schedule_id", "")).strip():
+            completed_prerequisites = ["collect_payment_intent", "promise_date", "promise_capture", "promise_followup"]
+            confirmation_reason = "promise_to_pay_confirmed"
+            for node_id in completed_prerequisites:
+                markers[node_id] = {
+                    "state": "done",
+                    "updated_at": now,
+                    "source": "response_render",
+                    "reason": "promise_captured_and_followup_scheduled",
+                }
+            if memory is not None:
+                memory.set_state(promise_stage="confirmed")
     markers["confirmation"] = {
         "state": "done",
         "updated_at": now,

@@ -4,11 +4,11 @@ from agents.collection_agent.agent import CollectionAgent
 from agents.collection_agent.nodes.plan_proposal_directive_node import PlanProposalDirectiveNode
 from agents.collection_agent.nodes.plan_proposal_graph_node import PlanProposalGraphNode
 from agents.collection_agent.nodes.plan_proposal_state_node import PlanProposalStateNode
-from agents.collection_agent.nodes.plan_proposal_utils import (
+from agents.collection_agent.utils.plan_proposal_utils import (
     finalize_conversation_memory,
     is_right_party_denial,
 )
-from agents.collection_agent.nodes.callback_time_extractor import extract_callback_time
+from agents.collection_agent.utils.callback_time_extractor import extract_callback_time
 from src.nodes.base import BaseGraphNode
 from src.memory.types import WorkingMemory
 
