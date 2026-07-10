@@ -13,6 +13,7 @@ from agents.collection_agent.utils.plan_proposal_utils import (
     effective_mode,
     fresh_debug_state,
     get_existing_conversation_plan,
+    is_customer_callback_request,
     is_plan_rejection,
     is_plan_request,
     json_compact,
@@ -66,6 +67,12 @@ class PlanProposalStateNode(BaseGraphNode):
         existing_plan = get_existing_conversation_plan(state=state, memory_state=memory_state)
         prepared_memory_state = overlay_verification_state_from_graph(state=state, memory_state=memory_state)
         prepared_memory_state = overlay_negotiation_state_from_graph(state=state, memory_state=prepared_memory_state)
+        prepared_memory_state = self._apply_customer_callback_state(
+            state=state,
+            memory=memory,
+            memory_state=prepared_memory_state,
+            existing_plan=existing_plan,
+        )
         plan_mode = effective_mode(
             memory_state=prepared_memory_state,
             default=str(memory_state.get("mode", "strict_collections")),
@@ -110,6 +117,50 @@ class PlanProposalStateNode(BaseGraphNode):
             "response_mode": str(prepared_memory_state.get("response_mode", "informational")).strip(),
             "active_dialogue_owner": str(prepared_memory_state.get("active_dialogue_owner", "collections")).strip(),
         }
+
+    @staticmethod
+    def _apply_customer_callback_state(
+        *,
+        state: AgentState,
+        memory: Any,
+        memory_state: dict[str, Any],
+        existing_plan: dict[str, Any],
+    ) -> dict[str, Any]:
+        user_input = str(state.get("user_input", "")).strip()
+        right_party_status = str(memory_state.get("right_party_status", "")).strip().lower()
+        if right_party_status == "wrong_party" or not is_customer_callback_request(user_input):
+            return memory_state
+
+        current_stage = str(memory_state.get("customer_callback_stage", "")).strip().lower()
+        if current_stage in {"scheduling", "completed"}:
+            return memory_state
+
+        current_node_id = ""
+        if isinstance(existing_plan, dict):
+            current_node_id = str(existing_plan.get("current_node_id", "")).strip().lower()
+        updated = dict(memory_state)
+        updated.update(
+            {
+                "customer_callback_stage": "awaiting_callback",
+                "customer_callback_time": None,
+                "customer_callback_resume_node": current_node_id or memory_state.get("customer_callback_resume_node"),
+                "customer_callback_resume_objective": str(
+                    memory_state.get("customer_callback_resume_objective", "")
+                ).strip(),
+                "response_mode": "empathetic",
+                "active_dialogue_owner": "customer_callback",
+            }
+        )
+        if memory is not None:
+            memory.set_state(
+                customer_callback_stage="awaiting_callback",
+                customer_callback_time=None,
+                customer_callback_resume_node=updated.get("customer_callback_resume_node") or None,
+                customer_callback_resume_objective=updated.get("customer_callback_resume_objective") or None,
+                response_mode="empathetic",
+                active_dialogue_owner="customer_callback",
+            )
+        return updated
 
     def route(self, state: AgentState) -> str:
         return str(state.get("route", "continue")).strip().lower() or "continue"

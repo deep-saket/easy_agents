@@ -22,6 +22,7 @@ from agents.collection_agent.utils.plan_proposal_utils import (
     fresh_debug_state,
     get_existing_conversation_plan,
     is_provider_rate_limit_error,
+    is_customer_callback_request,
     is_right_party_denial,
     json_compact,
     looks_like_callback_time,
@@ -83,6 +84,7 @@ class PlanProposalDirectiveNode(BaseGraphNode):
             else get_existing_conversation_plan(state=state, memory_state=memory_state)
         )
         plan_signals = state.get("plan_signals") if isinstance(state.get("plan_signals"), dict) else {}
+        current_node_id = str(existing_plan.get("current_node_id", "")).strip().lower()
         identity_verified = bool(memory_state.get("identity_verified", False))
         right_party_status = str(memory_state.get("right_party_status", "")).strip().lower()
         wrong_party_callback_stage = str(memory_state.get("wrong_party_callback_stage", "")).strip().lower()
@@ -520,6 +522,129 @@ class PlanProposalDirectiveNode(BaseGraphNode):
                         "selected_next_node_id": "wrong_party_callback",
                         "mark_skipped": ["verify_identity"],
                     },
+                },
+            })
+
+        customer_callback_stage = str(memory_state.get("customer_callback_stage", "")).strip().lower()
+        if (
+            str(observed_tool).strip().lower() == "outbound_callback_schedule"
+            and isinstance(output, dict)
+            and str(output.get("status", "")).strip().lower() == "scheduled"
+            and customer_callback_stage in {"awaiting_callback", "scheduling", "completed"}
+        ):
+            scheduled_callback_time = str(observed_input.get("callback_time", "")).strip()
+            if memory is not None:
+                memory.set_state(
+                    customer_callback_stage="completed",
+                    customer_callback_time=scheduled_callback_time
+                    or str(memory_state.get("customer_callback_time", "")).strip()
+                    or None,
+                    conversation_complete=False,
+                    conversation_closing=True,
+                )
+            return with_plan({
+                "route": "continue",
+                "response_target": "customer",
+                "customer_callback_stage": "completed",
+                "plan_proposal": {
+                    "target": "customer",
+                    "intent": "customer_callback_confirmation",
+                    "conversation_objective": "customer_callback_confirmation",
+                    "dialogue_action": "customer_callback_confirmation",
+                    "response_mode": "empathetic",
+                    "customer_facing_goal": "Confirm the scheduled callback naturally and close the current call.",
+                    "plan_origin": "outbound_callback_scheduled",
+                },
+                "additional_targets": ["collection_memory_helper_agent"],
+                "memory_helper_trigger": {
+                    "reason": "customer_callback_scheduled",
+                    "callback_time": scheduled_callback_time
+                    or str(memory_state.get("customer_callback_time", "")).strip(),
+                },
+            })
+
+        if customer_callback_stage == "awaiting_callback" and right_party_status != "wrong_party":
+            callback_time = (
+                extract_callback_time(user_input, llm=self.llm)
+                if looks_like_callback_time(user_input) or is_customer_callback_request(user_input)
+                else ""
+            )
+            if callback_time:
+                if memory is not None:
+                    memory.set_state(
+                        customer_callback_stage="scheduling",
+                        customer_callback_time=callback_time,
+                    )
+                return with_plan({
+                    "route": "continue",
+                    "response_target": "customer",
+                    "customer_callback_stage": "scheduling",
+                    "plan_proposal": {
+                        "target": "customer",
+                        "intent": "customer_callback_confirmation",
+                        "conversation_objective": "customer_callback_confirmation",
+                        "dialogue_action": "customer_callback_confirmation",
+                        "response_mode": "empathetic",
+                        "customer_facing_goal": "Schedule the requested callback and confirm it to the customer.",
+                        "plan_origin": "customer_callback_time_captured",
+                    },
+                })
+            return with_plan({
+                "route": "continue",
+                "response_target": "customer",
+                "customer_callback_stage": "awaiting_callback",
+                "plan_proposal": {
+                    "target": "customer",
+                    "intent": "customer_callback_request",
+                    "conversation_objective": "customer_callback_request",
+                    "dialogue_action": "customer_callback_request",
+                    "response_mode": "empathetic",
+                    "customer_facing_goal": "Acknowledge the customer is unavailable and ask for a suitable callback time.",
+                    "plan_origin": "customer_callback_missing_time",
+                },
+            })
+
+        if right_party_status != "wrong_party" and is_customer_callback_request(user_input):
+            callback_time = extract_callback_time(user_input, llm=self.llm)
+            if memory is not None:
+                memory.set_state(
+                    customer_callback_stage=("scheduling" if callback_time else "awaiting_callback"),
+                    customer_callback_time=callback_time or None,
+                    customer_callback_resume_node=current_node_id or None,
+                    customer_callback_resume_objective=str(
+                        (state.get("plan_proposal") or {}).get("conversation_objective", "")
+                        if isinstance(state.get("plan_proposal"), dict)
+                        else ""
+                    ),
+                )
+            return with_plan({
+                "route": "continue",
+                "response_target": "customer",
+                "customer_callback_stage": ("scheduling" if callback_time else "awaiting_callback"),
+                "plan_proposal": {
+                    "target": "customer",
+                    "intent": (
+                        "customer_callback_confirmation"
+                        if callback_time
+                        else "customer_callback_request"
+                    ),
+                    "conversation_objective": (
+                        "customer_callback_confirmation"
+                        if callback_time
+                        else "customer_callback_request"
+                    ),
+                    "dialogue_action": (
+                        "customer_callback_confirmation"
+                        if callback_time
+                        else "customer_callback_request"
+                    ),
+                    "response_mode": "empathetic",
+                    "customer_facing_goal": (
+                        "Schedule the requested callback and confirm it to the customer."
+                        if callback_time
+                        else "Acknowledge the customer is unavailable and ask for a suitable callback time."
+                    ),
+                    "plan_origin": "customer_callback_request",
                 },
             })
 
@@ -1997,6 +2122,8 @@ class PlanProposalDirectiveNode(BaseGraphNode):
             "wrong_party_callback_confirmation",
             "wrong_party_callback_revision_confirmation",
             "wrong_party_closing_acknowledgement",
+            "customer_callback_request",
+            "customer_callback_confirmation",
             "conversation_termination",
         }
         if (
@@ -2317,6 +2444,8 @@ class PlanProposalDirectiveNode(BaseGraphNode):
             "wrong_party_callback_confirmation": ["confirm_callback_time", "close_conversation"],
             "wrong_party_callback_revision_confirmation": ["confirm_revised_callback_time", "close_conversation"],
             "wrong_party_closing_acknowledgement": ["acknowledge_and_close"],
+            "customer_callback_request": ["acknowledge_unavailable", "request_callback_time"],
+            "customer_callback_confirmation": ["confirm_callback_time", "close_conversation"],
             "explain_dues": ["mention_due_amount", "ask_next_step"],
             "purpose_disclosure": ["mention_policy_number", "mention_due_amount", "mention_due_date", "invite_context"],
             "hardship_hold_offer": ["acknowledge_hardship", "offer_eligible_hold", "ask_if_hold_helps"],
@@ -2386,6 +2515,8 @@ class PlanProposalDirectiveNode(BaseGraphNode):
                 "request_verification_from_third_party",
                 "mention_dues_or_policy_number",
             ],
+            "customer_callback_request": ["restart_conversation", "mention_internal_processing"],
+            "customer_callback_confirmation": ["restart_conversation", "mention_internal_processing"],
             "explain_dues": ["disclose_dues_before_verification", "mention_internal_processing"],
             "purpose_disclosure": ["present_resolution_menu", "offer_discount", "offer_restructure", "mention_internal_processing"],
             "hardship_hold_offer": ["repeat_standard_options", "ask_affordable_amount", "mention_internal_processing"],
@@ -2426,6 +2557,8 @@ class PlanProposalDirectiveNode(BaseGraphNode):
             "wrong_party_callback_confirmation": ["confirm_callback_time", "close_conversation"],
             "wrong_party_callback_revision_confirmation": ["confirm_revised_callback_time", "close_conversation"],
             "wrong_party_closing_acknowledgement": ["acknowledge_and_close"],
+            "customer_callback_request": ["request_callback_time"],
+            "customer_callback_confirmation": ["confirm_callback_time", "close_conversation"],
             "explain_dues": ["present_due_amount", "ask_next_step"],
             "purpose_disclosure": ["disclose_call_purpose", "invite_context"],
             "hardship_hold_offer": ["acknowledge_hardship", "offer_hardship_hold"],
@@ -2467,6 +2600,8 @@ class PlanProposalDirectiveNode(BaseGraphNode):
             "wrong_party_callback_confirmation": "Confirm the callback time and close the call respectfully.",
             "wrong_party_callback_revision_confirmation": "Confirm the updated callback time and close without repeating the previous time.",
             "wrong_party_closing_acknowledgement": "Acknowledge politely and end the call without repeating callback details.",
+            "customer_callback_request": "Acknowledge that the customer is unavailable and ask for a suitable callback time.",
+            "customer_callback_confirmation": "Confirm the scheduled callback time and close the current call politely.",
             "explain_dues": "Explain the overdue amount clearly and ask the next useful payment question.",
             "purpose_disclosure": "State the policy number, overdue installment, and original due date, then ask how you can help.",
             "hardship_hold_offer": "Acknowledge the hardship and offer the eligible temporary hold without repeating generic payment options.",

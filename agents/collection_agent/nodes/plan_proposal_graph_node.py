@@ -210,13 +210,24 @@ class PlanProposalGraphNode(BaseGraphNode):
             inferred_next = "close_conversation"
         right_party_status = str(memory_state.get("right_party_status", "")).strip().lower()
         wrong_party_callback_stage = str(memory_state.get("wrong_party_callback_stage", "")).strip().lower()
+        customer_callback_stage_global = str(memory_state.get("customer_callback_stage", "")).strip().lower()
         callback_confirmed_now = (
             right_party_status == "wrong_party"
             and wrong_party_callback_stage == "awaiting_callback"
             and looks_like_callback_time(user_input)
         )
         termination_requested = is_conversation_termination(user_input)
-        if right_party_status == "wrong_party" and not termination_requested:
+        if (
+            customer_callback_stage_global in {"awaiting_callback", "scheduling", "completed"}
+            and not bool(memory_state.get("identity_verified", False))
+            and not termination_requested
+        ):
+            inferred_next = (
+                "close_conversation"
+                if customer_callback_stage_global == "completed"
+                else "customer_callback"
+            )
+        elif right_party_status == "wrong_party" and not termination_requested:
             callback_already_completed = (
                 wrong_party_callback_stage == "completed"
                 and bool(str(memory_state.get("wrong_party_callback_time", "")).strip())
@@ -243,6 +254,7 @@ class PlanProposalGraphNode(BaseGraphNode):
             hardship_active = bool(hardship_context.get("hardship_detected", False))
             human_escalation_status = str(memory_state.get("human_escalation_status", "")).strip().lower()
             human_transfer_status = str(memory_state.get("human_transfer_status", "")).strip().lower()
+            customer_callback_stage = str(memory_state.get("customer_callback_stage", "")).strip().lower()
             hardship_options_exhausted = (
                 str(memory_state.get("negotiation_stage", "")).strip().lower() == "hardship_options_exhausted"
                 or (
@@ -256,7 +268,9 @@ class PlanProposalGraphNode(BaseGraphNode):
                     and bool(memory_state.get("generic_options_offered_after_discount", False))
                 )
             )
-            if human_escalation_status == "queued" or human_transfer_status == "pending":
+            if customer_callback_stage in {"awaiting_callback", "scheduling", "completed"}:
+                inferred_next = "customer_callback" if customer_callback_stage != "completed" else "close_conversation"
+            elif human_escalation_status == "queued" or human_transfer_status == "pending":
                 inferred_next = "transfer_to_specialist"
             elif hardship_options_exhausted:
                 inferred_next = "human_escalation"
@@ -396,6 +410,7 @@ class PlanProposalGraphNode(BaseGraphNode):
                 "promise_date",
                 "promise_capture",
                 "promise_followup",
+                "customer_callback",
                 "human_escalation",
                 "transfer_to_specialist",
             }
@@ -679,7 +694,8 @@ class PlanProposalGraphNode(BaseGraphNode):
         identity_verified: bool,
         memory_state: dict[str, Any],
     ) -> None:
-        if not identity_verified:
+        customer_callback_stage = str(memory_state.get("customer_callback_stage", "")).strip().lower()
+        if not identity_verified and customer_callback_stage not in {"awaiting_callback", "scheduling", "completed"}:
             return
         markers = plan.get("step_markers") if isinstance(plan.get("step_markers"), dict) else {}
         now = datetime.now(UTC).isoformat()
@@ -761,6 +777,8 @@ class PlanProposalGraphNode(BaseGraphNode):
         autopay_stage = str(memory_state.get("autopay_stage", "")).strip().lower()
         promise_stage = str(memory_state.get("promise_stage", "")).strip().lower()
         promise_reference = str(memory_state.get("promise_reference", "")).strip()
+        customer_callback_stage = str(memory_state.get("customer_callback_stage", "")).strip().lower()
+        outbound_callback_status = str(memory_state.get("outbound_callback_status", "")).strip().lower()
         promise_details = (
             memory_state.get("promise_to_pay_details")
             if isinstance(memory_state.get("promise_to_pay_details"), dict)
@@ -797,12 +815,24 @@ class PlanProposalGraphNode(BaseGraphNode):
             "transferred",
         }
 
+        if (
+            node_id == "purpose_disclosure"
+            and customer_callback_stage in {"awaiting_callback", "scheduling", "completed"}
+            and not bool(memory_state.get("identity_verified", False))
+        ):
+            return None
         if node_id == "purpose_disclosure" and candidate not in {
             "open_and_context",
             "verify_identity",
             "purpose_disclosure",
         }:
             return "done", "purpose_disclosed_before_current_objective"
+        if node_id == "verify_identity" and customer_callback_stage in {
+            "awaiting_callback",
+            "scheduling",
+            "completed",
+        }:
+            return "skipped", "customer_requested_callback_before_verification"
         if node_id == "discovery_empathy" and (hold_evidence or discount_evidence):
             return "done", "hardship_acknowledged"
         if node_id == "resolution_offer" and hold_evidence:
@@ -855,6 +885,11 @@ class PlanProposalGraphNode(BaseGraphNode):
             return "done", "promise_to_pay_recorded"
         if node_id == "promise_followup" and promise_followup_done:
             return "done", "promise_followup_scheduled"
+        if node_id == "customer_callback":
+            if customer_callback_stage == "completed" and outbound_callback_status == "scheduled":
+                return "done", "customer_callback_scheduled"
+            if customer_callback_stage in {"awaiting_callback", "scheduling"}:
+                return None
         if node_id == "human_escalation" and human_escalation_done:
             return "done", "escalation_queued"
         if node_id == "confirmation" and human_escalation_done:
@@ -923,6 +958,7 @@ class PlanProposalGraphNode(BaseGraphNode):
             {"id": "promise_date", "label": "Capture promised payment date", "owner": "customer", "status": "pending"},
             {"id": "promise_capture", "label": "Record promise-to-pay commitment", "owner": "collection_agent", "status": "pending"},
             {"id": "promise_followup", "label": "Schedule promise reminder and payment link", "owner": "collection_agent", "status": "pending"},
+            {"id": "customer_callback", "label": "Schedule customer-requested callback", "owner": "collection_agent", "status": "pending"},
             {"id": "confirmation", "label": "Confirm agreed outcome and reference", "owner": "collection_agent", "status": "pending"},
             {"id": "explain_dues", "label": "Explain standard payment options", "owner": "customer", "status": "pending"},
             {"id": "collect_payment_intent", "label": "Collect payment intent", "owner": "customer", "status": "pending"},
@@ -934,6 +970,7 @@ class PlanProposalGraphNode(BaseGraphNode):
             {"from": "open_and_context", "to": "verify_identity", "condition": "case_context_ready"},
             {"from": "verify_identity", "to": "purpose_disclosure", "condition": "identity_verified"},
             {"from": "verify_identity", "to": "wrong_party_callback", "condition": "wrong_party_detected"},
+            {"from": "verify_identity", "to": "customer_callback", "condition": "customer_unavailable"},
             {"from": "purpose_disclosure", "to": "discovery_empathy", "condition": "customer_situation_shared"},
             {"from": "purpose_disclosure", "to": "explain_dues", "condition": "standard_resolution_requested"},
             {"from": "discovery_empathy", "to": "resolution_offer", "condition": "eligible_assistance_found"},
@@ -953,6 +990,10 @@ class PlanProposalGraphNode(BaseGraphNode):
             {"from": "promise_date", "to": "promise_capture", "condition": "valid_date_captured"},
             {"from": "promise_capture", "to": "promise_followup", "condition": "promise_recorded"},
             {"from": "promise_followup", "to": "confirmation", "condition": "followup_scheduled"},
+            {"from": "purpose_disclosure", "to": "customer_callback", "condition": "customer_unavailable"},
+            {"from": "collect_payment_intent", "to": "customer_callback", "condition": "customer_unavailable"},
+            {"from": "resolution_offer", "to": "customer_callback", "condition": "customer_unavailable"},
+            {"from": "customer_callback", "to": "close_conversation", "condition": "callback_scheduled"},
             {"from": "confirmation", "to": "close_conversation", "condition": "outcome_confirmed"},
             {"from": "explain_dues", "to": "collect_payment_intent", "condition": "dues_explained"},
             {"from": "collect_payment_intent", "to": "resolve_outcome", "condition": "pay_now"},
@@ -1080,6 +1121,12 @@ class PlanProposalGraphNode(BaseGraphNode):
                 "owner": "collection_agent",
                 "status": "pending",
             },
+            {
+                "id": "customer_callback",
+                "label": "Schedule customer-requested callback",
+                "owner": "collection_agent",
+                "status": "pending",
+            },
         ]
         for node in additions:
             if node["id"] not in node_ids:
@@ -1094,6 +1141,7 @@ class PlanProposalGraphNode(BaseGraphNode):
         additions_edges = [
             {"from": "verify_identity", "to": "wrong_party_callback", "condition": "wrong_party_detected"},
             {"from": "verify_identity", "to": "purpose_disclosure", "condition": "identity_verified"},
+            {"from": "verify_identity", "to": "customer_callback", "condition": "customer_unavailable"},
             {"from": "purpose_disclosure", "to": "discovery_empathy", "condition": "customer_situation_shared"},
             {"from": "purpose_disclosure", "to": "explain_dues", "condition": "standard_resolution_requested"},
             {"from": "discovery_empathy", "to": "resolution_offer", "condition": "eligible_assistance_found"},
@@ -1114,6 +1162,10 @@ class PlanProposalGraphNode(BaseGraphNode):
             {"from": "promise_date", "to": "promise_capture", "condition": "valid_date_captured"},
             {"from": "promise_capture", "to": "promise_followup", "condition": "promise_recorded"},
             {"from": "promise_followup", "to": "confirmation", "condition": "followup_scheduled"},
+            {"from": "purpose_disclosure", "to": "customer_callback", "condition": "customer_unavailable"},
+            {"from": "collect_payment_intent", "to": "customer_callback", "condition": "customer_unavailable"},
+            {"from": "resolution_offer", "to": "customer_callback", "condition": "customer_unavailable"},
+            {"from": "customer_callback", "to": "close_conversation", "condition": "callback_scheduled"},
             {"from": "confirmation", "to": "close_conversation", "condition": "outcome_confirmed"},
             {"from": "wrong_party_callback", "to": "close_conversation", "condition": "callback_confirmed"},
             {"from": "resolve_outcome", "to": "close_conversation", "condition": "outcome_confirmed"},
@@ -1275,6 +1327,7 @@ class PlanProposalGraphNode(BaseGraphNode):
             "promise_date",
             "promise_capture",
             "promise_followup",
+            "customer_callback",
             "confirmation",
             "human_escalation",
             "transfer_to_specialist",

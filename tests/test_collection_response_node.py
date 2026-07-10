@@ -46,6 +46,24 @@ class _HallucinatedReferenceLLM:
         }
 
 
+class _IncompleteCallbackLLM:
+    def generate_json(self, system_prompt: str, user_prompt: str) -> dict[str, object]:
+        return {
+            "message": "I have scheduled your callback for 5 PM. EasySecure Financial Services will be in touch then. Have a great day.",
+            "response_target": "customer",
+        }
+
+
+class _CallbackRequestContextLLM:
+    def generate_json(self, system_prompt: str, user_prompt: str) -> dict[str, object]:
+        assert "+91-1800-555-2002" not in user_prompt
+        assert "EasySecure Financial Services" in user_prompt
+        return {
+            "message": "I understand you're in a meeting. When would be a suitable time for us to call you back?",
+            "response_target": "customer",
+        }
+
+
 def test_response_node_uses_llm_first_for_full_payment_objective() -> None:
     node = CollectionResponseNode(
         llm=_FullPaymentNaturalLLM(),
@@ -251,6 +269,216 @@ def test_response_node_allows_llm_for_arrangement_reasoning() -> None:
 
     assert update["response"] == "I can talk through a practical arrangement based on what works for you."
     assert update["response_render_debug"]["renderer_fallback_used"] is False
+
+
+def test_response_node_uses_graph_objective_for_customer_callback_over_stale_verification() -> None:
+    node = _build_node()
+    memory = WorkingMemory(
+        session_id="response-customer-callback",
+        state={
+            "active_customer_name": "Rohan Gupta",
+            "active_case_id": "COLL-1002",
+            "identity_verified": False,
+            "right_party_status": "awaiting_confirmation",
+            "customer_callback_stage": "awaiting_callback",
+            "active_dialogue_owner": "customer_callback",
+        },
+    )
+
+    update = node.execute(
+        {
+            "user_input": "Yes, but I'm in a meeting right now",
+            "memory": memory,
+            "conversation_plan": {
+                "current_node_id": "customer_callback",
+                "step_markers": {
+                    "verify_identity": {
+                        "state": "skipped",
+                        "reason": "customer_requested_callback_before_verification",
+                    },
+                    "customer_callback": {"state": "pending"},
+                },
+            },
+            "plan_proposal": {
+                "target": "customer",
+                "response_directive": {
+                    "conversation_objective": "collect_verification",
+                    "dialogue_action": "ask_verification",
+                    "response_mode": "compliance",
+                },
+            },
+        }
+    )
+
+    lowered = update["response"].lower()
+    assert "callback" in lowered
+    assert "date of birth" not in lowered
+    assert "phone number" not in lowered
+    assert update["response_render_debug"]["template_selected"] == "customer_callback_request"
+
+
+def test_response_node_customer_callback_request_does_not_expose_contact_number_to_llm() -> None:
+    node = CollectionResponseNode(
+        llm=_CallbackRequestContextLLM(),
+        strict_llm_mode=True,
+        system_prompt="render",
+        render_user_prompt="Verified response context JSON: {verified_response_context_json}",
+    )
+    memory = WorkingMemory(
+        session_id="response-customer-callback-no-contact",
+        state={
+            "active_customer_name": "Rohan Gupta",
+            "identity_verified": False,
+            "customer_callback_stage": "awaiting_callback",
+            "active_collection_context": {
+                "customer": {
+                    "variables": {
+                        "[COMPANY_NAME]": "EasySecure Financial Services",
+                        "[CONTACT_NUMBER]": "+91-1800-555-2002",
+                    }
+                }
+            },
+        },
+    )
+
+    update = node.execute(
+        {
+            "user_input": "Yes, but I'm in a meeting right now",
+            "memory": memory,
+            "conversation_plan": {"current_node_id": "customer_callback"},
+            "plan_proposal": {
+                "target": "customer",
+                "response_directive": {
+                    "conversation_objective": "customer_callback_request",
+                    "dialogue_action": "customer_callback_request",
+                    "response_mode": "empathetic",
+                },
+            },
+        }
+    )
+
+    assert "+91-1800-555-2002" not in update["response"]
+    assert update["response_render_debug"]["renderer_fallback_used"] is False
+
+
+def test_response_node_customer_callback_confirmation_includes_reference_and_safe_purpose() -> None:
+    node = _build_node()
+    memory = WorkingMemory(
+        session_id="response-customer-callback-confirmed",
+        state={
+            "active_customer_name": "Rohan Gupta",
+            "active_case_id": "COLL-1002",
+            "active_company_name": "EasySecure Financial Services",
+            "identity_verified": False,
+            "customer_callback_stage": "completed",
+            "customer_callback_time": "at 5 PM today",
+            "outbound_callback_status": "scheduled",
+            "outbound_callback_job_id": "CALL-123",
+        },
+    )
+
+    update = node.execute(
+        {
+            "user_input": "Can you call me this evening, around 5 PM?",
+            "memory": memory,
+            "conversation_plan": {"current_node_id": "customer_callback"},
+            "plan_proposal": {
+                "target": "customer",
+                "response_directive": {
+                    "conversation_objective": "customer_callback_confirmation",
+                    "dialogue_action": "customer_callback_confirmation",
+                    "response_mode": "empathetic",
+                },
+            },
+        }
+    )
+
+    response = update["response"]
+    assert "5 PM" in response
+    assert "premium installment on your policy" in response
+    assert "CALL-123" in response
+    assert "Rohan Gupta" in response
+    assert "date of birth" not in response.lower()
+
+
+def test_response_node_callback_llm_missing_reference_falls_back_to_complete_template() -> None:
+    node = CollectionResponseNode(
+        llm=_IncompleteCallbackLLM(),
+        strict_llm_mode=True,
+        system_prompt="render",
+        render_user_prompt="Verified response context JSON: {verified_response_context_json}",
+    )
+    memory = WorkingMemory(
+        session_id="response-customer-callback-llm-fallback",
+        state={
+            "active_customer_name": "Rohan Gupta",
+            "active_case_id": "COLL-1002",
+            "identity_verified": False,
+            "customer_callback_stage": "completed",
+            "customer_callback_time": "at 5 PM today",
+            "outbound_callback_status": "scheduled",
+            "outbound_callback_job_id": "CALL-123",
+        },
+    )
+
+    update = node.execute(
+        {
+            "user_input": "Can you call me this evening, around 5 PM?",
+            "memory": memory,
+            "conversation_plan": {"current_node_id": "customer_callback"},
+            "plan_proposal": {
+                "target": "customer",
+                "response_directive": {
+                    "conversation_objective": "customer_callback_confirmation",
+                    "dialogue_action": "customer_callback_confirmation",
+                    "response_mode": "empathetic",
+                },
+            },
+        }
+    )
+
+    assert update["response_render_debug"]["renderer_fallback_used"] is True
+    assert "CALL-123" in update["response"]
+    assert "premium installment on your policy" in update["response"]
+
+
+def test_response_node_uses_callback_confirmation_after_graph_advances_to_close() -> None:
+    node = _build_node()
+    memory = WorkingMemory(
+        session_id="response-customer-callback-close-node",
+        state={
+            "active_customer_name": "Aditi Sharma",
+            "identity_verified": False,
+            "customer_callback_stage": "completed",
+            "customer_callback_time": "at 3 PM",
+            "outbound_callback_status": "scheduled",
+            "outbound_callback_job_id": "CALL-456",
+        },
+    )
+
+    update = node.execute(
+        {
+            "user_input": "Can you call me this evening, around 3 PM?",
+            "memory": memory,
+            "conversation_plan": {"current_node_id": "close_conversation"},
+            "observation": {
+                "tool_name": "outbound_callback_schedule",
+                "output": {"status": "scheduled", "job_id": "CALL-456"},
+            },
+            "plan_proposal": {
+                "target": "customer",
+                "response_directive": {
+                    "conversation_objective": "close_conversation",
+                    "dialogue_action": "close_conversation",
+                },
+            },
+        }
+    )
+
+    assert update["response_render_debug"]["template_selected"] == "customer_callback_confirmation"
+    assert "CALL-456" in update["response"]
+    assert "premium installment on your policy" in update["response"]
+    assert "Aditi Sharma" in update["response"]
 
 
 def test_response_node_generic_closing_uses_customer_name() -> None:

@@ -1277,13 +1277,20 @@ response:
     - use only customer name, company name, and contact number
     - disclose no account, dues, policy, loan, case, or verification information
     - ask for a suitable callback time
+    If response_constraints.callback_flow=true or response_constraints.no_verification_request=true:
+    - do not ask for date of birth, phone number, registered mobile, or verification details
+    - do not say the customer must verify before proceeding in the current response
+    - acknowledge the customer is unavailable and ask for or confirm the callback only
     If the current objective is to protect privacy for an unverified respondent:
     - state only that details can be discussed directly with the named customer
     - do not provide the callback request in the same response
     If the current objective is to confirm the callback and close politely:
     - confirm render_variables.callback_time
-    - identify only the company that called
-    - close politely
+    - mention render_variables.callback_purpose_text when present
+    - include render_variables.callback_reference when present
+    - identify only the company that called; do not disclose amount, due date, account number, or policy number
+    - thank the customer by render_variables.customer_name
+    - if the customer said they are in a meeting, use a warm closing such as enjoying the rest of the meeting and goodbye
     Use recent_conversation only to maintain local continuity of phrasing and avoid sounding out of context.
     The supplied directive, constraints, and current-turn state remain authoritative over recent_conversation.
     If tone=empathetic, acknowledge the situation briefly and professionally.
@@ -1306,6 +1313,8 @@ response:
     Verified action result summary: {observation_json}
     Continue naturally from the recent conversation without restarting the interaction.
     Render the supplied directive only. Do not add workflow reasoning or a new dialogue goal.
+    If response_constraints says callback_flow or no_verification_request, do not request verification details.
+    For callback confirmation, include callback_time, callback_reference when available, callback_purpose_text when available, and a customer-name closing.
     Generate only structured JSON output.
   verification_opening_template: |
     Hello. This is {agent_name} calling on behalf of {company_name}. This call may be recorded for quality and training purposes. May I please speak with {customer_name}?

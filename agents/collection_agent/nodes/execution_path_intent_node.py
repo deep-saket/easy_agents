@@ -7,7 +7,10 @@ from typing import Any
 
 from agents.collection_agent.utils.callback_time_extractor import extract_callback_time
 from agents.collection_agent.nodes.collection_intent_node import CollectionIntentNode
-from agents.collection_agent.utils.plan_proposal_utils import promise_to_pay_ready_for_capture
+from agents.collection_agent.utils.plan_proposal_utils import (
+    is_customer_callback_request,
+    promise_to_pay_ready_for_capture,
+)
 from src.nodes.types import AgentState
 
 
@@ -306,6 +309,7 @@ class ExecutionPathIntentNode(CollectionIntentNode):
                     "reason": "Create the hold and send confirmation before responding.",
                 },
             }
+        identity_verified = bool(context.get("identity_verified", memory_state.get("identity_verified", False)))
         if right_party_status == "wrong_party" and "callback" in lowered and any(
             token in lowered for token in ("cancel", "remove", "do not call", "don't call")
         ):
@@ -331,8 +335,24 @@ class ExecutionPathIntentNode(CollectionIntentNode):
                     "reason": "Schedule the requested outbound callback.",
                 },
             }
-
-        identity_verified = bool(context.get("identity_verified", False))
+        customer_callback_stage = str(memory_state.get("customer_callback_stage", "")).strip().lower()
+        if (
+            right_party_status != "wrong_party"
+            and (
+                customer_callback_stage in {"awaiting_callback", "scheduling"}
+                or is_customer_callback_request(str(state.get("user_input", "")))
+            )
+            and extract_callback_time(str(state.get("user_input", "")), llm=self.llm)
+        ):
+            return {
+                "skip_llm": True,
+                "reason": "Customer callback time requires scheduler tool execution.",
+                "intent": {
+                    "intent": "need_tool",
+                    "confidence": 1.0,
+                    "reason": "Schedule the requested outbound callback.",
+                },
+            }
         missing_provided = context.get("verification_missing_fields_provided_turn")
         if identity_verified or not isinstance(missing_provided, list) or not missing_provided:
             return None

@@ -80,6 +80,8 @@ class CollectionResponseNode(ResponseNode):
         "wrong_party_callback_confirmation",
         "wrong_party_callback_revision_confirmation",
         "wrong_party_closing_acknowledgement",
+        "customer_callback_request",
+        "customer_callback_confirmation",
         "conversation_closing",
         "purpose_disclosure",
         "hardship_hold_offer",
@@ -350,6 +352,13 @@ class CollectionResponseNode(ResponseNode):
         proposal: dict[str, Any],
         context: dict[str, Any],
     ) -> dict[str, Any]:
+        graph_directive = self._directive_from_runtime_graph_objective(
+            proposal=proposal,
+            context=context,
+        )
+        if graph_directive is not None:
+            return graph_directive
+
         raw_compiled_directive = proposal.get("compiled_response_directive")
         if isinstance(raw_compiled_directive, dict):
             directive = self._normalize_compiled_response_directive(raw_compiled_directive)
@@ -378,6 +387,72 @@ class CollectionResponseNode(ResponseNode):
             state=state,
             proposal=proposal,
             context=context,
+        )
+
+    def _directive_from_runtime_graph_objective(
+        self,
+        *,
+        proposal: dict[str, Any],
+        context: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        conversation_plan = (
+            context.get("conversation_plan")
+            if isinstance(context.get("conversation_plan"), dict)
+            else {}
+        )
+        memory_state = context.get("memory_state") if isinstance(context.get("memory_state"), dict) else {}
+        stage = str(memory_state.get("customer_callback_stage", "")).strip().lower()
+        callback_status = str(memory_state.get("outbound_callback_status", "")).strip().lower()
+        current_node_id = str(conversation_plan.get("current_node_id", "")).strip().lower()
+        observation = context.get("observation") if isinstance(context.get("observation"), dict) else {}
+        observed_tool = str(observation.get("tool_name", "")).strip().lower()
+        if not observed_tool:
+            observations = context.get("observations")
+            if isinstance(observations, list):
+                for item in reversed(observations):
+                    if not isinstance(item, dict):
+                        continue
+                    observed_tool = str(item.get("tool_name", "")).strip().lower()
+                    if observed_tool:
+                        break
+        customer_callback_active = (
+            current_node_id == "customer_callback"
+            or (
+                stage == "completed"
+                and callback_status == "scheduled"
+                and observed_tool == "outbound_callback_schedule"
+            )
+        )
+        if not customer_callback_active:
+            return None
+
+        template_id = (
+            "customer_callback_confirmation"
+            if stage == "completed" or callback_status == "scheduled"
+            else "customer_callback_request"
+        )
+        response_target = str(proposal.get("target", context.get("response_target", "customer"))).strip().lower() or "customer"
+        return self._normalize_compiled_response_directive(
+            {
+                "template_id": template_id,
+                "response_target": response_target,
+                "tone": "empathetic",
+                "render_variables": self._build_render_variables(
+                    raw_directive={"conversation_objective": template_id, "dialogue_action": template_id},
+                    proposal=proposal,
+                    context=context,
+                ),
+                "response_constraints": self._build_render_constraints(
+                    response_target=response_target,
+                    context=context,
+                )
+                | {
+                    "callback_flow": True,
+                    "no_verification_request": True,
+                    "ask_one_question": template_id == "customer_callback_request",
+                },
+                "fallback_template_id": template_id,
+            }
         )
 
     @staticmethod
@@ -467,6 +542,32 @@ class CollectionResponseNode(ResponseNode):
                     "fallback_template_id": "handoff_payload",
                 }
             ) or {}
+        raw_objective = ""
+        if isinstance(proposal.get("response_directive"), dict):
+            raw_objective = str(
+                proposal.get("response_directive", {}).get("conversation_objective", "")
+            ).strip().lower()
+        elif isinstance(proposal, dict):
+            raw_objective = str(proposal.get("conversation_objective", "")).strip().lower()
+        if raw_objective in {"customer_callback_request", "customer_callback_confirmation"}:
+            template_id = raw_objective
+            return self._normalize_compiled_response_directive(
+                {
+                    "template_id": template_id,
+                    "response_target": response_target,
+                    "tone": "empathetic",
+                    "render_variables": self._build_render_variables(
+                        raw_directive={"conversation_objective": raw_objective},
+                        proposal=proposal,
+                        context=context,
+                    ),
+                    "response_constraints": self._build_render_constraints(
+                        response_target=response_target,
+                        context=context,
+                    ),
+                    "fallback_template_id": template_id,
+                }
+            ) or {}
         if not bool(verification_context.get("identity_verified", False)):
             return self._normalize_compiled_response_directive(
                 {
@@ -522,6 +623,10 @@ class CollectionResponseNode(ResponseNode):
             return "wrong_party_callback_revision_confirmation"
         if objective == "wrong_party_closing_acknowledgement" or action == "wrong_party_closing_acknowledgement":
             return "wrong_party_closing_acknowledgement"
+        if objective == "customer_callback_request" or action == "customer_callback_request":
+            return "customer_callback_request"
+        if objective == "customer_callback_confirmation" or action == "customer_callback_confirmation":
+            return "customer_callback_confirmation"
         if objective == "close_conversation" or action == "close_conversation":
             return "conversation_closing"
         if objective == "purpose_disclosure" or action == "disclose_call_purpose":
@@ -742,6 +847,8 @@ class CollectionResponseNode(ResponseNode):
             "compliance_constraints": {
                 "no_dues_before_verification": bool(constraints.get("no_dues_before_verification", False)),
                 "wrong_party": wrong_party,
+                "callback_flow": bool(constraints.get("callback_flow", False)),
+                "no_verification_request": bool(constraints.get("no_verification_request", False)),
                 "avoid_internal_terms": bool(constraints.get("avoid_internal_terms", True)),
                 "avoid_placeholders": bool(constraints.get("avoid_placeholders", True)),
                 "avoid_repeat_greeting": bool(constraints.get("greeted", False)),
@@ -760,9 +867,10 @@ class CollectionResponseNode(ResponseNode):
             "customer_name",
             "agent_name",
             "company_name",
-            "contact_number",
             "missing_fields",
             "callback_time",
+            "callback_reference",
+            "callback_purpose_text",
             "opening_turn",
             "customer_facing_goal",
             "message_hint",
@@ -861,6 +969,8 @@ class CollectionResponseNode(ResponseNode):
             "wrong_party_callback_confirmation": "Confirm the callback and close politely",
             "wrong_party_callback_revision_confirmation": "Confirm the revised callback and close politely",
             "wrong_party_closing_acknowledgement": "Acknowledge and close a wrong-party call",
+            "customer_callback_request": "Ask the customer for a suitable callback time",
+            "customer_callback_confirmation": "Confirm the customer callback and close politely",
             "conversation_closing": "Close the conversation politely",
             "purpose_disclosure": "Disclose the overdue policy purpose after verification",
             "hardship_hold_offer": "Offer the eligible premium hold",
@@ -1107,6 +1217,24 @@ class CollectionResponseNode(ResponseNode):
             ).strip()
         if template_id == "wrong_party_closing_acknowledgement":
             return "You're welcome. Goodbye."
+        if template_id == "customer_callback_request":
+            return (
+                "Of course, I won't keep you. I'm calling about your policy, and it can wait "
+                "for a better time. When would suit you for a quick callback?"
+            ).strip()
+        if template_id == "customer_callback_confirmation":
+            timing = f" {callback_time}" if callback_time else ""
+            callback_reference = str(render_variables.get("callback_reference", "")).strip()
+            reference_text = f" Your reference number is {callback_reference}." if callback_reference else ""
+            purpose_text = str(
+                render_variables.get("callback_purpose_text", "a premium installment on your policy")
+            ).strip() or "a premium installment on your policy"
+            return (
+                f"Absolutely, I have scheduled a callback{timing}. Just so you're aware, "
+                f"it's regarding {purpose_text}, and we'll go through the options together then."
+                f"{reference_text} Thank you, and enjoy the rest of your meeting, {customer_name}. "
+                "Talk soon, goodbye."
+            ).strip()
         if template_id == "conversation_closing":
             return f"Thank you for your time, {customer_name}. Have a good day. Goodbye."
         if template_id == "purpose_disclosure":
@@ -1350,6 +1478,24 @@ class CollectionResponseNode(ResponseNode):
                 ]
             ):
                 result["forbidden_actions_blocked"].append("disclose_account_details_to_wrong_party")
+        if bool(constraints.get("no_verification_request", False)):
+            lowered = rendered.lower()
+            if any(
+                token in lowered
+                for token in (
+                    "date of birth",
+                    "dob",
+                    "phone number",
+                    "mobile number",
+                    "registered phone",
+                    "registered mobile",
+                    "verification details",
+                    "verify your",
+                    "verify a few",
+                    "security and privacy",
+                )
+            ):
+                result["forbidden_actions_blocked"].append("verification_request_not_allowed_for_current_objective")
         if bool(constraints.get("greeted", False)) and self._contains_repeat_greeting(rendered):
             result["forbidden_actions_blocked"].append("repeat_greeting")
         if bool(constraints.get("avoid_internal_terms", True)) and self._contains_internal_processing(rendered):
@@ -1372,6 +1518,35 @@ class CollectionResponseNode(ResponseNode):
                 result["forbidden_actions_blocked"].append("missing_partial_amount_question")
             if any(token in lowered for token in ["link has been sent", "link is on its way", "payment received"]):
                 result["forbidden_actions_blocked"].append("premature_partial_payment_claim")
+        elif template_id in {"customer_callback_request", "customer_callback_confirmation"}:
+            if any(
+                token in lowered
+                for token in (
+                    "date of birth",
+                    "dob",
+                    "phone number",
+                    "mobile number",
+                    "registered phone",
+                    "registered mobile",
+                    "verification details",
+                    "verify your",
+                    "verification process",
+                    "provide them now",
+                )
+            ):
+                result["forbidden_actions_blocked"].append("callback_must_not_request_verification_now")
+            if template_id == "customer_callback_request" and "?" not in rendered:
+                result["forbidden_actions_blocked"].append("missing_callback_time_question")
+            if template_id == "customer_callback_confirmation":
+                callback_time = str(render_variables.get("callback_time", "")).strip()
+                if callback_time and callback_time.lower() not in lowered:
+                    result["forbidden_actions_blocked"].append("missing_callback_time")
+                callback_reference = str(render_variables.get("callback_reference", "")).strip()
+                if callback_reference and callback_reference.lower() not in lowered:
+                    result["forbidden_actions_blocked"].append("missing_callback_reference")
+                callback_purpose = str(render_variables.get("callback_purpose_text", "")).strip()
+                if callback_purpose and callback_purpose.lower() not in lowered:
+                    result["forbidden_actions_blocked"].append("missing_callback_purpose")
         elif template_id == "partial_payment_link_offer":
             partial_amount = str(render_variables.get("partial_payment_amount_text", "")).strip()
             remaining_balance = str(render_variables.get("remaining_balance_text", "")).strip()
@@ -1572,7 +1747,9 @@ class CollectionResponseNode(ResponseNode):
         agent_name = str(
             customer_variables.get("[AGENT_NAME]", case.get("assigned_agent", "Collections representative"))
         ).strip() or "Collections representative"
-        company_name = str(customer_variables.get("[COMPANY_NAME]", "the bank")).strip() or "the bank"
+        company_name = str(
+            customer_variables.get("[COMPANY_NAME]", memory_state.get("active_company_name", "the bank"))
+        ).strip() or "the bank"
         contact_number = str(customer_variables.get("[CONTACT_NUMBER]", "")).strip()
         policy_number = str(customer_variables.get("[POLICY_NUMBER]", case.get("loan_id", ""))).strip()
         due_date = str(customer_variables.get("[DUE_DATE]", "")).strip()
@@ -1582,7 +1759,11 @@ class CollectionResponseNode(ResponseNode):
         installment_amount = str(
             customer_variables.get("[AMOUNT]", f"{overdue_amount:.2f}")
         ).strip()
-        callback_time = str(memory_state.get("wrong_party_callback_time", "") or "").strip()
+        callback_time = str(
+            memory_state.get("customer_callback_time")
+            or memory_state.get("wrong_party_callback_time", "")
+            or ""
+        ).strip()
         policy = active_context.get("policy") if isinstance(active_context.get("policy"), dict) else {}
         hold_program = (
             memory_state.get("hardship_hold_program")
@@ -1708,6 +1889,8 @@ class CollectionResponseNode(ResponseNode):
             ).strip(),
             "promise_date_rejection_reason": str(memory_state.get("promise_date_rejection_reason", "")).strip(),
             "callback_time": callback_time,
+            "callback_reference": str(memory_state.get("outbound_callback_job_id", "") or "").strip(),
+            "callback_purpose_text": "a premium installment on your policy",
             "case_id": str(facts.get("case_id", memory_state.get("active_case_id", "COLL-1001"))).strip() or "COLL-1001",
             "overdue_amount_text": f"{overdue_amount:.2f}",
             "missing_fields": str(missing_fields or self.verification_default_missing_text).strip(),
@@ -1868,6 +2051,8 @@ class CollectionResponseNode(ResponseNode):
             "Verified response context JSON: {verified_response_context_json}\n"
             "Render a natural response for the current objective using only verified facts. "
             "Do not add a new objective or claim an action unless it appears in the verified context. "
+            "If compliance_constraints.callback_flow is true, acknowledge the customer is unavailable and either ask for "
+            "a callback time or confirm the scheduled callback; do not ask for identity verification details. "
             "Generate only structured JSON output."
         )
 

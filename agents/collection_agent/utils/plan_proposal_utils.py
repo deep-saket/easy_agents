@@ -62,6 +62,46 @@ def needs_discount_specialist(text: str) -> bool:
     return any(keyword in lowered for keyword in keywords)
 
 
+def is_customer_callback_request(text: str) -> bool:
+    """Return true when the verified/right-party customer asks to continue later."""
+
+    lowered = re.sub(r"[^a-z0-9\s:]", " ", str(text or "").lower())
+    lowered = re.sub(r"\s+", " ", lowered).strip()
+    if not lowered:
+        return False
+    if any(
+        phrase in lowered
+        for phrase in (
+            "call me later",
+            "call later",
+            "call back later",
+            "callback later",
+            "call me back",
+            "can you call",
+            "please call",
+            "try later",
+            "reach me later",
+            "talk later",
+        )
+    ):
+        return True
+    return any(
+        phrase in lowered
+        for phrase in (
+            "i am busy",
+            "i'm busy",
+            "in a meeting",
+            "i am in meeting",
+            "i'm in meeting",
+            "driving",
+            "cannot talk now",
+            "can't talk now",
+            "not available now",
+            "unavailable now",
+        )
+    )
+
+
 def verification_required_fields(memory_state: dict[str, Any]) -> list[str]:
     required = memory_state.get("active_verification_required_fields")
     required_fields = [str(x).strip().lower() for x in required if str(x).strip()] if isinstance(required, list) else []

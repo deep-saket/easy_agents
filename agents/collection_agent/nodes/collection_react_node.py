@@ -10,6 +10,7 @@ from typing import Any
 from uuid import uuid4
 
 from agents.collection_agent.utils.callback_time_extractor import extract_callback_time
+from agents.collection_agent.utils.plan_proposal_utils import is_customer_callback_request
 from agents.collection_agent.tools.common import utc_now
 from src.nodes.react_node import ReactNode
 from src.nodes.types import AgentState
@@ -556,34 +557,34 @@ class CollectionReactNode(ReactNode):
                     else {}
                 )
                 details["email_confirmation"] = dict(latest_output)
-            if memory is not None:
-                memory.set_state(
-                    discount_stage="review_scheduling",
-                    installment_discount_details=details,
-                    negotiation_stage="confirming_commitment",
-                )
-            review_after_months = int(details.get("review_after_months", 0) or 0)
-            if review_after_months > 0 and case_id:
-                scheduled_for = self._add_months(datetime.now(UTC).date(), review_after_months).isoformat()
+                if memory is not None:
+                    memory.set_state(
+                        discount_stage="review_scheduling",
+                        installment_discount_details=details,
+                        negotiation_stage="confirming_commitment",
+                    )
+                review_after_months = int(details.get("review_after_months", 0) or 0)
+                if review_after_months > 0 and case_id:
+                    scheduled_for = self._add_months(datetime.now(UTC).date(), review_after_months).isoformat()
+                    return {
+                        "skip_llm": True,
+                        "reason": "Discount and both confirmations completed; schedule review follow-up.",
+                        "decision": self._tool_decision(
+                            "followup_schedule",
+                            {
+                                "case_id": case_id,
+                                "scheduled_for": scheduled_for,
+                                "preferred_channel": "voice",
+                                "reason": "installment_discount_review",
+                            },
+                        ),
+                    }
+                if memory is not None:
+                    memory.set_state(discount_stage="confirmed")
                 return {
                     "skip_llm": True,
-                    "reason": "Discount and both confirmations completed; schedule review follow-up.",
-                    "decision": self._tool_decision(
-                        "followup_schedule",
-                        {
-                            "case_id": case_id,
-                            "scheduled_for": scheduled_for,
-                            "preferred_channel": "voice",
-                            "reason": "installment_discount_review",
-                        },
-                    ),
-                }
-            if memory is not None:
-                memory.set_state(discount_stage="confirmed")
-            return {
-                "skip_llm": True,
-                "reason": "Discount and both confirmations completed.",
-                "decision": SimpleNamespace(
+                    "reason": "Discount and both confirmations completed.",
+                    "decision": SimpleNamespace(
                         thought="Discount application and notifications are complete.",
                         tool_call=None,
                         tool_calls=[],
@@ -593,23 +594,39 @@ class CollectionReactNode(ReactNode):
                         no_tools_required=True,
                     ),
                 }
-            hold_details = (
-                dict(memory_state.get("hardship_hold_details", {}))
-                if isinstance(memory_state.get("hardship_hold_details"), dict)
-                else {}
-            )
-            hold_details["email_confirmation"] = dict(latest_output)
-            if memory is not None:
-                memory.set_state(
-                    hardship_hold_stage="confirmed",
-                    hardship_hold_details=hold_details,
-                    negotiation_stage="confirming_commitment",
+
+            if str(memory_state.get("hardship_hold_stage", "")).strip().lower() == "sms_sent":
+                hold_details = (
+                    dict(memory_state.get("hardship_hold_details", {}))
+                    if isinstance(memory_state.get("hardship_hold_details"), dict)
+                    else {}
                 )
+                hold_details["email_confirmation"] = dict(latest_output)
+                if memory is not None:
+                    memory.set_state(
+                        hardship_hold_stage="confirmed",
+                        hardship_hold_details=hold_details,
+                        negotiation_stage="confirming_commitment",
+                    )
+                return {
+                    "skip_llm": True,
+                    "reason": "Premium hold and both confirmations completed.",
+                    "decision": SimpleNamespace(
+                        thought="Hold creation and notifications are complete; continue to customer confirmation.",
+                        tool_call=None,
+                        tool_calls=[],
+                        respond_directly=True,
+                        response_text=None,
+                        done=True,
+                        no_tools_required=True,
+                    ),
+                }
+
             return {
                 "skip_llm": True,
-                "reason": "Premium hold and both confirmations completed.",
+                "reason": "Email confirmation completed without a matching active workflow.",
                 "decision": SimpleNamespace(
-                    thought="Hold creation and notifications are complete; continue to customer confirmation.",
+                    thought="Email confirmation completed; no additional tool action is required.",
                     tool_call=None,
                     tool_calls=[],
                     respond_directly=True,
@@ -624,6 +641,36 @@ class CollectionReactNode(ReactNode):
             latest_input = latest.get("input") if isinstance(latest.get("input"), dict) else {}
             if isinstance(latest_input, dict):
                 scheduled_callback_time = str(latest_input.get("callback_time", "")).strip()
+            customer_callback_stage = str(memory_state.get("customer_callback_stage", "")).strip().lower()
+            if customer_callback_stage in {"awaiting_callback", "scheduling"}:
+                if memory is not None:
+                    memory.set_state(
+                        outbound_callback_job_id=latest_output.get("job_id"),
+                        outbound_callback_scheduled_for=latest_output.get("scheduled_for"),
+                        outbound_callback_status=latest_output.get("status"),
+                        customer_callback_stage=(
+                            "completed"
+                            if str(latest_output.get("status", "")).strip().lower() == "scheduled"
+                            else customer_callback_stage
+                        ),
+                        customer_callback_time=(
+                            scheduled_callback_time
+                            or memory_state.get("customer_callback_time")
+                        ),
+                    )
+                return {
+                    "skip_llm": True,
+                    "reason": "Customer callback scheduling tool completed.",
+                    "decision": SimpleNamespace(
+                        thought="Callback scheduling is complete; continue to customer confirmation.",
+                        tool_call=None,
+                        tool_calls=[],
+                        respond_directly=True,
+                        response_text=None,
+                        done=True,
+                        no_tools_required=True,
+                    ),
+                }
             if memory is not None:
                 memory.set_state(
                     outbound_callback_job_id=latest_output.get("job_id"),
@@ -875,7 +922,39 @@ class CollectionReactNode(ReactNode):
             "privacy_notice_given",
             "awaiting_callback",
         }:
-            return None
+            customer_callback_stage = str(memory_state.get("customer_callback_stage", "")).strip().lower()
+            if customer_callback_stage not in {"awaiting_callback", "scheduling"} and not (
+                right_party_status != "wrong_party"
+                and is_customer_callback_request(user_input)
+            ):
+                return None
+            callback_time = (
+                str(memory_state.get("customer_callback_time", "") or "").strip()
+                or extract_callback_time(user_input, llm=self.llm)
+            )
+            if not callback_time or not case_id or not customer_id:
+                return None
+            if memory is not None:
+                memory.set_state(
+                    customer_callback_stage="scheduling",
+                    customer_callback_time=callback_time,
+                )
+            return {
+                "skip_llm": True,
+                "reason": "Schedule customer-requested outbound callback.",
+                "decision": self._tool_decision(
+                    "outbound_callback_schedule",
+                    {
+                        "case_id": case_id,
+                        "customer_id": customer_id,
+                        "session_id": str(state.get("session_id", "")).strip() or "collection-session",
+                        "callback_time": callback_time,
+                        "timezone": str(memory_state.get("timezone", "Asia/Kolkata")).strip() or "Asia/Kolkata",
+                        "phone": memory_state.get("active_customer_phone"),
+                        "max_retries": 3,
+                    },
+                ),
+            }
         callback_time = extract_callback_time(user_input, llm=self.llm)
         if not callback_time or not case_id or not customer_id:
             return None
