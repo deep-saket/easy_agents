@@ -190,6 +190,7 @@ class ConversationManagerAgent:
                     session_id=session_id,
                     request_id=request_id,
                     customer_input_id=customer_input_id,
+                    customer_input=customer_input,
                     replay=replay,
                     delivery_mode=delivery_mode,
                 )
@@ -609,6 +610,7 @@ class ConversationManagerAgent:
         session_id: str,
         request_id: str,
         customer_input_id: str,
+        customer_input: str,
         replay: BufferedResponse,
         delivery_mode: str,
     ) -> dict[str, Any]:
@@ -633,7 +635,7 @@ class ConversationManagerAgent:
             "conversation_id": session_id,
             "request_id": request_id,
             "customer_input_id": customer_input_id,
-            "customer_input": getattr(replay, "message_text", None),
+            "customer_input": customer_input,
             "wait_duration_ms": 0.0,
             "filler_messages_sent": [],
             "filler_categories": [],

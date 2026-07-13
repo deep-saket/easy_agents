@@ -146,11 +146,13 @@ class PaymentLinkCreateInput(BaseModel):
 
 
 class PaymentLinkCreateOutput(BaseModel):
-    payment_reference_id: str
+    status: Literal["created", "failed"] = "created"
+    payment_reference_id: str | None = None
     case_id: str
     amount: float
-    payment_url: str
-    expires_at: datetime
+    payment_url: str | None = None
+    expires_at: datetime | None = None
+    error: str | None = None
 
 
 class PaymentStatusCheckInput(BaseModel):

@@ -49,6 +49,7 @@ from agents.collection_agent.tools import (
     PlanProposeTool,
     PremiumHoldCreateTool,
     PromiseCaptureTool,
+    FollowupScheduleTool,
     SMSConfirmationSendTool,
     VerifyDOBTool,
     VerifyMobileTool,
@@ -356,6 +357,7 @@ class CollectionAgent(BaseAgent):
         )
         registry.register(PaymentLinkCreateTool(store=self.data_store))
         registry.register(PromiseCaptureTool(store=self.data_store))
+        registry.register(FollowupScheduleTool(store=self.data_store))
         registry.register(PremiumHoldCreateTool(store=self.data_store))
         registry.register(InstallmentDiscountEvaluateTool(store=self.data_store))
         registry.register(InstallmentDiscountApplyTool(store=self.data_store))
@@ -828,10 +830,12 @@ class CollectionAgent(BaseAgent):
             llm_status = str(update.get("llm_status", "")).strip()
             updated_suffix = f", updated={len([x for x in updated_fields if str(x).strip()])}" if updated_fields else ""
             llm_suffix = f"; llm_status={llm_status}" if llm_status else ""
+            keys = sorted(str(key).strip() for key in extracted_turn if str(key).strip())
+            keys_suffix = f"; keys={','.join(keys)}" if keys else ""
             return (
                 f"entity_extract: turn_entities={len(extracted_turn)}; "
                 f"session_entities={len(extracted_all)}{updated_suffix}; "
-                f"identity_verified={verified}{llm_suffix}."
+                f"identity_verified={verified}{keys_suffix}{llm_suffix}."
             )
 
         if node_name == "react":

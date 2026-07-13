@@ -37,6 +37,7 @@ class PaymentLinkCreateTool(BaseTool[PaymentLinkCreateInput, PaymentLinkCreateOu
             },
         )
         return PaymentLinkCreateOutput(
+            status="created",
             payment_reference_id=ref_id,
             case_id=input.case_id,
             amount=float(input.amount),

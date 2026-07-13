@@ -62,12 +62,63 @@ def needs_discount_specialist(text: str) -> bool:
     return any(keyword in lowered for keyword in keywords)
 
 
+def is_customer_callback_request(text: str) -> bool:
+    """Return true when the verified/right-party customer asks to continue later."""
+
+    lowered = re.sub(r"[^a-z0-9\s:]", " ", str(text or "").lower())
+    lowered = re.sub(r"\s+", " ", lowered).strip()
+    if not lowered:
+        return False
+    if any(
+        phrase in lowered
+        for phrase in (
+            "call me later",
+            "call later",
+            "call back later",
+            "callback later",
+            "call me back",
+            "can you call",
+            "please call",
+            "try later",
+            "reach me later",
+            "talk later",
+        )
+    ):
+        return True
+    return any(
+        phrase in lowered
+        for phrase in (
+            "i am busy",
+            "i'm busy",
+            "in a meeting",
+            "i am in meeting",
+            "i'm in meeting",
+            "driving",
+            "cannot talk now",
+            "can't talk now",
+            "not available now",
+            "unavailable now",
+        )
+    )
+
+
 def verification_required_fields(memory_state: dict[str, Any]) -> list[str]:
     required = memory_state.get("active_verification_required_fields")
     required_fields = [str(x).strip().lower() for x in required if str(x).strip()] if isinstance(required, list) else []
     if required_fields:
         return sorted(set(required_fields))
     return ["dob", "phone"]
+
+
+def promise_to_pay_ready_for_capture(memory_state: dict[str, Any]) -> bool:
+    """Return true when PTP has a date and must execute capture tools."""
+
+    return (
+        str(memory_state.get("payment_commitment_type", "")).strip().upper() == "PROMISE_TO_PAY"
+        and str(memory_state.get("promise_stage", "")).strip().lower() == "date_captured"
+        and bool(str(memory_state.get("promised_date", "")).strip())
+        and not bool(str(memory_state.get("promise_reference", "")).strip())
+    )
 
 
 def overlay_verification_state_from_graph(*, state: AgentState, memory_state: dict[str, Any]) -> dict[str, Any]:
@@ -277,6 +328,9 @@ def mark_confirmation_delivered(memory: Any) -> dict[str, Any]:
     now = datetime.now(UTC).isoformat()
     markers = dict(plan.get("step_markers", {})) if isinstance(plan.get("step_markers"), dict) else {}
     completed_prerequisites: list[str] = []
+    next_current = "close_conversation"
+    next_reason = "awaiting_customer_closing_reply"
+    confirmation_reason = "agreed_outcome_and_reference_delivered"
     if str(memory_state.get("partial_payment_stage", "")).strip().lower() == "confirmed":
         details = (
             memory_state.get("partial_payment_details")
@@ -296,32 +350,85 @@ def mark_confirmation_delivered(memory: Any) -> dict[str, Any]:
                     "source": "response_render",
                     "reason": "payment_link_created_and_sms_sent",
                 }
+    if str(memory_state.get("payment_resolution_stage", "")).strip().lower() in {"confirmed", "link_sent", "autopay_offered"}:
+        details = (
+            memory_state.get("full_payment_details")
+            if isinstance(memory_state.get("full_payment_details"), dict)
+            else {}
+        )
+        sms = details.get("sms_confirmation") if isinstance(details.get("sms_confirmation"), dict) else {}
+        if (
+            str(details.get("payment_reference_id", "")).strip()
+            and str(sms.get("status", "")).strip().lower() == "sent"
+        ):
+            completed_prerequisites = ["collect_payment_intent", "full_payment_options", "full_payment_link"]
+            if str(memory_state.get("autopay_stage", "")).strip().lower() == "enabled":
+                completed_prerequisites.append("autopay_offer")
+                next_current = "close_conversation"
+                next_reason = "autopay_enabled_confirmation_delivered"
+                confirmation_reason = "autopay_enabled_confirmation_delivered"
+            else:
+                next_current = "autopay_offer"
+                next_reason = "awaiting_autopay_response"
+            for node_id in completed_prerequisites:
+                markers[node_id] = {
+                    "state": "done",
+                    "updated_at": now,
+                    "source": "response_render",
+                    "reason": "full_payment_link_created_and_sms_sent",
+                }
+    if str(memory_state.get("promise_stage", "")).strip().lower() == "followup_scheduled":
+        details = (
+            memory_state.get("promise_to_pay_details")
+            if isinstance(memory_state.get("promise_to_pay_details"), dict)
+            else {}
+        )
+        followup = details.get("followup_schedule") if isinstance(details.get("followup_schedule"), dict) else {}
+        if str(details.get("promise_id", "")).strip() and str(followup.get("schedule_id", "")).strip():
+            completed_prerequisites = ["collect_payment_intent", "promise_date", "promise_capture", "promise_followup"]
+            confirmation_reason = "promise_to_pay_confirmed"
+            for node_id in completed_prerequisites:
+                markers[node_id] = {
+                    "state": "done",
+                    "updated_at": now,
+                    "source": "response_render",
+                    "reason": "promise_captured_and_followup_scheduled",
+                }
+            if memory is not None:
+                memory.set_state(promise_stage="confirmed")
     markers["confirmation"] = {
         "state": "done",
         "updated_at": now,
         "source": "response_render",
-        "reason": "agreed_outcome_and_reference_delivered",
+        "reason": confirmation_reason,
     }
     markers["close_conversation"] = {
         "state": "pending",
         "updated_at": now,
         "source": "response_render",
-        "reason": "awaiting_customer_closing_reply",
+        "reason": next_reason,
     }
+    if next_current == "autopay_offer":
+        markers["autopay_offer"] = {
+            "state": "pending",
+            "updated_at": now,
+            "source": "response_render",
+            "reason": "awaiting_autopay_response",
+        }
 
     nodes = [dict(node) for node in plan.get("nodes", []) if isinstance(node, dict)]
     for node in nodes:
         node_id = str(node.get("id", "")).strip()
         if node_id in completed_prerequisites or node_id == "confirmation":
             node["status"] = "done"
-        elif node_id == "close_conversation":
+        elif node_id == next_current:
             node["status"] = "in_progress"
 
     plan["nodes"] = nodes
     plan["step_markers"] = markers
     plan["previous_node_id"] = "confirmation"
-    plan["current_node_id"] = "close_conversation"
-    plan["next_node_ids"] = []
+    plan["current_node_id"] = next_current
+    plan["next_node_ids"] = ["close_conversation"] if next_current == "autopay_offer" else []
     plan["status"] = "active"
     plan["updated_from"] = "response_render"
     transition_update = {

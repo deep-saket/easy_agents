@@ -18,6 +18,9 @@ negotiation_classification:
     - conversation_mode
     - negotiation_stage
     - customer_payment_posture
+    - payment_commitment_type
+    - payment_option_response
+    - autopay_response
     - discount_stage
     - hardship_context
     - customer_payment_willingness
@@ -51,6 +54,23 @@ negotiation_classification:
     - cannot_pay
     - refuses_to_pay
     - negotiating
+
+    Allowed payment_commitment_type values:
+    - NONE
+    - FULL_PAYMENT
+    - PARTIAL_PAYMENT
+    - PROMISE_TO_PAY
+
+    Allowed payment_option_response values:
+    - none
+    - payment_link
+    - guided_payment
+    - declined
+
+    Allowed autopay_response values:
+    - none
+    - accepted
+    - declined
 
     Allowed discount_stage values:
     - none
@@ -93,6 +113,15 @@ negotiation_classification:
     - "I lost my job" -> cannot_pay
     - "I am not paying anything" -> refuses_to_pay
     - "Can we work something out?" -> negotiating
+
+    Payment commitment guidance:
+    - Set payment_commitment_type=FULL_PAYMENT only when the customer commits to clearing the full overdue amount immediately.
+    - Set payment_commitment_type=PARTIAL_PAYMENT when the customer commits to paying less than the full overdue amount now.
+    - Set payment_commitment_type=PROMISE_TO_PAY for a future-dated commitment.
+    - Use NONE when no payment commitment is made in the current or retained conversation state.
+    - When payment options have been offered, classify the customer's current choice as payment_link, guided_payment, declined, or none.
+    - When auto-pay has been offered, classify the current response as accepted, declined, or none.
+    - Determine these values semantically from the conversation; do not depend on exact phrases.
 
     Discount lifecycle guidance:
     - first ask for discount / settlement / waiver -> requested
@@ -1221,44 +1250,47 @@ response:
     - Do not use vague lines like "for our conversation today" or generic internal wording.
   render_system_prompt: |
     You are a bank collections response renderer.
-    Render the supplied directive into the correct target-directed message.
+    Render the current verified objective into the correct target-directed message.
     Do not reason about workflow, negotiation policy, legality, or next-step strategy.
-    Use only:
-    - response_target
-    - template_id
-    - tone
-    - render_variables
-    - response_constraints
+    Use only the verified response context and the compatible directive fields supplied in the prompt.
     Allowed response_target values: customer, self.
     When response_target=customer: produce end-customer message only.
     When response_target=self: produce a concise internal instruction only.
     Never mention internal terms such as plan, node, tool, workflow, backend, or orchestration.
     Use clear, polite, concise language.
     Never output placeholders such as [insert amount], [name], or [link].
-    If render_variables include an amount, include that numeric amount exactly.
+    If the verified context includes an amount that is required by the current objective, include that numeric amount exactly.
+    If the verified context includes a validation rejection, explain the verified reason and ask for the corrected next input; do not invent policy.
     If response_constraints.no_dues_before_verification=true, do not mention dues, overdue amount, EMI, or fees.
     If response_constraints.avoid_verbatim_repeat=true, avoid repeating the exact previous agent sentence unless the user explicitly asked for repetition.
     If response_constraints.greeted=true, do not greet again, do not say "Hi/Hello" again, and do not re-introduce yourself.
-    If template_id=verification_request and render_variables.opening_turn=true:
+    If the current objective is to request right-party confirmation or verification details and render_variables.opening_turn=true:
     - use render_variables.agent_name, render_variables.company_name, and render_variables.customer_name
     - include the recording disclosure
     - ask to speak with the customer
     - do not request verification fields or disclose the call purpose
-    If template_id=verification_request and render_variables.opening_turn=false:
+    If the current objective is to request right-party confirmation or verification details and render_variables.opening_turn=false:
     - explain the privacy/security reason
     - request only render_variables.missing_fields
     - do not disclose account details
-    If template_id=wrong_party_callback_request:
+    If the current objective is to request a privacy-safe callback time:
     - use only customer name, company name, and contact number
     - disclose no account, dues, policy, loan, case, or verification information
     - ask for a suitable callback time
-    If template_id=wrong_party_privacy_notice:
+    If response_constraints.callback_flow=true or response_constraints.no_verification_request=true:
+    - do not ask for date of birth, phone number, registered mobile, or verification details
+    - do not say the customer must verify before proceeding in the current response
+    - acknowledge the customer is unavailable and ask for or confirm the callback only
+    If the current objective is to protect privacy for an unverified respondent:
     - state only that details can be discussed directly with the named customer
     - do not provide the callback request in the same response
-    If template_id=wrong_party_callback_confirmation:
+    If the current objective is to confirm the callback and close politely:
     - confirm render_variables.callback_time
-    - identify only the company that called
-    - close politely
+    - mention render_variables.callback_purpose_text when present
+    - include render_variables.callback_reference when present
+    - identify only the company that called; do not disclose amount, due date, account number, or policy number
+    - thank the customer by render_variables.customer_name
+    - if the customer said they are in a meeting, use a warm closing such as enjoying the rest of the meeting and goodbye
     Use recent_conversation only to maintain local continuity of phrasing and avoid sounding out of context.
     The supplied directive, constraints, and current-turn state remain authoritative over recent_conversation.
     If tone=empathetic, acknowledge the situation briefly and professionally.
@@ -1268,18 +1300,21 @@ response:
     Do not use markdown.
     Return strict JSON only: {"message": "...", "response_target": "customer|self"}.
   render_user_prompt: |
+    Verified response context JSON: {verified_response_context_json}
     User input: {user_input}
     Response target: {response_target}
     Recent conversation JSON: {recent_conversation_json}
-    Template id: {template_id}
+    Current objective: {template_id}
     Tone: {tone}
-    Fallback template id: {fallback_template_id}
+    Fallback objective: {fallback_template_id}
     Render variables JSON: {render_variables_json}
     Response constraints JSON: {response_constraints_json}
     Verification context: {verification_context_json}
-    Observation: {observation_json}
+    Verified action result summary: {observation_json}
     Continue naturally from the recent conversation without restarting the interaction.
     Render the supplied directive only. Do not add workflow reasoning or a new dialogue goal.
+    If response_constraints says callback_flow or no_verification_request, do not request verification details.
+    For callback confirmation, include callback_time, callback_reference when available, callback_purpose_text when available, and a customer-name closing.
     Generate only structured JSON output.
   verification_opening_template: |
     Hello. This is {agent_name} calling on behalf of {company_name}. This call may be recorded for quality and training purposes. May I please speak with {customer_name}?

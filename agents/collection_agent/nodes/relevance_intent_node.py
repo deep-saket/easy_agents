@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from agents.collection_agent.nodes.collection_intent_node import CollectionIntentNode
-from agents.collection_agent.nodes.plan_proposal_utils import is_right_party_denial
+from agents.collection_agent.utils.plan_proposal_utils import is_right_party_denial
 from src.nodes.types import AgentState
 
 

@@ -5,8 +5,12 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from agents.collection_agent.nodes.callback_time_extractor import extract_callback_time
+from agents.collection_agent.utils.callback_time_extractor import extract_callback_time
 from agents.collection_agent.nodes.collection_intent_node import CollectionIntentNode
+from agents.collection_agent.utils.plan_proposal_utils import (
+    is_customer_callback_request,
+    promise_to_pay_ready_for_capture,
+)
 from src.nodes.types import AgentState
 
 
@@ -185,6 +189,45 @@ class ExecutionPathIntentNode(CollectionIntentNode):
         memory_state = self._get_memory_state(state)
         right_party_status = str(memory_state.get("right_party_status", "")).strip().lower()
         lowered = str(state.get("user_input", "")).lower()
+        if promise_to_pay_ready_for_capture(memory_state):
+            return {
+                "skip_llm": True,
+                "reason": "Promise-to-pay date captured; execute promise capture workflow.",
+                "intent": {
+                    "intent": "need_tool",
+                    "confidence": 1.0,
+                    "reason": "Validate and record the promise-to-pay commitment.",
+                },
+            }
+        if (
+            str(memory_state.get("payment_resolution_stage", "")).strip().lower() in {"options_offered", "link_offered"}
+            and str(memory_state.get("payment_commitment_type", "")).strip().upper() == "FULL_PAYMENT"
+            and str(memory_state.get("payment_option_response", "")).strip().lower() == "payment_link"
+        ):
+            return {
+                "skip_llm": True,
+                "reason": "Accepted full-payment link requires creation and SMS delivery.",
+                "intent": {
+                    "intent": "need_tool",
+                    "confidence": 1.0,
+                    "reason": "Create the full-payment link.",
+                },
+            }
+        if (
+            str(memory_state.get("payment_resolution_stage", "")).strip().lower() in {"confirmed", "autopay_offered"}
+            and str(memory_state.get("payment_commitment_type", "")).strip().upper() == "FULL_PAYMENT"
+            and str(memory_state.get("autopay_response", "")).strip().lower() == "accepted"
+            and str(memory_state.get("autopay_stage", "")).strip().lower() != "enabled"
+        ):
+            return {
+                "skip_llm": True,
+                "reason": "Accepted auto-pay setup should complete the shared auto-pay workflow.",
+                "intent": {
+                    "intent": "need_tool",
+                    "confidence": 1.0,
+                    "reason": "Record auto-pay enrollment on the existing full-payment link.",
+                },
+            }
         if (
             str(memory_state.get("partial_payment_stage", "")).strip().lower() == "link_offered"
             and self._is_affirmative(lowered)
@@ -225,6 +268,34 @@ class ExecutionPathIntentNode(CollectionIntentNode):
                 },
             }
         if (
+            (
+                str(memory_state.get("negotiation_stage", "")).strip().lower() == "hardship_options_exhausted"
+                or bool(
+                    (
+                        memory_state.get("hardship_context", {})
+                        if isinstance(memory_state.get("hardship_context"), dict)
+                        else {}
+                    ).get("hardship_detected", False)
+                )
+            )
+            and (
+                str(memory_state.get("discount_stage", "")).strip().lower() in {"counter_offer", "rejected"}
+                or str(memory_state.get("discount_response", "")).strip().lower() in {"counter", "rejected"}
+            )
+            and bool(memory_state.get("discount_offered", False))
+            and bool(memory_state.get("generic_options_offered_after_discount", False))
+            and str(memory_state.get("human_escalation_status", "")).strip().lower() != "queued"
+        ):
+            return {
+                "skip_llm": True,
+                "reason": "Exhausted hardship options require human specialist escalation.",
+                "intent": {
+                    "intent": "need_tool",
+                    "confidence": 1.0,
+                    "reason": "Queue human escalation for exhausted hardship options.",
+                },
+            }
+        if (
             str(memory_state.get("hardship_hold_stage", "")).strip().lower() == "offered"
             and not self._has_active_discount_branch(memory_state)
             and str(memory_state.get("hold_response", "")).strip().lower() == "accepted"
@@ -238,6 +309,7 @@ class ExecutionPathIntentNode(CollectionIntentNode):
                     "reason": "Create the hold and send confirmation before responding.",
                 },
             }
+        identity_verified = bool(context.get("identity_verified", memory_state.get("identity_verified", False)))
         if right_party_status == "wrong_party" and "callback" in lowered and any(
             token in lowered for token in ("cancel", "remove", "do not call", "don't call")
         ):
@@ -263,8 +335,24 @@ class ExecutionPathIntentNode(CollectionIntentNode):
                     "reason": "Schedule the requested outbound callback.",
                 },
             }
-
-        identity_verified = bool(context.get("identity_verified", False))
+        customer_callback_stage = str(memory_state.get("customer_callback_stage", "")).strip().lower()
+        if (
+            right_party_status != "wrong_party"
+            and (
+                customer_callback_stage in {"awaiting_callback", "scheduling"}
+                or is_customer_callback_request(str(state.get("user_input", "")))
+            )
+            and extract_callback_time(str(state.get("user_input", "")), llm=self.llm)
+        ):
+            return {
+                "skip_llm": True,
+                "reason": "Customer callback time requires scheduler tool execution.",
+                "intent": {
+                    "intent": "need_tool",
+                    "confidence": 1.0,
+                    "reason": "Schedule the requested outbound callback.",
+                },
+            }
         missing_provided = context.get("verification_missing_fields_provided_turn")
         if identity_verified or not isinstance(missing_provided, list) or not missing_provided:
             return None

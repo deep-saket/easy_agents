@@ -4,11 +4,11 @@ from agents.collection_agent.agent import CollectionAgent
 from agents.collection_agent.nodes.plan_proposal_directive_node import PlanProposalDirectiveNode
 from agents.collection_agent.nodes.plan_proposal_graph_node import PlanProposalGraphNode
 from agents.collection_agent.nodes.plan_proposal_state_node import PlanProposalStateNode
-from agents.collection_agent.nodes.plan_proposal_utils import (
+from agents.collection_agent.utils.plan_proposal_utils import (
     finalize_conversation_memory,
     is_right_party_denial,
 )
-from agents.collection_agent.nodes.callback_time_extractor import extract_callback_time
+from agents.collection_agent.utils.callback_time_extractor import extract_callback_time
 from src.nodes.base import BaseGraphNode
 from src.memory.types import WorkingMemory
 
@@ -303,7 +303,7 @@ def test_wrong_party_callback_flow_reaches_explicit_closing_node() -> None:
 
 
 def test_plan_proposal_directive_node_returns_response_directive() -> None:
-    _, _, directive_update = _run_split_chain(
+    _, graph_update, directive_update = _run_split_chain(
         {
             "mode": "strict_collections",
             "active_case_id": "COLL-1001",
@@ -321,7 +321,8 @@ def test_plan_proposal_directive_node_returns_response_directive() -> None:
 
     proposal = directive_update["plan_proposal"]
     directive = proposal["response_directive"]
-    assert proposal["plan_tree_update"]["selected_next_node_id"] == "verify_identity"
+    assert "plan_tree_update" not in proposal
+    assert graph_update["conversation_plan"]["current_node_id"] == "verify_identity"
     assert directive["conversation_objective"] == "collect_verification"
     assert directive["dialogue_action"] == "ask_verification"
 
@@ -559,7 +560,7 @@ def test_plan_proposal_directive_does_not_rehandoff_generic_hardship_acceptance(
 
 
 def test_plan_proposal_directive_termination_remains_intact() -> None:
-    _, _, directive_update = _run_split_chain(
+    _, graph_update, directive_update = _run_split_chain(
         {
             "mode": "strict_collections",
             "active_case_id": "COLL-1001",
@@ -583,7 +584,8 @@ def test_plan_proposal_directive_termination_remains_intact() -> None:
 
     proposal = directive_update["plan_proposal"]
     assert proposal["intent"] == "conversation_termination"
-    assert proposal["plan_tree_update"]["operation"] == "complete"
+    assert "plan_tree_update" not in proposal
+    assert graph_update["conversation_plan"]["current_node_id"] == "close_conversation"
 
 
 def test_collection_agent_graph_wires_split_plan_nodes() -> None:

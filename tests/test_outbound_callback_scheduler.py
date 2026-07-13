@@ -9,6 +9,9 @@ from agents.collection_agent.services.outbound_callback_queue import (
     resolve_callback_datetime,
 )
 from agents.collection_agent.nodes.collection_react_node import CollectionReactNode
+from agents.collection_agent.nodes.plan_proposal_state_node import PlanProposalStateNode
+from agents.collection_agent.nodes.plan_proposal_directive_node import PlanProposalDirectiveNode
+from agents.collection_agent.nodes.plan_proposal_graph_node import PlanProposalGraphNode
 from agents.collection_agent.tools.data_store import CollectionDataStore
 from agents.collection_agent.tools.outbound_callback_cancel_tool import OutboundCallbackCancelTool
 from agents.collection_agent.tools.outbound_callback_schedule_tool import OutboundCallbackScheduleTool
@@ -235,6 +238,236 @@ def test_wrong_party_callback_turn_selects_scheduler_tool() -> None:
         assert completion_update["decision"].done is True
         assert memory.state["outbound_callback_job_id"]
         assert memory.state["outbound_callback_status"] == "scheduled"
+
+
+def test_scheduled_callback_tool_result_leads_to_confirmation_directive() -> None:
+    memory = WorkingMemory(
+        session_id="session-1",
+        state={
+            "active_case_id": "COLL-1002",
+            "active_user_id": "CUST-2002",
+            "active_customer_name": "Rohan Gupta",
+            "identity_verified": False,
+            "right_party_status": "wrong_party",
+            "wrong_party_callback_stage": "awaiting_callback",
+        },
+    )
+    node = PlanProposalDirectiveNode(llm=None, strict_llm_mode=False)
+
+    update = node.execute(
+        {
+            "user_input": "try at 11AM today",
+            "memory": memory,
+            "observations": [
+                {
+                    "tool_phase": {
+                        "tool_name": "outbound_callback_schedule",
+                        "input": {
+                            "case_id": "COLL-1002",
+                            "customer_id": "CUST-2002",
+                            "session_id": "session-1",
+                            "callback_time": "at 11 AM today",
+                            "timezone": "Asia/Kolkata",
+                            "phone": None,
+                            "max_retries": 3,
+                        },
+                        "output": {
+                            "job_id": "CALL-123",
+                            "case_id": "COLL-1002",
+                            "customer_id": "CUST-2002",
+                            "session_id": "session-1",
+                            "scheduled_for": "2026-06-24T11:00:00+05:30",
+                            "timezone": "Asia/Kolkata",
+                            "phone": "+919900001002",
+                            "status": "scheduled",
+                            "retry_count": 0,
+                        },
+                    }
+                }
+            ],
+            "steps": 1,
+        }
+    )
+
+    directive = update["plan_proposal"]["response_directive"]
+    assert directive["conversation_objective"] == "wrong_party_callback_confirmation"
+    assert memory.state["wrong_party_callback_stage"] == "completed"
+    assert memory.state["wrong_party_callback_time"] == "at 11 AM today"
+
+
+def test_verified_customer_callback_without_time_asks_for_callback_time() -> None:
+    memory = WorkingMemory(
+        session_id="session-customer-callback",
+        state={
+            "active_case_id": "COLL-1002",
+            "active_user_id": "CUST-2002",
+            "active_customer_name": "Rohan Gupta",
+            "identity_verified": True,
+            "right_party_status": "right_party",
+        },
+    )
+    node = PlanProposalDirectiveNode(llm=None, strict_llm_mode=False)
+
+    update = node.execute(
+        {
+            "user_input": "I'm in a meeting, can you call later?",
+            "memory": memory,
+            "observations": [],
+            "steps": 0,
+        }
+    )
+
+    directive = update["plan_proposal"]["response_directive"]
+    assert directive["conversation_objective"] == "customer_callback_request"
+    assert memory.state["customer_callback_stage"] == "awaiting_callback"
+    assert not memory.state.get("customer_callback_time")
+
+
+def test_pre_verification_right_party_callback_uses_customer_callback_node() -> None:
+    memory = WorkingMemory(
+        session_id="session-customer-callback-preverify",
+        state={
+            "active_case_id": "COLL-1002",
+            "active_user_id": "CUST-2002",
+            "active_customer_name": "Rohan Gupta",
+            "identity_verified": False,
+            "right_party_status": "right_party",
+        },
+    )
+    directive_update = PlanProposalDirectiveNode(llm=None, strict_llm_mode=False).execute(
+        {
+            "user_input": "Yes, but I'm in a meeting right now.",
+            "memory": memory,
+            "observations": [],
+            "steps": 0,
+        }
+    )
+    assert directive_update["plan_proposal"]["response_directive"]["conversation_objective"] == "customer_callback_request"
+    assert memory.state["customer_callback_stage"] == "awaiting_callback"
+
+    graph_update = PlanProposalGraphNode(llm=None, strict_llm_mode=False).execute(
+        {
+            "user_input": "Yes, but I'm in a meeting right now.",
+            "memory": memory,
+            "plan_proposal": directive_update["plan_proposal"],
+        }
+    )
+    assert graph_update["conversation_plan"]["current_node_id"] == "customer_callback"
+    markers = graph_update["conversation_plan"].get("step_markers", {})
+    assert markers["verify_identity"]["state"] == "skipped"
+    assert markers["purpose_disclosure"]["state"] == "pending"
+    assert markers["customer_callback"]["state"] == "pending"
+
+
+def test_plan_state_sets_customer_callback_before_graph_runs() -> None:
+    memory = WorkingMemory(
+        session_id="session-customer-callback-state",
+        state={
+            "active_case_id": "COLL-1003",
+            "active_user_id": "CUST-2003",
+            "active_customer_name": "Neha Verma",
+            "identity_verified": False,
+            "right_party_status": "awaiting_confirmation",
+            "conversation_mode": "verification",
+            "response_mode": "compliance",
+        },
+    )
+
+    state_update = PlanProposalStateNode(llm=None, strict_llm_mode=False).execute(
+        {
+            "user_input": "Yes, but I'm in a meeting right now",
+            "memory": memory,
+            "observations": [],
+        }
+    )
+    assert state_update["plan_prepared_memory_state"]["customer_callback_stage"] == "awaiting_callback"
+    assert memory.state["customer_callback_stage"] == "awaiting_callback"
+
+    graph_update = PlanProposalGraphNode(llm=None, strict_llm_mode=False).execute(
+        {
+            "user_input": "Yes, but I'm in a meeting right now",
+            "memory": memory,
+            **state_update,
+        }
+    )
+    assert graph_update["conversation_plan"]["current_node_id"] == "customer_callback"
+
+
+def test_verified_customer_callback_reuses_outbound_scheduler_tool() -> None:
+    with TemporaryDirectory() as raw_dir:
+        root = Path(raw_dir)
+        (root / "data").mkdir()
+        (root / "data" / "customers.json").write_text(
+            '[{"customer_id":"CUST-2002","phone":"+919900001002"}]\n',
+            encoding="utf-8",
+        )
+        store = CollectionDataStore(base_dir=root)
+        queue = OutboundCallbackQueue(runtime_dir=store.runtime_dir, dispatch=lambda _: {})
+        registry = ToolRegistry()
+        registry.register(OutboundCallbackScheduleTool(store=store, queue=queue))
+        react = CollectionReactNode(
+            llm=None,
+            system_prompt="",
+            user_prompt="{user_input}",
+            available_tools="",
+            tool_registry=registry,
+        )
+        memory = WorkingMemory(
+            session_id="session-customer-callback",
+            state={
+                "active_case_id": "COLL-1002",
+                "active_user_id": "CUST-2002",
+                "active_customer_name": "Rohan Gupta",
+                "identity_verified": False,
+                "right_party_status": "right_party",
+                "customer_callback_stage": "awaiting_callback",
+                "timezone": "Asia/Kolkata",
+            },
+        )
+
+        state = {
+            "session_id": "session-customer-callback",
+            "case_id": "COLL-1002",
+            "user_id": "CUST-2002",
+            "user_input": "Call me around 7 PM today.",
+            "memory": memory,
+            "observations": [],
+            "steps": 0,
+        }
+        update = react.execute(state)
+
+        assert update["decision"].tool_call.tool_name == "outbound_callback_schedule"
+        assert update["decision"].tool_call.arguments["callback_time"] == "at 7 PM today"
+
+        tool_update = ToolExecutionNode(executor=ToolExecutor(registry=registry)).execute(
+            {
+                **state,
+                **update,
+                "observations": [],
+            }
+        )
+        completion_update = react.execute(
+            {
+                **state,
+                "steps": update["steps"],
+                **tool_update,
+            }
+        )
+
+        assert completion_update["decision"].done is True
+        assert memory.state["customer_callback_stage"] == "completed"
+        assert memory.state["customer_callback_time"] == "at 7 PM today"
+        assert memory.state["outbound_callback_status"] == "scheduled"
+        assert queue._read_rows(queue.queue_path)[0]["job_id"] == memory.state["outbound_callback_job_id"]
+
+        directive = PlanProposalDirectiveNode(llm=None, strict_llm_mode=False).execute(
+            {
+                **state,
+                "steps": update["steps"],
+                **tool_update,
+            }
+        )["plan_proposal"]["response_directive"]
+        assert directive["conversation_objective"] == "customer_callback_confirmation"
 
 
 def test_wrong_party_callback_cancellation_selects_cancel_tool() -> None:

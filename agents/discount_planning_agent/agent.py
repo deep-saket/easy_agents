@@ -17,6 +17,8 @@ class DiscountPlanningAgent:
     llm: Any | None = None
 
     def run(self, handoff_payload: dict[str, Any]) -> dict[str, Any]:
+        if not isinstance(handoff_payload, dict):
+            handoff_payload = {}
         case_id = str(handoff_payload.get("case_id", "UNKNOWN"))
         hardship_reason = str(handoff_payload.get("hardship_reason", "income_reduction"))
         target_emi = handoff_payload.get("target_monthly_emi")

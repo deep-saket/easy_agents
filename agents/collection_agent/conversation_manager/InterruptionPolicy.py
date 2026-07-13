@@ -17,10 +17,10 @@ class InterruptionPolicy:
     )
 
     def is_repeat_request(self, text: str) -> bool:
-        candidate = text.strip()
+        candidate = re.sub(r"[.!?,;:]+$", "", text.strip()).strip()
         if not candidate:
             return False
-        return any(pattern.search(candidate) for pattern in self._REPEAT_PATTERNS)
+        return any(pattern.fullmatch(candidate) for pattern in self._REPEAT_PATTERNS)
 
     def classify_text_input(self, text: str) -> str:
         if self.is_repeat_request(text):

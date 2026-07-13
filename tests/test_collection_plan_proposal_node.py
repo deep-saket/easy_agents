@@ -55,9 +55,8 @@ def test_plan_proposal_keeps_verify_identity_when_identity_verified_false() -> N
     update = _run_chain(memory)
 
     proposal = update["plan_proposal"]
-    tree = proposal["plan_tree_update"]
-    assert tree["selected_next_node_id"] == "verify_identity"
-    assert tree["current_node_id"] == "verify_identity"
+    assert "plan_tree_update" not in proposal
+    assert update["conversation_plan"]["current_node_id"] == "verify_identity"
     assert proposal["next_actions"][0] == "verify_identity"
 
 
@@ -88,10 +87,9 @@ def test_plan_proposal_advances_when_identity_verified_true_even_if_missing_fiel
     update = directive_node.execute({**state, **state_update, **graph_update})
 
     proposal = update["plan_proposal"]
-    tree = proposal["plan_tree_update"]
-    assert tree["selected_next_node_id"] == "explain_dues"
-    assert tree["current_node_id"] == "explain_dues"
-    assert "verify_identity" not in proposal["next_actions"]
+    assert "plan_tree_update" not in proposal
+    assert update["conversation_plan"]["current_node_id"] == "purpose_disclosure"
+    assert proposal["conversation_objective"] == "purpose_disclosure"
 
 
 def test_plan_proposal_attaches_hardship_response_directive() -> None:

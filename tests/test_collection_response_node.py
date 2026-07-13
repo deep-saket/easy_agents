@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from agents.collection_agent.nodes.collection_response_node import CollectionResponseNode
-from agents.collection_agent.nodes.plan_proposal_utils import finalize_conversation_memory
+from agents.collection_agent.utils.plan_proposal_utils import finalize_conversation_memory
 from src.memory.types import WorkingMemory
 
 
@@ -10,6 +10,504 @@ def _build_node() -> CollectionResponseNode:
         llm=None,
         strict_llm_mode=False,
     )
+
+
+class _FailingRenderLLM:
+    def generate_json(self, system_prompt: str, user_prompt: str) -> dict[str, object]:
+        raise RuntimeError("LLM renderer failed.")
+
+
+class _ScriptedRenderLLM:
+    def generate_json(self, system_prompt: str, user_prompt: str) -> dict[str, object]:
+        return {
+            "message": "I can talk through a practical arrangement based on what works for you.",
+            "response_target": "customer",
+        }
+
+
+class _FullPaymentNaturalLLM:
+    def generate_json(self, system_prompt: str, user_prompt: str) -> dict[str, object]:
+        assert "Verified response context JSON" in user_prompt
+        return {
+            "message": (
+                "The payment link is on its way to your registered mobile. "
+                "Your reference number is PAY-123. Once payment is received, you will get an instant receipt. "
+                "Would you like to set up auto-pay so future installments are not missed?"
+            ),
+            "response_target": "customer",
+        }
+
+
+class _HallucinatedReferenceLLM:
+    def generate_json(self, system_prompt: str, user_prompt: str) -> dict[str, object]:
+        return {
+            "message": "The link is on its way, and your reference number is PAY-FAKE999.",
+            "response_target": "customer",
+        }
+
+
+class _IncompleteCallbackLLM:
+    def generate_json(self, system_prompt: str, user_prompt: str) -> dict[str, object]:
+        return {
+            "message": "I have scheduled your callback for 5 PM. EasySecure Financial Services will be in touch then. Have a great day.",
+            "response_target": "customer",
+        }
+
+
+class _CallbackRequestContextLLM:
+    def generate_json(self, system_prompt: str, user_prompt: str) -> dict[str, object]:
+        assert "+91-1800-555-2002" not in user_prompt
+        assert "EasySecure Financial Services" in user_prompt
+        return {
+            "message": "I understand you're in a meeting. When would be a suitable time for us to call you back?",
+            "response_target": "customer",
+        }
+
+
+def test_response_node_uses_llm_first_for_full_payment_objective() -> None:
+    node = CollectionResponseNode(
+        llm=_FullPaymentNaturalLLM(),
+        strict_llm_mode=True,
+        system_prompt="render",
+        render_user_prompt="Verified response context JSON: {verified_response_context_json}",
+    )
+    memory = WorkingMemory(
+        session_id="response-full-payment",
+        state={
+            "active_customer_name": "Rohan Gupta",
+            "active_case_id": "COLL-1002",
+            "active_overdue_amount": 37800.0,
+            "identity_verified": True,
+            "payment_commitment_type": "FULL_PAYMENT",
+            "payment_resolution_stage": "confirmed",
+            "full_payment_details": {
+                "payment_reference_id": "PAY-123",
+                "sms_confirmation": {"status": "sent"},
+            },
+        },
+    )
+
+    update = node.execute(
+        {
+            "user_input": "Send me the link, please.",
+            "memory": memory,
+            "plan_proposal": {
+                "target": "customer",
+                "response_directive": {
+                    "conversation_objective": "full_payment_confirmation",
+                    "dialogue_action": "confirm_full_payment_link",
+                    "response_mode": "informational",
+                },
+            },
+        }
+    )
+
+    assert update["response_render_debug"]["renderer_fallback_used"] is False
+    assert "reference number is PAY-123" in update["response"]
+    assert "auto-pay" in update["response"]
+
+
+def test_response_node_falls_back_when_llm_fails_for_full_payment_objective() -> None:
+    node = CollectionResponseNode(
+        llm=_FailingRenderLLM(),
+        strict_llm_mode=True,
+        system_prompt="render",
+        render_user_prompt="Verified response context JSON: {verified_response_context_json}",
+    )
+    memory = WorkingMemory(
+        session_id="response-full-payment-fallback",
+        state={
+            "active_customer_name": "Rohan Gupta",
+            "active_case_id": "COLL-1002",
+            "active_overdue_amount": 37800.0,
+            "identity_verified": True,
+            "payment_commitment_type": "FULL_PAYMENT",
+            "payment_resolution_stage": "confirmed",
+            "full_payment_details": {
+                "payment_reference_id": "PAY-123",
+                "sms_confirmation": {"status": "sent"},
+            },
+        },
+    )
+
+    update = node.execute(
+        {
+            "user_input": "Send me the link, please.",
+            "memory": memory,
+            "plan_proposal": {
+                "target": "customer",
+                "response_directive": {
+                    "conversation_objective": "full_payment_confirmation",
+                    "dialogue_action": "confirm_full_payment_link",
+                    "response_mode": "informational",
+                },
+            },
+        }
+    )
+
+    assert update["response_render_debug"]["renderer_fallback_used"] is True
+    assert "reference number is PAY-123" in update["response"]
+
+
+def test_response_node_falls_back_when_llm_invents_reference() -> None:
+    node = CollectionResponseNode(
+        llm=_HallucinatedReferenceLLM(),
+        strict_llm_mode=True,
+        system_prompt="render",
+        render_user_prompt="Verified response context JSON: {verified_response_context_json}",
+    )
+    memory = WorkingMemory(
+        session_id="response-full-payment-hallucinated-reference",
+        state={
+            "active_customer_name": "Rohan Gupta",
+            "active_case_id": "COLL-1002",
+            "active_overdue_amount": 37800.0,
+            "identity_verified": True,
+            "payment_commitment_type": "FULL_PAYMENT",
+            "payment_resolution_stage": "confirmed",
+            "full_payment_details": {
+                "payment_reference_id": "PAY-123",
+                "sms_confirmation": {"status": "sent"},
+            },
+        },
+    )
+
+    update = node.execute(
+        {
+            "user_input": "Send me the link, please.",
+            "memory": memory,
+            "plan_proposal": {
+                "target": "customer",
+                "response_directive": {
+                    "conversation_objective": "full_payment_confirmation",
+                    "dialogue_action": "confirm_full_payment_link",
+                    "response_mode": "informational",
+                },
+            },
+        }
+    )
+
+    assert update["response_render_debug"]["renderer_fallback_used"] is True
+    assert "PAY-FAKE999" not in update["response"]
+    assert "PAY-123" in update["response"]
+
+
+def test_response_node_explains_below_minimum_partial_payment_validation() -> None:
+    node = _build_node()
+    memory = WorkingMemory(
+        session_id="response-partial-validation",
+        state={
+            "active_customer_name": "Rohan Gupta",
+            "active_case_id": "COLL-1002",
+            "active_overdue_amount": 37800.0,
+            "identity_verified": True,
+            "partial_payment_stage": "collecting_amount",
+            "partial_payment_validation": {
+                "status": "rejected",
+                "reason": "below_minimum_partial_payment",
+                "offered_amount": 7000.0,
+                "offered_pct": 18.52,
+                "minimum_partial_payment_pct": 20.0,
+                "minimum_partial_payment_amount": 7560.0,
+                "total_due": 37800.0,
+            },
+        },
+    )
+
+    update = node.execute(
+        {
+            "user_input": "I can pay 7000 today.",
+            "memory": memory,
+            "plan_proposal": {
+                "target": "customer",
+                "response_directive": {
+                    "conversation_objective": "partial_payment_amount_request",
+                    "dialogue_action": "ask_partial_payment_amount",
+                    "response_mode": "empathetic",
+                },
+            },
+        }
+    )
+
+    assert "7000.00" in update["response"]
+    assert "7560.00" in update["response"]
+    assert "20%" in update["response"]
+    assert "How much do you think" not in update["response"]
+
+
+def test_response_node_allows_llm_for_arrangement_reasoning() -> None:
+    node = CollectionResponseNode(
+        llm=_ScriptedRenderLLM(),
+        strict_llm_mode=True,
+        system_prompt="render",
+        render_user_prompt="{template_id}",
+    )
+    memory = WorkingMemory(
+        session_id="response-arrangement",
+        state={
+            "active_customer_name": "Rohan Gupta",
+            "active_case_id": "COLL-1002",
+            "active_overdue_amount": 37800.0,
+            "identity_verified": True,
+        },
+    )
+
+    update = node.execute(
+        {
+            "user_input": "Can we discuss another option?",
+            "memory": memory,
+            "plan_proposal": {
+                "target": "customer",
+                "response_directive": {
+                    "conversation_objective": "present_arrangement_options",
+                    "dialogue_action": "discuss_arrangement",
+                    "response_mode": "negotiation",
+                },
+            },
+        }
+    )
+
+    assert update["response"] == "I can talk through a practical arrangement based on what works for you."
+    assert update["response_render_debug"]["renderer_fallback_used"] is False
+
+
+def test_response_node_uses_graph_objective_for_customer_callback_over_stale_verification() -> None:
+    node = _build_node()
+    memory = WorkingMemory(
+        session_id="response-customer-callback",
+        state={
+            "active_customer_name": "Rohan Gupta",
+            "active_case_id": "COLL-1002",
+            "identity_verified": False,
+            "right_party_status": "awaiting_confirmation",
+            "customer_callback_stage": "awaiting_callback",
+            "active_dialogue_owner": "customer_callback",
+        },
+    )
+
+    update = node.execute(
+        {
+            "user_input": "Yes, but I'm in a meeting right now",
+            "memory": memory,
+            "conversation_plan": {
+                "current_node_id": "customer_callback",
+                "step_markers": {
+                    "verify_identity": {
+                        "state": "skipped",
+                        "reason": "customer_requested_callback_before_verification",
+                    },
+                    "customer_callback": {"state": "pending"},
+                },
+            },
+            "plan_proposal": {
+                "target": "customer",
+                "response_directive": {
+                    "conversation_objective": "collect_verification",
+                    "dialogue_action": "ask_verification",
+                    "response_mode": "compliance",
+                },
+            },
+        }
+    )
+
+    lowered = update["response"].lower()
+    assert "callback" in lowered
+    assert "date of birth" not in lowered
+    assert "phone number" not in lowered
+    assert update["response_render_debug"]["template_selected"] == "customer_callback_request"
+
+
+def test_response_node_customer_callback_request_does_not_expose_contact_number_to_llm() -> None:
+    node = CollectionResponseNode(
+        llm=_CallbackRequestContextLLM(),
+        strict_llm_mode=True,
+        system_prompt="render",
+        render_user_prompt="Verified response context JSON: {verified_response_context_json}",
+    )
+    memory = WorkingMemory(
+        session_id="response-customer-callback-no-contact",
+        state={
+            "active_customer_name": "Rohan Gupta",
+            "identity_verified": False,
+            "customer_callback_stage": "awaiting_callback",
+            "active_collection_context": {
+                "customer": {
+                    "variables": {
+                        "[COMPANY_NAME]": "EasySecure Financial Services",
+                        "[CONTACT_NUMBER]": "+91-1800-555-2002",
+                    }
+                }
+            },
+        },
+    )
+
+    update = node.execute(
+        {
+            "user_input": "Yes, but I'm in a meeting right now",
+            "memory": memory,
+            "conversation_plan": {"current_node_id": "customer_callback"},
+            "plan_proposal": {
+                "target": "customer",
+                "response_directive": {
+                    "conversation_objective": "customer_callback_request",
+                    "dialogue_action": "customer_callback_request",
+                    "response_mode": "empathetic",
+                },
+            },
+        }
+    )
+
+    assert "+91-1800-555-2002" not in update["response"]
+    assert update["response_render_debug"]["renderer_fallback_used"] is False
+
+
+def test_response_node_customer_callback_confirmation_includes_reference_and_safe_purpose() -> None:
+    node = _build_node()
+    memory = WorkingMemory(
+        session_id="response-customer-callback-confirmed",
+        state={
+            "active_customer_name": "Rohan Gupta",
+            "active_case_id": "COLL-1002",
+            "active_company_name": "EasySecure Financial Services",
+            "identity_verified": False,
+            "customer_callback_stage": "completed",
+            "customer_callback_time": "at 5 PM today",
+            "outbound_callback_status": "scheduled",
+            "outbound_callback_job_id": "CALL-123",
+        },
+    )
+
+    update = node.execute(
+        {
+            "user_input": "Can you call me this evening, around 5 PM?",
+            "memory": memory,
+            "conversation_plan": {"current_node_id": "customer_callback"},
+            "plan_proposal": {
+                "target": "customer",
+                "response_directive": {
+                    "conversation_objective": "customer_callback_confirmation",
+                    "dialogue_action": "customer_callback_confirmation",
+                    "response_mode": "empathetic",
+                },
+            },
+        }
+    )
+
+    response = update["response"]
+    assert "5 PM" in response
+    assert "premium installment on your policy" in response
+    assert "CALL-123" in response
+    assert "Rohan Gupta" in response
+    assert "date of birth" not in response.lower()
+
+
+def test_response_node_callback_llm_missing_reference_falls_back_to_complete_template() -> None:
+    node = CollectionResponseNode(
+        llm=_IncompleteCallbackLLM(),
+        strict_llm_mode=True,
+        system_prompt="render",
+        render_user_prompt="Verified response context JSON: {verified_response_context_json}",
+    )
+    memory = WorkingMemory(
+        session_id="response-customer-callback-llm-fallback",
+        state={
+            "active_customer_name": "Rohan Gupta",
+            "active_case_id": "COLL-1002",
+            "identity_verified": False,
+            "customer_callback_stage": "completed",
+            "customer_callback_time": "at 5 PM today",
+            "outbound_callback_status": "scheduled",
+            "outbound_callback_job_id": "CALL-123",
+        },
+    )
+
+    update = node.execute(
+        {
+            "user_input": "Can you call me this evening, around 5 PM?",
+            "memory": memory,
+            "conversation_plan": {"current_node_id": "customer_callback"},
+            "plan_proposal": {
+                "target": "customer",
+                "response_directive": {
+                    "conversation_objective": "customer_callback_confirmation",
+                    "dialogue_action": "customer_callback_confirmation",
+                    "response_mode": "empathetic",
+                },
+            },
+        }
+    )
+
+    assert update["response_render_debug"]["renderer_fallback_used"] is True
+    assert "CALL-123" in update["response"]
+    assert "premium installment on your policy" in update["response"]
+
+
+def test_response_node_uses_callback_confirmation_after_graph_advances_to_close() -> None:
+    node = _build_node()
+    memory = WorkingMemory(
+        session_id="response-customer-callback-close-node",
+        state={
+            "active_customer_name": "Aditi Sharma",
+            "identity_verified": False,
+            "customer_callback_stage": "completed",
+            "customer_callback_time": "at 3 PM",
+            "outbound_callback_status": "scheduled",
+            "outbound_callback_job_id": "CALL-456",
+        },
+    )
+
+    update = node.execute(
+        {
+            "user_input": "Can you call me this evening, around 3 PM?",
+            "memory": memory,
+            "conversation_plan": {"current_node_id": "close_conversation"},
+            "observation": {
+                "tool_name": "outbound_callback_schedule",
+                "output": {"status": "scheduled", "job_id": "CALL-456"},
+            },
+            "plan_proposal": {
+                "target": "customer",
+                "response_directive": {
+                    "conversation_objective": "close_conversation",
+                    "dialogue_action": "close_conversation",
+                },
+            },
+        }
+    )
+
+    assert update["response_render_debug"]["template_selected"] == "customer_callback_confirmation"
+    assert "CALL-456" in update["response"]
+    assert "premium installment on your policy" in update["response"]
+    assert "Aditi Sharma" in update["response"]
+
+
+def test_response_node_generic_closing_uses_customer_name() -> None:
+    node = _build_node()
+    memory = WorkingMemory(
+        session_id="response-generic-close",
+        state={
+            "active_customer_name": "Rohan Gupta",
+            "active_case_id": "COLL-1002",
+            "identity_verified": True,
+        },
+    )
+
+    update = node.execute(
+        {
+            "user_input": "No, thanks",
+            "memory": memory,
+            "plan_proposal": {
+                "target": "customer",
+                "response_directive": {
+                    "conversation_objective": "close_conversation",
+                    "dialogue_action": "close_conversation",
+                    "response_mode": "informational",
+                },
+            },
+        }
+    )
+
+    assert "Thank you for your time, Rohan Gupta." in update["response"]
 
 
 def test_response_node_renders_from_hardship_response_directive() -> None:
@@ -667,6 +1165,36 @@ def test_response_node_validator_blocks_dues_before_verification() -> None:
 
     assert validation["text"] is None
     assert "disclose_dues_before_verification" in validation["forbidden_actions_blocked"]
+
+
+def test_response_node_validator_blocks_mixed_discount_hold_offer() -> None:
+    node = _build_node()
+
+    validation = node._validate_response_against_directive(
+        text=(
+            "I can offer a 10% discount and also place the premium on hold for 2 months. "
+            "Would that help?"
+        ),
+        directive={
+            "template_id": "installment_discount_offer",
+            "response_target": "customer",
+            "tone": "empathetic",
+            "render_variables": {
+                "discount_pct_text": "10",
+                "original_amount_text": "37800.00",
+                "revised_amount_text": "34020.00",
+            },
+            "response_constraints": {},
+            "fallback_template_id": "installment_discount_offer",
+        },
+        context={
+            "response_target": "customer",
+            "verification_context": {"identity_verified": True},
+        },
+    )
+
+    assert validation["text"] is None
+    assert "mixed_offer_with_hold" in validation["forbidden_actions_blocked"]
 
 
 def test_response_node_negotiation_mode_does_not_add_empathy_language() -> None:
