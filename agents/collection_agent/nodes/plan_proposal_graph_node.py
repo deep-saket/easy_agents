@@ -1,4 +1,4 @@
-"""Plan proposal graph mutation node for collections planning."""
+"""Runtime projection of Collection Agent workflow state into a plan tree."""
 
 from __future__ import annotations
 
@@ -23,9 +23,13 @@ from src.nodes.base import BaseGraphNode
 from src.nodes.types import AgentState, NodeUpdate
 
 
+_TERMINAL_STATES = {"done", "blocked", "skipped"}
+_VALID_STATES = {*_TERMINAL_STATES, "pending"}
+
+
 @dataclass(slots=True)
 class PlanProposalGraphNode(BaseGraphNode):
-    """Owns conversation plan graph mutation and step-marker reconciliation."""
+    """Projects authoritative runtime state into the conversation plan."""
 
     llm: Any | None = None
     system_prompt: str = ""
@@ -41,56 +45,63 @@ class PlanProposalGraphNode(BaseGraphNode):
         self._record_llm_usage(state, node_name="plan_proposal_graph")
         self.last_debug = fresh_debug_state()
         memory = state.get("memory")
-        memory_state = dict(getattr(memory, "state", {})) if memory is not None else {}
-        prepared_memory_state = (
+        raw_memory = dict(getattr(memory, "state", {})) if memory is not None else {}
+        memory_state = (
             dict(state.get("plan_prepared_memory_state"))
             if isinstance(state.get("plan_prepared_memory_state"), dict)
             else overlay_negotiation_state_from_graph(
                 state=state,
-                memory_state=overlay_verification_state_from_graph(state=state, memory_state=memory_state),
+                memory_state=overlay_verification_state_from_graph(
+                    state=state,
+                    memory_state=raw_memory,
+                ),
             )
         )
-        self._overlay_wrong_party_state(
-            memory_state=prepared_memory_state,
-            user_input=str(state.get("user_input", "")),
-        )
-        existing_plan = get_existing_conversation_plan(state=state, memory_state=prepared_memory_state)
-        plan_signals = state.get("plan_signals") if isinstance(state.get("plan_signals"), dict) else {}
+        user_input = str(state.get("user_input", ""))
+        self._overlay_wrong_party_state(memory_state=memory_state, user_input=user_input)
+
+        existing_plan = get_existing_conversation_plan(state=state, memory_state=memory_state)
         plan_mode = str(
             state.get(
                 "plan_mode",
                 effective_mode(
-                    memory_state=prepared_memory_state,
-                    default=str(memory_state.get("mode", "strict_collections")),
+                    memory_state=memory_state,
+                    default=str(raw_memory.get("mode", "strict_collections")),
                 ),
             )
-        ).strip()
+        ).strip() or "strict_collections"
         plan_origin = str(state.get("plan_origin", "react")).strip() or "react"
-        user_input = str(state.get("user_input", ""))
+        response_target = str(state.get("response_target", "customer")).strip().lower() or "customer"
+        route = str(state.get("route", "continue")).strip().lower() or "continue"
+        plan_signals = state.get("plan_signals") if isinstance(state.get("plan_signals"), dict) else {}
+
         observation = latest_observation(state)
         observed_tool = str(state.get("observed_tool", "")).strip()
         observed_tool_output = (
             dict(state.get("observed_tool_output"))
             if isinstance(state.get("observed_tool_output"), dict)
-            else (observation.get("output", {}) if isinstance(observation, dict) and isinstance(observation.get("output"), dict) else {})
+            else (
+                dict(observation.get("output", {}))
+                if isinstance(observation, dict) and isinstance(observation.get("output"), dict)
+                else {}
+            )
         )
-        route = str(state.get("route", "continue")).strip().lower() or "continue"
-        response_target = str(state.get("response_target", "customer")).strip().lower() or "customer"
 
-        plan = self._build_or_update_conversation_plan(
+        plan = self._project_plan(
             existing_plan=existing_plan,
+            memory_state=memory_state,
             user_input=user_input,
-            memory_state=prepared_memory_state,
             mode=plan_mode,
             plan_origin=plan_origin,
             response_target=response_target,
             route=route,
-            observed_tool=observed_tool,
-            proposal={},
             plan_signals=plan_signals,
+            observed_tool=observed_tool,
+            observed_tool_output=observed_tool_output,
         )
         if memory is not None:
             memory.set_state(active_conversation_plan=plan)
+
         self.plan_graph_debug = {
             "plan_id": plan.get("plan_id"),
             "version": plan.get("version"),
@@ -102,6 +113,7 @@ class PlanProposalGraphNode(BaseGraphNode):
             "observed_tool": observed_tool,
             "observed_tool_output": observed_tool_output,
             "plan_signals": plan_signals,
+            "synchronization_source": "runtime_projection",
         }
         return {
             "route": "continue",
@@ -114,375 +126,71 @@ class PlanProposalGraphNode(BaseGraphNode):
     def route(self, state: AgentState) -> str:
         return str(state.get("route", "continue")).strip().lower() or "continue"
 
-    @staticmethod
-    def _compact_conversation_plan(plan: dict[str, Any]) -> dict[str, Any]:
-        if not isinstance(plan, dict):
-            return {}
-        nodes_raw = plan.get("nodes") if isinstance(plan.get("nodes"), list) else []
-        edges_raw = plan.get("edges") if isinstance(plan.get("edges"), list) else []
-        markers = plan.get("step_markers") if isinstance(plan.get("step_markers"), dict) else {}
-        nodes = []
-        for node in nodes_raw[:10]:
-            if not isinstance(node, dict):
-                continue
-            nodes.append(
-                {
-                    "id": str(node.get("id", "")).strip(),
-                    "label": str(node.get("label", "")).strip(),
-                    "status": str(node.get("status", "")).strip(),
-                    "owner": str(node.get("owner", "")).strip(),
-                }
-            )
-        edges = []
-        for edge in edges_raw[:16]:
-            if not isinstance(edge, dict):
-                continue
-            edges.append(
-                {
-                    "from": str(edge.get("from", "")).strip(),
-                    "to": str(edge.get("to", "")).strip(),
-                    "condition": str(edge.get("condition", "")).strip(),
-                }
-            )
-        marker_view = {}
-        for key, raw in markers.items():
-            if len(marker_view) >= 12:
-                break
-            if not isinstance(raw, dict):
-                continue
-            marker_view[str(key)] = str(raw.get("state", "pending")).strip()
-        return {
-            "plan_id": str(plan.get("plan_id", "")).strip(),
-            "version": int(plan.get("version", 1) or 1),
-            "status": str(plan.get("status", "active")).strip(),
-            "current_node_id": str(plan.get("current_node_id", "")).strip(),
-            "next_node_ids": [str(x).strip() for x in (plan.get("next_node_ids") or []) if str(x).strip()][:6],
-            "nodes": nodes,
-            "edges": edges,
-            "step_markers": marker_view,
-        }
-
-    def _build_or_update_conversation_plan(
+    def _project_plan(
         self,
         *,
         existing_plan: dict[str, Any],
-        user_input: str,
         memory_state: dict[str, Any],
+        user_input: str,
         mode: str,
         plan_origin: str,
         response_target: str,
         route: str,
+        plan_signals: dict[str, Any],
         observed_tool: str,
-        proposal: dict[str, Any],
-        plan_signals: dict[str, Any] | None = None,
+        observed_tool_output: dict[str, Any],
     ) -> dict[str, Any]:
-        plan = self._create_initial_plan_graph(memory_state=memory_state, mode=mode) if not existing_plan else dict(existing_plan)
-        plan.setdefault("nodes", [])
-        plan.setdefault("edges", [])
-        plan.setdefault("timeline", [])
-        plan.setdefault("revision_log", [])
-        plan.setdefault("status", "active")
-        plan.setdefault("version", 1)
-        plan.setdefault("objective", "Drive compliant collections conversation toward payment resolution.")
-        plan.setdefault("plan_id", f"plan-{str(memory_state.get('active_case_id', 'COLL-1001')).strip().upper()}")
-        plan.setdefault("root_node_id", "open_and_context")
-        plan.setdefault("step_markers", {})
-        self._ensure_privacy_and_closing_nodes(plan=plan)
-
-        previous_current = str(plan.get("current_node_id", "")) or str(plan.get("root_node_id", "open_and_context"))
-        plan_update = proposal.get("plan_tree_update") if isinstance(proposal.get("plan_tree_update"), dict) else {}
-        proposal_context = proposal.get("context") if isinstance(proposal.get("context"), dict) else {}
-        observed_output = (
-            proposal_context.get("observed_tool_output")
-            if isinstance(proposal_context.get("observed_tool_output"), dict)
-            else {}
+        plan = (
+            self._create_initial_plan_graph(memory_state=memory_state, mode=mode)
+            if not existing_plan
+            else self._normalize_existing_plan(existing_plan=existing_plan, memory_state=memory_state, mode=mode)
         )
-        inferred_next = self._infer_current_node_id(
+        previous_current = str(plan.get("current_node_id", "")).strip()
+        prior_executed = previous_current if existing_plan else ""
+        current = self._current_objective_from_runtime(
+            memory_state=memory_state,
+            previous_current=prior_executed,
             user_input=user_input,
-            observed_tool=observed_tool,
-            response_target=response_target,
-            route=route,
-            proposal=proposal,
-            plan_update=plan_update,
-            previous_current=previous_current,
+            plan_signals=plan_signals,
         )
-        if is_conversation_termination(user_input):
-            inferred_next = "close_conversation"
-        right_party_status = str(memory_state.get("right_party_status", "")).strip().lower()
-        wrong_party_callback_stage = str(memory_state.get("wrong_party_callback_stage", "")).strip().lower()
-        customer_callback_stage_global = str(memory_state.get("customer_callback_stage", "")).strip().lower()
-        callback_confirmed_now = (
-            right_party_status == "wrong_party"
-            and wrong_party_callback_stage == "awaiting_callback"
-            and looks_like_callback_time(user_input)
-        )
-        termination_requested = is_conversation_termination(user_input)
-        if (
-            customer_callback_stage_global in {"awaiting_callback", "scheduling", "completed"}
-            and not bool(memory_state.get("identity_verified", False))
-            and not termination_requested
-        ):
-            inferred_next = (
-                "close_conversation"
-                if customer_callback_stage_global == "completed"
-                else "customer_callback"
-            )
-        elif right_party_status == "wrong_party" and not termination_requested:
-            callback_already_completed = (
-                wrong_party_callback_stage == "completed"
-                and bool(str(memory_state.get("wrong_party_callback_time", "")).strip())
-            )
-            inferred_next = (
-                "close_conversation"
-                if callback_confirmed_now or callback_already_completed
-                else "wrong_party_callback"
-            )
-        elif bool(memory_state.get("identity_verified", False)) and not termination_requested:
-            hold_stage = str(memory_state.get("hardship_hold_stage", "")).strip().lower()
-            discount_stage = str(memory_state.get("discount_stage", "")).strip().lower()
-            partial_stage = str(memory_state.get("partial_payment_stage", "")).strip().lower()
-            payment_stage = str(memory_state.get("payment_resolution_stage", "")).strip().lower()
-            payment_commitment_type = str(memory_state.get("payment_commitment_type", "NONE")).strip().upper()
-            promise_stage = str(memory_state.get("promise_stage", "")).strip().lower()
-            autopay_response = str(memory_state.get("autopay_response", "none")).strip().lower()
-            autopay_stage = str(memory_state.get("autopay_stage", "")).strip().lower()
-            hardship_context = (
-                memory_state.get("hardship_context")
-                if isinstance(memory_state.get("hardship_context"), dict)
-                else {}
-            )
-            hardship_active = bool(hardship_context.get("hardship_detected", False))
-            human_escalation_status = str(memory_state.get("human_escalation_status", "")).strip().lower()
-            human_transfer_status = str(memory_state.get("human_transfer_status", "")).strip().lower()
-            customer_callback_stage = str(memory_state.get("customer_callback_stage", "")).strip().lower()
-            hardship_options_exhausted = (
-                str(memory_state.get("negotiation_stage", "")).strip().lower() == "hardship_options_exhausted"
-                or (
-                    discount_stage in {"counter_offer", "rejected"}
-                    and bool(memory_state.get("discount_offered", False))
-                    and bool(memory_state.get("generic_options_offered_after_discount", False))
-                )
-                or (
-                    str(memory_state.get("discount_response", "")).strip().lower() in {"counter", "rejected"}
-                    and bool(memory_state.get("discount_offered", False))
-                    and bool(memory_state.get("generic_options_offered_after_discount", False))
-                )
-            )
-            if customer_callback_stage in {"awaiting_callback", "scheduling", "completed"}:
-                inferred_next = "customer_callback" if customer_callback_stage != "completed" else "close_conversation"
-            elif human_escalation_status == "queued" or human_transfer_status == "pending":
-                inferred_next = "transfer_to_specialist"
-            elif hardship_options_exhausted:
-                inferred_next = "human_escalation"
-            elif payment_commitment_type == "PROMISE_TO_PAY" and promise_stage == "confirmed":
-                inferred_next = "close_conversation"
-            elif payment_commitment_type == "PROMISE_TO_PAY" and promise_stage == "followup_scheduled":
-                inferred_next = "confirmation"
-            elif payment_commitment_type == "PROMISE_TO_PAY" and promise_stage == "captured":
-                inferred_next = "promise_followup"
-            elif payment_commitment_type == "PROMISE_TO_PAY" and promise_stage == "recording":
-                inferred_next = "promise_capture"
-            elif payment_commitment_type == "PROMISE_TO_PAY" and promise_stage == "date_captured":
-                inferred_next = "promise_capture"
-            elif payment_commitment_type == "PROMISE_TO_PAY":
-                inferred_next = "promise_date"
-            elif payment_commitment_type == "FULL_PAYMENT" and autopay_stage == "enabled":
-                markers = (
-                    memory_state.get("active_conversation_plan", {}).get("step_markers", {})
-                    if isinstance(memory_state.get("active_conversation_plan"), dict)
-                    else {}
-                )
-                confirmation_marker = markers.get("confirmation") if isinstance(markers, dict) else {}
-                confirmation_reason = (
-                    str(confirmation_marker.get("reason", "")).strip().lower()
-                    if isinstance(confirmation_marker, dict)
-                    else ""
-                )
-                confirmation_delivered = confirmation_reason == "autopay_enabled_confirmation_delivered"
-                inferred_next = "close_conversation" if confirmation_delivered else "confirmation"
-            elif payment_commitment_type == "FULL_PAYMENT" and autopay_response == "declined":
-                inferred_next = "close_conversation"
-            elif payment_commitment_type == "FULL_PAYMENT" and payment_stage in {"confirmed", "link_sent", "autopay_offered"}:
-                inferred_next = "autopay_offer"
-            elif payment_commitment_type == "FULL_PAYMENT" and payment_stage in {"link_requested", "link_created"}:
-                inferred_next = "full_payment_link"
-            elif payment_commitment_type == "FULL_PAYMENT" and payment_stage in {"options_offered", "link_offered"}:
-                inferred_next = "full_payment_options"
-            elif payment_commitment_type == "FULL_PAYMENT":
-                inferred_next = "collect_payment_intent"
-            elif (
-                discount_stage in {"counter_offer", "rejected"}
-                and bool(memory_state.get("discount_offered", False))
-                and not bool(memory_state.get("generic_options_offered_after_discount", False))
-            ):
-                inferred_next = "explain_dues"
-            elif partial_stage == "confirmed" and self._is_hold_closing_reply(user_input):
-                inferred_next = "close_conversation"
-            elif partial_stage == "confirmed":
-                inferred_next = "confirmation"
-            elif partial_stage == "link_offered":
-                inferred_next = "partial_link"
-            elif partial_stage == "collecting_amount":
-                inferred_next = "partial_amount"
-            elif discount_stage == "confirmed" and self._is_hold_closing_reply(user_input):
-                inferred_next = "close_conversation"
-            elif discount_stage == "confirmed":
-                inferred_next = "confirmation"
-            elif discount_stage in {"offered", "accepted"}:
-                inferred_next = "discount_offer"
-            elif hold_stage == "confirmed" and self._is_hold_closing_reply(user_input):
-                inferred_next = "close_conversation"
-            elif hold_stage == "confirmed":
-                inferred_next = "confirmation"
-            elif hold_stage == "offered" and self._is_affirmative(user_input):
-                inferred_next = "confirmation"
-            elif hardship_active and self._has_eligible_premium_hold(memory_state):
-                inferred_next = "resolution_offer"
-            elif previous_current in {"open_and_context", "verify_identity", "explain_dues"}:
-                inferred_next = "purpose_disclosure"
-        self._apply_plan_tree_update(plan=plan, plan_update=plan_update)
-        markers = self._init_or_reconcile_step_markers(plan=plan)
-        if right_party_status == "wrong_party":
-            self._enforce_wrong_party_branch(
-                markers=markers,
-                callback_completed=(
-                    callback_confirmed_now
-                    or (
-                        wrong_party_callback_stage == "completed"
-                        and bool(str(memory_state.get("wrong_party_callback_time", "")).strip())
-                    )
-                ),
-            )
-            plan["step_markers"] = markers
-        self._apply_step_marker_updates(
-            plan=plan,
-            plan_update=plan_update,
-            previous_current=previous_current,
-            candidate=inferred_next,
-            user_input=user_input,
-            observed_tool=observed_tool,
-            observed_output=(observed_output if isinstance(observed_output, dict) else {}),
-            memory_identity_verified=bool(memory_state.get("identity_verified", False)),
-        )
-        self._enforce_verification_marker_consistency(
-            plan=plan,
-            memory_identity_verified=bool(memory_state.get("identity_verified", False)),
-            observed_tool=observed_tool,
-            observed_output=(observed_output if isinstance(observed_output, dict) else {}),
-        )
-        if inferred_next in {"human_escalation", "transfer_to_specialist"}:
-            self._ensure_handoff_branch(plan=plan)
-        self._reconcile_canonical_stage_markers(
-            plan=plan,
-            candidate=inferred_next,
-            identity_verified=bool(memory_state.get("identity_verified", False)),
-            memory_state=memory_state,
-        )
-        self._remove_verify_identity_node_if_verified(
-            plan=plan,
-            identity_verified=bool(memory_state.get("identity_verified", False)),
-        )
-        self._reconcile_partial_payment_marker_consistency(
-            plan=plan,
-            memory_state=memory_state,
-        )
-        self._reopen_autopay_confirmation_if_needed(
-            plan=plan,
-            memory_state=memory_state,
-            candidate=inferred_next,
-        )
-        markers = self._init_or_reconcile_step_markers(plan=plan)
-        next_current = self._resolve_next_current_node(
-            plan=plan,
-            previous_current=previous_current,
-            candidate=inferred_next,
-            markers=markers,
-        )
-        if (
-            bool(memory_state.get("identity_verified", False))
-            and inferred_next in {
-                "discount_offer",
-                "explain_dues",
-                "collect_payment_intent",
-                "full_payment_options",
-                "full_payment_link",
-                "autopay_offer",
-                "promise_date",
-                "promise_capture",
-                "promise_followup",
-                "customer_callback",
-                "human_escalation",
-                "transfer_to_specialist",
-            }
-            and any(
-                isinstance(node, dict) and str(node.get("id", "")).strip() == inferred_next
-                for node in plan.get("nodes", [])
-            )
-        ):
-            next_current = inferred_next
-        callback_flow_completed = (
-            callback_confirmed_now
-            or (
-                right_party_status == "wrong_party"
-                and wrong_party_callback_stage == "completed"
-                and bool(str(memory_state.get("wrong_party_callback_time", "")).strip())
-            )
-        )
-        root_id = str(plan.get("root_node_id", "open_and_context")).strip() or "open_and_context"
-        if next_current != root_id and self._marker_state(markers=markers, node_id=root_id) == "pending":
-            prior = markers.get(root_id) if isinstance(markers.get(root_id), dict) else {}
-            markers[root_id] = {
-                "state": "done",
-                "updated_at": datetime.now(UTC).isoformat(),
-                "source": "graph_resolver",
-                "reason": str(prior.get("reason", "")) or "case_context_ready_transition",
-            }
-            plan["step_markers"] = markers
-        self._prune_disconnected_nodes(plan=plan, keep_ids={next_current})
-        self._enforce_status_consistency(
-            plan=plan,
-            current_node_id=next_current,
-            response_target=response_target,
-            markers=markers,
-        )
-        markers = self._init_or_reconcile_step_markers(plan=plan)
+        if current in {"human_escalation", "transfer_to_specialist"}:
+            self._ensure_handoff_branch(plan)
 
-        lowered = user_input.lower()
-        signals = plan_signals or {}
-        should_revise = (
-            bool(signals.get("is_plan_rejection", False))
-            or bool(signals.get("needs_discount_specialist", False))
-            or bool(signals.get("hardship_signal", False))
-            or "hardship" in lowered
-            or "cannot pay" in lowered
-            or response_target != "customer"
-            or bool(plan_update.get("new_nodes"))
-            or bool(plan_update.get("remove_node_ids"))
+        markers = self._project_markers(
+            plan=plan,
+            memory_state=memory_state,
+            previous_current=prior_executed,
+            current=current,
+            observed_tool=observed_tool,
+            observed_tool_output=observed_tool_output,
         )
-        if should_revise:
-            plan["version"] = int(plan.get("version", 1)) + 1
-            plan["revision_log"].append(
+        self._apply_node_statuses(
+            plan=plan,
+            markers=markers,
+            current=current,
+            response_target=response_target,
+        )
+
+        changed = previous_current != current
+        if changed or response_target != "customer" or bool(plan_signals.get("is_plan_rejection", False)):
+            plan["version"] = int(plan.get("version", 1) or 1) + 1
+            revisions = list(plan.get("revision_log", [])) if isinstance(plan.get("revision_log"), list) else []
+            revisions.append(
                 {
-                    "revision": int(plan.get("version", 1)),
-                    "reason": f"context shift: target={response_target}, route={route}, origin={plan_origin}",
-                    "at_utc": datetime.now(UTC).isoformat(),
+                    "revision": plan["version"],
+                    "reason": f"runtime objective changed: {previous_current or 'initial'} -> {current}",
+                    "at_utc": self._now(),
                 }
             )
+            plan["revision_log"] = revisions[-40:]
 
-        plan["current_node_id"] = next_current
         plan["previous_node_id"] = previous_current or None
-        plan["next_node_ids"] = self._next_nodes_from_edges(nodes=plan.get("edges", []), current_node_id=next_current)
-        plan["updated_from"] = plan_origin or "react"
+        plan["current_node_id"] = current
+        plan["next_node_ids"] = self._pending_successors(plan=plan, current=current)
+        plan["mode"] = mode
+        plan["updated_from"] = plan_origin
         plan["last_response_target"] = response_target
-        status_override = str(plan_update.get("status", "")).strip().lower() if isinstance(plan_update, dict) else ""
-        if status_override in {"active", "completed"}:
-            plan["status"] = status_override
-        else:
-            plan["status"] = (
-                "completed"
-                if is_conversation_termination(user_input) and not callback_flow_completed
-                else "active"
-            )
+        plan["status"] = "completed" if bool(memory_state.get("conversation_closed", False)) else "active"
         self._append_timeline_snapshot(
             plan=plan,
             update={
@@ -490,117 +198,751 @@ class PlanProposalGraphNode(BaseGraphNode):
                 "route": route,
                 "response_target": response_target,
                 "previous_node_id": previous_current,
-                "current_node_id": next_current,
-                "plan_outline": str(proposal.get("plan_outline", "")).strip(),
-                "operation": str(plan_update.get("operation", "advance")) if isinstance(plan_update, dict) else "advance",
+                "current_node_id": current,
+                "operation": "runtime_projection",
             },
         )
         return plan
 
     @staticmethod
-    def _reopen_autopay_confirmation_if_needed(
+    def _current_objective_from_runtime(
+        *,
+        memory_state: dict[str, Any],
+        previous_current: str,
+        user_input: str,
+        plan_signals: dict[str, Any],
+    ) -> str:
+        if bool(memory_state.get("conversation_closed", False)) or is_conversation_termination(user_input):
+            return "close_conversation"
+
+        right_party = str(memory_state.get("right_party_status", "")).strip().lower()
+        wrong_party_stage = str(memory_state.get("wrong_party_callback_stage", "")).strip().lower()
+        if right_party == "wrong_party":
+            return "close_conversation" if wrong_party_stage == "completed" else "wrong_party_callback"
+
+        callback_stage = str(memory_state.get("customer_callback_stage", "")).strip().lower()
+        if callback_stage in {"awaiting_callback", "scheduling", "completed"}:
+            return "close_conversation" if callback_stage == "completed" else "customer_callback"
+
+        if not bool(memory_state.get("identity_verified", False)):
+            return "verify_identity"
+
+        completed_objectives = {
+            str(item).strip().lower()
+            for item in memory_state.get("completed_objectives", [])
+            if str(item).strip()
+        } if isinstance(memory_state.get("completed_objectives"), list) else set()
+        if (
+            "hardship_hold_confirmation" in completed_objectives
+            and str(memory_state.get("hardship_hold_stage", "")).strip().lower() == "confirmed"
+        ):
+            return "close_conversation"
+        if (
+            "installment_discount_confirmation" in completed_objectives
+            and str(memory_state.get("discount_stage", "")).strip().lower() == "confirmed"
+        ):
+            return "close_conversation"
+        if (
+            "partial_payment_confirmation" in completed_objectives
+            and str(memory_state.get("partial_payment_stage", "")).strip().lower() == "confirmed"
+        ):
+            return "close_conversation"
+        if (
+            "promise_to_pay_confirmation" in completed_objectives
+            and str(memory_state.get("payment_commitment_type", "NONE")).strip().upper() == "PROMISE_TO_PAY"
+        ):
+            return "close_conversation"
+        if (
+            "full_payment_confirmation" in completed_objectives
+            and str(memory_state.get("payment_commitment_type", "NONE")).strip().upper() == "FULL_PAYMENT"
+        ):
+            autopay_stage = str(memory_state.get("autopay_stage", "")).strip().lower()
+            autopay_response = str(memory_state.get("autopay_response", "none")).strip().lower()
+            return "close_conversation" if autopay_stage == "enabled" or autopay_response == "declined" else "autopay_offer"
+
+        transfer = str(memory_state.get("human_transfer_status", "")).strip().lower()
+        escalation = str(memory_state.get("human_escalation_status", "")).strip().lower()
+        if transfer in {"pending", "transferring", "transferred"} or escalation in {"queued", "completed"}:
+            return "transfer_to_specialist"
+
+        negotiation = str(memory_state.get("negotiation_stage", "")).strip().lower()
+        discount_stage = str(memory_state.get("discount_stage", "")).strip().lower()
+        discount_response = str(memory_state.get("discount_response", "")).strip().lower()
+        generic_options = bool(memory_state.get("generic_options_offered_after_discount", False))
+        options_exhausted = negotiation == "hardship_options_exhausted" or (
+            generic_options
+            and (
+                discount_stage in {"counter_offer", "rejected"}
+                or discount_response in {"counter", "rejected"}
+            )
+        )
+        if options_exhausted:
+            return "human_escalation"
+        if bool(plan_signals.get("needs_discount_specialist", False)):
+            return "evaluate_assistance"
+        if discount_stage in {"requested", "planning"} or (
+            discount_stage in {"", "none"}
+            and bool(memory_state.get("discount_requested", False))
+        ):
+            return "evaluate_assistance"
+        if discount_stage == "confirmed":
+            return (
+                "close_conversation"
+                if bool(memory_state.get("discount_confirmation_delivered", False))
+                else "confirmation"
+            )
+        if discount_stage in {"offered", "accepted"}:
+            return "discount_offer"
+        if discount_stage in {"counter_offer", "rejected"} or discount_response in {"counter", "rejected"}:
+            return "collect_payment_intent" if generic_options else "explain_dues"
+
+        hold_stage = str(memory_state.get("hardship_hold_stage", "")).strip().lower()
+        hold_response = str(memory_state.get("hold_response", "")).strip().lower()
+        if hold_stage == "confirmed":
+            return (
+                "close_conversation"
+                if bool(memory_state.get("hardship_hold_confirmation_delivered", False))
+                else "confirmation"
+            )
+        if hold_response in {"uncertain", "rejected"}:
+            return "discount_offer"
+        if hold_stage in {"accepted", "created", "sms_sent"}:
+            return "confirmation"
+        if hold_stage == "offered":
+            return "resolution_offer"
+
+        commitment = str(memory_state.get("payment_commitment_type", "NONE")).strip().upper()
+        confirmation_reason = PlanProposalGraphNode._existing_confirmation_reason(memory_state)
+        promise_stage = str(memory_state.get("promise_stage", "")).strip().lower()
+        if commitment == "PROMISE_TO_PAY":
+            if promise_stage == "confirmed" or bool(memory_state.get("promise_confirmation_delivered", False)):
+                return "close_conversation"
+            if promise_stage == "followup_scheduled":
+                return "confirmation"
+            if promise_stage == "captured":
+                return "promise_followup"
+            if promise_stage in {"date_captured", "recording"}:
+                return "promise_capture"
+            return "promise_date"
+
+        payment_stage = str(memory_state.get("payment_resolution_stage", "")).strip().lower()
+        autopay_stage = str(memory_state.get("autopay_stage", "")).strip().lower()
+        autopay_response = str(memory_state.get("autopay_response", "none")).strip().lower()
+        if commitment == "FULL_PAYMENT":
+            confirmation_delivered = (
+                bool(memory_state.get("full_payment_confirmation_delivered", False))
+                or confirmation_reason == "autopay_enabled_confirmation_delivered"
+            )
+            if confirmation_delivered:
+                return "close_conversation" if autopay_stage == "enabled" else "autopay_offer"
+            if autopay_response == "declined":
+                return "close_conversation"
+            if autopay_stage == "enabled":
+                return "confirmation"
+            if payment_stage in {"confirmed", "link_sent", "autopay_offered"}:
+                return "autopay_offer"
+            if payment_stage in {"link_requested", "link_created"}:
+                return "full_payment_link"
+            if payment_stage in {"options_offered", "link_offered"}:
+                return "full_payment_options"
+            return "collect_payment_intent"
+
+        partial_stage = str(memory_state.get("partial_payment_stage", "")).strip().lower()
+        if partial_stage:
+            if bool(memory_state.get("partial_payment_confirmation_delivered", False)):
+                return "close_conversation"
+            if partial_stage == "confirmed":
+                return "confirmation"
+            if partial_stage in {"link_offered", "link_requested", "link_created"}:
+                return "partial_link"
+            if partial_stage in {"collecting_amount", "amount_invalid"}:
+                return "partial_amount"
+
+        hardship = (
+            memory_state.get("hardship_context")
+            if isinstance(memory_state.get("hardship_context"), dict)
+            else {}
+        )
+        if bool(hardship.get("hardship_detected", False)):
+            return (
+                "resolution_offer"
+                if PlanProposalGraphNode._has_eligible_premium_hold(memory_state)
+                else "evaluate_assistance"
+            )
+        if str(memory_state.get("customer_payment_posture", "")).strip().lower() == "partial_now":
+            return "partial_amount"
+
+        if previous_current == "purpose_disclosure":
+            return "collect_payment_intent"
+        if previous_current not in {"", "open_and_context", "verify_identity"}:
+            return previous_current
+        verification_answer = bool(
+            re.search(r"\b\d{4}-\d{2}-\d{2}\b", user_input)
+            or re.search(r"\b\d{10,12}\b", user_input)
+        )
+        return "purpose_disclosure" if verification_answer else "explain_dues"
+
+    def _project_markers(
+        self,
         *,
         plan: dict[str, Any],
         memory_state: dict[str, Any],
-        candidate: str,
-    ) -> None:
-        if candidate != "confirmation":
-            return
-        if str(memory_state.get("payment_commitment_type", "NONE")).strip().upper() != "FULL_PAYMENT":
-            return
-        if str(memory_state.get("autopay_stage", "")).strip().lower() != "enabled":
-            return
-        markers = plan.get("step_markers") if isinstance(plan.get("step_markers"), dict) else {}
-        confirmation_marker = markers.get("confirmation") if isinstance(markers.get("confirmation"), dict) else {}
-        if str(confirmation_marker.get("reason", "")).strip().lower() == "autopay_enabled_confirmation_delivered":
-            return
-        markers["confirmation"] = {
-            "state": "pending",
-            "updated_at": datetime.now(UTC).isoformat(),
-            "source": "canonical_flow",
-            "reason": "awaiting_autopay_enabled_confirmation",
+        previous_current: str,
+        current: str,
+        observed_tool: str,
+        observed_tool_output: dict[str, Any],
+    ) -> dict[str, Any]:
+        node_ids = {
+            str(node.get("id", "")).strip()
+            for node in plan.get("nodes", [])
+            if isinstance(node, dict) and str(node.get("id", "")).strip()
         }
-        plan["step_markers"] = markers
-
-    @staticmethod
-    def _overlay_wrong_party_state(*, memory_state: dict[str, Any], user_input: str) -> None:
-        if bool(memory_state.get("identity_verified", False)):
-            return
-        right_party_status = str(memory_state.get("right_party_status", "")).strip().lower()
-        if right_party_status == "wrong_party":
-            return
-        if not is_right_party_denial(
-            user_input,
-            awaiting_confirmation=right_party_status in {"", "awaiting_confirmation"},
-        ):
-            return
-
-        normalized_input = re.sub(r"\s+", " ", user_input.strip().lower())
-        callback_time = extract_callback_time(user_input) if looks_like_callback_time(user_input) else ""
-        memory_state["right_party_status"] = "wrong_party"
-        memory_state["wrong_party_callback_stage"] = (
-            "completed"
-            if callback_time
-            else "privacy_notice_given"
-            if normalized_input in {"no", "nope", "nah"}
-            else "awaiting_callback"
-        )
-        memory_state["wrong_party_callback_time"] = callback_time or None
-
-    @staticmethod
-    def _enforce_wrong_party_branch(*, markers: dict[str, Any], callback_completed: bool) -> None:
-        now = datetime.now(UTC).isoformat()
-
-        def set_marker(node_id: str, state: str, reason: str) -> None:
+        existing = plan.get("step_markers") if isinstance(plan.get("step_markers"), dict) else {}
+        markers: dict[str, dict[str, Any]] = {}
+        now = self._now()
+        for node_id in node_ids:
+            raw = existing.get(node_id) if isinstance(existing.get(node_id), dict) else {}
+            state = str(raw.get("state", "pending")).strip().lower()
+            if state not in _VALID_STATES:
+                state = "pending"
             markers[node_id] = {
                 "state": state,
+                "updated_at": str(raw.get("updated_at", "")) or now,
+                "source": str(raw.get("source", "")) or "runtime_projection",
+                "reason": str(raw.get("reason", "")),
+            }
+
+        def set_marker(node_id: str, status: str, reason: str) -> None:
+            if node_id not in node_ids:
+                return
+            markers[node_id] = {
+                "state": status,
                 "updated_at": now,
-                "source": "wrong_party_guard",
+                "source": "runtime_projection",
                 "reason": reason,
             }
 
-        set_marker(
+        set_marker("open_and_context", "done", "case_context_loaded")
+        identity_verified = bool(memory_state.get("identity_verified", False))
+        if identity_verified:
+            set_marker("verify_identity", "done", "identity_verified")
+
+        right_party = str(memory_state.get("right_party_status", "")).strip().lower()
+        callback_stage = str(memory_state.get("customer_callback_stage", "")).strip().lower()
+        wrong_party_stage = str(memory_state.get("wrong_party_callback_stage", "")).strip().lower()
+        if right_party == "wrong_party":
+            self._project_wrong_party_markers(
+                set_marker=set_marker,
+                completed=wrong_party_stage == "completed",
+            )
+        elif callback_stage in {"awaiting_callback", "scheduling", "completed"} and not identity_verified:
+            set_marker("verify_identity", "skipped", "customer_requested_callback_before_verification")
+        else:
+            set_marker("wrong_party_callback", "skipped", "right_party_or_standard_flow")
+
+        for node_id in node_ids:
+            projection = self._objective_evidence(
+                node_id=node_id,
+                current=current,
+                memory_state=memory_state,
+            )
+            if projection:
+                status, reason = projection
+                set_marker(node_id, status, reason)
+
+        if previous_current and previous_current != current and previous_current in node_ids:
+            if markers[previous_current]["state"] == "pending":
+                set_marker(previous_current, "done", "previous_active_objective_executed")
+
+        commitment = str(memory_state.get("payment_commitment_type", "NONE")).strip().upper()
+        mutually_exclusive = {
+            "FULL_PAYMENT": {
+                "partial_amount",
+                "partial_link",
+                "promise_date",
+                "promise_capture",
+                "promise_followup",
+            },
+            "PARTIAL_PAYMENT": {
+                "full_payment_options",
+                "full_payment_link",
+                "autopay_offer",
+                "promise_date",
+                "promise_capture",
+                "promise_followup",
+            },
+            "PROMISE_TO_PAY": {
+                "full_payment_options",
+                "full_payment_link",
+                "autopay_offer",
+                "partial_amount",
+                "partial_link",
+            },
+        }
+        for node_id in mutually_exclusive.get(commitment, set()):
+            if markers.get(node_id, {}).get("state") != "done":
+                set_marker(node_id, "skipped", f"mutually_exclusive_{commitment.lower()}_selected")
+
+        failed_statuses = {"failed", "error", "locked", "rejected", "denied", "invalid"}
+        tool_status = str(observed_tool_output.get("status", "")).strip().lower()
+        if (
+            observed_tool
+            and tool_status in failed_statuses
+            and current in node_ids
+            and self._tool_matches_node(
+                node_id=current,
+                node_label=self._node_label(plan, current),
+                observed_tool=observed_tool,
+            )
+        ):
+            set_marker(current, "blocked", f"tool_failed:{observed_tool}")
+
+        # The active objective is always pending until execution supplies
+        # completion evidence. This guarantees exactly one in-progress node.
+        if current in node_ids and markers[current]["state"] != "blocked":
+            set_marker(current, "pending", "current_runtime_objective")
+        if bool(memory_state.get("conversation_closed", False)):
+            set_marker("close_conversation", "done", "conversation_closed")
+        plan["step_markers"] = markers
+        return markers
+
+    @staticmethod
+    def _objective_evidence(
+        *,
+        node_id: str,
+        current: str,
+        memory_state: dict[str, Any],
+    ) -> tuple[str, str] | None:
+        identity_verified = bool(memory_state.get("identity_verified", False))
+        callback_stage = str(memory_state.get("customer_callback_stage", "")).strip().lower()
+        if (
+            node_id == "purpose_disclosure"
+            and callback_stage in {"awaiting_callback", "scheduling", "completed"}
+            and not identity_verified
+        ):
+            return None
+        if node_id == "purpose_disclosure" and current not in {
+            "open_and_context",
             "verify_identity",
-            "skipped",
-            "wrong_party_detected_no_verification_allowed",
+            "purpose_disclosure",
+            "customer_callback",
+        }:
+            return "done", "purpose_disclosure_executed"
+
+        hold_stage = str(memory_state.get("hardship_hold_stage", "")).strip().lower()
+        hold_response = str(memory_state.get("hold_response", "")).strip().lower()
+        discount_stage = str(memory_state.get("discount_stage", "")).strip().lower()
+        discount_response = str(memory_state.get("discount_response", "")).strip().lower()
+        discount_evidence = (
+            discount_stage in {"offered", "accepted", "confirmed", "rejected", "counter_offer"}
+            or discount_response in {"accepted", "rejected", "counter"}
         )
+        hold_evidence = hold_stage in {
+            "offered",
+            "accepted",
+            "created",
+            "sms_sent",
+            "confirmed",
+            "superseded",
+        }
+        if node_id == "discovery_empathy" and (hold_evidence or discount_evidence):
+            return "done", "hardship_acknowledged"
+        if node_id == "resolution_offer" and (
+            hold_stage in {"accepted", "created", "sms_sent", "confirmed", "superseded"}
+            or hold_response in {"accepted", "uncertain", "rejected"}
+        ):
+            return "done", "hold_option_presented"
+        if node_id == "assess_after_hold":
+            if hold_response in {"uncertain", "rejected"}:
+                return "done", "post_hold_ability_assessed"
+            if hold_stage == "superseded" and discount_evidence:
+                return "done", "hold_assessment_completed_before_discount"
+            if hold_evidence and discount_evidence:
+                return "done", "discount_progress_proves_hold_assessment_completed"
+            if discount_evidence and not hold_evidence:
+                return "skipped", "discount_selected_without_hold_assessment"
+        if node_id == "discount_offer" and (
+            discount_stage in {"accepted", "confirmed", "rejected", "counter_offer"}
+            or discount_response in {"accepted", "rejected", "counter"}
+        ):
+            return "done", "discount_offer_executed"
+
+        commitment = str(memory_state.get("payment_commitment_type", "NONE")).strip().upper()
+        partial_stage = str(memory_state.get("partial_payment_stage", "")).strip().lower()
+        partial_details = (
+            memory_state.get("partial_payment_details")
+            if isinstance(memory_state.get("partial_payment_details"), dict)
+            else {}
+        )
+        if node_id == "collect_payment_intent" and (
+            commitment in {"FULL_PAYMENT", "PARTIAL_PAYMENT", "PROMISE_TO_PAY"}
+            or partial_stage in {"collecting_amount", "link_offered", "link_requested", "link_created", "confirmed"}
+        ):
+            return "done", "payment_intent_captured"
+        if node_id == "partial_amount" and (
+            partial_details.get("partial_payment_amount") not in {None, ""}
+            or partial_stage in {"link_offered", "link_requested", "link_created", "confirmed"}
+        ):
+            return "done", "partial_amount_validated"
+        partial_sms = (
+            partial_details.get("sms_confirmation")
+            if isinstance(partial_details.get("sms_confirmation"), dict)
+            else {}
+        )
+        if node_id == "partial_link" and (
+            partial_stage == "confirmed"
+            or (
+                str(partial_details.get("payment_reference_id", "")).strip()
+                and str(partial_sms.get("status", "")).strip().lower() == "sent"
+            )
+        ):
+            return "done", "partial_payment_link_sent"
+
+        payment_stage = str(memory_state.get("payment_resolution_stage", "")).strip().lower()
+        full_details = (
+            memory_state.get("full_payment_details")
+            if isinstance(memory_state.get("full_payment_details"), dict)
+            else {}
+        )
+        if node_id == "full_payment_options" and commitment == "FULL_PAYMENT" and payment_stage in {
+            "link_requested",
+            "link_created",
+            "confirmed",
+            "link_sent",
+            "autopay_offered",
+        }:
+            return "done", "full_payment_method_offered"
+        full_sms = (
+            full_details.get("sms_confirmation")
+            if isinstance(full_details.get("sms_confirmation"), dict)
+            else {}
+        )
+        if node_id == "full_payment_link" and (
+            payment_stage in {"confirmed", "link_sent", "autopay_offered"}
+            or (
+                str(full_details.get("payment_reference_id", "")).strip()
+                and str(full_sms.get("status", "")).strip().lower() == "sent"
+            )
+        ):
+            return "done", "full_payment_link_sent"
+
+        autopay_stage = str(memory_state.get("autopay_stage", "")).strip().lower()
+        autopay_response = str(memory_state.get("autopay_response", "none")).strip().lower()
+        disposition = str(memory_state.get("final_disposition", "")).strip().upper()
+        if node_id == "autopay_offer":
+            if autopay_stage == "enabled" or disposition == "AUTOPAY_ENABLED":
+                return "done", "autopay_enabled"
+            if autopay_response == "declined":
+                return "skipped", "autopay_declined"
+
+        promise_stage = str(memory_state.get("promise_stage", "")).strip().lower()
+        promise_details = (
+            memory_state.get("promise_to_pay_details")
+            if isinstance(memory_state.get("promise_to_pay_details"), dict)
+            else {}
+        )
+        if node_id == "promise_date" and promise_stage in {
+            "date_captured",
+            "recording",
+            "captured",
+            "followup_scheduled",
+            "confirmed",
+        }:
+            return "done", "promise_date_captured"
+        if node_id == "promise_capture" and (
+            str(memory_state.get("promise_reference", "")).strip()
+            or promise_stage in {"captured", "followup_scheduled", "confirmed"}
+        ):
+            return "done", "promise_recorded"
+        followup = (
+            promise_details.get("followup_schedule")
+            if isinstance(promise_details.get("followup_schedule"), dict)
+            else {}
+        )
+        if node_id == "promise_followup" and (
+            str(followup.get("schedule_id", "")).strip()
+            or promise_stage in {"followup_scheduled", "confirmed"}
+            or disposition == "PROMISE_TO_PAY_SCHEDULED"
+        ):
+            return "done", "promise_followup_scheduled"
+
+        if node_id == "customer_callback":
+            outbound_status = str(memory_state.get("outbound_callback_status", "")).strip().lower()
+            if callback_stage == "completed" and outbound_status == "scheduled":
+                return "done", "customer_callback_scheduled"
+
+        completed_objectives = {
+            str(item).strip().lower()
+            for item in memory_state.get("completed_objectives", [])
+            if str(item).strip()
+        } if isinstance(memory_state.get("completed_objectives"), list) else set()
+        if node_id == "confirmation" and completed_objectives.intersection(
+            {
+                "hardship_hold_confirmation",
+                "installment_discount_confirmation",
+                "partial_payment_confirmation",
+                "full_payment_confirmation",
+                "promise_to_pay_confirmation",
+            }
+        ):
+            return "done", "confirmation_response_rendered"
+
+        escalation = str(memory_state.get("human_escalation_status", "")).strip().lower()
+        transfer = str(memory_state.get("human_transfer_status", "")).strip().lower()
+        handoff_started = escalation in {"queued", "completed"} or transfer in {
+            "pending",
+            "transferring",
+            "transferred",
+        }
+        if node_id == "human_escalation" and handoff_started:
+            return "done", "human_escalation_queued"
+        if node_id == "transfer_to_specialist" and transfer == "transferred":
+            return "done", "human_transfer_completed"
+        if node_id == "confirmation" and (
+            handoff_started or current in {"human_escalation", "transfer_to_specialist"}
+        ):
+            return "skipped", "handoff_replaces_standard_confirmation"
+        return None
+
+    @staticmethod
+    def _project_wrong_party_markers(*, set_marker: Any, completed: bool) -> None:
+        set_marker("verify_identity", "skipped", "wrong_party_no_verification")
         for node_id in (
             "purpose_disclosure",
             "discovery_empathy",
             "resolution_offer",
+            "assess_after_hold",
+            "discount_offer",
             "confirmation",
             "explain_dues",
             "collect_payment_intent",
             "evaluate_assistance",
             "resolve_outcome",
         ):
-            set_marker(
-                node_id,
-                "skipped",
-                "wrong_party_branch_prevents_account_disclosure",
-            )
-        if callback_completed:
-            set_marker("wrong_party_callback", "done", "callback_time_confirmed")
+            set_marker(node_id, "skipped", "wrong_party_privacy_branch")
+        if completed:
+            set_marker("wrong_party_callback", "done", "wrong_party_callback_confirmed")
 
-    def _remove_verify_identity_node_if_verified(self, *, plan: dict[str, Any], identity_verified: bool) -> None:
-        if not identity_verified:
-            return
-        # Keep completed steps visible in topology: do not remove verify_identity.
-        nodes = [dict(node) for node in plan.get("nodes", []) if isinstance(node, dict)]
-        for node in nodes:
-            if str(node.get("id", "")).strip() == "verify_identity":
-                node["status"] = "done"
-        plan["nodes"] = nodes
-        markers = plan.get("step_markers")
-        if isinstance(markers, dict):
-            prior = markers.get("verify_identity") if isinstance(markers.get("verify_identity"), dict) else {}
-            markers["verify_identity"] = {
-                "state": "done",
-                "updated_at": datetime.now(UTC).isoformat(),
-                "source": "memory_identity_verified",
-                "reason": str(prior.get("reason", "identity_verified_in_memory")),
+    @staticmethod
+    def _apply_node_statuses(
+        *,
+        plan: dict[str, Any],
+        markers: dict[str, dict[str, Any]],
+        current: str,
+        response_target: str,
+    ) -> None:
+        for node in plan.get("nodes", []):
+            if not isinstance(node, dict):
+                continue
+            node_id = str(node.get("id", "")).strip()
+            marker = markers.get(node_id, {})
+            marker_state = str(marker.get("state", "pending")).strip().lower()
+            if node_id == current and marker_state != "blocked":
+                node["status"] = "in_progress"
+                if response_target == "self":
+                    node["owner"] = "collection_agent"
+            elif marker_state in _TERMINAL_STATES:
+                node["status"] = marker_state
+            else:
+                node["status"] = "pending"
+
+    @staticmethod
+    def _create_initial_plan_graph(*, memory_state: dict[str, Any], mode: str) -> dict[str, Any]:
+        case_id = str(memory_state.get("active_case_id", "COLL-1001")).strip().upper() or "COLL-1001"
+        nodes = [
+            {"id": node_id, "label": label, "owner": owner, "status": "pending"}
+            for node_id, label, owner in PlanProposalGraphNode._base_node_specs()
+        ]
+        return {
+            "plan_id": f"plan-{case_id}",
+            "version": 1,
+            "status": "active",
+            "mode": mode,
+            "objective": "Move borrower conversation to payment, promise-to-pay, or compliant follow-up.",
+            "root_node_id": "open_and_context",
+            "current_node_id": "verify_identity",
+            "previous_node_id": None,
+            "next_node_ids": [],
+            "nodes": nodes,
+            "edges": PlanProposalGraphNode._base_edges(),
+            "step_markers": {},
+            "timeline": [],
+            "timeline_snapshots": [],
+            "revision_log": [],
+            "updated_from": "initial",
+            "last_response_target": "customer",
+        }
+
+    @staticmethod
+    def _normalize_existing_plan(
+        *,
+        existing_plan: dict[str, Any],
+        memory_state: dict[str, Any],
+        mode: str,
+    ) -> dict[str, Any]:
+        plan = dict(existing_plan)
+        existing_nodes = {
+            str(node.get("id", "")).strip(): dict(node)
+            for node in plan.get("nodes", [])
+            if isinstance(node, dict) and str(node.get("id", "")).strip()
+        }
+        for node_id, label, owner in PlanProposalGraphNode._base_node_specs():
+            existing_nodes.setdefault(
+                node_id,
+                {"id": node_id, "label": label, "owner": owner, "status": "pending"},
+            )
+        plan["nodes"] = list(existing_nodes.values())
+
+        edge_keys: set[tuple[str, str, str]] = set()
+        edges: list[dict[str, str]] = []
+        for edge in [*plan.get("edges", []), *PlanProposalGraphNode._base_edges()]:
+            if not isinstance(edge, dict):
+                continue
+            normalized = {
+                "from": str(edge.get("from", "")).strip(),
+                "to": str(edge.get("to", "")).strip(),
+                "condition": str(edge.get("condition", "")).strip(),
             }
-            plan["step_markers"] = markers
+            key = (normalized["from"], normalized["to"], normalized["condition"])
+            if normalized["from"] and normalized["to"] and key not in edge_keys:
+                edges.append(normalized)
+                edge_keys.add(key)
+        plan["edges"] = edges
+        plan.setdefault(
+            "plan_id",
+            f"plan-{str(memory_state.get('active_case_id', 'COLL-1001')).strip().upper()}",
+        )
+        plan.setdefault("version", 1)
+        plan.setdefault("status", "active")
+        plan.setdefault("objective", "Move borrower conversation to payment resolution.")
+        plan.setdefault("root_node_id", "open_and_context")
+        plan.setdefault("current_node_id", "verify_identity")
+        plan.setdefault("step_markers", {})
+        plan.setdefault("timeline", [])
+        plan.setdefault("timeline_snapshots", [])
+        plan.setdefault("revision_log", [])
+        plan["mode"] = mode
+        return plan
+
+    @staticmethod
+    def _base_node_specs() -> list[tuple[str, str, str]]:
+        return [
+            ("open_and_context", "Initialize case context", "collection_agent"),
+            ("verify_identity", "Verify customer identity", "customer"),
+            ("wrong_party_callback", "Arrange privacy-safe callback", "collection_agent"),
+            ("purpose_disclosure", "Disclose call purpose and overdue installment", "collection_agent"),
+            ("discovery_empathy", "Understand and acknowledge customer situation", "collection_agent"),
+            ("resolution_offer", "Present eligible resolution option", "collection_agent"),
+            ("assess_after_hold", "Assess ability to resume after hold", "customer"),
+            ("discount_offer", "Present eligible installment discount", "collection_agent"),
+            ("explain_dues", "Explain standard payment options", "customer"),
+            ("collect_payment_intent", "Collect payment intent", "customer"),
+            ("partial_amount", "Identify and validate partial-payment amount", "customer"),
+            ("partial_link", "Create and send secure partial-payment link", "collection_agent"),
+            ("full_payment_options", "Offer full-payment method", "collection_agent"),
+            ("full_payment_link", "Create and send secure full-payment link", "collection_agent"),
+            ("autopay_offer", "Offer auto-pay setup", "customer"),
+            ("promise_date", "Capture promised payment date", "customer"),
+            ("promise_capture", "Record promise-to-pay commitment", "collection_agent"),
+            ("promise_followup", "Schedule promise reminder and payment link", "collection_agent"),
+            ("customer_callback", "Schedule customer-requested callback", "collection_agent"),
+            ("evaluate_assistance", "Evaluate discount/restructure assistance", "collection_agent"),
+            ("resolve_outcome", "Finalize payment, promise, or follow-up", "customer"),
+            ("confirmation", "Confirm agreed outcome and reference", "collection_agent"),
+            ("close_conversation", "Close conversation", "collection_agent"),
+        ]
+
+    @staticmethod
+    def _base_edges() -> list[dict[str, str]]:
+        raw = [
+            ("open_and_context", "verify_identity", "case_context_ready"),
+            ("verify_identity", "purpose_disclosure", "identity_verified"),
+            ("verify_identity", "wrong_party_callback", "wrong_party_detected"),
+            ("verify_identity", "customer_callback", "customer_unavailable"),
+            ("purpose_disclosure", "discovery_empathy", "customer_situation_shared"),
+            ("purpose_disclosure", "explain_dues", "standard_resolution_requested"),
+            ("purpose_disclosure", "partial_amount", "partial_payment_available"),
+            ("purpose_disclosure", "customer_callback", "customer_unavailable"),
+            ("discovery_empathy", "resolution_offer", "eligible_assistance_found"),
+            ("resolution_offer", "confirmation", "hold_accepted"),
+            ("resolution_offer", "assess_after_hold", "customer_unsure_after_hold"),
+            ("resolution_offer", "customer_callback", "customer_unavailable"),
+            ("assess_after_hold", "discount_offer", "discount_eligible"),
+            ("discount_offer", "confirmation", "discount_accepted"),
+            ("discount_offer", "explain_dues", "discount_rejected"),
+            ("explain_dues", "collect_payment_intent", "options_explained"),
+            ("collect_payment_intent", "partial_amount", "partial_payment"),
+            ("partial_amount", "partial_link", "amount_validated"),
+            ("partial_link", "confirmation", "link_sent"),
+            ("collect_payment_intent", "full_payment_options", "pay_now"),
+            ("full_payment_options", "full_payment_link", "payment_link_requested"),
+            ("full_payment_link", "confirmation", "link_sent"),
+            ("confirmation", "autopay_offer", "autopay_offered"),
+            ("autopay_offer", "confirmation", "autopay_accepted"),
+            ("autopay_offer", "close_conversation", "autopay_declined_or_later"),
+            ("collect_payment_intent", "promise_date", "promise_to_pay"),
+            ("promise_date", "promise_capture", "valid_date_captured"),
+            ("promise_capture", "promise_followup", "promise_recorded"),
+            ("promise_followup", "confirmation", "followup_scheduled"),
+            ("collect_payment_intent", "customer_callback", "customer_unavailable"),
+            ("collect_payment_intent", "evaluate_assistance", "cannot_pay_full"),
+            ("evaluate_assistance", "resolve_outcome", "assistance_ready"),
+            ("resolve_outcome", "confirmation", "outcome_ready"),
+            ("customer_callback", "close_conversation", "callback_scheduled"),
+            ("wrong_party_callback", "close_conversation", "callback_confirmed"),
+            ("confirmation", "close_conversation", "outcome_confirmed"),
+        ]
+        return [{"from": src, "to": dst, "condition": condition} for src, dst, condition in raw]
+
+    @staticmethod
+    def _ensure_handoff_branch(plan: dict[str, Any]) -> None:
+        node_ids = {
+            str(node.get("id", "")).strip()
+            for node in plan.get("nodes", [])
+            if isinstance(node, dict)
+        }
+        additions = [
+            ("human_escalation", "Queue human specialist escalation"),
+            ("transfer_to_specialist", "Transfer call to specialist"),
+        ]
+        for node_id, label in additions:
+            if node_id not in node_ids:
+                plan["nodes"].append(
+                    {
+                        "id": node_id,
+                        "label": label,
+                        "owner": "collection_agent",
+                        "status": "pending",
+                    }
+                )
+                node_ids.add(node_id)
+        edge_keys = {
+            (str(edge.get("from", "")).strip(), str(edge.get("to", "")).strip())
+            for edge in plan.get("edges", [])
+            if isinstance(edge, dict)
+        }
+        for source in (
+            "resolution_offer",
+            "discount_offer",
+            "evaluate_assistance",
+            "resolve_outcome",
+        ):
+            if (source, "human_escalation") not in edge_keys:
+                plan["edges"].append(
+                    {
+                        "from": source,
+                        "to": "human_escalation",
+                        "condition": "runtime_options_exhausted",
+                    }
+                )
+        if ("human_escalation", "transfer_to_specialist") not in edge_keys:
+            plan["edges"].append(
+                {
+                    "from": "human_escalation",
+                    "to": "transfer_to_specialist",
+                    "condition": "escalation_queued",
+                }
+            )
 
     @staticmethod
     def _has_eligible_premium_hold(memory_state: dict[str, Any]) -> bool:
@@ -611,1310 +953,197 @@ class PlanProposalGraphNode(BaseGraphNode):
         )
         case = context.get("case") if isinstance(context.get("case"), dict) else {}
         loan_id = str(case.get("loan_id", memory_state.get("active_loan_id", ""))).strip().upper()
-        hardship_context = (
+        hardship = (
             memory_state.get("hardship_context")
             if isinstance(memory_state.get("hardship_context"), dict)
             else {}
         )
-        hardship_reason = str(
-            hardship_context.get("hardship_reason", memory_state.get("hardship_reason", ""))
-        ).strip().lower()
-        programs = (
-            memory_state.get("assistance_programs")
-            if isinstance(memory_state.get("assistance_programs"), list)
-            else []
-        )
+        reason = str(hardship.get("hardship_reason", memory_state.get("hardship_reason", ""))).strip().lower()
+        programs = memory_state.get("assistance_programs") if isinstance(memory_state.get("assistance_programs"), list) else []
         for program in programs:
-            if not isinstance(program, dict):
+            if not isinstance(program, dict) or str(program.get("program_type", "")).strip().lower() != "premium_hold":
                 continue
-            if str(program.get("program_type", "")).strip().lower() != "premium_hold":
-                continue
-            eligible_loan_ids = {
+            loans = {
                 str(item).strip().upper()
                 for item in program.get("eligible_loan_ids", [])
                 if str(item).strip()
             } if isinstance(program.get("eligible_loan_ids"), list) else set()
-            hardship_reasons = {
+            reasons = {
                 str(item).strip().lower()
                 for item in program.get("hardship_reasons", [])
                 if str(item).strip()
             } if isinstance(program.get("hardship_reasons"), list) else set()
-            if eligible_loan_ids and loan_id not in eligible_loan_ids:
+            if loans and loan_id not in loans:
                 continue
-            if hardship_reasons and hardship_reason not in hardship_reasons:
+            if reasons and reason not in reasons:
                 continue
             return True
         return False
 
     @staticmethod
-    def _is_affirmative(text: str) -> bool:
-        normalized = re.sub(r"[^a-z0-9\s]", " ", str(text).lower())
-        normalized = re.sub(r"\s+", " ", normalized).strip()
-        return any(
-            phrase in normalized
-            for phrase in (
-                "yes",
-                "that would help",
-                "would really help",
-                "sounds good",
-                "i agree",
-                "please do",
-                "go ahead",
-                "okay",
-                "ok",
-            )
-        )
-
-    @staticmethod
-    def _is_hold_closing_reply(text: str) -> bool:
-        normalized = re.sub(r"[^a-z0-9\s]", " ", str(text).lower())
-        normalized = re.sub(r"\s+", " ", normalized).strip()
-        return any(
-            phrase in normalized
-            for phrase in (
-                "no thank",
-                "no thanks",
-                "nothing else",
-                "that is all",
-                "that's all",
-                "thank you",
-                "thankyou",
-                "thanks",
-                "sure",
-                "bye",
-                "goodbye",
-            )
-        )
-
-    @staticmethod
-    def _reconcile_canonical_stage_markers(
-        *,
-        plan: dict[str, Any],
-        candidate: str,
-        identity_verified: bool,
-        memory_state: dict[str, Any],
-    ) -> None:
-        customer_callback_stage = str(memory_state.get("customer_callback_stage", "")).strip().lower()
-        if not identity_verified and customer_callback_stage not in {"awaiting_callback", "scheduling", "completed"}:
+    def _overlay_wrong_party_state(*, memory_state: dict[str, Any], user_input: str) -> None:
+        if bool(memory_state.get("identity_verified", False)):
             return
-        markers = plan.get("step_markers") if isinstance(plan.get("step_markers"), dict) else {}
-        now = datetime.now(UTC).isoformat()
-        node_ids = {
-            str(node.get("id", "")).strip()
-            for node in plan.get("nodes", [])
-            if isinstance(node, dict) and str(node.get("id", "")).strip()
-        }
-
-        def mark_done(node_id: str, reason: str) -> None:
-            if node_id not in node_ids:
-                return
-            markers[node_id] = {
-                "state": "done",
-                "updated_at": now,
-                "source": "canonical_flow",
-                "reason": reason,
-            }
-
-        def mark_skipped(node_id: str, reason: str) -> None:
-            if node_id not in node_ids:
-                return
-            markers[node_id] = {
-                "state": "skipped",
-                "updated_at": now,
-                "source": "canonical_flow",
-                "reason": reason,
-            }
-
-        if "wrong_party_callback" in node_ids:
-            markers["wrong_party_callback"] = {
-                "state": "skipped",
-                "updated_at": now,
-                "source": "canonical_flow",
-                "reason": "right_party_verified",
-            }
-
-        for node_id in sorted(node_ids):
-            projection = PlanProposalGraphNode._project_marker_from_runtime(
-                node_id=node_id,
-                candidate=candidate,
-                memory_state=memory_state,
-            )
-            if not projection:
-                continue
-            state, reason = projection
-            if state == "done":
-                mark_done(node_id, reason)
-            elif state == "skipped":
-                mark_skipped(node_id, reason)
-        plan["step_markers"] = markers
+        right_party = str(memory_state.get("right_party_status", "")).strip().lower()
+        if right_party == "wrong_party":
+            stage = str(memory_state.get("wrong_party_callback_stage", "")).strip().lower()
+            if stage == "awaiting_callback" and looks_like_callback_time(user_input):
+                callback_time = extract_callback_time(user_input)
+                if callback_time:
+                    memory_state["wrong_party_callback_stage"] = "completed"
+                    memory_state["wrong_party_callback_time"] = callback_time
+            return
+        if not is_right_party_denial(
+            user_input,
+            awaiting_confirmation=right_party in {"", "awaiting_confirmation"},
+        ):
+            return
+        callback_time = extract_callback_time(user_input) if looks_like_callback_time(user_input) else ""
+        normalized = re.sub(r"\s+", " ", user_input.strip().lower())
+        memory_state["right_party_status"] = "wrong_party"
+        memory_state["wrong_party_callback_stage"] = (
+            "completed"
+            if callback_time
+            else "privacy_notice_given"
+            if normalized in {"no", "nope", "nah"}
+            else "awaiting_callback"
+        )
+        memory_state["wrong_party_callback_time"] = callback_time or None
 
     @staticmethod
-    def _project_marker_from_runtime(
-        *,
-        node_id: str,
-        candidate: str,
-        memory_state: dict[str, Any],
-    ) -> tuple[str, str] | None:
-        hold_stage = str(memory_state.get("hardship_hold_stage", "")).strip().lower()
-        hold_response = str(memory_state.get("hold_response", "")).strip().lower()
-        discount_stage = str(memory_state.get("discount_stage", "")).strip().lower()
-        discount_response = str(memory_state.get("discount_response", "")).strip().lower()
-        discount_offered = bool(memory_state.get("discount_offered", False))
-        partial_stage = str(memory_state.get("partial_payment_stage", "")).strip().lower()
-        partial_details = (
-            memory_state.get("partial_payment_details")
-            if isinstance(memory_state.get("partial_payment_details"), dict)
+    def _existing_confirmation_reason(memory_state: dict[str, Any]) -> str:
+        plan = (
+            memory_state.get("active_conversation_plan")
+            if isinstance(memory_state.get("active_conversation_plan"), dict)
             else {}
         )
-        payment_commitment_type = str(memory_state.get("payment_commitment_type", "NONE")).strip().upper()
-        payment_stage = str(memory_state.get("payment_resolution_stage", "")).strip().lower()
-        payment_details = (
-            memory_state.get("full_payment_details")
-            if isinstance(memory_state.get("full_payment_details"), dict)
-            else {}
-        )
-        autopay_response = str(memory_state.get("autopay_response", "none")).strip().lower()
-        autopay_stage = str(memory_state.get("autopay_stage", "")).strip().lower()
-        promise_stage = str(memory_state.get("promise_stage", "")).strip().lower()
-        promise_reference = str(memory_state.get("promise_reference", "")).strip()
-        customer_callback_stage = str(memory_state.get("customer_callback_stage", "")).strip().lower()
-        outbound_callback_status = str(memory_state.get("outbound_callback_status", "")).strip().lower()
-        promise_details = (
-            memory_state.get("promise_to_pay_details")
-            if isinstance(memory_state.get("promise_to_pay_details"), dict)
-            else {}
-        )
-        human_escalation_status = str(memory_state.get("human_escalation_status", "")).strip().lower()
-        human_transfer_status = str(memory_state.get("human_transfer_status", "")).strip().lower()
-        final_disposition = str(memory_state.get("final_disposition", "")).strip().upper()
-
-        hold_evidence = hold_stage in {"offered", "accepted", "confirmed"}
-        discount_evidence = (
-            discount_stage in {"offered", "accepted", "confirmed", "rejected", "counter_offer"}
-            or (discount_response in {"accepted", "rejected", "counter"} and discount_offered)
-        )
-        partial_amount = partial_details.get("partial_payment_amount")
-        partial_sms = partial_details.get("sms_confirmation") if isinstance(partial_details.get("sms_confirmation"), dict) else {}
-        partial_link_done = (
-            str(partial_details.get("payment_reference_id", "")).strip()
-            and str(partial_sms.get("status", "")).strip().lower() == "sent"
-        ) or partial_stage == "confirmed"
-        full_payment_sms = payment_details.get("sms_confirmation") if isinstance(payment_details.get("sms_confirmation"), dict) else {}
-        full_payment_link_done = (
-            str(payment_details.get("payment_reference_id", "")).strip()
-            and str(full_payment_sms.get("status", "")).strip().lower() == "sent"
-        ) or payment_stage in {"confirmed", "link_sent", "autopay_offered"}
-        promise_followup = promise_details.get("followup_schedule") if isinstance(promise_details.get("followup_schedule"), dict) else {}
-        promise_followup_done = (
-            str(promise_followup.get("schedule_id", "")).strip()
-            or promise_stage in {"followup_scheduled", "confirmed"}
-            or final_disposition == "PROMISE_TO_PAY_SCHEDULED"
-        )
-        human_escalation_done = human_escalation_status in {"queued", "completed"} or human_transfer_status in {
-            "pending",
-            "transferred",
-        }
-
-        if (
-            node_id == "purpose_disclosure"
-            and customer_callback_stage in {"awaiting_callback", "scheduling", "completed"}
-            and not bool(memory_state.get("identity_verified", False))
-        ):
-            return None
-        if node_id == "purpose_disclosure" and candidate not in {
-            "open_and_context",
-            "verify_identity",
-            "purpose_disclosure",
-        }:
-            return "done", "purpose_disclosed_before_current_objective"
-        if node_id == "verify_identity" and customer_callback_stage in {
-            "awaiting_callback",
-            "scheduling",
-            "completed",
-        }:
-            return "skipped", "customer_requested_callback_before_verification"
-        if node_id == "discovery_empathy" and (hold_evidence or discount_evidence):
-            return "done", "hardship_acknowledged"
-        if node_id == "resolution_offer" and hold_evidence:
-            return "done", "resolution_offer_presented"
-        if node_id == "assess_after_hold" and (
-            hold_response in {"uncertain", "rejected"} or discount_evidence
-        ):
-            return "done", "post_hold_resume_assessed"
-        if node_id == "discount_offer" and discount_evidence:
-            return "done", "discount_offer_presented"
-        if node_id == "collect_payment_intent":
-            if partial_stage in {"collecting_amount", "link_offered", "confirmed"}:
-                return "done", "partial_payment_intent_captured"
-            if payment_commitment_type == "FULL_PAYMENT":
-                return "done", "full_payment_intent_captured"
-            if payment_commitment_type == "PROMISE_TO_PAY":
-                return "done", "promise_to_pay_intent_captured"
-        if node_id == "partial_amount" and (
-            partial_amount not in {None, ""} or partial_stage in {"link_offered", "confirmed"}
-        ):
-            return "done", "partial_amount_validated"
-        if node_id == "partial_link" and partial_link_done:
-            return "done", "partial_payment_link_created_and_sent"
-        if node_id == "full_payment_options" and payment_commitment_type == "FULL_PAYMENT" and payment_stage in {
-            "link_requested",
-            "link_created",
-            "confirmed",
-            "link_sent",
-            "autopay_offered",
-        }:
-            return "done", "full_payment_method_offered"
-        if node_id == "full_payment_link" and full_payment_link_done:
-            return "done", "full_payment_link_created_and_sent"
-        if node_id == "autopay_offer":
-            if autopay_stage == "enabled" or final_disposition == "AUTOPAY_ENABLED":
-                return "done", "autopay_enabled"
-            if autopay_response == "declined":
-                return "skipped", "autopay_declined"
-        if node_id == "promise_date" and promise_stage in {
-            "date_captured",
-            "recording",
-            "captured",
-            "followup_scheduled",
-            "confirmed",
-        }:
-            return "done", "promised_payment_date_captured"
-        if node_id == "promise_capture" and (
-            promise_reference or promise_stage in {"captured", "followup_scheduled", "confirmed"}
-        ):
-            return "done", "promise_to_pay_recorded"
-        if node_id == "promise_followup" and promise_followup_done:
-            return "done", "promise_followup_scheduled"
-        if node_id == "customer_callback":
-            if customer_callback_stage == "completed" and outbound_callback_status == "scheduled":
-                return "done", "customer_callback_scheduled"
-            if customer_callback_stage in {"awaiting_callback", "scheduling"}:
-                return None
-        if node_id == "human_escalation" and human_escalation_done:
-            return "done", "escalation_queued"
-        if node_id == "confirmation" and human_escalation_done:
-            return "skipped", "handoff_replaces_standard_confirmation"
-        return None
-
-    @staticmethod
-    def _ensure_handoff_branch(*, plan: dict[str, Any]) -> None:
-        nodes = [dict(node) for node in plan.get("nodes", []) if isinstance(node, dict)]
-        node_map = {str(node.get("id", "")).strip(): node for node in nodes if str(node.get("id", "")).strip()}
-        for node_id, label in (
-            ("human_escalation", "Queue human specialist escalation"),
-            ("transfer_to_specialist", "Transfer call to specialist"),
-        ):
-            if node_id not in node_map:
-                node_map[node_id] = {
-                    "id": node_id,
-                    "label": label,
-                    "owner": "collection_agent",
-                    "status": "pending",
-                }
-
-        edge_set: set[tuple[str, str, str]] = set()
-        for edge in plan.get("edges", []):
-            if not isinstance(edge, dict):
-                continue
-            src = str(edge.get("from", "")).strip()
-            dst = str(edge.get("to", "")).strip()
-            cond = str(edge.get("condition", "")).strip()
-            if src and dst and src in node_map and dst in node_map:
-                edge_set.add((src, dst, cond))
-        for src, dst, cond in (
-            ("resolution_offer", "human_escalation", "hardship_options_exhausted"),
-            ("discount_offer", "human_escalation", "hardship_options_exhausted"),
-            ("human_escalation", "transfer_to_specialist", "escalation_queued"),
-        ):
-            if src in node_map and dst in node_map:
-                edge_set.add((src, dst, cond))
-
-        plan["nodes"] = list(node_map.values())
-        plan["edges"] = [
-            {"from": src, "to": dst, "condition": cond}
-            for src, dst, cond in sorted(edge_set)
-        ]
-
-    @staticmethod
-    def _create_initial_plan_graph(*, memory_state: dict[str, Any], mode: str) -> dict[str, Any]:
-        case_id = str(memory_state.get("active_case_id", "COLL-1001")).strip().upper() or "COLL-1001"
-        identity_verified = bool(memory_state.get("identity_verified", False))
-        current_node_id = "purpose_disclosure" if identity_verified else "verify_identity"
-        next_node_ids = ["purpose_disclosure"] if not identity_verified else []
-        nodes = [
-            {"id": "open_and_context", "label": "Initialize case context", "owner": "collection_agent", "status": "done"},
-            {"id": "verify_identity", "label": "Verify customer identity", "owner": "customer", "status": ("done" if identity_verified else "in_progress")},
-            {"id": "wrong_party_callback", "label": "Arrange privacy-safe callback", "owner": "collection_agent", "status": "pending"},
-            {"id": "purpose_disclosure", "label": "Disclose call purpose and overdue installment", "owner": "collection_agent", "status": ("in_progress" if identity_verified else "pending")},
-            {"id": "discovery_empathy", "label": "Understand and acknowledge customer situation", "owner": "collection_agent", "status": "pending"},
-            {"id": "resolution_offer", "label": "Present eligible resolution option", "owner": "collection_agent", "status": "pending"},
-            {"id": "assess_after_hold", "label": "Assess ability to resume after hold", "owner": "customer", "status": "pending"},
-            {"id": "discount_offer", "label": "Present eligible installment discount", "owner": "collection_agent", "status": "pending"},
-            {"id": "partial_amount", "label": "Identify and validate partial-payment amount", "owner": "customer", "status": "pending"},
-            {"id": "partial_link", "label": "Create and send secure partial-payment link", "owner": "collection_agent", "status": "pending"},
-            {"id": "full_payment_options", "label": "Offer full-payment method", "owner": "collection_agent", "status": "pending"},
-            {"id": "full_payment_link", "label": "Create and send secure full-payment link", "owner": "collection_agent", "status": "pending"},
-            {"id": "autopay_offer", "label": "Offer auto-pay setup", "owner": "customer", "status": "pending"},
-            {"id": "promise_date", "label": "Capture promised payment date", "owner": "customer", "status": "pending"},
-            {"id": "promise_capture", "label": "Record promise-to-pay commitment", "owner": "collection_agent", "status": "pending"},
-            {"id": "promise_followup", "label": "Schedule promise reminder and payment link", "owner": "collection_agent", "status": "pending"},
-            {"id": "customer_callback", "label": "Schedule customer-requested callback", "owner": "collection_agent", "status": "pending"},
-            {"id": "confirmation", "label": "Confirm agreed outcome and reference", "owner": "collection_agent", "status": "pending"},
-            {"id": "explain_dues", "label": "Explain standard payment options", "owner": "customer", "status": "pending"},
-            {"id": "collect_payment_intent", "label": "Collect payment intent", "owner": "customer", "status": "pending"},
-            {"id": "evaluate_assistance", "label": "Evaluate discount/restructure assistance", "owner": "collection_agent", "status": "pending"},
-            {"id": "resolve_outcome", "label": "Finalize payment, promise, or follow-up", "owner": "customer", "status": "pending"},
-            {"id": "close_conversation", "label": "Close conversation", "owner": "collection_agent", "status": "pending"},
-        ]
-        edges = [
-            {"from": "open_and_context", "to": "verify_identity", "condition": "case_context_ready"},
-            {"from": "verify_identity", "to": "purpose_disclosure", "condition": "identity_verified"},
-            {"from": "verify_identity", "to": "wrong_party_callback", "condition": "wrong_party_detected"},
-            {"from": "verify_identity", "to": "customer_callback", "condition": "customer_unavailable"},
-            {"from": "purpose_disclosure", "to": "discovery_empathy", "condition": "customer_situation_shared"},
-            {"from": "purpose_disclosure", "to": "explain_dues", "condition": "standard_resolution_requested"},
-            {"from": "discovery_empathy", "to": "resolution_offer", "condition": "eligible_assistance_found"},
-            {"from": "resolution_offer", "to": "confirmation", "condition": "hold_accepted"},
-            {"from": "resolution_offer", "to": "assess_after_hold", "condition": "customer_unsure_after_hold"},
-            {"from": "assess_after_hold", "to": "discount_offer", "condition": "discount_eligible"},
-            {"from": "discount_offer", "to": "confirmation", "condition": "discount_accepted"},
-            {"from": "purpose_disclosure", "to": "partial_amount", "condition": "partial_payment_available"},
-            {"from": "partial_amount", "to": "partial_link", "condition": "amount_validated"},
-            {"from": "partial_link", "to": "confirmation", "condition": "link_sent"},
-            {"from": "collect_payment_intent", "to": "full_payment_options", "condition": "pay_now"},
-            {"from": "full_payment_options", "to": "full_payment_link", "condition": "payment_link_requested"},
-            {"from": "full_payment_link", "to": "confirmation", "condition": "link_sent"},
-            {"from": "confirmation", "to": "autopay_offer", "condition": "autopay_offered"},
-            {"from": "autopay_offer", "to": "close_conversation", "condition": "autopay_declined_or_later"},
-            {"from": "collect_payment_intent", "to": "promise_date", "condition": "promise_to_pay"},
-            {"from": "promise_date", "to": "promise_capture", "condition": "valid_date_captured"},
-            {"from": "promise_capture", "to": "promise_followup", "condition": "promise_recorded"},
-            {"from": "promise_followup", "to": "confirmation", "condition": "followup_scheduled"},
-            {"from": "purpose_disclosure", "to": "customer_callback", "condition": "customer_unavailable"},
-            {"from": "collect_payment_intent", "to": "customer_callback", "condition": "customer_unavailable"},
-            {"from": "resolution_offer", "to": "customer_callback", "condition": "customer_unavailable"},
-            {"from": "customer_callback", "to": "close_conversation", "condition": "callback_scheduled"},
-            {"from": "confirmation", "to": "close_conversation", "condition": "outcome_confirmed"},
-            {"from": "explain_dues", "to": "collect_payment_intent", "condition": "dues_explained"},
-            {"from": "collect_payment_intent", "to": "resolve_outcome", "condition": "pay_now"},
-            {"from": "collect_payment_intent", "to": "evaluate_assistance", "condition": "cannot_pay_full"},
-            {"from": "evaluate_assistance", "to": "resolve_outcome", "condition": "assistance_ready"},
-            {"from": "wrong_party_callback", "to": "close_conversation", "condition": "callback_confirmed"},
-            {"from": "resolve_outcome", "to": "close_conversation", "condition": "outcome_confirmed"},
-        ]
-        return {
-            "plan_id": f"plan-{case_id}",
-            "version": 1,
-            "status": "active",
-            "mode": mode,
-            "objective": "Move borrower conversation to payment, promise-to-pay, or compliant follow-up.",
-            "root_node_id": "open_and_context",
-            "current_node_id": current_node_id,
-            "previous_node_id": None,
-            "next_node_ids": next_node_ids,
-            "nodes": nodes,
-            "edges": edges,
-            "timeline": [],
-            "revision_log": [],
-            "updated_from": "initial",
-            "last_response_target": "customer",
-        }
-
-    @staticmethod
-    def _ensure_privacy_and_closing_nodes(*, plan: dict[str, Any]) -> None:
-        nodes = [dict(node) for node in plan.get("nodes", []) if isinstance(node, dict)]
-        node_ids = {str(node.get("id", "")).strip() for node in nodes}
-        additions = [
-            {
-                "id": "wrong_party_callback",
-                "label": "Arrange privacy-safe callback",
-                "owner": "collection_agent",
-                "status": "pending",
-            },
-            {
-                "id": "close_conversation",
-                "label": "Close conversation",
-                "owner": "collection_agent",
-                "status": "pending",
-            },
-            {
-                "id": "purpose_disclosure",
-                "label": "Disclose call purpose and overdue installment",
-                "owner": "collection_agent",
-                "status": "pending",
-            },
-            {
-                "id": "discovery_empathy",
-                "label": "Understand and acknowledge customer situation",
-                "owner": "collection_agent",
-                "status": "pending",
-            },
-            {
-                "id": "resolution_offer",
-                "label": "Present eligible resolution option",
-                "owner": "collection_agent",
-                "status": "pending",
-            },
-            {
-                "id": "confirmation",
-                "label": "Confirm agreed outcome and reference",
-                "owner": "collection_agent",
-                "status": "pending",
-            },
-            {
-                "id": "assess_after_hold",
-                "label": "Assess ability to resume after hold",
-                "owner": "customer",
-                "status": "pending",
-            },
-            {
-                "id": "discount_offer",
-                "label": "Present eligible installment discount",
-                "owner": "collection_agent",
-                "status": "pending",
-            },
-            {
-                "id": "partial_amount",
-                "label": "Identify and validate partial-payment amount",
-                "owner": "customer",
-                "status": "pending",
-            },
-            {
-                "id": "partial_link",
-                "label": "Create and send secure partial-payment link",
-                "owner": "collection_agent",
-                "status": "pending",
-            },
-            {
-                "id": "full_payment_options",
-                "label": "Offer full-payment method",
-                "owner": "collection_agent",
-                "status": "pending",
-            },
-            {
-                "id": "full_payment_link",
-                "label": "Create and send secure full-payment link",
-                "owner": "collection_agent",
-                "status": "pending",
-            },
-            {
-                "id": "autopay_offer",
-                "label": "Offer auto-pay setup",
-                "owner": "customer",
-                "status": "pending",
-            },
-            {
-                "id": "promise_date",
-                "label": "Capture promised payment date",
-                "owner": "customer",
-                "status": "pending",
-            },
-            {
-                "id": "promise_capture",
-                "label": "Record promise-to-pay commitment",
-                "owner": "collection_agent",
-                "status": "pending",
-            },
-            {
-                "id": "promise_followup",
-                "label": "Schedule promise reminder and payment link",
-                "owner": "collection_agent",
-                "status": "pending",
-            },
-            {
-                "id": "customer_callback",
-                "label": "Schedule customer-requested callback",
-                "owner": "collection_agent",
-                "status": "pending",
-            },
-        ]
-        for node in additions:
-            if node["id"] not in node_ids:
-                nodes.append(node)
-                node_ids.add(node["id"])
-
-        edges = [dict(edge) for edge in plan.get("edges", []) if isinstance(edge, dict)]
-        edge_keys = {
-            (str(edge.get("from", "")).strip(), str(edge.get("to", "")).strip())
-            for edge in edges
-        }
-        additions_edges = [
-            {"from": "verify_identity", "to": "wrong_party_callback", "condition": "wrong_party_detected"},
-            {"from": "verify_identity", "to": "purpose_disclosure", "condition": "identity_verified"},
-            {"from": "verify_identity", "to": "customer_callback", "condition": "customer_unavailable"},
-            {"from": "purpose_disclosure", "to": "discovery_empathy", "condition": "customer_situation_shared"},
-            {"from": "purpose_disclosure", "to": "explain_dues", "condition": "standard_resolution_requested"},
-            {"from": "discovery_empathy", "to": "resolution_offer", "condition": "eligible_assistance_found"},
-            {"from": "resolution_offer", "to": "confirmation", "condition": "hold_accepted"},
-            {"from": "resolution_offer", "to": "assess_after_hold", "condition": "customer_unsure_after_hold"},
-            {"from": "assess_after_hold", "to": "discount_offer", "condition": "discount_eligible"},
-            {"from": "discount_offer", "to": "confirmation", "condition": "discount_accepted"},
-            {"from": "purpose_disclosure", "to": "partial_amount", "condition": "partial_payment_available"},
-            {"from": "partial_amount", "to": "partial_link", "condition": "amount_validated"},
-            {"from": "partial_link", "to": "confirmation", "condition": "link_sent"},
-            {"from": "explain_dues", "to": "collect_payment_intent", "condition": "dues_explained"},
-            {"from": "collect_payment_intent", "to": "full_payment_options", "condition": "pay_now"},
-            {"from": "full_payment_options", "to": "full_payment_link", "condition": "payment_link_requested"},
-            {"from": "full_payment_link", "to": "confirmation", "condition": "link_sent"},
-            {"from": "confirmation", "to": "autopay_offer", "condition": "autopay_offered"},
-            {"from": "autopay_offer", "to": "close_conversation", "condition": "autopay_declined_or_later"},
-            {"from": "collect_payment_intent", "to": "promise_date", "condition": "promise_to_pay"},
-            {"from": "promise_date", "to": "promise_capture", "condition": "valid_date_captured"},
-            {"from": "promise_capture", "to": "promise_followup", "condition": "promise_recorded"},
-            {"from": "promise_followup", "to": "confirmation", "condition": "followup_scheduled"},
-            {"from": "purpose_disclosure", "to": "customer_callback", "condition": "customer_unavailable"},
-            {"from": "collect_payment_intent", "to": "customer_callback", "condition": "customer_unavailable"},
-            {"from": "resolution_offer", "to": "customer_callback", "condition": "customer_unavailable"},
-            {"from": "customer_callback", "to": "close_conversation", "condition": "callback_scheduled"},
-            {"from": "confirmation", "to": "close_conversation", "condition": "outcome_confirmed"},
-            {"from": "wrong_party_callback", "to": "close_conversation", "condition": "callback_confirmed"},
-            {"from": "resolve_outcome", "to": "close_conversation", "condition": "outcome_confirmed"},
-        ]
-        for edge in additions_edges:
-            key = (edge["from"], edge["to"])
-            if key not in edge_keys and edge["from"] in node_ids and edge["to"] in node_ids:
-                edges.append(edge)
-                edge_keys.add(key)
-        plan["nodes"] = nodes
-        plan["edges"] = edges
-
-    def _apply_plan_tree_update(self, *, plan: dict[str, Any], plan_update: dict[str, Any]) -> None:
-        if not isinstance(plan_update, dict) or not plan_update:
-            return
-        nodes = [dict(node) for node in plan.get("nodes", []) if isinstance(node, dict)]
-        edges = [dict(edge) for edge in plan.get("edges", []) if isinstance(edge, dict)]
-        node_map = {str(node.get("id", "")): node for node in nodes if str(node.get("id", "")).strip()}
-        historical_ids = self._historical_node_ids(plan=plan)
-
-        for node_id in [str(x).strip() for x in plan_update.get("remove_node_ids", []) if str(x).strip()]:
-            if node_id in historical_ids:
-                continue
-            node_map.pop(node_id, None)
-        if plan_update.get("remove_node_ids"):
-            removed_ids = {str(x).strip() for x in plan_update.get("remove_node_ids", []) if str(x).strip()}
-            removed_ids = {node_id for node_id in removed_ids if node_id not in historical_ids}
-            edges = [
-                edge
-                for edge in edges
-                if str(edge.get("from", "")).strip() not in removed_ids and str(edge.get("to", "")).strip() not in removed_ids
-            ]
-
-        for raw in plan_update.get("new_nodes", []):
-            if not isinstance(raw, dict):
-                continue
-            node_id = str(raw.get("id", "")).strip()
-            if not node_id:
-                continue
-            node_map[node_id] = {
-                "id": node_id,
-                "label": str(raw.get("label", node_id)).strip() or node_id,
-                "owner": str(raw.get("owner", "collection_agent")).strip() or "collection_agent",
-                "status": str(raw.get("status", "pending")).strip() or "pending",
-            }
-
-        edge_set = set()
-        for edge in edges:
-            src = str(edge.get("from", "")).strip()
-            dst = str(edge.get("to", "")).strip()
-            cond = str(edge.get("condition", "")).strip()
-            if not src or not dst:
-                continue
-            if src not in node_map or dst not in node_map:
-                continue
-            edge_set.add((src, dst, cond))
-        for raw in plan_update.get("new_edges", []):
-            if not isinstance(raw, dict):
-                continue
-            src = str(raw.get("from", "")).strip()
-            dst = str(raw.get("to", "")).strip()
-            cond = str(raw.get("condition", "")).strip()
-            if not src or not dst:
-                continue
-            if src not in node_map or dst not in node_map:
-                continue
-            edge_set.add((src, dst, cond))
-
-        mark_done = {str(x).strip() for x in plan_update.get("mark_done", []) if str(x).strip()}
-        mark_skipped = {str(x).strip() for x in plan_update.get("mark_skipped", []) if str(x).strip()}
-        mark_blocked = {str(x).strip() for x in plan_update.get("mark_blocked", []) if str(x).strip()}
-        for node_id, node in node_map.items():
-            if node_id in mark_done:
-                node["status"] = "done"
-            elif node_id in mark_skipped:
-                node["status"] = "skipped"
-            elif node_id in mark_blocked:
-                node["status"] = "blocked"
-
-        plan["nodes"] = list(node_map.values())
-        plan["edges"] = [
-            {"from": src, "to": dst, "condition": cond}
-            for (src, dst, cond) in sorted(edge_set)
-        ]
-
-    def _resolve_next_current_node(
-        self,
-        *,
-        plan: dict[str, Any],
-        previous_current: str,
-        candidate: str,
-        markers: dict[str, Any],
-    ) -> str:
-        node_ids = {str(node.get("id")) for node in plan.get("nodes", []) if isinstance(node, dict)}
-        parent_map = self._parent_map(nodes=plan.get("edges", []))
-
-        def is_actionable(node_id: str) -> bool:
-            if node_id not in node_ids:
-                return False
-            if not self._is_node_unlocked(plan=plan, node_id=node_id, markers=markers):
-                return False
-            return self._marker_state(markers=markers, node_id=node_id) == "pending"
-
-        def first_actionable_descendant(start_node_id: str) -> str:
-            queue: list[str] = [start_node_id]
-            visited: set[str] = set()
-            while queue:
-                nid = queue.pop(0)
-                if not nid or nid in visited:
-                    continue
-                visited.add(nid)
-                if is_actionable(nid):
-                    return nid
-                children = self._next_nodes_from_edges(nodes=plan.get("edges", []), current_node_id=nid)
-                for child in children:
-                    if child not in visited:
-                        queue.append(child)
-            return ""
-
-        def nearest_unlocked(node_id: str) -> str:
-            cursor = node_id
-            visited: set[str] = set()
-            while cursor and cursor not in visited:
-                visited.add(cursor)
-                if cursor in node_ids and self._is_node_unlocked(
-                    plan=plan,
-                    node_id=cursor,
-                    markers=markers,
-                ):
-                    return cursor
-                cursor = parent_map.get(cursor, "")
-            root_candidate = str(plan.get("root_node_id", "open_and_context"))
-            return root_candidate if root_candidate in node_ids else node_id
-
-        if not previous_current or previous_current not in node_ids:
-            root = str(plan.get("root_node_id", "open_and_context"))
-            if is_actionable(candidate):
-                return candidate
-            first = first_actionable_descendant(root)
-            if first:
-                return first
-            if candidate in node_ids and self._is_node_unlocked(plan=plan, node_id=candidate, markers=markers):
-                return candidate
-            return root if root in node_ids else candidate
-
-        previous_current = nearest_unlocked(previous_current)
-        allowed_next = self._next_nodes_from_edges(nodes=plan.get("edges", []), current_node_id=previous_current)
-        if candidate in {
-            "wrong_party_callback",
-            "close_conversation",
-            "purpose_disclosure",
-            "discovery_empathy",
-            "resolution_offer",
-            "explain_dues",
-            "collect_payment_intent",
-            "full_payment_options",
-            "full_payment_link",
-            "autopay_offer",
-            "promise_date",
-            "promise_capture",
-            "promise_followup",
-            "customer_callback",
-            "confirmation",
-            "human_escalation",
-            "transfer_to_specialist",
-        } and is_actionable(candidate):
-            return candidate
-        if not allowed_next:
-            if is_actionable(candidate):
-                return candidate
-            if candidate in node_ids and self._is_node_unlocked(plan=plan, node_id=candidate, markers=markers):
-                return candidate
-            first = first_actionable_descendant(previous_current)
-            if first:
-                return first
-            return previous_current
-
-        if candidate in allowed_next and is_actionable(candidate):
-            return candidate
-
-        # Enforce sequential progression with marker gates.
-        for node_id in allowed_next:
-            if is_actionable(node_id):
-                return node_id
-        for node_id in allowed_next:
-            first = first_actionable_descendant(node_id)
-            if first:
-                return first
-        return previous_current
-
-    @staticmethod
-    def _parent_map(*, nodes: list[Any]) -> dict[str, str]:
-        parent_map: dict[str, str] = {}
-        for edge in nodes:
-            if not isinstance(edge, dict):
-                continue
-            src = str(edge.get("from", "")).strip()
-            dst = str(edge.get("to", "")).strip()
-            if not src or not dst:
-                continue
-            if dst not in parent_map:
-                parent_map[dst] = src
-        return parent_map
-
-    def _enforce_status_consistency(
-        self,
-        *,
-        plan: dict[str, Any],
-        current_node_id: str,
-        response_target: str,
-        markers: dict[str, Any],
-    ) -> None:
-        nodes = [node for node in plan.get("nodes", []) if isinstance(node, dict)]
-        node_map = {str(node.get("id", "")).strip(): node for node in nodes if str(node.get("id", "")).strip()}
-        if current_node_id not in node_map:
-            return
-
-        for node_id, node in node_map.items():
-            marker_state = self._marker_state(markers=markers, node_id=node_id)
-            if node_id == current_node_id:
-                if marker_state in {"done", "skipped", "blocked"}:
-                    node["status"] = marker_state
-                else:
-                    node["status"] = "in_progress"
-                    node["owner"] = "collection_agent" if response_target == "self" else node.get("owner", "customer")
-                continue
-            if marker_state in {"done", "skipped", "blocked"}:
-                node["status"] = marker_state
-            else:
-                node["status"] = "pending"
-
-    @staticmethod
-    def _marker_state(*, markers: dict[str, Any], node_id: str) -> str:
-        raw = markers.get(node_id)
-        if isinstance(raw, dict):
-            state = str(raw.get("state", "pending")).strip().lower()
-        else:
-            state = str(raw or "pending").strip().lower()
-        if state in {"done", "skipped", "blocked", "pending"}:
-            return state
-        return "pending"
-
-    def _init_or_reconcile_step_markers(self, *, plan: dict[str, Any]) -> dict[str, Any]:
-        existing = plan.get("step_markers") if isinstance(plan.get("step_markers"), dict) else {}
-        markers: dict[str, Any] = dict(existing)
-        has_existing_markers = bool(existing)
-        root_id = str(plan.get("root_node_id", "open_and_context")).strip() or "open_and_context"
-        now = datetime.now(UTC).isoformat()
-
-        node_ids: set[str] = set()
-        for node in plan.get("nodes", []):
-            if not isinstance(node, dict):
-                continue
-            node_id = str(node.get("id", "")).strip()
-            if not node_id:
-                continue
-            node_ids.add(node_id)
-            status = str(node.get("status", "pending")).strip().lower()
-            previous = markers.get(node_id) if isinstance(markers.get(node_id), dict) else {}
-            previous_state = str(previous.get("state", "pending")).strip().lower()
-            if previous_state not in {"done", "skipped", "blocked", "pending"}:
-                previous_state = "pending"
-
-            if previous_state in {"done", "skipped", "blocked"}:
-                state = previous_state
-            elif (not has_existing_markers) and status in {"done", "skipped", "blocked"}:
-                # Bootstrap marker states from node status for initial sessions.
-                state = status
-            elif node_id == root_id and not existing:
-                state = "pending"
-            else:
-                state = "pending"
-
-            markers[node_id] = {
-                "state": state,
-                "updated_at": str(previous.get("updated_at", now)),
-                "source": str(previous.get("source", "reconciler")),
-                "reason": str(previous.get("reason", "")),
-            }
-
-        for marker_id in list(markers.keys()):
-            if marker_id not in node_ids:
-                markers.pop(marker_id, None)
-
-        plan["step_markers"] = markers
-        return markers
-
-    def _apply_step_marker_updates(
-        self,
-        *,
-        plan: dict[str, Any],
-        plan_update: dict[str, Any],
-        previous_current: str,
-        candidate: str,
-        user_input: str,
-        observed_tool: str,
-        observed_output: dict[str, Any],
-        memory_identity_verified: bool,
-    ) -> None:
         markers = plan.get("step_markers") if isinstance(plan.get("step_markers"), dict) else {}
-        now = datetime.now(UTC).isoformat()
-        if not isinstance(plan_update, dict):
-            plan["step_markers"] = markers
-            return
-
-        mark_done = {str(x).strip() for x in plan_update.get("mark_done", []) if str(x).strip()}
-        mark_skipped = {str(x).strip() for x in plan_update.get("mark_skipped", []) if str(x).strip()}
-        mark_blocked = {str(x).strip() for x in plan_update.get("mark_blocked", []) if str(x).strip()}
-
-        def set_state(node_id: str, state: str, reason: str) -> None:
-            prior = markers.get(node_id) if isinstance(markers.get(node_id), dict) else {}
-            markers[node_id] = {
-                "state": state,
-                "updated_at": now,
-                "source": "plan_tree_update",
-                "reason": reason or str(prior.get("reason", "")),
-            }
-
-        for node_id in sorted(mark_done):
-            if self._can_accept_done_marker(
-                plan=plan,
-                node_id=node_id,
-                user_input=user_input,
-                observed_tool=observed_tool,
-                observed_output=observed_output,
-                memory_identity_verified=memory_identity_verified,
-            ):
-                set_state(node_id, "done", "mark_done")
-        for node_id in sorted(mark_skipped):
-            if self._can_accept_skip_marker(
-                plan=plan,
-                node_id=node_id,
-                previous_current=previous_current,
-                user_input=user_input,
-                memory_identity_verified=memory_identity_verified,
-                markers=markers,
-            ):
-                set_state(node_id, "skipped", "mark_skipped")
-        for node_id in sorted(mark_blocked):
-            set_state(node_id, "blocked", "mark_blocked")
-
-        if memory_identity_verified:
-            # Deterministic safety: if identity is already verified in memory state,
-            # keep the marker aligned even when the model omits mark_done.
-            set_state("verify_identity", "done", "memory_identity_verified")
-
-        root_id = str(plan.get("root_node_id", "open_and_context")).strip() or "open_and_context"
-        if (
-            previous_current == root_id
-            and candidate
-            and candidate != root_id
-            and self._marker_state(markers=markers, node_id=root_id) == "pending"
-        ):
-            # Root step completes only when planner advances to next actionable step.
-            set_state(root_id, "done", "case_context_ready_transition")
-
-        if (
-            previous_current
-            and candidate
-            and candidate != previous_current
-            and self._marker_state(markers=markers, node_id=previous_current) == "pending"
-        ):
-            # Require explicit completion/skip marker before moving from previous step.
-            set_state(previous_current, "pending", "awaiting_completion_or_skip_marker")
-
-        plan["step_markers"] = markers
-
-    def _enforce_verification_marker_consistency(
-        self,
-        *,
-        plan: dict[str, Any],
-        memory_identity_verified: bool,
-        observed_tool: str,
-        observed_output: dict[str, Any],
-    ) -> None:
-        markers = plan.get("step_markers") if isinstance(plan.get("step_markers"), dict) else {}
-        verify_raw = markers.get("verify_identity")
-        if not isinstance(verify_raw, dict):
-            return
-        verify_state = str(verify_raw.get("state", "pending")).strip().lower()
-        if verify_state != "done":
-            return
-
-        if memory_identity_verified:
-            return
-
-        verify_raw["state"] = "pending"
-        verify_raw["source"] = "reconciler"
-        verify_raw["reason"] = "identity_not_verified_in_current_state"
-        verify_raw["updated_at"] = datetime.now(UTC).isoformat()
-        markers["verify_identity"] = verify_raw
-        plan["step_markers"] = markers
-
-    @staticmethod
-    def _reconcile_partial_payment_marker_consistency(
-        *,
-        plan: dict[str, Any],
-        memory_state: dict[str, Any],
-    ) -> None:
-        if str(memory_state.get("partial_payment_stage", "")).strip().lower() != "confirmed":
-            return
-
-        details = (
-            memory_state.get("partial_payment_details")
-            if isinstance(memory_state.get("partial_payment_details"), dict)
-            else {}
-        )
-        sms = details.get("sms_confirmation") if isinstance(details.get("sms_confirmation"), dict) else {}
-        if (
-            not str(details.get("payment_reference_id", "")).strip()
-            or str(sms.get("status", "")).strip().lower() != "sent"
-        ):
-            return
-
-        now = datetime.now(UTC).isoformat()
-        markers = plan.get("step_markers") if isinstance(plan.get("step_markers"), dict) else {}
-        for node_id in ("partial_amount", "partial_link"):
-            if not any(
-                isinstance(node, dict) and str(node.get("id", "")).strip() == node_id
-                for node in plan.get("nodes", [])
-            ):
-                continue
-            markers[node_id] = {
-                "state": "done",
-                "updated_at": now,
-                "source": "partial_payment_reconciler",
-                "reason": "payment_link_created_and_sms_sent",
-            }
-
-        for node in plan.get("nodes", []):
-            if (
-                isinstance(node, dict)
-                and str(node.get("id", "")).strip() in {"partial_amount", "partial_link"}
-            ):
-                node["status"] = "done"
-        plan["step_markers"] = markers
-
-    @staticmethod
-    def _node_owner(*, plan: dict[str, Any], node_id: str) -> str:
-        for node in plan.get("nodes", []):
-            if not isinstance(node, dict):
-                continue
-            if str(node.get("id", "")).strip() != node_id:
-                continue
-            owner = str(node.get("owner", "collection_agent")).strip().lower()
-            return owner or "collection_agent"
-        return "collection_agent"
-
-    @staticmethod
-    def _node_label_by_id(*, plan: dict[str, Any], node_id: str) -> str:
-        for node in plan.get("nodes", []):
-            if not isinstance(node, dict):
-                continue
-            if str(node.get("id", "")).strip() != node_id:
-                continue
-            return str(node.get("label", node_id)).strip() or node_id
-        return node_id
+        marker = markers.get("confirmation") if isinstance(markers.get("confirmation"), dict) else {}
+        return str(marker.get("reason", "")).strip().lower()
 
     @staticmethod
     def _tokenize(text: str) -> set[str]:
-        tokens = re.findall(r"[a-z0-9]+", str(text).lower())
-        stop = {
-            "and",
-            "or",
-            "the",
-            "a",
-            "an",
-            "to",
-            "of",
-            "for",
-            "with",
-            "customer",
-            "collection",
-            "agent",
-            "call",
-            "context",
-            "details",
-            "outcome",
-            "finalize",
+        stop = {"and", "or", "the", "a", "an", "to", "of", "for", "with", "customer", "agent"}
+        return {
+            token
+            for token in re.findall(r"[a-z0-9]+", str(text).lower())
+            if token and token not in stop
         }
-        return {token for token in tokens if token and token not in stop}
 
     def _tool_matches_node(self, *, node_id: str, node_label: str, observed_tool: str) -> bool:
         tool_tokens = self._tokenize(observed_tool)
-        if not tool_tokens:
-            return False
         node_tokens = self._tokenize(node_id) | self._tokenize(node_label)
-        if not node_tokens:
-            return False
-        return bool(tool_tokens.intersection(node_tokens))
-
-    def _can_accept_done_marker(
-        self,
-        *,
-        plan: dict[str, Any],
-        node_id: str,
-        user_input: str,
-        observed_tool: str,
-        observed_output: dict[str, Any],
-        memory_identity_verified: bool,
-    ) -> bool:
-        owner = self._node_owner(plan=plan, node_id=node_id)
-        if node_id == str(plan.get("root_node_id", "open_and_context")).strip():
-            return True
-        if node_id == "verify_identity":
-            # Identity completion is gated by effective verification state,
-            # not by single-tool success in isolation.
-            return bool(memory_identity_verified)
-        if observed_tool:
-            tool_status = str(observed_output.get("status", "")).strip().lower()
-            if tool_status in {"failed", "locked", "error", "rejected", "denied", "invalid"}:
-                return False
-            owner = self._node_owner(plan=plan, node_id=node_id)
-            if owner in {"customer", "borrower"}:
-                label = self._node_label_by_id(plan=plan, node_id=node_id)
-                return self._tool_matches_node(node_id=node_id, node_label=label, observed_tool=observed_tool)
-            return True
-        lowered = user_input.lower()
-        if any(token in lowered for token in ["skip", "skipped", "defer", "later"]):
-            return True
-        if owner in {"customer", "borrower"}:
-            # Customer-owned steps must be grounded in an observed tool result.
-            return False
-        return True
-
-    def _can_accept_skip_marker(
-        self,
-        *,
-        plan: dict[str, Any],
-        node_id: str,
-        previous_current: str,
-        user_input: str,
-        memory_identity_verified: bool,
-        markers: dict[str, Any],
-    ) -> bool:
-        root_id = str(plan.get("root_node_id", "open_and_context")).strip() or "open_and_context"
-        if node_id == root_id:
-            return False
-        if node_id == "verify_identity" and not memory_identity_verified:
-            return False
-
-        lowered = str(user_input).lower()
-        explicit_skip = any(
-            token in lowered
-            for token in [
-                "skip",
-                "skipped",
-                "defer",
-                "later",
-                "not now",
-                "can't talk",
-                "cannot talk",
-                "call me later",
-            ]
-        )
-        if not explicit_skip:
-            return False
-
-        current = str(previous_current or "").strip()
-        if not current:
-            return False
-        if node_id == current:
-            return True
-
-        allowed_next = self._next_nodes_from_edges(nodes=plan.get("edges", []), current_node_id=current)
-        if node_id not in allowed_next:
-            return False
-        return self._is_node_unlocked(plan=plan, node_id=node_id, markers=markers)
-
-    def _is_node_unlocked(self, *, plan: dict[str, Any], node_id: str, markers: dict[str, Any]) -> bool:
-        parents: list[str] = []
-        for edge in plan.get("edges", []):
-            if not isinstance(edge, dict):
-                continue
-            src = str(edge.get("from", "")).strip()
-            dst = str(edge.get("to", "")).strip()
-            if dst == node_id and src:
-                parents.append(src)
-        if not parents:
-            return True
-        # Incoming edges represent alternate branch paths. A node is unlocked
-        # when at least one predecessor path has completed or been skipped.
-        return any(
-            self._marker_state(markers=markers, node_id=parent_id) in {"done", "skipped"}
-            for parent_id in parents
-        )
-
-    def _prune_disconnected_nodes(self, *, plan: dict[str, Any], keep_ids: set[str]) -> None:
-        nodes = [node for node in plan.get("nodes", []) if isinstance(node, dict)]
-        node_map = {str(node.get("id", "")).strip(): node for node in nodes if str(node.get("id", "")).strip()}
-        if not node_map:
-            return
-        root_id = str(plan.get("root_node_id", "")).strip() or next(iter(node_map.keys()))
-        if root_id not in node_map:
-            root_id = next(iter(node_map.keys()))
-            plan["root_node_id"] = root_id
-
-        forward_adj: dict[str, list[str]] = {node_id: [] for node_id in node_map}
-        edges = [edge for edge in plan.get("edges", []) if isinstance(edge, dict)]
-        filtered_edges: list[dict[str, Any]] = []
-        for edge in edges:
-            src = str(edge.get("from", "")).strip()
-            dst = str(edge.get("to", "")).strip()
-            if src not in node_map or dst not in node_map:
-                continue
-            filtered_edges.append({"from": src, "to": dst, "condition": str(edge.get("condition", "")).strip()})
-            forward_adj[src].append(dst)
-
-        reachable: set[str] = set()
-        queue: list[str] = [root_id]
-        while queue:
-            nid = queue.pop(0)
-            if nid in reachable:
-                continue
-            reachable.add(nid)
-            for child in forward_adj.get(nid, []):
-                if child not in reachable:
-                    queue.append(child)
-
-        historical_ids = self._historical_node_ids(plan=plan)
-        keep = set(reachable) | {kid for kid in keep_ids if kid in node_map} | {hid for hid in historical_ids if hid in node_map}
-        plan["nodes"] = [node_map[node_id] for node_id in node_map if node_id in keep]
-        plan["edges"] = [edge for edge in filtered_edges if edge["from"] in keep and edge["to"] in keep]
-
-    @staticmethod
-    def _historical_node_ids(*, plan: dict[str, Any]) -> set[str]:
-        markers = plan.get("step_markers") if isinstance(plan.get("step_markers"), dict) else {}
-        historical: set[str] = set()
-        for node_id, raw in markers.items():
-            node_key = str(node_id).strip()
-            if not node_key:
-                continue
-            if isinstance(raw, dict):
-                state = str(raw.get("state", "pending")).strip().lower()
-            else:
-                state = str(raw or "pending").strip().lower()
-            if state in {"done", "skipped", "blocked"}:
-                historical.add(node_key)
-        return historical
-
-    def _infer_current_node_id(
-        self,
-        *,
-        user_input: str,
-        observed_tool: str,
-        response_target: str,
-        route: str,
-        proposal: dict[str, Any],
-        plan_update: dict[str, Any],
-        previous_current: str,
-    ) -> str:
-        selected_next = str(plan_update.get("selected_next_node_id", "")).strip()
-        if selected_next:
-            return selected_next
-        current_override = str(plan_update.get("current_node_id", "")).strip()
-        if current_override:
-            return current_override
-
-        lowered = user_input.lower()
-        proposal_intent = str(proposal.get("intent", "")).strip().lower() if isinstance(proposal, dict) else ""
-        if self.strict_llm_mode:
-            if proposal_intent == "conversation_termination" or is_conversation_termination(user_input):
-                return "close_conversation"
-            return str(previous_current or "").strip()
-        if proposal_intent == "conversation_termination" or is_conversation_termination(user_input):
-            return "close_conversation"
-        if observed_tool in {"verify_dob", "verify_mobile"} or "verify" in lowered:
-            return "verify_identity"
-        if observed_tool in {"dues_explain_build", "loan_policy_lookup"} or any(
-            token in lowered for token in ["dues", "overdue", "emi", "policy", "amount due"]
-        ):
-            return "explain_dues"
-        if observed_tool in {"payment_link_create", "pay_by_phone_collect", "payment_status_check"} or any(
-            token in lowered for token in ["pay now", "payment", "link", "settle"]
-        ):
-            return "resolve_outcome"
-        if any(token in lowered for token in ["cannot pay", "hardship", "discount", "waiver", "restructure", "settlement"]):
-            return "evaluate_assistance"
-        if response_target == "self":
-            return "evaluate_assistance"
-        return "collect_payment_intent"
-
-    @staticmethod
-    def _next_nodes_from_edges(*, nodes: list[Any], current_node_id: str) -> list[str]:
-        next_nodes: list[str] = []
-        seen: set[str] = set()
-        for edge in nodes:
-            if not isinstance(edge, dict):
-                continue
-            if str(edge.get("from", "")) != current_node_id:
-                continue
-            to = str(edge.get("to", "")).strip()
-            if to and to not in seen:
-                next_nodes.append(to)
-                seen.add(to)
-        return next_nodes
+        return bool(tool_tokens and node_tokens and tool_tokens.intersection(node_tokens))
 
     @staticmethod
     def _node_label(plan: dict[str, Any], node_id: str) -> str:
         for node in plan.get("nodes", []):
-            if isinstance(node, dict) and str(node.get("id", "")) == node_id:
+            if isinstance(node, dict) and str(node.get("id", "")).strip() == node_id:
                 return str(node.get("label", node_id)).strip() or node_id
         return node_id
 
     @staticmethod
-    def _append_timeline_snapshot(*, plan: dict[str, Any], update: dict[str, Any]) -> None:
-        timeline = plan.get("timeline")
-        entries = list(timeline) if isinstance(timeline, list) else []
-        timestamp = datetime.now(UTC).isoformat()
-        entries.append(
+    def _pending_successors(*, plan: dict[str, Any], current: str) -> list[str]:
+        statuses = {
+            str(node.get("id", "")).strip(): str(node.get("status", "pending")).strip().lower()
+            for node in plan.get("nodes", [])
+            if isinstance(node, dict)
+        }
+        result: list[str] = []
+        for edge in plan.get("edges", []):
+            if not isinstance(edge, dict) or str(edge.get("from", "")).strip() != current:
+                continue
+            destination = str(edge.get("to", "")).strip()
+            if destination and statuses.get(destination) == "pending" and destination not in result:
+                result.append(destination)
+        return result
+
+    @staticmethod
+    def _compact_conversation_plan(plan: dict[str, Any]) -> dict[str, Any]:
+        nodes = [
             {
-                "at_utc": timestamp,
-                "version": int(plan.get("version", 1)),
+                "id": str(node.get("id", "")).strip(),
+                "label": str(node.get("label", "")).strip(),
+                "status": str(node.get("status", "")).strip(),
+                "owner": str(node.get("owner", "")).strip(),
+            }
+            for node in plan.get("nodes", [])
+            if isinstance(node, dict)
+        ]
+        edges = [
+            {
+                "from": str(edge.get("from", "")).strip(),
+                "to": str(edge.get("to", "")).strip(),
+                "condition": str(edge.get("condition", "")).strip(),
+            }
+            for edge in plan.get("edges", [])
+            if isinstance(edge, dict)
+        ]
+        markers = plan.get("step_markers") if isinstance(plan.get("step_markers"), dict) else {}
+        return {
+            "plan_id": str(plan.get("plan_id", "")).strip(),
+            "version": int(plan.get("version", 1) or 1),
+            "status": str(plan.get("status", "active")).strip(),
+            "current_node_id": str(plan.get("current_node_id", "")).strip(),
+            "next_node_ids": list(plan.get("next_node_ids", [])),
+            "nodes": nodes,
+            "edges": edges,
+            "step_markers": {
+                str(node_id): str(raw.get("state", "pending")).strip()
+                for node_id, raw in markers.items()
+                if isinstance(raw, dict)
+            },
+        }
+
+    @staticmethod
+    def _append_timeline_snapshot(*, plan: dict[str, Any], update: dict[str, Any]) -> None:
+        now = PlanProposalGraphNode._now()
+        timeline = list(plan.get("timeline", [])) if isinstance(plan.get("timeline"), list) else []
+        timeline.append(
+            {
+                "at_utc": now,
+                "version": int(plan.get("version", 1) or 1),
                 "status": str(plan.get("status", "active")),
                 "current_node_id": str(plan.get("current_node_id", "")),
-                "next_node_ids": list(plan.get("next_node_ids", [])) if isinstance(plan.get("next_node_ids"), list) else [],
-                "update": update,
+                "next_node_ids": list(plan.get("next_node_ids", [])),
+                "update": dict(update),
             }
         )
-        plan["timeline"] = entries[-40:]
+        plan["timeline"] = timeline[-40:]
 
-        # Persist full plan snapshots across turns so the UI can render a
-        # conversation-level plan timeline (prev/next over historical plan states).
         snapshot_plan = {
             "plan_id": str(plan.get("plan_id", "")),
-            "version": int(plan.get("version", 1)),
+            "version": int(plan.get("version", 1) or 1),
             "status": str(plan.get("status", "active")),
             "mode": str(plan.get("mode", "strict_collections")),
             "objective": str(plan.get("objective", "")),
             "root_node_id": str(plan.get("root_node_id", "")),
             "current_node_id": str(plan.get("current_node_id", "")),
             "previous_node_id": plan.get("previous_node_id"),
-            "next_node_ids": list(plan.get("next_node_ids", [])) if isinstance(plan.get("next_node_ids"), list) else [],
+            "next_node_ids": list(plan.get("next_node_ids", [])),
             "nodes": [dict(node) for node in plan.get("nodes", []) if isinstance(node, dict)],
             "edges": [dict(edge) for edge in plan.get("edges", []) if isinstance(edge, dict)],
-            "step_markers": dict(plan.get("step_markers", {})) if isinstance(plan.get("step_markers"), dict) else {},
+            "step_markers": dict(plan.get("step_markers", {})),
             "updated_from": str(plan.get("updated_from", "")),
             "last_response_target": str(plan.get("last_response_target", "")),
         }
-        snapshots_raw = plan.get("timeline_snapshots")
-        snapshots = list(snapshots_raw) if isinstance(snapshots_raw, list) else []
+        snapshots = (
+            list(plan.get("timeline_snapshots", []))
+            if isinstance(plan.get("timeline_snapshots"), list)
+            else []
+        )
         snapshots.append(
             {
-                "at_utc": timestamp,
-                "version": int(plan.get("version", 1)),
+                "at_utc": now,
+                "version": int(plan.get("version", 1) or 1),
                 "status": str(plan.get("status", "active")),
                 "current_node_id": str(plan.get("current_node_id", "")),
-                "update": dict(update) if isinstance(update, dict) else {},
+                "update": dict(update),
                 "plan": snapshot_plan,
             }
         )
         plan["timeline_snapshots"] = snapshots[-80:]
+
+    @staticmethod
+    def _now() -> str:
+        return datetime.now(UTC).isoformat()

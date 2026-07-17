@@ -1,0 +1,182 @@
+flowchart TD
+  Start["START"] --> RI["relevance_intent<br/>RelevanceIntentNode<br/>routes: relevant | irrelevant | empty"]
+
+  RI -->|irrelevant / empty| IR["irrelevant_response<br/>CollectionResponseNode<br/>out-of-scope response"]
+  IR --> End["END"]
+
+  RI -->|relevant| EE["entity_extract<br/>CollectionEntityExtractNode<br/>extract turn entities + verification evidence"]
+  EE --> NC["negotiation_classification<br/>NegotiationClassificationNode<br/>conversation mode + posture + hardship + discount + promise/full/partial signals"]
+  NC --> PP["pre_plan_intent<br/>PrePlanIntentNode<br/>routes: plan | decide"]
+
+  PP -->|plan| PPS["plan_proposal_state<br/>PlanProposalStateNode<br/>prepare memory + plan signals"]
+  PP -->|decide| XP["execution_path_intent<br/>ExecutionPathIntentNode<br/>routes: need_memory | verification_react | need_tool | react"]
+
+  XP -->|need_memory| MR["memory_retrieve<br/>MemoryRetrieveNode"]
+  MR --> PMP["post_memory_plan_intent<br/>PostMemoryPlanIntentNode<br/>routes: plan | verification_react | react"]
+  PMP -->|plan| PPS
+  PMP -->|verification_react| VR["verification_react<br/>VerificationReactNode"]
+  PMP -->|react| RN["react<br/>CollectionReactNode"]
+
+  XP -->|verification_react| VR
+  XP -->|need_tool / react| RN
+
+  VR -->|act| TE["tool_execution<br/>ToolExecutionNode"]
+  VR -->|respond / end| PVI["post_verification_intent<br/>PostVerificationIntentNode<br/>routes: plan | react"]
+  PVI -->|plan| PPS
+  PVI -->|react| RN
+
+  RN -->|act| TE
+  RN -->|respond / end| PPS
+
+  TE -->|verification tool result| VR
+  TE -->|non-verification tool result| RN
+
+  PPS -->|continue| PPG["plan_proposal_graph<br/>PlanProposalGraphNode<br/>mutate plan tree + reconcile step markers"]
+  PPG -->|continue| PPD["plan_proposal_directive<br/>PlanProposalDirectiveNode<br/>build response directive + handoffs + tool-ready objectives"]
+  PPD -->|continue| RF["reflect<br/>CollectionReflectNode<br/>validate response safety/completeness"]
+  RF -->|retry_plan_proposal| PPS
+  RF -->|complete| RR["relevant_response<br/>CollectionResponseNode<br/>render response + target + closing flags"]
+  RR --> End
+
+  subgraph TOOLBOX["Registered tool catalog in CollectionAgent._build_tool_registry"]
+    VT1["verify_dob"]
+    VT2["verify_mobile"]
+    T1["loan_policy_lookup"]
+    T2["offer_eligibility"]
+    T3["outbound_callback_schedule"]
+    T4["outbound_callback_cancel"]
+    T5["payment_link_create"]
+    T6["promise_capture"]
+    T7["followup_schedule"]
+    T8["premium_hold_create"]
+    T9["installment_discount_evaluate"]
+    T10["installment_discount_apply"]
+    T11["sms_confirmation_send"]
+    T12["email_confirmation_send"]
+    T13["human_escalation"]
+    T14["plan_propose"]
+  end
+
+  VR -. verification tools .-> VT1
+  VR -. verification tools .-> VT2
+  RN -. business tools .-> TOOLBOX
+  TE -. executes selected tool .-> TOOLBOX
+
+  subgraph PLANTREE["Mutable conversation-plan graph from PlanProposalGraphNode"]
+    OC["open_and_context<br/>Initialize case context"]
+    VI["verify_identity<br/>Verify customer identity"]
+    WPC["wrong_party_callback<br/>Arrange privacy-safe callback"]
+    CC["customer_callback<br/>Schedule customer-requested callback"]
+    PDIS["purpose_disclosure<br/>Disclose call purpose and overdue installment"]
+    DE["discovery_empathy<br/>Understand and acknowledge customer situation"]
+    RO["resolution_offer<br/>Present eligible resolution option"]
+    AAH["assess_after_hold<br/>Assess ability to resume after hold"]
+    DO["discount_offer<br/>Present eligible installment discount"]
+    PA["partial_amount<br/>Identify and validate partial-payment amount"]
+    PL["partial_link<br/>Create and send secure partial-payment link"]
+    EXD["explain_dues<br/>Explain standard payment options"]
+    CPI["collect_payment_intent<br/>Collect payment intent"]
+    FPO["full_payment_options<br/>Offer full-payment method"]
+    FPL["full_payment_link<br/>Create and send secure full-payment link"]
+    APO["autopay_offer<br/>Offer auto-pay setup"]
+    PD["promise_date<br/>Capture promised payment date"]
+    PC["promise_capture<br/>Record promise-to-pay commitment"]
+    PF["promise_followup<br/>Schedule promise reminder and payment link"]
+    EA["evaluate_assistance<br/>Evaluate discount/restructure assistance"]
+    RES["resolve_outcome<br/>Finalize payment, promise, or follow-up"]
+    HE["human_escalation<br/>Queue human specialist escalation"]
+    TS["transfer_to_specialist<br/>Transfer call to specialist"]
+    CONF["confirmation<br/>Confirm agreed outcome and reference"]
+    CLOSE["close_conversation<br/>Close conversation"]
+
+    OC -->|case_context_ready| VI
+    VI -->|identity_verified| PDIS
+    VI -->|wrong_party_detected| WPC
+    VI -->|customer_unavailable| CC
+
+    WPC -->|callback_confirmed| CLOSE
+    CC -->|callback_scheduled| CLOSE
+
+    PDIS -->|customer_situation_shared| DE
+    PDIS -->|standard_resolution_requested| EXD
+    PDIS -->|partial_payment_available| PA
+    PDIS -->|customer_unavailable| CC
+
+    DE -->|eligible_assistance_found| RO
+    RO -->|hold_accepted| CONF
+    RO -->|customer_unsure_after_hold| AAH
+    RO -->|customer_unavailable| CC
+    RO -->|hardship_options_exhausted| HE
+
+    AAH -->|discount_eligible| DO
+    DO -->|discount_accepted| CONF
+    DO -->|hardship_options_exhausted| HE
+
+    PA -->|amount_validated| PL
+    PL -->|link_sent| CONF
+
+    EXD -->|dues_explained| CPI
+    CPI -->|pay_now| FPO
+    CPI -->|promise_to_pay| PD
+    CPI -->|cannot_pay_full| EA
+    CPI -->|customer_unavailable| CC
+
+    FPO -->|payment_link_requested| FPL
+    FPL -->|link_sent| CONF
+    CONF -->|autopay_offered| APO
+    APO -->|autopay_declined_or_later| CLOSE
+    APO -->|autopay_enabled| CONF
+
+    PD -->|valid_date_captured| PC
+    PC -->|promise_recorded| PF
+    PF -->|followup_scheduled| CONF
+
+    EA -->|assistance_ready| RES
+    CPI -->|pay_now_legacy| RES
+    HE -->|escalation_queued| TS
+    TS -->|handoff_confirmed| CLOSE
+    CONF -->|outcome_confirmed| CLOSE
+    RES -->|outcome_confirmed| CLOSE
+  end
+
+  subgraph OVERRIDES["State-driven shortcuts in directive/react nodes"]
+    O1["Wrong-party denial<br/>skip verification/account disclosure; move to wrong_party_callback"]
+    O2["Wrong-party callback time<br/>extract + normalize time; outbound_callback_schedule; close"]
+    O3["Customer callback request<br/>capture requested time; outbound_callback_schedule; close"]
+    O4["Callback cancellation<br/>outbound_callback_cancel"]
+    O5["Identity evidence present<br/>verification_react -> verify_dob + verify_mobile"]
+    O6["Hardship/job loss<br/>offer premium hold when eligible"]
+    O7["Hold accepted<br/>premium_hold_create -> SMS -> email -> confirmation"]
+    O8["Unsure after hold<br/>installment_discount_evaluate -> discount_offer"]
+    O9["Discount accepted<br/>installment_discount_apply -> SMS -> email -> followup_schedule -> confirmation"]
+    O10["Partial payment amount<br/>LLM structured amount parse -> payment_link_create -> SMS -> confirmation"]
+    O11["Full payment<br/>payment_link_create -> SMS -> confirmation -> autopay_offer"]
+    O12["Auto-pay accepted<br/>mark enabled + disposition update -> confirmation/close"]
+    O13["Promise-to-pay<br/>validate date -> promise_capture -> followup_schedule -> confirmation"]
+    O14["Exhausted hardship options<br/>human_escalation -> transfer_to_specialist"]
+    O15["Termination/thanks/bye<br/>close_conversation + conversation manager grace timer"]
+  end
+
+  XP -. pre-route guards .-> O1
+  XP -. verification evidence .-> O5
+  RN -. tool-chain overrides .-> OVERRIDES
+  PPG -. marker reconciliation .-> PLANTREE
+  PPD -. compliance + objective directives .-> OVERRIDES
+
+  subgraph ORCH["External orchestration outside LangGraph"]
+    ENDT["CollectionAgent returns END payload"]
+    CUST["response_target=customer<br/>return message to caller/UI"]
+    SELF["response_target=self<br/>main.py self-hop back into CollectionAgent"]
+    DISC["response_target=discount_planning_agent<br/>DiscountPlanningAgent runs, stores recommendation, then self-hop"]
+    MEM["additional_targets includes collection_memory_helper_agent<br/>post-response memory update"]
+    CM["ConversationManagerAgent<br/>terminate_call=true starts grace timer"]
+    FIN["finalize_conversation_memory<br/>mark close_conversation done + plan completed"]
+  end
+
+  End --> ENDT
+  ENDT --> CUST
+  ENDT --> SELF
+  ENDT --> DISC
+  ENDT --> MEM
+  CUST --> CM
+  CM --> FIN

@@ -10,7 +10,6 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from agents.collection_agent.llm_structured import StructuredOutputRunner
-from agents.collection_agent.utils.plan_proposal_utils import mark_confirmation_delivered
 from src.nodes.response_node import ResponseNode
 from src.nodes.types import AgentState, NodeUpdate
 
@@ -156,9 +155,19 @@ class CollectionResponseNode(ResponseNode):
                 "full_payment_confirmation",
                 "promise_to_pay_confirmation",
             } and str(update.get("response", "")).strip():
-                advanced_plan = mark_confirmation_delivered(memory)
-                if advanced_plan:
-                    update["conversation_plan"] = advanced_plan
+                completed_objectives = [
+                    str(item).strip().lower()
+                    for item in memory_state.get("completed_objectives", [])
+                    if str(item).strip()
+                ] if isinstance(memory_state.get("completed_objectives"), list) else []
+                if objective not in completed_objectives:
+                    completed_objectives.append(objective)
+                completion_update: dict[str, Any] = {
+                    "completed_objectives": completed_objectives[-40:],
+                }
+                if objective == "promise_to_pay_confirmation":
+                    completion_update["promise_stage"] = "confirmed"
+                memory.set_state(**completion_update)
             opening_rendered = (
                 str(self.last_render_debug.get("response_render_debug", {}).get("template_selected", "")).strip()
                 == "verification_request"
@@ -1556,6 +1565,23 @@ class CollectionResponseNode(ResponseNode):
                 result["forbidden_actions_blocked"].append("missing_remaining_balance")
             if any(token in lowered for token in ["link has been sent", "link is on its way", "payment received"]):
                 result["forbidden_actions_blocked"].append("premature_partial_payment_claim")
+        elif template_id == "arrangement_discussion":
+            if any(
+                token in lowered
+                for token in (
+                    "split the payment",
+                    "splitting the payment",
+                    "smaller installments",
+                    "over the next few months",
+                    "pay the revised amount",
+                    "pay your revised amount",
+                )
+            ):
+                result["forbidden_actions_blocked"].append("unsupported_installment_split_offer")
+            if bool(render_variables.get("generic_options_after_discount", False)):
+                policy_options = str(render_variables.get("policy_options_text", "")).strip().lower()
+                if policy_options and policy_options not in lowered:
+                    result["forbidden_actions_blocked"].append("missing_verified_standard_options")
         elif template_id == "hardship_hold_offer":
             hold_months = str(render_variables.get("hold_months", "")).strip()
             if hold_months and hold_months not in rendered:

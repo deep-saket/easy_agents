@@ -154,3 +154,81 @@ def test_human_transfer_branch_reflects_escalation_state() -> None:
     assert markers["human_escalation"] == "done"
     assert markers["confirmation"] == "skipped"
     assert nodes["transfer_to_specialist"] == "in_progress"
+
+
+def test_partial_payment_projection_uses_tool_backed_runtime_evidence() -> None:
+    plan = _execute(
+        {
+            "active_case_id": "COLL-1002",
+            "identity_verified": True,
+            "right_party_status": "confirmed",
+            "payment_commitment_type": "PARTIAL_PAYMENT",
+            "partial_payment_stage": "confirmed",
+            "partial_payment_details": {
+                "partial_payment_amount": 8000.0,
+                "payment_reference_id": "PAY-8000",
+                "sms_confirmation": {"status": "sent"},
+            },
+        },
+        user_input="I received the link",
+    )
+
+    markers = _markers(plan)
+    nodes = _nodes(plan)
+    assert plan["current_node_id"] == "confirmation"
+    assert markers["collect_payment_intent"] == "done"
+    assert markers["partial_amount"] == "done"
+    assert markers["partial_link"] == "done"
+    assert nodes["confirmation"] == "in_progress"
+    assert sum(status == "in_progress" for status in nodes.values()) == 1
+
+
+def test_discount_selected_without_hold_skips_unexecuted_hold_assessment() -> None:
+    plan = _execute(
+        {
+            "active_case_id": "COLL-1002",
+            "identity_verified": True,
+            "right_party_status": "confirmed",
+            "hardship_context": {"hardship_detected": True, "hardship_reason": "job_loss"},
+            "discount_stage": "offered",
+            "discount_offered": True,
+            "hardship_hold_stage": "",
+            "hold_response": "none",
+        },
+        user_input="Do you have a discount option?",
+    )
+
+    markers = _markers(plan)
+    nodes = _nodes(plan)
+    assert plan["current_node_id"] == "discount_offer"
+    assert markers["assess_after_hold"] == "skipped"
+    assert nodes["discount_offer"] == "in_progress"
+    assert sum(status == "in_progress" for status in nodes.values()) == 1
+
+
+def test_runtime_objective_switch_leaves_no_stale_active_payment_node() -> None:
+    initial = {
+        "active_case_id": "COLL-1002",
+        "identity_verified": True,
+        "right_party_status": "confirmed",
+        "payment_commitment_type": "FULL_PAYMENT",
+        "payment_resolution_stage": "options_offered",
+    }
+    first_plan = _execute(initial, user_input="I can pay now")
+    switched = dict(initial)
+    switched.update(
+        {
+            "active_conversation_plan": first_plan,
+            "payment_commitment_type": "NONE",
+            "payment_resolution_stage": "",
+            "customer_payment_posture": "cannot_pay",
+            "hardship_context": {"hardship_detected": True, "hardship_reason": "job_loss"},
+        }
+    )
+
+    plan = _execute(switched, user_input="I lost my job and cannot pay now")
+    nodes = _nodes(plan)
+    assert plan["current_node_id"] == "evaluate_assistance"
+    assert nodes["evaluate_assistance"] == "in_progress"
+    assert nodes["full_payment_options"] != "in_progress"
+    assert sum(status == "in_progress" for status in nodes.values()) == 1

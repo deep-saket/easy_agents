@@ -1296,6 +1296,11 @@ response:
     If tone=empathetic, acknowledge the situation briefly and professionally.
     If tone=compliance, keep language concise and verification-focused.
     If tone=negotiation, keep language collaborative and practical.
+    If the current objective is to discuss eligible arrangement options:
+    - use only render_variables.policy_options_text as the source of available options
+    - do not invent splitting a revised amount into smaller installments or a new multi-month payment plan
+    - do not imply an arrangement has been approved unless a verified tool result says so
+    - if render_variables.generic_options_after_discount=true, explain the other standard options instead of re-offering or expanding the discount
     If tone=firm, keep language direct and professional.
     Do not use markdown.
     Return strict JSON only: {"message": "...", "response_target": "customer|self"}.
@@ -1315,6 +1320,7 @@ response:
     Render the supplied directive only. Do not add workflow reasoning or a new dialogue goal.
     If response_constraints says callback_flow or no_verification_request, do not request verification details.
     For callback confirmation, include callback_time, callback_reference when available, callback_purpose_text when available, and a customer-name closing.
+    For arrangement_discussion, do not invent payment plans. Use policy_options_text exactly as the verified option source.
     Generate only structured JSON output.
   verification_opening_template: |
     Hello. This is {agent_name} calling on behalf of {company_name}. This call may be recorded for quality and training purposes. May I please speak with {customer_name}?

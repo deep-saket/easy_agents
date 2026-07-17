@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from agents.collection_agent.nodes.collection_response_node import CollectionResponseNode
+from agents.collection_agent.nodes.plan_proposal_graph_node import PlanProposalGraphNode
 from agents.collection_agent.utils.plan_proposal_utils import finalize_conversation_memory
 from src.memory.types import WorkingMemory
 
@@ -50,6 +51,18 @@ class _IncompleteCallbackLLM:
     def generate_json(self, system_prompt: str, user_prompt: str) -> dict[str, object]:
         return {
             "message": "I have scheduled your callback for 5 PM. EasySecure Financial Services will be in touch then. Have a great day.",
+            "response_target": "customer",
+        }
+
+
+class _UnsupportedArrangementLLM:
+    def generate_json(self, system_prompt: str, user_prompt: str) -> dict[str, object]:
+        return {
+            "message": (
+                "I understand you're looking for more flexibility. We can arrange a payment plan "
+                "where you pay the revised amount of 34020.00 in smaller installments over the next few months. "
+                "Would splitting the payment make it easier for you to manage?"
+            ),
             "response_target": "customer",
         }
 
@@ -269,6 +282,56 @@ def test_response_node_allows_llm_for_arrangement_reasoning() -> None:
 
     assert update["response"] == "I can talk through a practical arrangement based on what works for you."
     assert update["response_render_debug"]["renderer_fallback_used"] is False
+
+
+def test_response_node_blocks_unsupported_arrangement_split_after_discount() -> None:
+    node = CollectionResponseNode(
+        llm=_UnsupportedArrangementLLM(),
+        strict_llm_mode=True,
+        system_prompt="render",
+        render_user_prompt="Verified response context JSON: {verified_response_context_json}",
+    )
+    memory = WorkingMemory(
+        session_id="response-arrangement-unsupported-split",
+        state={
+            "active_customer_name": "Rohan Gupta",
+            "active_case_id": "COLL-1002",
+            "active_overdue_amount": 37800.0,
+            "identity_verified": True,
+            "generic_options_offered_after_discount": True,
+            "active_collection_context": {
+                "policy": {
+                    "allow_partial_payment": True,
+                    "min_partial_payment_pct": 20,
+                    "max_promise_days": 5,
+                    "restructure_allowed": True,
+                }
+            },
+        },
+    )
+
+    update = node.execute(
+        {
+            "user_input": "do you have some more options?",
+            "memory": memory,
+            "plan_proposal": {
+                "target": "customer",
+                "response_directive": {
+                    "conversation_objective": "present_arrangement_options",
+                    "dialogue_action": "present_offer",
+                    "response_mode": "negotiation",
+                },
+            },
+        }
+    )
+
+    response = update["response"].lower()
+    assert update["response_render_debug"]["renderer_fallback_used"] is True
+    assert "smaller installments" not in response
+    assert "splitting the payment" not in response
+    assert "partial payment starting from 20%" in response
+    assert "payment commitment within 5 days" in response
+    assert "standard restructure review" in response
 
 
 def test_response_node_uses_graph_objective_for_customer_callback_over_stale_verification() -> None:
@@ -644,6 +707,7 @@ def test_response_node_renders_staged_job_loss_hold_flow_from_data() -> None:
     assert "20%" not in offer
 
     memory.set_state(
+        hardship_hold_stage="confirmed",
         active_conversation_plan={
             "plan_id": "PLAN-HOLD-1",
             "version": 1,
@@ -695,14 +759,18 @@ def test_response_node_renders_staged_job_loss_hold_flow_from_data() -> None:
     assert "reference number is HOLD-A1B2C3D4E5" in confirmation
     assert "confirmation has been sent by sms and email" in confirmation.lower()
     assert "anything else" not in confirmation.lower()
-    advanced_plan = confirmation_update["conversation_plan"]
+    assert "conversation_plan" not in confirmation_update
+    assert "hardship_hold_confirmation" in memory.state["completed_objectives"]
+    advanced_plan = PlanProposalGraphNode(llm=None, strict_llm_mode=False).execute(
+        {"memory": memory, "user_input": "continue"}
+    )["conversation_plan"]
     advanced_nodes = {item["id"]: item for item in advanced_plan["nodes"]}
     assert advanced_plan["current_node_id"] == "close_conversation"
     assert advanced_plan["status"] == "active"
     assert advanced_plan["step_markers"]["confirmation"]["state"] == "done"
     assert advanced_nodes["confirmation"]["status"] == "done"
     assert advanced_nodes["close_conversation"]["status"] == "in_progress"
-    assert advanced_plan["timeline_snapshots"][-1]["update"]["origin"] == "response_render"
+    assert advanced_plan["timeline_snapshots"][-1]["update"]["operation"] == "runtime_projection"
 
     closing_update = node.execute(
         {

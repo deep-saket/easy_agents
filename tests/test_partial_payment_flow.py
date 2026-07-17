@@ -414,7 +414,14 @@ def test_confirmation_render_preserves_partial_payment_completion() -> None:
         }
     )
 
-    plan = memory.state["active_conversation_plan"]
+    assert "partial_payment_confirmation" in memory.state["completed_objectives"]
+    plan = graph_node.execute(
+        {
+            "user_input": "continue",
+            "memory": memory,
+            "steps": 0,
+        }
+    )["conversation_plan"]
     statuses = {
         str(item["id"]): str(item["status"])
         for item in plan["nodes"]
