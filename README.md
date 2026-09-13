@@ -6,10 +6,16 @@ Project documentation lives under [docs/](./docs/README.md).
 
 Start here:
 
+- [Getting Started](./docs/getting-started.md)
+- [Current Capabilities and Limitations](./docs/reference/current-capabilities.md)
+- [Functionality Catalog and Test Matrix](./docs/reference/functionalities/README.md)
+- [Create an Agent](./docs/guides/create-an-agent.md)
 - [Documentation Index](./docs/README.md)
 - [Framework Overview](./docs/architecture/framework-overview.md)
 - [Conversation Management Architecture](./docs/architecture/conversation-management.md)
 - [MailMind Overview](./docs/agents/mailmind/overview.md)
+
+The framework is local-first, but external integrations are opt-in rather than offline: hosted LLM providers, Gmail, Twilio, and model downloads require network access. The getting-started path runs without provider credentials.
 
 ## Conversation Manager
 

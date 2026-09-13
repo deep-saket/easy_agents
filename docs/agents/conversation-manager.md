@@ -1,5 +1,7 @@
 # Conversation Manager Agent
 
+Status: working, collection-specific runtime wrapper.
+
 `ConversationManagerAgent` lives under `agents/collection_agent/conversation_manager`.
 
 It does not own collections business logic. It owns the customer-facing waiting experience.
@@ -50,3 +52,5 @@ The conversation manager provides replacement entrypoints for:
 - Pipecat voice runtime
 
 It treats `CollectionAgent` as a black-box business runtime. Collection business prompts, nodes, graph logic, and tools remain unchanged.
+
+For setup commands, runtime-state fields, interruption behavior, APIs, and debugging, see the [complete Conversation Manager README](../../agents/collection_agent/conversation_manager/README.md).

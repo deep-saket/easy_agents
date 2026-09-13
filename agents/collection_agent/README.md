@@ -8,7 +8,7 @@ Use this section when someone is running Collection Agent for the first time.
 
 ### 1) Python environment
 
-From repo root (`/Users/saketm10/Projects/openclaw_agents`):
+From the repository root:
 
 ```bash
 python3 -m venv .venv
@@ -62,7 +62,7 @@ Notes:
 ### 3) Run Collection Agent (interactive CLI)
 
 ```bash
-python agents/collection_agent/main.py --interactive --session-id collection-demo
+python -m agents.collection_agent.main --interactive --session-id collection-demo
 ```
 
 ### 4) Run Collection Agent UI
@@ -914,7 +914,7 @@ export NVIDIA_API_KEY="nvapi-..."
 Optional override at runtime:
 
 ```bash
-python agents/collection_agent/main.py --interactive --nvidia-api-key "nvapi-..."
+python -m agents.collection_agent.main --interactive --nvidia-api-key "nvapi-..."
 ```
 
 ## Ollama Cloud model setup (LLM provider)
@@ -930,7 +930,7 @@ OLLAMA_API_KEY=ollama-...
 Optional override at runtime:
 
 ```bash
-python agents/collection_agent/main.py --interactive --ollama-api-key "ollama-..."
+python -m agents.collection_agent.main --interactive --ollama-api-key "ollama-..."
 ```
 
 ## Key-event memory stores

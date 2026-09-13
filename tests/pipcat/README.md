@@ -14,10 +14,8 @@ pip install "pipecat-ai[nvidia,webrtc]"
 ## Run
 
 ```bash
-source /Users/saketm10/miniconda3/etc/profile.d/conda.sh
-conda activate ecs
-cd /Users/saketm10/Projects/openclaw_agents
-set -a; source .env; set +a
+source .venv/bin/activate
+export NVIDIA_API_KEY="replace-with-your-key"
 python tests/pipcat/test.py -t webrtc
 ```
 

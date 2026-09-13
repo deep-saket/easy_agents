@@ -509,7 +509,7 @@ Agent: This request is outside collections scope. I can only help with loan dues
 ### Start UI
 
 ```bash
-cd /Users/saketm10/Projects/openclaw_agents
+# Run from the repository root.
 ./ui-render.sh
 ```
 

@@ -10,7 +10,7 @@ Use this section when someone is running the conversation-managed collection sta
 
 ### 1) Python environment
 
-From repo root (`/Users/saketm10/Projects/openclaw_agents`):
+From the repository root:
 
 ```bash
 python3 -m venv .venv
@@ -55,7 +55,7 @@ set +a
 
 Notes:
 
-- Collection Agent currently defaults to local `llm.provider: ollama` with `gemma4:31b-cloud` in [agents/collection_agent/config.yml](/Users/saketm10/Projects/openclaw_agents/agents/collection_agent/config.yml).
+- Collection Agent currently defaults to local `llm.provider: ollama` with `gemma4:31b-cloud` in [the Collection Agent config](../config.yml).
 - Local Ollama requests use the existing OpenAI-compatible route at `http://localhost:11434/v1/chat/completions` and do not require an API key.
 - The default voice path now uses the same local Faster-Whisper + SpeechT5 direction as `deep-saket/smruti`.
 - `NVIDIA_API_KEY` is only required if you switch `voice_runtime.stt_backend` or `voice_runtime.tts_backend` to `nvidia`, or if you switch the main LLM provider to NVIDIA.
@@ -122,9 +122,9 @@ Expected response:
 
 Conversation Manager uses:
 
-- Per-session wrapper runtime state: [ConversationManagerAgent.py](/Users/saketm10/Projects/openclaw_agents/agents/collection_agent/conversation_manager/ConversationManagerAgent.py)
-- Delivery-tracking state: [MessageDeliveryTracker.py](/Users/saketm10/Projects/openclaw_agents/agents/collection_agent/conversation_manager/MessageDeliveryTracker.py)
-- Buffered response state: [ResponseBuffer.py](/Users/saketm10/Projects/openclaw_agents/agents/collection_agent/conversation_manager/ResponseBuffer.py)
+- Per-session wrapper runtime state: [ConversationManagerAgent.py](./ConversationManagerAgent.py)
+- Delivery-tracking state: [MessageDeliveryTracker.py](./MessageDeliveryTracker.py)
+- Buffered response state: [ResponseBuffer.py](./ResponseBuffer.py)
 
 Important: this state is wrapper-owned. It does **not** replace the collection agent graph state or memory contract.
 
@@ -276,7 +276,7 @@ flowchart TD
 
 ## Latency model
 
-Latency thresholds are defined in [ConversationManagerConfig.py](/Users/saketm10/Projects/openclaw_agents/agents/collection_agent/conversation_manager/ConversationManagerConfig.py).
+Latency thresholds are defined in [ConversationManagerConfig.py](./ConversationManagerConfig.py).
 
 Categories:
 
@@ -298,7 +298,7 @@ Current defaults:
 
 Filler prompts are loaded from:
 
-- [filler_library.json](/Users/saketm10/Projects/openclaw_agents/agents/collection_agent/conversation_manager/filler_library.json)
+- [filler_library.json](./filler_library.json)
 
 Default behavior:
 
@@ -337,12 +337,12 @@ Important: voice interruption progress is still estimate-based unless the underl
 
 The integrated UI path already uses the wrapper:
 
-- [agents/collection_agent/ui/server.py](/Users/saketm10/Projects/openclaw_agents/agents/collection_agent/ui/server.py) creates `ConversationManagedRuntime`
+- [the Collection Agent UI server](../ui/server.py) creates `ConversationManagedRuntime`
 - `ConversationManagedRuntime` wraps `CollectionDebugRuntime`
 
 The explicit wrapper runtime is implemented in:
 
-- [runtime.py](/Users/saketm10/Projects/openclaw_agents/agents/collection_agent/conversation_manager/runtime.py)
+- [runtime.py](./runtime.py)
 
 Key behavior:
 
@@ -387,5 +387,5 @@ When conversation delivery behavior looks wrong, inspect these first:
 
 See:
 
-- [instant_response_trace.json](/Users/saketm10/Projects/openclaw_agents/agents/collection_agent/conversation_manager/runtime/examples/instant_response_trace.json)
-- [long_wait_trace.json](/Users/saketm10/Projects/openclaw_agents/agents/collection_agent/conversation_manager/runtime/examples/long_wait_trace.json)
+- [instant_response_trace.json](./runtime/examples/instant_response_trace.json)
+- [long_wait_trace.json](./runtime/examples/long_wait_trace.json)

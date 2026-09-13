@@ -4,7 +4,7 @@ Purpose: local debug UI to test text turns and inspect graph execution/state upd
 
 ## First-time setup
 
-From repo root (`/Users/saketm10/Projects/openclaw_agents`):
+From the repository root:
 
 ```bash
 python3 -m venv .venv
@@ -25,7 +25,7 @@ Default voice config is local:
 
 - STT: `whisper_local`
 - TTS: `speecht5_local`
-- configured in [agents/collection_agent/config.yml](/Users/saketm10/Projects/openclaw_agents/agents/collection_agent/config.yml)
+- configured in [the Collection Agent config](../config.yml)
 
 Load `.env` values in shell:
 
