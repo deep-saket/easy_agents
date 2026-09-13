@@ -10,12 +10,26 @@ Start here:
 - [Current Capabilities and Limitations](./docs/reference/current-capabilities.md)
 - [Functionality Catalog and Test Matrix](./docs/reference/functionalities/README.md)
 - [Create an Agent](./docs/guides/create-an-agent.md)
+- [Personal Agent Constellation](./docs/vision/personal-agent-constellation.md)
+- [Feature Intake and Draft Charters](./docs/guides/feature-intake.md)
+- [Personal Constellation Delivery Plan](./docs/plans/personal-constellation-plan.md)
 - [Documentation Index](./docs/README.md)
 - [Framework Overview](./docs/architecture/framework-overview.md)
 - [Conversation Management Architecture](./docs/architecture/conversation-management.md)
 - [MailMind Overview](./docs/agents/mailmind/overview.md)
 
 The framework is local-first, but external integrations are opt-in rather than offline: hosted LLM providers, Gmail, Twilio, and model downloads require network access. The getting-started path runs without provider credentials.
+
+## Personal Agent Constellation
+
+The repository now includes an offline first slice of the planned personal agent system. It maintains a starter Roster of overlapping Guilds, Specialists, and Capabilities, then analyzes a plain-language feature as one of: reuse an existing capability, compose a Playbook, extend a Specialist, or create a proposed Draft Charter.
+
+```bash
+PYTHONPATH=src python -m easy_agents.constellation.cli \
+  "Track my electricity bill and remind me before the due date"
+```
+
+This command only produces a proposal. It does not run the requested workflow, persist a new agent, grant permissions, or activate generated code.
 
 ## Conversation Manager
 

@@ -41,6 +41,7 @@ Concrete agents may assemble different graphs directly with LangGraph. `Collecti
 | Graph Builder | Local web UI, node/agent catalog, structural validation, JSON export, Python scaffold export | API tests pass; exported Python is not yet a runnable generated application | [Graph Builder](./functionalities/graph-builder.md) |
 | Agent composition | `AgentNode` can invoke any object with `run()` and optionally expose its result as observation/response | Implemented in-process; discovery, permissions, budgets, and durable handoffs are not centralized | [Agent runtime and nodes](./functionalities/agent-runtime-and-nodes.md) |
 | Configuration | YAML defaults, repository `.env` loading, environment overrides through `AppSettings` | Core tests pass; one stale dotenv naming test remains | [Configuration](./functionalities/configuration.md) |
+| Constellation feature intake | Versioned starter Roster, overlapping Guild membership, feature fit analysis, risk inference, and proposed Draft Charters | Offline first slice; lexical matching only, and it does not scaffold, persist, activate, or execute agents | [Constellation feature intake](./functionalities/constellation-feature-intake.md) |
 
 ## Reusable Node Catalog
 
@@ -121,12 +122,13 @@ The following roadmap concepts do not exist as stable platform features today:
 - a declarative `agent.yaml` manifest and loader
 - an `easy-agents` command-line interface
 - installable capability packs
-- a generic registry that discovers and selects agents
+- a persistent runtime registry that discovers, versions, and selects runnable agents (the feature-intake Roster is static planning metadata)
 - centralized permission, approval, budget, and policy enforcement
 - durable cross-agent handoffs and resumable checkpoints
 - process or container isolation for arbitrary tools
 - a single canonical run/event schema across every agent
 - a packaged runtime with a stable public import namespace
+- automatic Charter/Playbook scaffolding, evaluation, installation, or activation from a feature proposal
 
 Do not copy CLI commands or manifest examples from the roadmap and expect them to run yet.
 

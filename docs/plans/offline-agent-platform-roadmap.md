@@ -27,6 +27,12 @@ and offline operations.
 The collection agent is the behavioral reference implementation. It should be
 migrated incrementally behind compatibility tests, not rewritten wholesale.
 
+The [Personal Agent Constellation](../vision/personal-agent-constellation.md)
+defines the user-facing vocabulary, overlapping personal/science/startup Guilds,
+and recommended Specialist roster. Its
+[gap and delivery plan](./personal-constellation-plan.md) extends this platform
+sequence with feature intake, the Control Room, and domain-fleet rollout.
+
 ## North-star experience
 
 The finished system should support this workflow:
@@ -959,6 +965,8 @@ Exit criteria:
 Deliverables:
 
 - agent registry and capability discovery
+- Feature Architect proposals that choose reuse, composition, extension, or a
+  new Draft Charter
 - `SupervisorGraph`, `PlanExecuteGraph`, and `MapReduceGraph`
 - typed handoffs and task trees
 - local worker pool and resource-aware scheduling

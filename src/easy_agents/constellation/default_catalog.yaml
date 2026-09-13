@@ -1,0 +1,316 @@
+version: 1
+
+guilds:
+  - id: commons
+    display_name: Commons
+    purpose: Shared routing, knowledge, safety, identity, and automation services.
+    tags: [assistant, coordination, knowledge, privacy, safety, automation]
+  - id: home
+    display_name: Home Guild
+    purpose: Household operations, purchases, utilities, maintenance, and family logistics.
+    tags: [home, household, utility, maintenance, grocery, family, vendor]
+  - id: life_admin
+    display_name: Life Admin Guild
+    purpose: Calendar, travel, personal documents, government services, routines, and reminders.
+    tags: [calendar, travel, reminder, routine, government, documents, india]
+  - id: wellbeing
+    display_name: Wellbeing Guild
+    purpose: Human-reviewed health, food, fitness, learning, and emergency-preparedness support.
+    tags: [health, meal, fitness, learning, emergency, wellbeing]
+  - id: science_lab
+    display_name: Science Lab
+    purpose: Literature, hypotheses, experiments, reproducibility, evaluation, and scientific writing.
+    tags: [research, scientific, paper, experiment, literature, citation, data]
+  - id: venture_studio
+    display_name: Venture Studio
+    purpose: Product, customers, operations, growth, hiring, fundraising, and company decisions.
+    tags: [startup, business, product, customer, market, hiring, fundraising]
+  - id: engineering
+    display_name: Engineering Guild
+    purpose: Software design, implementation, quality, releases, infrastructure, and security.
+    tags: [software, code, engineering, test, deploy, infrastructure, security]
+  - id: finance
+    display_name: Finance Guild
+    purpose: Budgets, bills, bookkeeping, tax preparation, runway, and approval-gated payments.
+    tags: [finance, budget, bill, bookkeeping, tax, payment, runway]
+  - id: communications
+    display_name: Communications Guild
+    purpose: Email, messaging, writing, presentations, notifications, and publishing.
+    tags: [email, message, whatsapp, writing, presentation, notification, publish]
+
+capabilities:
+  - id: coordination.route
+    display_name: Route a mission
+    description: Classify a request and select a bounded specialist or playbook.
+    tags: [route, coordinate, delegate, task, mission, assistant]
+    effects: [read]
+  - id: knowledge.search
+    display_name: Search knowledge
+    description: Search permitted local knowledge and explicitly enabled external sources.
+    tags: [search, research, knowledge, documents, find]
+    effects: [read]
+  - id: knowledge.summarize
+    display_name: Summarize material
+    description: Produce a sourced summary of documents, threads, or research material.
+    tags: [summarize, summary, documents, paper, email, knowledge]
+    effects: [read]
+  - id: knowledge.verify_claims
+    display_name: Verify claims and citations
+    description: Check claims against primary sources and preserve provenance.
+    tags: [verify, fact, claim, citation, source, paper]
+    effects: [read]
+  - id: calendar.inspect
+    display_name: Inspect schedule
+    description: Read calendars, appointments, deadlines, and routines.
+    tags: [calendar, appointment, deadline, meeting, routine, schedule]
+    effects: [read]
+  - id: calendar.propose
+    display_name: Propose schedule changes
+    description: Draft reminders, events, and routine changes without committing them.
+    tags: [calendar, appointment, reminder, meeting, routine, schedule]
+    effects: [read, write]
+    risk: moderate
+  - id: household.track
+    display_name: Track household operations
+    description: Track utility bills, groceries, inventory, maintenance, and recurring household work.
+    tags: [home, household, electricity, water, gas, utility, bill, grocery, maintenance, track]
+    effects: [read, write]
+    risk: moderate
+  - id: household.compare_vendors
+    display_name: Compare local vendors
+    description: Research and compare repair, maintenance, and household service vendors.
+    tags: [home, household, vendor, repair, maintenance, compare, india]
+    effects: [read]
+    network_required: true
+  - id: shopping.plan
+    display_name: Plan purchases
+    description: Build a comparison and shopping list without placing an order.
+    tags: [buy, grocery, product, purchase, shopping, compare, plan]
+    effects: [read, write]
+    risk: moderate
+  - id: travel.plan
+    display_name: Plan travel
+    description: Research routes, trains, flights, hotels, and create an itinerary.
+    tags: [flight, hotel, irctc, itinerary, train, travel, trip, commute, india]
+    effects: [read, write]
+    risk: moderate
+    network_required: true
+  - id: government.track_documents
+    display_name: Track official documents
+    description: Track renewal dates and preparation checklists for personal documents.
+    tags: [aadhaar, pan, passport, government, document, renewal, india]
+    effects: [read, write]
+    risk: high
+    approval_required: true
+  - id: wellbeing.plan
+    display_name: Plan wellbeing routines
+    description: Draft meal, fitness, learning, and wellbeing routines without medical diagnosis.
+    tags: [health, meal, food, fitness, learning, routine, wellbeing]
+    effects: [read, write]
+    risk: moderate
+  - id: papers.discover
+    display_name: Discover literature
+    description: Search for relevant scientific papers and construct a sourced reading list.
+    tags: [research, scientific, literature, paper, publication, search]
+    effects: [read]
+    network_required: true
+  - id: experiments.design
+    display_name: Design experiments
+    description: Turn a hypothesis into a falsifiable, budgeted, reproducible experiment plan.
+    tags: [research, scientific, hypothesis, experiment, study, design]
+    effects: [read, write]
+  - id: experiments.run_sandboxed
+    display_name: Run sandboxed experiments
+    description: Execute approved scientific or ML experiments inside a constrained workspace.
+    tags: [research, experiment, run, execute, sandbox, benchmark]
+    effects: [read, compute, write]
+    risk: moderate
+  - id: experiments.track
+    display_name: Track experiment lineage
+    description: Record datasets, code versions, parameters, metrics, artifacts, and outcomes.
+    tags: [experiment, dataset, metric, artifact, reproducibility, track]
+    effects: [read, write]
+  - id: models.evaluate
+    display_name: Evaluate ML models
+    description: Evaluate machine-learning models against declared datasets and thresholds.
+    tags: [machinelearning, ml, model, benchmark, evaluate, metric, dataset]
+    effects: [read, compute, write]
+  - id: product.shape
+    display_name: Shape a product feature
+    description: Turn evidence and goals into requirements, risks, acceptance criteria, and a roadmap.
+    tags: [product, feature, roadmap, requirement, user, analytics, ux]
+    effects: [read, write]
+  - id: market.research
+    display_name: Research a market
+    description: Analyze markets, competitors, customer problems, and positioning with sources.
+    tags: [market, competitor, competition, customer, startup, research, pricing]
+    effects: [read]
+    network_required: true
+  - id: customer.discovery
+    display_name: Plan customer discovery
+    description: Create interview plans, synthesize notes, and track hypotheses without contacting people.
+    tags: [customer, discovery, interview, problem, hypothesis, startup]
+    effects: [read, write]
+  - id: software.plan
+    display_name: Plan software changes
+    description: Inspect code and produce an implementation and validation plan.
+    tags: [software, code, engineering, implement, architecture, plan]
+    effects: [read, write]
+  - id: software.change_sandboxed
+    display_name: Change software in a sandbox
+    description: Edit and test code inside an explicitly scoped workspace.
+    tags: [software, code, coding, engineering, implement, test, sandbox]
+    effects: [read, compute, write]
+    risk: moderate
+  - id: startup.plan_operations
+    display_name: Plan startup operations
+    description: Plan hiring, fundraising, partnerships, operating cadence, and company decisions.
+    tags: [startup, business, hiring, fundraising, partnership, operations, investor]
+    effects: [read, write]
+    risk: moderate
+  - id: finance.analyze
+    display_name: Analyze finances
+    description: Analyze budgets, bills, expenses, bookkeeping records, and runway without moving money.
+    tags: [finance, budget, bill, expense, bookkeeping, runway, analyze]
+    effects: [read, write]
+    risk: high
+    approval_required: true
+  - id: tax.prepare
+    display_name: Prepare tax material
+    description: Organize records and questions for a qualified tax professional.
+    tags: [tax, gst, income, records, india, ca]
+    effects: [read, write]
+    risk: high
+    approval_required: true
+  - id: communications.draft
+    display_name: Draft communications
+    description: Draft email, WhatsApp, announcements, presentations, and other messages.
+    tags: [email, whatsapp, message, writing, presentation, announcement, draft]
+    effects: [read, write]
+  - id: communications.send
+    display_name: Send communications
+    description: Send an approved message through a configured channel.
+    tags: [email, whatsapp, message, notification, send, publish]
+    effects: [read, send]
+    risk: high
+    network_required: true
+    approval_required: true
+  - id: policy.assess
+    display_name: Assess policy and risk
+    description: Evaluate permissions, data sensitivity, requested effects, and approval requirements.
+    tags: [policy, permission, privacy, risk, safety, approval, security]
+    effects: [read]
+  - id: observability.inspect
+    display_name: Inspect system health
+    description: Inspect runs, traces, failures, budgets, queues, and specialist health.
+    tags: [monitor, observability, trace, failure, budget, queue, health]
+    effects: [read]
+
+specialists:
+  - id: personal_steward
+    display_name: Personal Steward
+    purpose: Serve as the human's front door, clarify missions, route work, and synthesize results.
+    guilds: [commons, home, life_admin, science_lab, venture_studio]
+    capability_ids: [coordination.route]
+    tags: [assistant, coordinate, route, delegate, mission]
+    liaison: true
+  - id: knowledge_librarian
+    display_name: Knowledge Librarian
+    purpose: Search, summarize, verify, and preserve provenance across permitted knowledge.
+    guilds: [commons, science_lab, venture_studio]
+    capability_ids: [knowledge.search, knowledge.summarize, knowledge.verify_claims]
+    tags: [knowledge, research, documents, citation, summarize]
+    liaison: true
+  - id: schedule_coordinator
+    display_name: Schedule Coordinator
+    purpose: Coordinate calendars, routines, reminders, and deadlines across personal and startup work.
+    guilds: [commons, life_admin, home, venture_studio]
+    capability_ids: [calendar.inspect, calendar.propose]
+    tags: [calendar, schedule, reminder, deadline, routine]
+    liaison: true
+  - id: household_operator
+    display_name: Household Operator
+    purpose: Track household work and research local vendors and purchases.
+    guilds: [home, finance]
+    capability_ids: [household.track, household.compare_vendors, shopping.plan]
+    tags: [home, household, utility, bill, grocery, vendor, maintenance]
+  - id: travel_coordinator
+    display_name: Travel Coordinator
+    purpose: Prepare Indian and international travel and commute plans.
+    guilds: [life_admin, finance]
+    capability_ids: [travel.plan]
+    tags: [travel, trip, flight, train, irctc, hotel, commute]
+  - id: document_coordinator
+    display_name: Document Coordinator
+    purpose: Track sensitive personal and official-document workflows without impersonating the user.
+    guilds: [life_admin, finance]
+    capability_ids: [government.track_documents, tax.prepare]
+    tags: [government, aadhaar, pan, passport, renewal, tax, india]
+    liaison: true
+  - id: wellbeing_coach
+    display_name: Wellbeing Coach
+    purpose: Support routines, nutrition, fitness, learning, and preparation while deferring medical decisions.
+    guilds: [wellbeing, home, life_admin]
+    capability_ids: [wellbeing.plan]
+    tags: [health, meal, fitness, learning, routine, wellbeing]
+  - id: research_scientist
+    display_name: Research Scientist
+    purpose: Discover literature, form hypotheses, and design reproducible experiments.
+    guilds: [science_lab]
+    capability_ids: [papers.discover, experiments.design, knowledge.verify_claims]
+    tags: [research, scientific, paper, literature, hypothesis, experiment]
+  - id: ml_engineer
+    display_name: ML Engineer
+    purpose: Implement, run, track, and evaluate machine-learning experiments reproducibly.
+    guilds: [science_lab, engineering, venture_studio]
+    capability_ids: [experiments.run_sandboxed, experiments.track, models.evaluate, software.change_sandboxed]
+    tags: [machinelearning, ml, model, dataset, training, benchmark, gpu]
+    liaison: true
+  - id: product_operator
+    display_name: Product Operator
+    purpose: Convert customer evidence and strategy into product decisions and executable feature definitions.
+    guilds: [venture_studio, engineering]
+    capability_ids: [product.shape, customer.discovery]
+    tags: [product, feature, roadmap, customer, ux, analytics]
+    liaison: true
+  - id: market_researcher
+    display_name: Market Researcher
+    purpose: Research markets, competitors, customers, positioning, and pricing.
+    guilds: [venture_studio]
+    capability_ids: [market.research, customer.discovery]
+    tags: [market, competitor, customer, pricing, startup, research]
+  - id: software_engineer
+    display_name: Software Engineer
+    purpose: Plan, implement, and test software changes inside approved workspace boundaries.
+    guilds: [engineering, science_lab, venture_studio]
+    capability_ids: [software.plan, software.change_sandboxed]
+    tags: [software, code, engineering, implement, test, architecture]
+    liaison: true
+  - id: startup_operator
+    display_name: Startup Operator
+    purpose: Support operating cadence, hiring, fundraising, partnerships, and founder decisions.
+    guilds: [venture_studio, finance, communications]
+    capability_ids: [startup.plan_operations, finance.analyze, communications.draft]
+    tags: [startup, business, operations, hiring, fundraising, investor, runway]
+    liaison: true
+  - id: finance_controller
+    display_name: Finance Controller
+    purpose: Analyze personal and startup finances while keeping payments and regulated decisions human-controlled.
+    guilds: [finance, home, venture_studio]
+    capability_ids: [finance.analyze, tax.prepare, household.track]
+    tags: [finance, budget, bill, expense, bookkeeping, tax, runway]
+    liaison: true
+  - id: communications_operator
+    display_name: Communications Operator
+    purpose: Draft communications and send them only through explicit approval gates.
+    guilds: [communications, home, venture_studio]
+    capability_ids: [communications.draft, communications.send]
+    tags: [email, whatsapp, message, presentation, notification, publish]
+    liaison: true
+  - id: safety_steward
+    display_name: Safety Steward
+    purpose: Evaluate permissions, privacy, risk, approvals, and system health across every guild.
+    guilds: [commons, home, life_admin, wellbeing, science_lab, venture_studio, engineering, finance, communications]
+    capability_ids: [policy.assess, observability.inspect]
+    tags: [policy, permission, privacy, safety, approval, observability]
+    liaison: true

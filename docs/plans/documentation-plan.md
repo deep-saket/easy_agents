@@ -54,6 +54,7 @@ docs/
   getting-started.md                # install and first offline run
   guides/
     create-an-agent.md              # current authoring workflow
+    feature-intake.md               # current feature-fit workflow and safety boundary
     compose-agents.md               # future focused guide
     configure-models.md             # future provider/offline guide
     use-memory.md                   # future task-oriented memory guide
@@ -77,6 +78,9 @@ docs/
   plans/
     documentation-plan.md
     offline-agent-platform-roadmap.md
+    personal-constellation-plan.md
+  vision/
+    personal-agent-constellation.md
 ```
 
 ## Delivery Plan

@@ -8,6 +8,8 @@
 - **Understand what works today:** [Current Capabilities](./reference/current-capabilities.md)
 - **Inspect one tested capability:** [Functionality Catalog and Test Matrix](./reference/functionalities/README.md)
 - **Build a new agent:** [Create an Agent](./guides/create-an-agent.md)
+- **Design the personal agent system:** [Personal Agent Constellation](./vision/personal-agent-constellation.md)
+- **Classify a new feature:** [Feature Intake and Draft Charters](./guides/feature-intake.md)
 - **Understand the target platform:** [Offline Agent Platform Roadmap](./plans/offline-agent-platform-roadmap.md)
 
 The capability reference describes implemented behavior. The roadmap describes future work, including manifest-driven agents and a platform CLI that do not exist yet.
@@ -29,6 +31,7 @@ The capability reference describes implemented behavior. The roadmap describes f
 - [Graph Builder](./reference/functionalities/graph-builder.md)
 - [Configuration](./reference/functionalities/configuration.md)
 - [Concrete Agents](./reference/functionalities/agents.md)
+- [Constellation Feature Intake](./reference/functionalities/constellation-feature-intake.md)
 
 ## Working and Experimental Agents
 
@@ -54,6 +57,7 @@ These pages reserve planned roles; they do not describe complete runnable agents
 
 - [Documentation Plan](./plans/documentation-plan.md)
 - [Offline Agent Platform Roadmap](./plans/offline-agent-platform-roadmap.md)
+- [Personal Constellation Gap and Delivery Plan](./plans/personal-constellation-plan.md)
 - [Memory Vector Index Plan](./plans/memory-vector-index-plan.md)
 - [Refactor Fix Plan](./plans/refactor-fix-plan.md)
 - [Docstring Rules](./conventions/docstring-rules.md)

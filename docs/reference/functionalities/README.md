@@ -22,12 +22,13 @@ The status labels mean:
 | [Graph Builder](./graph-builder.md) | Verified | Five API tests and the `/health` smoke passed |
 | [Configuration](./configuration.md) | Partially verified | Three config tests and the corrected `.env.example` load passed; one stale dotenv naming test failed |
 | [Concrete agents](./agents.md) | Mixed | Simple, MailMind, Conversation Manager, and two specialist smokes passed; Collection Agent had 117 passes and 22 failures |
+| [Constellation feature intake](./constellation-feature-intake.md) | Verified first slice | Fourteen focused offline tests passed for Roster validation, lifecycle filtering, all four decisions, risk/network gates, determinism, and the local API |
 
 Focused counts overlap because some tests validate more than one capability. Do not add the rows to derive the repository total.
 
-## Complete Safe Test Run
+## Broad Test Run Excluding the Explicit Live Test
 
-The repository collected 261 tests. The explicitly live Groq connectivity test was excluded because it uses a configured account and the network:
+The repository collected 275 tests. The explicitly live Groq connectivity test was excluded because it uses a configured account and the network:
 
 ```bash
 python -m pytest -q --ignore=tests/test_groq_connectivity.py
@@ -36,7 +37,7 @@ python -m pytest -q --ignore=tests/test_groq_connectivity.py
 Result:
 
 ```text
-230 passed, 30 failed
+244 passed, 30 failed
 ```
 
 The 30 failures were distributed as follows:
@@ -44,10 +45,10 @@ The 30 failures were distributed as follows:
 | Area | Failed | What failed |
 | --- | ---: | --- |
 | Collection Agent | 22 | plan transitions, response constraints, discount/hardship routing, callback routing, promise-date extraction, and required-entity fallback |
-| Remote model regression tests | 7 | test doubles no longer match the current TLS/SDK transport implementation; the Groq unit path attempted external authentication |
+| Remote model regression tests | 7 | test doubles no longer match the current TLS/SDK transport implementation; despite excluding the explicit live test, the Groq unit path attempted external authentication |
 | Dotenv regression test | 1 | the test expects `EASY_AGENT_TWILIO_ACCOUNT_SID` while runtime code uses `TWILIO_ACCOUNT_SID` |
 
-No production claim should be based only on the total pass percentage. Read the individual functionality page and the failing test names before relying on a path.
+This is not yet a hermetic or network-safe default suite: the remote Groq regression path observed ambient credentials and attempted external authentication. No production claim should be based only on the total pass percentage. Read the individual functionality page and the failing test names before relying on a path.
 
 ## Live Checks Not Performed
 
