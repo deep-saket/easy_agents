@@ -12,8 +12,12 @@ from pathlib import Path
 from time import perf_counter
 from typing import Any
 
-from src.llm.base import BaseLLM
-from src.platform_logging.tracing import record_llm_call
+from .base import BaseLLM
+
+try:
+    from src.platform_logging.tracing import record_llm_call
+except ModuleNotFoundError:  # Installed package exposes platform_logging directly.
+    from platform_logging.tracing import record_llm_call
 
 @dataclass(slots=True)
 class LLMGeneration:
@@ -21,6 +25,10 @@ class LLMGeneration:
     content: str
     thinking_content: str | None = None
     raw_text: str = ""
+    finish_reason: str | None = None
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
+    total_tokens: int | None = None
 
 
 @dataclass(slots=True)

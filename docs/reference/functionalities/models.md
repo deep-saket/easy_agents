@@ -9,6 +9,7 @@ Status: local contracts verified; hosted transports partially verified; live pro
 | `LocalLLM` | Wrapper around a local generation client | Offline after dependencies and weights are available |
 | `Qwen3_1_7BLLM` | Hugging Face Qwen model | May download weights on first use |
 | `FunctionGemmaLLM` | FunctionGemma local planner | May download weights on first use |
+| `MacGemmaLLM` | Native Apple Silicon `gemma-4-E4B` llama.cpp completions service | Loopback by default; optional local key |
 | `EndpointLLM` / `RemoteLLM` | Arbitrary JSON text-generation endpoint | Depends on endpoint |
 | `OpenAICompatibleLLM` | OpenAI-style chat-completions server, including local servers | Local or network, based on URL |
 | `OpenAILLM` | Hosted OpenAI-compatible endpoint default | Network and API key |
@@ -60,15 +61,46 @@ llm = LLMFactory.build_openai_compatible_llm(
 
 Use the factory-specific builders for OpenAI, Groq, and NVIDIA. Load credentials from environment variables; do not hard-code or commit them.
 
+## Mac-Hosted Gemma Usage
+
+The native Mac service is a completions endpoint, not an OpenAI-compatible chat
+endpoint:
+
+```python
+from src.llm import LLMFactory
+
+llm = LLMFactory.build_mac_gemma_llm(max_new_tokens=128)
+llm.require_ready()
+result = llm.generate_result("A short explanation of gradient descent:\n")
+print(result.content)
+```
+
+The adapter provides readiness, model discovery, non-streaming completion,
+portable usage fields, bounded retry, credential redaction, JSON parsing, and
+Pydantic validation. It reads `GEMMA_API_BASE` and the optional
+`MAC_SERVING_API_KEY`.
+
+The served `gemma-4-E4B` is a pretrained base model. Existing agents that rely
+on instruction following or exact JSON require task-specific evaluation before
+using this provider. See [Use the Mac-Hosted Gemma Model](../../guides/use-local-gemma.md).
+
 ## Verification
 
-Eighteen isolated tests passed for:
+Twenty-six isolated tests passed for:
 
 - FunctionGemma generation limits
 - Hugging Face JSON repair and generation behavior
 - `LocalLLM` prompt shaping and structured generation
 - local-model singleton caching
 - LLM classifier prompt and result mapping
+- Mac Gemma completion payloads and portable response parsing
+- readiness and model discovery
+- environment/factory integration for MailMind and Collection Agent
+- bounded retry, generation limits, and key redaction
+- schema-aware structured-generation prompt construction
+
+An explicitly enabled loopback live smoke passed readiness, discovery, and a
+small completion against the running `gemma-4-E4B` service.
 
 A no-network smoke replaced HTTP and Groq SDK transports with fakes and successfully exercised `EndpointLLM`, `OpenAICompatibleLLM`, `OpenAILLM`, `NvidiaLLM`, and `GroqLLM`.
 
@@ -81,4 +113,5 @@ The explicitly live Groq connectivity test was not run.
 - Hosted provider behavior has not been verified in this documentation pass.
 - The remote regression suite must be updated before CI can safely claim provider-adapter coverage.
 - Model adapters do not yet expose one uniform capability description for context length, tool calling, streaming, or structured output.
+- `MacGemmaLLM` is non-streaming and the service is inference-only; model training and checkpoint management remain outside this repository.
 - Use deterministic rules for permissions, approvals, limits, and irreversible actions even when a model plans the workflow.

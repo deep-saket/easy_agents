@@ -67,6 +67,7 @@ voice-realtime = [
 voice-processing = "voice_processing.cli:main"
 collection-speech-tools = "speech.cli:main"
 constellation-intake = "easy_agents.constellation.cli:main"
+local-gemma = "llm.mac_gemma_cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
@@ -80,3 +81,6 @@ where = ["src"]
 [tool.pytest.ini_options]
 pythonpath = ["src", "."]
 testpaths = ["tests"]
+markers = [
+  "integration: requires a live local or external integration and explicit opt-in",
+]

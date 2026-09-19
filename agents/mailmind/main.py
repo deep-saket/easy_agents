@@ -104,6 +104,15 @@ def build_llm(settings: AppSettings):
             max_new_tokens=settings.llm.max_new_tokens,
             enable_thinking=settings.llm.enable_thinking,
         )
+    if provider in {"mac_gemma", "local_gemma"}:
+        return LLMFactory.build_mac_gemma_llm(
+            base_url=settings.llm.base_url,
+            model_name=settings.llm.model_name,
+            max_new_tokens=settings.llm.max_new_tokens,
+            temperature=settings.llm.temperature,
+            top_p=settings.llm.top_p,
+            timeout_seconds=settings.llm.timeout_seconds,
+        )
     if provider == "openai":
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:

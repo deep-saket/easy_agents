@@ -1,6 +1,6 @@
 # Functionality Catalog and Verification Matrix
 
-This catalog documents each implemented functional area separately and records how it was verified on branch `saket/framework_update` on 2026-09-13.
+This catalog documents each implemented functional area separately and records how it was verified on branch `saket/framework_update` on 2026-09-20.
 
 The status labels mean:
 
@@ -16,11 +16,11 @@ The status labels mean:
 | [Agent runtime and reusable nodes](./agent-runtime-and-nodes.md) | Verified | 16 focused tests passed; `GraphAgent`, `ApprovalNode`, `RouterNode`, and trace smokes passed |
 | [Tools and execution](./tools.md) | Verified for shared tools; collection tools partial | 13 shared-tool/source tests passed; registry/catalog/executor smoke passed; collection suite is mixed |
 | [Memory and retrieval](./memory.md) | Verified | 13 storage/type/vector tests passed, plus 9 memory-node tests in the runtime group |
-| [Model adapters](./models.md) | Partially verified | 18 local/model-contract tests passed; five remote adapters passed an isolated transport smoke; seven checked-in remote regression tests failed |
+| [Model adapters](./models.md) | Partially verified | 26 local/model-contract tests and one opt-in Mac Gemma live smoke passed; five remote adapters passed an isolated transport smoke; seven checked-in remote regression tests failed |
 | [Channels, sources, and voice](./channels-and-voice.md) | Verified locally; live services unverified | 21 channel/voice tests passed; six fake-backed Gmail tool tests passed |
 | [Observability](./observability.md) | Smoke verified | `GraphAgent` emitted turn and node events through an in-memory trace sink; tool tracing is exercised by agent tests |
 | [Graph Builder](./graph-builder.md) | Verified | Five API tests and the `/health` smoke passed |
-| [Configuration](./configuration.md) | Partially verified | Three config tests and the corrected `.env.example` load passed; one stale dotenv naming test failed |
+| [Configuration](./configuration.md) | Partially verified | Four config tests and the corrected `.env.example` load passed; one stale dotenv naming test failed |
 | [Concrete agents](./agents.md) | Mixed | Simple, MailMind, Conversation Manager, and two specialist smokes passed; Collection Agent had 117 passes and 22 failures |
 | [Constellation feature intake](./constellation-feature-intake.md) | Verified first slice | Fourteen focused offline tests passed for Roster validation, lifecycle filtering, all four decisions, risk/network gates, determinism, and the local API |
 
@@ -28,7 +28,7 @@ Focused counts overlap because some tests validate more than one capability. Do 
 
 ## Broad Test Run Excluding the Explicit Live Test
 
-The repository collected 275 tests. The explicitly live Groq connectivity test was excluded because it uses a configured account and the network:
+The repository collected 284 tests. The explicitly live Groq connectivity test was excluded because it uses a configured account and the network:
 
 ```bash
 python -m pytest -q --ignore=tests/test_groq_connectivity.py
@@ -37,7 +37,7 @@ python -m pytest -q --ignore=tests/test_groq_connectivity.py
 Result:
 
 ```text
-244 passed, 30 failed
+253 passed, 1 skipped, 30 failed
 ```
 
 The 30 failures were distributed as follows:
@@ -87,7 +87,8 @@ python -m pytest -q \
 # Local/model contracts that make no provider request
 python -m pytest -q \
   tests/test_function_gemma_limits.py tests/test_huggingface_json.py \
-  tests/test_llm_classifier.py tests/test_llm_singleton.py tests/test_local_llm.py
+  tests/test_llm_classifier.py tests/test_llm_singleton.py tests/test_local_llm.py \
+  tests/test_mac_gemma.py
 
 # Channels and voice contracts with fakes
 python -m pytest -q \

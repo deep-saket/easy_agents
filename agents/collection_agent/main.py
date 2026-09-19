@@ -152,6 +152,21 @@ def build_llm(
             temperature=temperature,
         )
 
+    if provider in {"mac_gemma", "local_gemma"}:
+        base_url = str(
+            llm_cfg.get("base_url")
+            or os.getenv("GEMMA_API_BASE", "http://127.0.0.1:8080")
+        )
+        return LLMFactory.build_mac_gemma_llm(
+            base_url=base_url,
+            model_name=model_name,
+            api_key=os.getenv("MAC_SERVING_API_KEY"),
+            max_new_tokens=max_new_tokens,
+            temperature=float(temperature) if temperature is not None else 0.0,
+            top_p=float(llm_cfg.get("top_p", 0.95)),
+            timeout_seconds=float(llm_cfg.get("timeout_seconds", 300.0)),
+        )
+
     if provider == "ollama":
         api_key = cli_ollama_api_key or os.getenv("OLLAMA_API_KEY")
         base_url = str(llm_cfg.get("base_url") or os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"))
@@ -175,7 +190,8 @@ def build_llm(
         )
 
     raise ValueError(
-        f"Collection Agent supports llm.provider values: openai, nvidia, groq, ollama. Got: {provider}"
+        "Collection Agent supports llm.provider values: openai, nvidia, groq, "
+        f"ollama, mac_gemma. Got: {provider}"
     )
 
 

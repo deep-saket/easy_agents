@@ -10,6 +10,7 @@
 - **Build a new agent:** [Create an Agent](./guides/create-an-agent.md)
 - **Design the personal agent system:** [Personal Agent Constellation](./vision/personal-agent-constellation.md)
 - **Classify a new feature:** [Feature Intake and Draft Charters](./guides/feature-intake.md)
+- **Use the Mac-hosted model:** [Local Gemma Integration](./guides/use-local-gemma.md)
 - **Understand the target platform:** [Offline Agent Platform Roadmap](./plans/offline-agent-platform-roadmap.md)
 
 The capability reference describes implemented behavior. The roadmap describes future work, including manifest-driven agents and a platform CLI that do not exist yet.

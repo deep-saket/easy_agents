@@ -5,8 +5,11 @@ Purpose: Implements the factory module for the shared llm platform layer.
 
 from __future__ import annotations
 
+import os
+
 from src.llm.function_gemma import FunctionGemmaLLM
 from src.llm.local_llm import FunctionCallingLocalLLM, LocalLLM
+from src.llm.mac_gemma import DEFAULT_GEMMA_API_BASE, DEFAULT_GEMMA_MODEL, MacGemmaLLM
 from src.llm.qwen import Qwen3_1_7BLLM
 from src.llm.remote_llm import GroqLLM, NvidiaLLM, OpenAICompatibleLLM, OpenAILLM, RemoteLLM
 
@@ -54,6 +57,40 @@ class LLMFactory:
                 torch_dtype=torch_dtype,
                 max_new_tokens=max_new_tokens,
             )
+        )
+
+    @staticmethod
+    def build_mac_gemma_llm(
+        *,
+        base_url: str | None = None,
+        model_name: str = DEFAULT_GEMMA_MODEL,
+        api_key: str | None = None,
+        max_new_tokens: int | None = None,
+        temperature: float = 0.0,
+        top_p: float = 0.95,
+        stop: tuple[str, ...] = ("\n\n",),
+        timeout_seconds: float = 300.0,
+        max_retries: int = 1,
+    ) -> MacGemmaLLM:
+        """Builds the direct Mac-hosted Gemma completion client."""
+
+        resolved_api_key = (
+            api_key if api_key is not None else os.getenv("MAC_SERVING_API_KEY")
+        )
+        return MacGemmaLLM(
+            base_url=(
+                base_url
+                or os.getenv("GEMMA_API_BASE")
+                or DEFAULT_GEMMA_API_BASE
+            ),
+            model_name=model_name,
+            api_key=resolved_api_key,
+            max_tokens=128 if max_new_tokens is None else max_new_tokens,
+            temperature=temperature,
+            top_p=top_p,
+            stop=stop,
+            timeout_seconds=timeout_seconds,
+            max_retries=max_retries,
         )
 
     @staticmethod

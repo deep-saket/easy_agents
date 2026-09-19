@@ -30,6 +30,11 @@ def _env_int(name: str) -> int | None:
     return int(value) if value is not None else None
 
 
+def _env_float(name: str) -> float | None:
+    value = os.getenv(name)
+    return float(value) if value is not None else None
+
+
 def _env_csv(name: str) -> tuple[str, ...] | None:
     value = os.getenv(name)
     if value is None:
@@ -108,6 +113,10 @@ class LLMSettings(BaseModel):
     torch_dtype: str = "auto"
     max_new_tokens: int | None = None
     enable_thinking: bool = True
+    base_url: str | None = None
+    timeout_seconds: float = 300.0
+    temperature: float = 0.0
+    top_p: float = 0.95
 
 
 class PlannerSettings(BaseModel):
@@ -231,6 +240,11 @@ class AppSettings(BaseModel):
                     "enable_thinking": _env_bool("EASY_AGENT_LLM_THINKING", False)
                     if os.getenv("EASY_AGENT_LLM_THINKING") is not None
                     else None,
+                    "base_url": _env_str("GEMMA_API_BASE")
+                    or _env_str("EASY_AGENT_LLM_BASE_URL"),
+                    "timeout_seconds": _env_float("EASY_AGENT_LLM_TIMEOUT_SECONDS"),
+                    "temperature": _env_float("EASY_AGENT_LLM_TEMPERATURE"),
+                    "top_p": _env_float("EASY_AGENT_LLM_TOP_P"),
                 },
                 "planner": {
                     "enabled": _env_bool("EASY_AGENT_PLANNER_ENABLED", False)

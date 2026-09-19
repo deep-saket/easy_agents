@@ -81,3 +81,27 @@ def test_memory_vector_settings_load_from_env(monkeypatch) -> None:
     assert settings.memory.embedding_model == "sentence-transformers/all-MiniLM-L6-v2"
     assert settings.memory.hybrid_search_enabled is True
     assert settings.memory.vector_top_k == 12
+
+
+def test_mac_gemma_settings_load_from_environment(tmp_path: Path, monkeypatch) -> None:
+    config_path = tmp_path / "easy_agent.yaml"
+    config_path.write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("EASY_AGENT_CONFIG_PATH", str(config_path))
+    monkeypatch.setenv("EASY_AGENT_LLM_PROVIDER", "mac_gemma")
+    monkeypatch.setenv("EASY_AGENT_LLM_MODEL_NAME", "gemma-4-E4B")
+    monkeypatch.setenv("EASY_AGENT_LLM_MAX_NEW_TOKENS", "96")
+    monkeypatch.setenv("EASY_AGENT_LLM_TIMEOUT_SECONDS", "180")
+    monkeypatch.setenv("EASY_AGENT_LLM_TEMPERATURE", "0.2")
+    monkeypatch.setenv("EASY_AGENT_LLM_TOP_P", "0.9")
+    monkeypatch.setenv("GEMMA_API_BASE", "http://127.0.0.1:8080")
+    monkeypatch.chdir(tmp_path)
+
+    settings = AppSettings.from_env()
+
+    assert settings.llm.provider == "mac_gemma"
+    assert settings.llm.model_name == "gemma-4-E4B"
+    assert settings.llm.max_new_tokens == 96
+    assert settings.llm.base_url == "http://127.0.0.1:8080"
+    assert settings.llm.timeout_seconds == 180
+    assert settings.llm.temperature == 0.2
+    assert settings.llm.top_p == 0.9

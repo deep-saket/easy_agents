@@ -12,6 +12,7 @@ Start here:
 - [Create an Agent](./docs/guides/create-an-agent.md)
 - [Personal Agent Constellation](./docs/vision/personal-agent-constellation.md)
 - [Feature Intake and Draft Charters](./docs/guides/feature-intake.md)
+- [Use the Mac-Hosted Gemma Model](./docs/guides/use-local-gemma.md)
 - [Personal Constellation Delivery Plan](./docs/plans/personal-constellation-plan.md)
 - [Documentation Index](./docs/README.md)
 - [Framework Overview](./docs/architecture/framework-overview.md)

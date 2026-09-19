@@ -42,6 +42,7 @@ The checked-in [`.env.example`](../../../.env.example) uses the names currently 
 | Paths | `EASY_AGENT_DB_PATH`, `EASY_AGENT_LOG_PATH`, `EASY_AGENT_POLICY_PATH`, memory/table/catalog paths |
 | Runtime | `EASY_AGENT_SOURCE`, `EASY_AGENT_CLASSIFIER_MODE`, `EASY_AGENT_LLM_ENABLED`, `EASY_AGENT_POLL_SECONDS` |
 | Default LLM | `EASY_AGENT_LLM_PROVIDER`, `EASY_AGENT_LLM_MODEL_NAME`, device, dtype, token, and thinking settings |
+| Mac Gemma | `GEMMA_API_BASE`, optional `MAC_SERVING_API_KEY`, LLM timeout, temperature, top-p, and max-token settings |
 | Planner | `EASY_AGENT_PLANNER_ENABLED` plus provider/model/device/dtype/token settings |
 | Memory | `EASY_AGENT_MEMORY_*` cache, archive, similarity, embedding, hybrid, and top-k settings |
 | WhatsApp | `EASY_AGENT_WHATSAPP_MODE`, allowlist, destination, `EASY_AGENT_TWILIO_WHATSAPP_FROM` |
@@ -54,7 +55,7 @@ Collection Agent additionally reads its own `config.yml`, CLI overrides, and a p
 
 ## Verification
 
-Three core configuration tests passed for YAML loading, environment override precedence, and memory-vector settings. Copying the corrected `.env.example` into an isolated temporary directory and loading it through `AppSettings.from_env()` also passed.
+Four core configuration tests passed for YAML loading, environment override precedence, memory-vector settings, and the Mac Gemma model profile. Copying the corrected `.env.example` into an isolated temporary directory and loading it through `AppSettings.from_env()` also passed.
 
 `tests/test_dotenv_loading.py` still fails because it writes `EASY_AGENT_TWILIO_ACCOUNT_SID` and `EASY_AGENT_TWILIO_AUTH_TOKEN`, while the runtime intentionally reads the standard Twilio names `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN`. The checked-in example now follows the runtime names.
 
