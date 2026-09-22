@@ -76,7 +76,7 @@ package-dir = {"" = "src"}
 where = ["src"]
 
 [tool.setuptools.package-data]
-"easy_agents.constellation" = ["default_catalog.yaml"]
+"easy_agents.constellation" = ["default_catalog.yaml", "knowledge_graph.yaml"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src", "."]

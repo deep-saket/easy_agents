@@ -1,0 +1,733 @@
+version: 1
+
+guilds:
+  - id: employment
+    label: Employment Boundary
+    description: Protects separation between current employment, personal work, and independent exploration.
+    tags: [employment, confidentiality, provenance, intellectual-property]
+  - id: venture_exploration
+    label: Venture Exploration
+    description: Discovers, tests, compares, and archives deep-tech opportunity theses.
+    tags: [opportunity, thesis, validation, customer, economics]
+  - id: energy
+    label: Energy Exploration
+    description: Energy systems, storage, hydrogen, grids, power electronics, materials, economics, and safety.
+    tags: [energy, battery, hydrogen, grid, materials]
+  - id: satcom
+    label: Satellite Communications
+    description: Space, RF, link budgets, constellations, ground systems, hardware, authorization, and mission assurance.
+    tags: [satellite, communications, rf, orbit, spectrum]
+  - id: medical_deeptech
+    label: Medical Deep-Tech
+    description: Clinical needs, devices, diagnostics, medical AI, evidence, safety, quality, and health economics.
+    tags: [medical, clinical, device, diagnostics, health]
+
+components:
+  - id: route_and_synthesize
+    kind: playbook
+    label: Route & Synthesize
+    description: Classify a mission, delegate bounded work, collect typed results, and synthesize an answer.
+    status: planned
+    tags: [route, delegate, synthesize]
+  - id: research_with_provenance
+    kind: playbook
+    label: Research with Provenance
+    description: Plan research, gather sources, extract claims, verify evidence, and preserve citations.
+    status: planned
+    tags: [research, evidence, citation]
+  - id: analyze_and_compare
+    kind: playbook
+    label: Analyze & Compare
+    description: Normalize options, calculate metrics, score trade-offs, and explain uncertainty.
+    status: planned
+    tags: [analysis, comparison, uncertainty]
+  - id: plan_and_operate
+    kind: playbook
+    label: Plan & Operate
+    description: Inspect state, propose an action, cross Gates, execute, verify, and record.
+    status: planned
+    tags: [plan, operate, approval]
+  - id: design_run_evaluate
+    kind: playbook
+    label: Design · Run · Evaluate
+    description: Turn a falsifiable hypothesis into a reproducible, evaluated experiment.
+    status: planned
+    tags: [experiment, reproducibility, evaluation]
+  - id: adversarial_review
+    kind: playbook
+    label: Adversarial Review
+    description: Review an artifact against a rubric and separate blocking from non-blocking findings.
+    status: planned
+    tags: [review, red-team, risk]
+  - id: scheduled_review
+    kind: playbook
+    label: Scheduled Review
+    description: Wake on a schedule, inspect state, create a digest, and propose follow-up work.
+    status: planned
+    tags: [schedule, routine, digest]
+  - id: opportunity_validation
+    kind: playbook
+    label: Opportunity Validation
+    description: Move a thesis through conflict, problem, science, market, regulation, economics, experiment, and decision Gates.
+    status: planned
+    tags: [opportunity, thesis, falsification, decision]
+  - id: call_family_member
+    kind: playbook
+    label: Call Family Member
+    description: Check contact cadence, find a suitable time, prepare talking points, request approval, and record follow-ups.
+    status: planned
+    tags: [family, reminder, call, approval]
+
+  - id: working
+    kind: memory
+    label: Working Memory
+    description: Short-lived state for the current conversation and Run.
+    status: implemented
+    tags: [session, working, temporary]
+  - id: long_term
+    kind: memory
+    label: Long-Term Memory
+    description: Typed episodic, semantic, procedural, task, reflection, and error records with provenance.
+    status: implemented
+    tags: [long-term, typed, retrieval]
+  - id: personal
+    kind: memory
+    label: Personal Vault
+    description: Private life, household, relationship, preference, and routine memory scope.
+    status: planned
+    tags: [personal, private, household]
+  - id: employer_authorized
+    kind: memory
+    label: Employer-Authorized Vault
+    description: Explicitly authorized work material isolated from personal and exploration data.
+    status: planned
+    tags: [employment, confidential, isolated]
+  - id: exploration
+    kind: memory
+    label: Exploration Vault
+    description: Independent opportunity theses, public evidence, experiments, decisions, and learnings.
+    status: planned
+    tags: [exploration, thesis, experiment]
+  - id: future_company
+    kind: memory
+    label: Future Company Vault
+    description: Dormant company scope activated only after a thesis passes the Venture Decision Gate.
+    status: dormant
+    tags: [company, startup, isolated]
+
+  - id: calculate
+    kind: tool
+    label: Calculate
+    description: Safely evaluate basic arithmetic expressions.
+    status: implemented
+    tags: [math, deterministic]
+  - id: unit_convert
+    kind: tool
+    label: Unit Convert
+    description: Convert common length, weight, and temperature units.
+    status: implemented
+    tags: [units, deterministic]
+  - id: memory_search
+    kind: tool
+    label: Memory Search
+    description: Search layered long-term memory with typed filters.
+    status: implemented
+    tags: [memory, retrieval]
+  - id: memory_write
+    kind: tool
+    label: Memory Write
+    description: Write a validated typed record into layered memory.
+    status: implemented
+    tags: [memory, write]
+  - id: gmail_fetch
+    kind: tool
+    label: Gmail Fetch
+    description: Fetch and optionally process Gmail messages through an approved source.
+    status: implemented
+    tags: [gmail, email, network]
+    risk: moderate
+  - id: email_search
+    kind: tool
+    label: Email Search
+    description: Search stored email by keyword, category, sender, and time range.
+    status: implemented
+    tags: [email, search]
+  - id: email_classifier
+    kind: tool
+    label: Email Classifier
+    description: Classify selected stored email and persist the result.
+    status: implemented
+    tags: [email, classify]
+  - id: email_summary
+    kind: tool
+    label: Email Summary
+    description: Summarize selected stored email messages.
+    status: implemented
+    tags: [email, summarize]
+  - id: draft_reply
+    kind: tool
+    label: Draft Reply
+    description: Create a reply draft for a stored email.
+    status: implemented
+    tags: [email, draft]
+  - id: email_send
+    kind: tool
+    label: Email Send
+    description: Send an explicitly approved reply for a stored email.
+    status: implemented
+    tags: [email, send, approval]
+    risk: high
+  - id: notification
+    kind: tool
+    label: Notification
+    description: Execute or inspect an approved WhatsApp notification action.
+    status: implemented
+    tags: [notification, whatsapp, approval]
+    risk: high
+
+  - id: outbound_approval
+    kind: policy
+    label: Outbound Approval Gate
+    description: Blocks messages, calls, purchases, payments, publishing, and submissions until approved.
+    status: planned
+    tags: [approval, outbound, side-effect]
+    risk: high
+  - id: employment_separation
+    kind: policy
+    label: Employment Separation
+    description: Denies cross-scope access and flags possible confidentiality or invention-assignment overlap.
+    status: planned
+    tags: [employment, confidentiality, scope]
+    risk: critical
+  - id: medical_safety
+    kind: policy
+    label: Medical Safety Boundary
+    description: Prevents diagnosis, prescription, unsupported clinical claims, or unapproved sensitive-data use.
+    status: planned
+    tags: [medical, clinical, safety]
+    risk: critical
+  - id: offline_strict
+    kind: policy
+    label: Strict Offline Boundary
+    description: Denies non-loopback network access unless a Run selects an approved network profile.
+    status: planned
+    tags: [offline, network, privacy]
+    risk: high
+
+  - id: mac_gemma
+    kind: model
+    label: Mac Gemma · gemma-4-E4B
+    description: Loopback llama.cpp completions model for evaluated local inference tasks.
+    status: live
+    tags: [local, gemma, completion, loopback]
+    metadata:
+      endpoint: http://127.0.0.1:8080/v1/completions
+      context_tokens: 16384
+
+  - id: feature_architect
+    kind: service
+    label: Feature Architect
+    description: Recommends reuse, composition, extension, or a proposed new Specialist.
+    status: implemented
+    tags: [intake, architecture, roster]
+  - id: mission_runtime
+    kind: service
+    label: Mission Runtime
+    description: Future durable Runs, Work orders, events, budgets, cancellation, and restart recovery.
+    status: planned
+    tags: [runtime, work-order, durable]
+  - id: artifact_store
+    kind: service
+    label: Artifact Store
+    description: Versioned references for evidence, datasets, notebooks, reports, and experiment outputs.
+    status: planned
+    tags: [artifact, provenance, version]
+
+specialists:
+  - id: shopping_pantry_specialist
+    label: Shopping & Pantry Specialist
+    description: Plans groceries, household purchases, comparisons, and restocking without autonomous checkout.
+    guild: home
+    templates: [analyze_and_compare, plan_and_operate]
+    tags: [shopping, grocery, pantry]
+  - id: family_relationships_specialist
+    label: Family & Relationships Specialist
+    description: Manages contact cadence, birthdays, family follow-ups, and approved communication preparation.
+    guild: home
+    templates: [scheduled_review, plan_and_operate]
+    tags: [family, relationships, reminder]
+  - id: digital_librarian
+    label: Digital Librarian
+    description: Organizes files, notes, bookmarks, photographs, documents, and backup reminders.
+    guild: life_admin
+    templates: [scheduled_review, research_with_provenance]
+    tags: [files, notes, backup, organize]
+
+  - id: employment_boundary_guardian
+    label: Employment Boundary Guardian
+    description: Keeps employer, personal, exploration, and future-company data and activity separated.
+    guild: employment
+    templates: [adversarial_review]
+    tags: [employment, boundary, provenance]
+  - id: confidentiality_monitor
+    label: Confidentiality Monitor
+    description: Reviews inputs and outputs for employer-confidential or restricted material.
+    guild: employment
+    templates: [adversarial_review]
+    tags: [confidentiality, review, data]
+  - id: ip_boundary_reviewer
+    label: IP Boundary Reviewer
+    description: Flags possible invention-assignment, prior-employer, and ownership concerns for qualified review.
+    guild: employment
+    templates: [research_with_provenance, adversarial_review]
+    tags: [intellectual-property, invention, provenance]
+  - id: work_performance_assistant
+    label: Work Performance Assistant
+    description: Supports current employment using only explicitly authorized work information and tools.
+    guild: employment
+    templates: [route_and_synthesize, plan_and_operate]
+    tags: [employment, productivity, authorized]
+  - id: time_allocation_steward
+    label: Time Allocation Steward
+    description: Protects work obligations, health, family time, and bounded exploration time.
+    guild: employment
+    templates: [scheduled_review, analyze_and_compare]
+    tags: [time, calendar, balance]
+
+  - id: opportunity_portfolio_steward
+    label: Opportunity Portfolio Steward
+    description: Maintains opportunity theses and decides which questions deserve the next unit of effort.
+    guild: venture_exploration
+    templates: [route_and_synthesize, opportunity_validation]
+    tags: [opportunity, thesis, portfolio]
+  - id: idea_lab
+    label: Idea Lab
+    description: Generates, combines, varies, and challenges deep-tech ideas while labeling speculation.
+    guild: venture_exploration
+    templates: [research_with_provenance]
+    tags: [brainstorm, hypothesis, creativity]
+  - id: problem_discovery_specialist
+    label: Problem Discovery Specialist
+    description: Searches for costly, frequent, urgent, and poorly solved user or industrial problems.
+    guild: venture_exploration
+    templates: [research_with_provenance]
+    tags: [problem, user, evidence]
+  - id: evidence_librarian
+    label: Evidence Librarian
+    description: Preserves claims, sources, dates, provenance, contradictions, and confidence.
+    guild: venture_exploration
+    templates: [research_with_provenance]
+    tags: [evidence, source, provenance]
+  - id: customer_discovery_specialist
+    label: Customer Discovery Specialist
+    description: Prepares interviews and extracts recurring unmet needs without unauthorized outreach.
+    guild: venture_exploration
+    templates: [research_with_provenance, analyze_and_compare]
+    tags: [customer, interview, need]
+  - id: scientific_reviewer
+    label: Scientific Reviewer
+    description: Adversarially reviews mechanisms, evidence, uncertainty, novelty, and reproducibility.
+    guild: venture_exploration
+    templates: [adversarial_review]
+    tags: [science, review, evidence]
+  - id: experiment_designer
+    label: Experiment Designer
+    description: Designs the cheapest falsification experiment with controls, metrics, risks, and stop conditions.
+    guild: venture_exploration
+    templates: [design_run_evaluate]
+    tags: [experiment, hypothesis, falsification]
+  - id: prototype_planner
+    label: Prototype Planner
+    description: Converts a validated question into a bounded simulation, bench test, software, or hardware prototype.
+    guild: venture_exploration
+    templates: [plan_and_operate, design_run_evaluate]
+    tags: [prototype, specification, test]
+  - id: prior_art_ip_scout
+    label: Prior-Art & IP Scout
+    description: Searches patents, publications, products, and public disclosures for novelty and overlap evidence.
+    guild: venture_exploration
+    templates: [research_with_provenance, adversarial_review]
+    tags: [patent, prior-art, novelty]
+  - id: technology_readiness_assessor
+    label: Technology Readiness Assessor
+    description: Scores maturity, dependencies, validation gaps, manufacturing readiness, and scale-up risk.
+    guild: venture_exploration
+    templates: [analyze_and_compare, adversarial_review]
+    tags: [trl, maturity, readiness]
+  - id: techno_economic_analyst
+    label: Techno-Economic Analyst
+    description: Models costs, performance, capital, utilization, unit economics, and sensitivity.
+    guild: venture_exploration
+    templates: [analyze_and_compare]
+    tags: [economics, cost, sensitivity]
+  - id: value_chain_analyst
+    label: Value-Chain Analyst
+    description: Maps suppliers, buyers, infrastructure, incumbents, bottlenecks, and decision power.
+    guild: venture_exploration
+    templates: [research_with_provenance, analyze_and_compare]
+    tags: [value-chain, supplier, customer]
+  - id: regulatory_safety_navigator
+    label: Regulatory & Safety Navigator
+    description: Identifies standards, evidence, approvals, safety obligations, and questions for qualified experts.
+    guild: venture_exploration
+    templates: [research_with_provenance, adversarial_review]
+    tags: [regulation, standards, safety]
+  - id: partnership_scout
+    label: Partnership Scout
+    description: Finds laboratories, professors, test facilities, hospitals, manufacturers, and industrial partners.
+    guild: venture_exploration
+    templates: [research_with_provenance]
+    tags: [partner, laboratory, facility]
+  - id: funding_programme_scout
+    label: Funding & Programme Scout
+    description: Monitors grants, challenges, incubators, public programmes, and stage-appropriate capital.
+    guild: venture_exploration
+    templates: [scheduled_review, research_with_provenance]
+    tags: [grant, funding, incubator]
+  - id: red_team_specialist
+    label: Red-Team Specialist
+    description: Attempts to disprove a thesis and surfaces hidden technical, market, regulatory, and execution assumptions.
+    guild: venture_exploration
+    templates: [adversarial_review]
+    tags: [red-team, risk, falsify]
+  - id: venture_decision_committee
+    label: Venture Decision Committee
+    description: Aggregates evidence into a continue, pause, combine, license, publish, or stop recommendation.
+    guild: venture_exploration
+    templates: [route_and_synthesize, opportunity_validation]
+    tags: [decision, gate, portfolio]
+
+  - id: energy_systems_scout
+    label: Energy Systems Scout
+    description: Maps generation, grids, storage, fuels, industrial demand, and system constraints.
+    guild: energy
+    templates: [research_with_provenance, analyze_and_compare]
+    tags: [energy, system, grid]
+  - id: electrochemistry_storage_specialist
+    label: Electrochemistry & Storage Specialist
+    description: Reviews batteries, degradation, materials, thermal behavior, recycling, and controls.
+    guild: energy
+    templates: [research_with_provenance, design_run_evaluate]
+    tags: [battery, electrochemistry, storage]
+  - id: hydrogen_decarbonization_specialist
+    label: Hydrogen & Industrial Decarbonization Specialist
+    description: Studies production, storage, transport, safety, derivatives, industrial heat, steel, and mobility.
+    guild: energy
+    templates: [research_with_provenance, analyze_and_compare]
+    tags: [hydrogen, decarbonization, industrial]
+  - id: power_electronics_specialist
+    label: Power Electronics Specialist
+    description: Studies converters, inverters, motor drives, charging, controls, reliability, and efficiency.
+    guild: energy
+    templates: [research_with_provenance, design_run_evaluate]
+    tags: [power-electronics, converter, control]
+  - id: grid_energy_software_specialist
+    label: Grid & Energy Software Specialist
+    description: Explores forecasting, optimization, distributed resources, demand response, and reliability software.
+    guild: energy
+    templates: [research_with_provenance, design_run_evaluate]
+    tags: [grid, software, optimization]
+  - id: energy_materials_scout
+    label: Energy Materials Scout
+    description: Reviews catalysts, membranes, coatings, critical materials, supply risk, and manufacturability.
+    guild: energy
+    templates: [research_with_provenance, adversarial_review]
+    tags: [materials, catalyst, manufacturing]
+  - id: energy_techno_economics_specialist
+    label: Energy Techno-Economics Specialist
+    description: Models levelized costs, degradation, utilization, infrastructure, and scale sensitivity.
+    guild: energy
+    templates: [analyze_and_compare]
+    tags: [energy, economics, cost]
+  - id: energy_standards_safety_specialist
+    label: Energy Standards & Safety Specialist
+    description: Tracks certification, testing, grid interconnection, environmental, and industrial safety requirements.
+    guild: energy
+    templates: [research_with_provenance, adversarial_review]
+    tags: [energy, standards, safety]
+
+  - id: satcom_systems_architect
+    label: Satcom Systems Architect
+    description: Designs end-to-end satellite, payload, ground, terminal, and network architectures.
+    guild: satcom
+    templates: [analyze_and_compare, plan_and_operate]
+    tags: [satcom, architecture, system]
+  - id: rf_link_budget_specialist
+    label: RF & Link-Budget Specialist
+    description: Analyzes frequency, antennas, propagation, interference, waveform, capacity, and margin.
+    guild: satcom
+    templates: [analyze_and_compare, design_run_evaluate]
+    tags: [rf, link-budget, antenna]
+  - id: orbit_constellation_analyst
+    label: Orbit & Constellation Analyst
+    description: Compares coverage, latency, revisit, capacity, orbital choices, and constellation trade-offs.
+    guild: satcom
+    templates: [analyze_and_compare]
+    tags: [orbit, constellation, coverage]
+  - id: ground_segment_specialist
+    label: Ground-Segment Specialist
+    description: Studies gateways, terminals, network management, edge systems, and field deployment.
+    guild: satcom
+    templates: [research_with_provenance, plan_and_operate]
+    tags: [ground, terminal, gateway]
+  - id: space_hardware_specialist
+    label: Space Hardware Specialist
+    description: Reviews radiation, thermal design, power, reliability, components, and qualification.
+    guild: satcom
+    templates: [research_with_provenance, adversarial_review]
+    tags: [space, hardware, qualification]
+  - id: spectrum_authorization_navigator
+    label: Spectrum & Authorization Navigator
+    description: Tracks IN-SPACe, DoT, WPC, spectrum, licensing, filings, and operational permissions.
+    guild: satcom
+    templates: [research_with_provenance, adversarial_review]
+    tags: [spectrum, authorization, regulation]
+  - id: mission_assurance_specialist
+    label: Mission Assurance Specialist
+    description: Reviews failure modes, redundancy, testing, debris, cybersecurity, safety, and recovery.
+    guild: satcom
+    templates: [adversarial_review]
+    tags: [mission, assurance, reliability]
+  - id: space_supply_chain_scout
+    label: Space Supply-Chain Scout
+    description: Maps components, manufacturers, facilities, qualification capacity, and technology transfer.
+    guild: satcom
+    templates: [research_with_provenance, analyze_and_compare]
+    tags: [space, supply-chain, manufacturing]
+  - id: downstream_applications_scout
+    label: Downstream Applications Scout
+    description: Explores connectivity, IoT, maritime, agriculture, disaster response, and remote-area applications.
+    guild: satcom
+    templates: [research_with_provenance, analyze_and_compare]
+    tags: [downstream, connectivity, application]
+
+  - id: clinical_problem_scout
+    label: Clinical Problem Scout
+    description: Identifies unmet clinical needs through workflow, burden, outcome, and stakeholder evidence.
+    guild: medical_deeptech
+    templates: [research_with_provenance]
+    tags: [clinical, problem, workflow]
+  - id: clinical_evidence_specialist
+    label: Clinical Evidence Specialist
+    description: Reviews study design, endpoints, bias, uncertainty, sample size, and standard of care.
+    guild: medical_deeptech
+    templates: [research_with_provenance, adversarial_review]
+    tags: [clinical, evidence, study]
+  - id: medical_device_systems_engineer
+    label: Medical Device Systems Engineer
+    description: Defines device requirements, sensors, hardware, software, reliability, and traceability.
+    guild: medical_deeptech
+    templates: [plan_and_operate, design_run_evaluate]
+    tags: [medical-device, systems, engineering]
+  - id: diagnostics_biotechnology_specialist
+    label: Diagnostics & Biotechnology Specialist
+    description: Reviews assays, biomarkers, biological mechanisms, laboratory validation, and biosafety.
+    guild: medical_deeptech
+    templates: [research_with_provenance, design_run_evaluate]
+    tags: [diagnostics, biotechnology, assay]
+  - id: medical_ai_specialist
+    label: Medical AI Specialist
+    description: Reviews datasets, bias, validation, drift, explainability, and clinical integration.
+    guild: medical_deeptech
+    templates: [design_run_evaluate, adversarial_review]
+    tags: [medical-ai, dataset, validation]
+  - id: regulatory_classification_navigator
+    label: Regulatory Classification Navigator
+    description: Researches device, IVD, software-device, drug, and combination-product classifications.
+    guild: medical_deeptech
+    templates: [research_with_provenance, adversarial_review]
+    tags: [medical, regulation, classification]
+  - id: clinical_investigation_planner
+    label: Clinical Investigation Planner
+    description: Prepares evidence questions around studies, ethics review, consent, sites, and monitoring.
+    guild: medical_deeptech
+    templates: [plan_and_operate, adversarial_review]
+    tags: [clinical, investigation, ethics]
+  - id: risk_human_factors_specialist
+    label: Risk & Human-Factors Specialist
+    description: Analyzes hazards, foreseeable misuse, usability, failure modes, and patient/operator safety.
+    guild: medical_deeptech
+    templates: [adversarial_review, design_run_evaluate]
+    tags: [risk, human-factors, safety]
+  - id: quality_system_specialist
+    label: Quality-System Specialist
+    description: Structures design controls, documentation, change control, verification, and validation evidence.
+    guild: medical_deeptech
+    templates: [plan_and_operate, adversarial_review]
+    tags: [quality, verification, validation]
+  - id: health_economics_specialist
+    label: Health-Economics Specialist
+    description: Compares clinical benefit, cost, reimbursement, procurement, and adoption incentives.
+    guild: medical_deeptech
+    templates: [analyze_and_compare]
+    tags: [health, economics, reimbursement]
+  - id: hospital_workflow_specialist
+    label: Hospital Workflow Specialist
+    description: Maps who uses, pays for, approves, maintains, and benefits from a medical product.
+    guild: medical_deeptech
+    templates: [research_with_provenance, analyze_and_compare]
+    tags: [hospital, workflow, procurement]
+  - id: medical_ethics_privacy_guardian
+    label: Medical Ethics & Privacy Guardian
+    description: Reviews consent, sensitive data, bias, human oversight, safety, and ethical boundaries.
+    guild: medical_deeptech
+    templates: [adversarial_review]
+    tags: [medical, ethics, privacy]
+
+relations:
+  - source: service:feature_architect
+    target: specialist:personal_steward
+    kind: advises
+    label: advises
+  - source: service:mission_runtime
+    target: playbook:route_and_synthesize
+    kind: executes
+    label: executes
+  - source: service:mission_runtime
+    target: playbook:plan_and_operate
+    kind: executes
+    label: executes
+  - source: service:mission_runtime
+    target: playbook:design_run_evaluate
+    kind: executes
+    label: executes
+  - source: service:artifact_store
+    target: memory:exploration
+    kind: persists_to
+    label: indexes artifacts in
+
+  - source: specialist:personal_steward
+    target: specialist:family_relationships_specialist
+    kind: delegates_to
+    label: delegates to
+  - source: specialist:personal_steward
+    target: specialist:shopping_pantry_specialist
+    kind: delegates_to
+    label: delegates to
+  - source: specialist:family_relationships_specialist
+    target: playbook:call_family_member
+    kind: runs
+    label: runs
+  - source: specialist:employment_boundary_guardian
+    target: specialist:opportunity_portfolio_steward
+    kind: guards
+    label: guards
+  - source: specialist:opportunity_portfolio_steward
+    target: guild:energy
+    kind: routes_to
+    label: routes to
+  - source: specialist:opportunity_portfolio_steward
+    target: guild:satcom
+    kind: routes_to
+    label: routes to
+  - source: specialist:opportunity_portfolio_steward
+    target: guild:medical_deeptech
+    kind: routes_to
+    label: routes to
+  - source: specialist:venture_decision_committee
+    target: specialist:opportunity_portfolio_steward
+    kind: advises
+    label: advises
+
+  - source: guild:home
+    target: memory:personal
+    kind: scoped_to
+    label: scoped to
+  - source: guild:life_admin
+    target: memory:personal
+    kind: scoped_to
+    label: scoped to
+  - source: guild:wellbeing
+    target: memory:personal
+    kind: scoped_to
+    label: scoped to
+  - source: guild:employment
+    target: memory:employer_authorized
+    kind: scoped_to
+    label: scoped to
+  - source: guild:venture_exploration
+    target: memory:exploration
+    kind: scoped_to
+    label: scoped to
+  - source: guild:energy
+    target: memory:exploration
+    kind: scoped_to
+    label: scoped to
+  - source: guild:satcom
+    target: memory:exploration
+    kind: scoped_to
+    label: scoped to
+  - source: guild:medical_deeptech
+    target: memory:exploration
+    kind: scoped_to
+    label: scoped to
+  - source: guild:venture_studio
+    target: memory:future_company
+    kind: scoped_to
+    label: activates with
+
+  - source: tool:memory_search
+    target: memory:long_term
+    kind: reads
+    label: reads
+  - source: tool:memory_write
+    target: memory:long_term
+    kind: writes
+    label: writes
+  - source: tool:email_search
+    target: capability:knowledge.search
+    kind: implements
+    label: implements
+  - source: tool:email_summary
+    target: capability:knowledge.summarize
+    kind: implements
+    label: implements
+  - source: tool:draft_reply
+    target: capability:communications.draft
+    kind: implements
+    label: implements
+  - source: tool:email_send
+    target: capability:communications.send
+    kind: implements
+    label: implements
+  - source: tool:notification
+    target: capability:communications.send
+    kind: implements
+    label: implements
+  - source: tool:calculate
+    target: playbook:analyze_and_compare
+    kind: supports
+    label: supports
+  - source: tool:unit_convert
+    target: playbook:analyze_and_compare
+    kind: supports
+    label: supports
+
+  - source: policy:outbound_approval
+    target: capability:communications.send
+    kind: governs
+    label: governs
+  - source: policy:employment_separation
+    target: guild:employment
+    kind: governs
+    label: governs
+  - source: policy:employment_separation
+    target: guild:venture_exploration
+    kind: governs
+    label: protects
+  - source: policy:medical_safety
+    target: guild:medical_deeptech
+    kind: governs
+    label: governs
+  - source: policy:offline_strict
+    target: service:mission_runtime
+    kind: governs
+    label: constrains
+  - source: model:mac_gemma
+    target: playbook:research_with_provenance
+    kind: supports
+    label: evaluated model for
+  - source: model:mac_gemma
+    target: playbook:design_run_evaluate
+    kind: supports
+    label: evaluated model for

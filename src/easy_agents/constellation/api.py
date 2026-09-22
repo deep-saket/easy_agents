@@ -6,6 +6,7 @@ from fastapi import FastAPI
 
 from easy_agents.constellation.directory import ConstellationDirectory
 from easy_agents.constellation.feature_intake import FeatureIntakeService
+from easy_agents.constellation.knowledge_graph import build_knowledge_graph
 from easy_agents.constellation.models import FeatureProposal, FeatureRequest
 
 
@@ -29,6 +30,12 @@ def create_app(directory: ConstellationDirectory | None = None) -> FastAPI:
     @app.get("/api/constellation")
     def constellation() -> dict[str, object]:
         return active_directory.catalog.model_dump(mode="json")
+
+    @app.get("/api/knowledge-graph")
+    def knowledge_graph() -> dict[str, object]:
+        """Returns active Roster entities plus planned reusable components."""
+
+        return build_knowledge_graph(active_directory).model_dump(mode="json")
 
     @app.post("/api/features/assess", response_model=FeatureProposal)
     def assess_feature(request: FeatureRequest) -> FeatureProposal:

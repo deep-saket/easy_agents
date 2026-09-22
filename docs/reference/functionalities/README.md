@@ -1,6 +1,6 @@
 # Functionality Catalog and Verification Matrix
 
-This catalog documents each implemented functional area separately and records how it was verified on branch `saket/framework_update` on 2026-09-20.
+This catalog documents each implemented functional area separately and records how it was verified on branch `saket/framework_update` on 2026-09-22.
 
 The status labels mean:
 
@@ -23,12 +23,13 @@ The status labels mean:
 | [Configuration](./configuration.md) | Partially verified | Four config tests and the corrected `.env.example` load passed; one stale dotenv naming test failed |
 | [Concrete agents](./agents.md) | Mixed | Simple, MailMind, Conversation Manager, and two specialist smokes passed; Collection Agent had 117 passes and 22 failures |
 | [Constellation feature intake](./constellation-feature-intake.md) | Verified first slice | Fourteen focused offline tests passed for Roster validation, lifecycle filtering, all four decisions, risk/network gates, determinism, and the local API |
+| [Constellation Map](../../guides/constellation-map.md) | Verified | Five graph/API/UI contract tests, JavaScript syntax validation, and browser interaction checks passed; 147 typed nodes and 269 valid relationships load locally |
 
 Focused counts overlap because some tests validate more than one capability. Do not add the rows to derive the repository total.
 
 ## Broad Test Run Excluding the Explicit Live Test
 
-The repository collected 284 tests. The explicitly live Groq connectivity test was excluded because it uses a configured account and the network:
+The repository collected 289 tests. The explicitly live Groq connectivity test was excluded because it uses a configured account and the network:
 
 ```bash
 python -m pytest -q --ignore=tests/test_groq_connectivity.py
@@ -37,7 +38,7 @@ python -m pytest -q --ignore=tests/test_groq_connectivity.py
 Result:
 
 ```text
-253 passed, 1 skipped, 30 failed
+258 passed, 1 skipped, 30 failed
 ```
 
 The 30 failures were distributed as follows:
@@ -99,6 +100,11 @@ python -m pytest -q \
 
 # Graph Builder
 python -m pytest -q tests/test_graph_builder_api.py
+
+# Constellation feature intake and knowledge graph
+PYTHONPATH=src python -m pytest -q \
+  tests/test_constellation_feature_intake.py \
+  tests/test_constellation_knowledge_graph.py
 
 # MailMind
 python -m pytest -q \

@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <title>Constellation Map · Easy Agents</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar">
+        <div class="brand-lockup">
+          <div class="brand-mark" aria-hidden="true">
+            <span></span><span></span><span></span>
+          </div>
+          <div>
+            <p class="eyebrow">Easy Agents · Control Room</p>
+            <h1>Constellation Map</h1>
+          </div>
+        </div>
+
+        <div class="top-stats" aria-label="Graph summary">
+          <div><strong id="stat-specialists">—</strong><span>specialists</span></div>
+          <div><strong id="stat-components">—</strong><span>components</span></div>
+          <div><strong id="stat-relations">—</strong><span>relationships</span></div>
+        </div>
+
+        <div class="top-actions">
+          <span id="api-state" class="health-pill loading">Connecting</span>
+          <button id="fit-view" class="icon-button" type="button" title="Fit graph to view" aria-label="Fit graph to view">⌗</button>
+        </div>
+      </header>
+
+      <div class="workspace">
+        <aside class="panel controls-panel">
+          <section>
+            <label class="field-label" for="search">Find anything</label>
+            <div class="search-wrap">
+              <span aria-hidden="true">⌕</span>
+              <input id="search" type="search" placeholder="Agent, tool, memory…" autocomplete="off" />
+              <kbd>/</kbd>
+            </div>
+          </section>
+
+          <section>
+            <p class="section-label">View</p>
+            <div class="segmented" role="group" aria-label="Graph preset">
+              <button class="preset active" data-preset="overview" type="button">Overview</button>
+              <button class="preset" data-preset="agents" type="button">Agents</button>
+              <button class="preset" data-preset="components" type="button">Components</button>
+              <button class="preset" data-preset="full" type="button">Full</button>
+            </div>
+          </section>
+
+          <section>
+            <label class="field-label" for="domain-filter">Circle / domain</label>
+            <select id="domain-filter">
+              <option value="all">All domains</option>
+            </select>
+          </section>
+
+          <section>
+            <div class="section-heading">
+              <p class="section-label">Node types</p>
+              <button id="toggle-types" class="text-button" type="button">All</button>
+            </div>
+            <div id="type-filters" class="type-filters"></div>
+          </section>
+
+          <section>
+            <p class="section-label">Lifecycle</p>
+            <label class="switch-row">
+              <input id="show-active" type="checkbox" checked />
+              <span class="switch"></span>
+              <span>Active & implemented</span>
+            </label>
+            <label class="switch-row">
+              <input id="show-planned" type="checkbox" checked />
+              <span class="switch"></span>
+              <span>Planned & dormant</span>
+            </label>
+          </section>
+
+          <section>
+            <p class="section-label">Display</p>
+            <label class="switch-row">
+              <input id="show-edge-labels" type="checkbox" />
+              <span class="switch"></span>
+              <span>Relationship labels</span>
+            </label>
+            <label class="switch-row">
+              <input id="reduce-motion" type="checkbox" />
+              <span class="switch"></span>
+              <span>Reduce motion</span>
+            </label>
+          </section>
+
+          <div class="control-note">
+            <span class="note-icon">i</span>
+            <p>Drag nodes to pin them. Scroll to zoom. Click an entity to inspect its relationships.</p>
+          </div>
+        </aside>
+
+        <main id="graph-stage" class="graph-stage" aria-label="Constellation knowledge graph">
+          <div class="stage-heading">
+            <div>
+              <p id="view-kicker" class="eyebrow">All circles</p>
+              <h2 id="view-title">Your personal agent system</h2>
+            </div>
+            <div class="visible-count"><strong id="visible-nodes">—</strong> nodes in view</div>
+          </div>
+
+          <svg id="graph" role="img" aria-label="Interactive agent relationship graph">
+            <defs>
+              <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+                <path d="M0,0 L0,6 L7,3 z" fill="currentColor"></path>
+              </marker>
+              <filter id="node-glow" x="-80%" y="-80%" width="260%" height="260%">
+                <feGaussianBlur stdDeviation="4" result="blur"></feGaussianBlur>
+                <feMerge><feMergeNode in="blur"></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge>
+              </filter>
+            </defs>
+            <g id="viewport">
+              <g id="edge-layer"></g>
+              <g id="edge-label-layer"></g>
+              <g id="node-layer"></g>
+            </g>
+          </svg>
+
+          <div id="graph-loading" class="graph-message">
+            <div class="loader"></div>
+            <strong>Mapping the constellation</strong>
+            <span>Loading agents and components…</span>
+          </div>
+          <div id="graph-empty" class="graph-message hidden">
+            <strong>No matching nodes</strong>
+            <span>Change the search or filters to restore the graph.</span>
+          </div>
+          <div id="tooltip" class="tooltip hidden"></div>
+
+          <div class="zoom-controls" aria-label="Zoom controls">
+            <button id="zoom-in" type="button" aria-label="Zoom in">+</button>
+            <button id="zoom-out" type="button" aria-label="Zoom out">−</button>
+            <button id="reset-view" type="button" aria-label="Reset zoom">1:1</button>
+          </div>
+
+          <div class="legend" id="legend"></div>
+        </main>
+
+        <aside class="panel inspector-panel">
+          <div id="inspector-empty" class="inspector-empty">
+            <div class="empty-orbit" aria-hidden="true"><span></span></div>
+            <p class="eyebrow">Inspector</p>
+            <h2>Select a node</h2>
+            <p>Explore its purpose, lifecycle, reusable components, and direct relationships.</p>
+          </div>
+
+          <div id="inspector" class="inspector hidden">
+            <div class="inspector-header">
+              <span id="inspector-kind" class="kind-pill"></span>
+              <span id="inspector-status" class="status-pill"></span>
+            </div>
+            <h2 id="inspector-title"></h2>
+            <p id="inspector-id" class="mono"></p>
+            <p id="inspector-description" class="description"></p>
+
+            <div class="inspector-actions">
+              <button id="focus-neighbors" type="button">Focus relationships</button>
+              <button id="release-node" type="button">Release position</button>
+            </div>
+
+            <section>
+              <p class="section-label">Tags</p>
+              <div id="inspector-tags" class="tags"></div>
+            </section>
+
+            <section>
+              <div class="section-heading">
+                <p class="section-label">Relationships</p>
+                <span id="relationship-count" class="count-badge"></span>
+              </div>
+              <div id="relationship-list" class="relationship-list"></div>
+            </section>
+
+            <section id="metadata-section">
+              <p class="section-label">Metadata</p>
+              <dl id="metadata-list" class="metadata-list"></dl>
+            </section>
+          </div>
+        </aside>
+      </div>
+
+      <footer class="statusbar">
+        <span><i class="live-dot"></i> Local Control Room</span>
+        <span id="status-text">Waiting for graph data</span>
+        <span>Catalog + deep-tech plan overlay</span>
+      </footer>
+    </div>
+
+    <script type="module" src="/static/app.js"></script>
+  </body>
+</html>

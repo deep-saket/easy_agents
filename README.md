@@ -13,6 +13,7 @@ Start here:
 - [Personal Agent Constellation](./docs/vision/personal-agent-constellation.md)
 - [Feature Intake and Draft Charters](./docs/guides/feature-intake.md)
 - [Use the Mac-Hosted Gemma Model](./docs/guides/use-local-gemma.md)
+- [Explore the Constellation Knowledge Graph](./docs/guides/constellation-map.md)
 - [Personal Constellation Delivery Plan](./docs/plans/personal-constellation-plan.md)
 - [Personal and Deep-Tech Explorer Implementation Plan](./docs/plans/deep-tech-explorer-implementation-plan.md)
 - [Documentation Index](./docs/README.md)
@@ -32,6 +33,15 @@ PYTHONPATH=src python -m easy_agents.constellation.cli \
 ```
 
 This command only produces a proposal. It does not run the requested workflow, persist a new agent, grant permissions, or activate generated code.
+
+Visualize active and planned Specialists together with their Circles, tools,
+memory scopes, Playbooks, policies, models, and platform services:
+
+```bash
+./run/constellation.sh
+```
+
+Open `http://127.0.0.1:8030`.
 
 ## Conversation Manager
 

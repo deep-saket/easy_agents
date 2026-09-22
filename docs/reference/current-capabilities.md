@@ -42,6 +42,7 @@ Concrete agents may assemble different graphs directly with LangGraph. `Collecti
 | Agent composition | `AgentNode` can invoke any object with `run()` and optionally expose its result as observation/response | Implemented in-process; discovery, permissions, budgets, and durable handoffs are not centralized | [Agent runtime and nodes](./functionalities/agent-runtime-and-nodes.md) |
 | Configuration | YAML defaults, repository `.env` loading, environment overrides through `AppSettings` | Core tests pass; one stale dotenv naming test remains | [Configuration](./functionalities/configuration.md) |
 | Constellation feature intake | Versioned starter Roster, overlapping Guild membership, feature fit analysis, risk inference, and proposed Draft Charters | Offline first slice; lexical matching only, and it does not scaffold, persist, activate, or execute agents | [Constellation feature intake](./functionalities/constellation-feature-intake.md) |
+| Constellation Map | Typed knowledge-graph API and dependency-free local UI for Specialists, Circles, capabilities, tools, memory scopes, Playbooks, policies, models, and services | Interactive topology is implemented; memory nodes describe boundaries and do not expose stored records | [Constellation Knowledge Graph](../guides/constellation-map.md) |
 
 ## Reusable Node Catalog
 
