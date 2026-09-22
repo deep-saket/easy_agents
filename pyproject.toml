@@ -67,6 +67,7 @@ voice-realtime = [
 voice-processing = "voice_processing.cli:main"
 collection-speech-tools = "speech.cli:main"
 constellation-intake = "easy_agents.constellation.cli:main"
+easy-agents = "easy_agents.fleet.cli:main"
 local-gemma = "llm.mac_gemma_cli:main"
 
 [tool.setuptools]
@@ -77,6 +78,7 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "easy_agents.constellation" = ["default_catalog.yaml", "knowledge_graph.yaml"]
+"easy_agents.fleet" = ["runtime_catalog.yaml"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src", "."]

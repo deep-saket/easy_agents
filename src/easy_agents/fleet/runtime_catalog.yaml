@@ -1,0 +1,330 @@
+version: 1
+
+memory_scopes:
+  - id: working
+    display_name: Working Memory
+    description: Short-lived state for the current conversation and Mission.
+    sensitivity: temporary
+    retention: session
+  - id: long_term
+    display_name: Long-Term Memory
+    description: Typed durable records with provenance and user-controlled retention.
+    sensitivity: private
+  - id: personal
+    display_name: Personal Vault
+    description: Private home, relationship, preference, routine, and life-administration memory.
+    sensitivity: private
+  - id: employer_authorized
+    display_name: Employer-Authorized Vault
+    description: Explicitly authorized work material isolated from personal and exploration data.
+    sensitivity: confidential
+  - id: exploration
+    display_name: Exploration Vault
+    description: Independent theses, public evidence, experiments, decisions, and learning.
+    sensitivity: private
+  - id: future_company
+    display_name: Future Company Vault
+    description: Dormant company scope enabled only after a human Venture Decision Gate.
+    sensitivity: confidential
+    dormant: true
+
+policies:
+  - id: offline_strict
+    display_name: Strict Offline Boundary
+    description: Allows local computation and loopback inference but denies external network effects.
+    allowed_effects: [read, write, compute, draft]
+    approval_effects: [send, call, purchase, payment, publish, submit, delete]
+    denied_effects: [transmit, deploy, hardware_control]
+    external_network: deny
+  - id: outbound_approval
+    display_name: Outbound Approval Gate
+    description: Requires a human decision for communication, commerce, publishing, deletion, and submissions.
+    allowed_effects: [read, write, compute, draft]
+    approval_effects: [send, call, purchase, payment, publish, submit, delete]
+    denied_effects: []
+    external_network: approval
+  - id: employment_separation
+    display_name: Employment Separation
+    description: Prevents employer-authorized data from entering personal, exploration, or company work.
+    allowed_effects: [read, write, compute, draft]
+    approval_effects: [send, publish, submit]
+    denied_effects: [copy_across_scope, train_on_employer_data]
+    external_network: deny
+    blocked_terms: [exfiltrate, leak confidential, copy employer data, train on employer data]
+  - id: medical_safety
+    display_name: Medical Safety Boundary
+    description: Keeps outputs informational and blocks diagnosis, prescription, and unsupported clinical authority.
+    allowed_effects: [read, write, compute, draft]
+    approval_effects: [submit, publish]
+    denied_effects: [diagnose, prescribe, recruit_participant, clinical_decision]
+    external_network: deny
+    blocked_terms: [diagnose me, prescribe, replace my doctor, approve this medical device]
+
+playbooks:
+  - id: route_and_synthesize
+    display_name: Route & Synthesize
+    description: Clarify a Mission, route bounded Work orders, and combine results.
+    tags: [route, delegate, synthesize]
+    steps:
+      - id: clarify
+        title: Clarify the outcome
+        instruction: Restate the requested outcome, constraints, and completion criteria.
+        kind: inspect
+      - id: route
+        title: Select bounded specialists
+        instruction: Choose the smallest set of Charters required for the Mission.
+        kind: delegate
+      - id: collect
+        title: Collect typed results
+        instruction: Gather results, evidence, gaps, and unresolved Gates from every Work order.
+        kind: delegate
+      - id: synthesize
+        title: Synthesize the result
+        instruction: Produce one concise result without widening permissions or hiding disagreement.
+        kind: synthesize
+
+  - id: research_with_provenance
+    display_name: Research with Provenance
+    description: Gather evidence, extract claims, verify conflicts, and preserve citations.
+    tags: [research, evidence, source, citation]
+    steps:
+      - id: frame
+        title: Frame the research question
+        instruction: Define the question, decision context, scope, and freshness requirement.
+        kind: inspect
+      - id: gather
+        title: Gather permitted sources
+        instruction: Search local knowledge first and use external sources only when explicitly permitted.
+        kind: tool
+      - id: extract
+        title: Extract claims and evidence
+        instruction: Separate sourced facts, calculations, assumptions, and inference.
+        kind: reason
+      - id: verify
+        title: Verify contradictions
+        instruction: Check material claims against primary sources and record uncertainty.
+        kind: reason
+      - id: report
+        title: Produce a provenance-aware brief
+        instruction: Return findings, sources, dates, limitations, and next evidence needed.
+        kind: synthesize
+
+  - id: analyze_and_compare
+    display_name: Analyze & Compare
+    description: Normalize alternatives, calculate metrics, score trade-offs, and expose uncertainty.
+    tags: [analysis, compare, trade-off, uncertainty]
+    steps:
+      - id: criteria
+        title: Define criteria
+        instruction: Define alternatives, units, decision criteria, constraints, and weights.
+        kind: inspect
+      - id: normalize
+        title: Normalize evidence
+        instruction: Normalize units and distinguish measurements from assumptions.
+        kind: tool
+        effects: [read, compute]
+      - id: calculate
+        title: Calculate deterministic metrics
+        instruction: Use declared calculators for arithmetic and preserve inputs.
+        kind: tool
+        effects: [read, compute]
+      - id: sensitivity
+        title: Test sensitivity
+        instruction: Identify which assumptions change the conclusion.
+        kind: reason
+      - id: compare
+        title: Explain the trade-off
+        instruction: Return the comparison, uncertainty, missing data, and reversible next step.
+        kind: synthesize
+
+  - id: plan_and_operate
+    display_name: Plan & Operate
+    description: Inspect state, propose action, cross Gates, execute permitted effects, verify, and record.
+    tags: [plan, operate, approval, verify]
+    steps:
+      - id: inspect
+        title: Inspect current state
+        instruction: Read only the permitted state and identify missing inputs.
+        kind: inspect
+      - id: propose
+        title: Propose an action plan
+        instruction: Produce a reversible plan, expected effects, and success criteria.
+        kind: reason
+      - id: gate
+        title: Cross required Gates
+        instruction: Pause for approval before any external or irreversible effect.
+        kind: gate
+      - id: execute
+        title: Execute permitted actions
+        instruction: Invoke only declared capabilities with validated inputs.
+        kind: tool
+        effects: [read, write]
+      - id: verify
+        title: Verify and record
+        instruction: Confirm the outcome and record a concise auditable result.
+        kind: record
+
+  - id: design_run_evaluate
+    display_name: Design · Run · Evaluate
+    description: Convert a hypothesis into a bounded, reproducible experiment.
+    tags: [experiment, hypothesis, reproducibility, evaluation]
+    steps:
+      - id: hypothesis
+        title: State a falsifiable hypothesis
+        instruction: Define the mechanism, measurable prediction, and failure condition.
+        kind: inspect
+      - id: design
+        title: Design the experiment
+        instruction: Define controls, variables, data, metrics, risks, budget, and stop conditions.
+        kind: reason
+      - id: gate
+        title: Review safety and resources
+        instruction: Pause when execution needs hardware, sensitive data, external systems, or material spend.
+        kind: gate
+      - id: run
+        title: Run in a sandbox
+        instruction: Execute only inside the declared workspace and preserve parameters and logs.
+        kind: tool
+        effects: [read, compute, write]
+      - id: evaluate
+        title: Evaluate and preserve lineage
+        instruction: Score results, uncertainty, reproducibility, and the next falsification test.
+        kind: record
+
+  - id: adversarial_review
+    display_name: Adversarial Review
+    description: Test an artifact against a rubric and identify blocking findings.
+    tags: [review, red-team, risk, safety]
+    steps:
+      - id: scope
+        title: Establish the review boundary
+        instruction: Identify the artifact, claims, authority limits, and applicable rubric.
+        kind: inspect
+      - id: challenge
+        title: Challenge assumptions
+        instruction: Search for unsupported claims, missing evidence, conflicts, and failure modes.
+        kind: reason
+      - id: classify
+        title: Classify findings
+        instruction: Separate blocking, non-blocking, uncertain, and out-of-scope findings.
+        kind: reason
+      - id: recommend
+        title: Recommend bounded remediation
+        instruction: Return specific tests, evidence, or qualified review needed before proceeding.
+        kind: synthesize
+
+  - id: scheduled_review
+    display_name: Scheduled Review
+    description: Inspect permitted state, create a digest, and propose follow-up work.
+    tags: [schedule, routine, digest, review]
+    steps:
+      - id: inspect
+        title: Inspect due state
+        instruction: Read the permitted schedule, records, or inventory for items due for review.
+        kind: inspect
+      - id: prioritize
+        title: Prioritize attention
+        instruction: Rank items by urgency, importance, reversibility, and dependency.
+        kind: reason
+      - id: digest
+        title: Create the digest
+        instruction: Summarize what changed, what is due, and what can wait.
+        kind: synthesize
+      - id: follow_up
+        title: Propose follow-up
+        instruction: Draft bounded tasks or reminders without committing external actions.
+        kind: record
+        effects: [read, write, draft]
+
+  - id: opportunity_validation
+    display_name: Opportunity Validation
+    description: Progress a thesis through employment, problem, science, market, safety, economics, and decision Gates.
+    tags: [opportunity, thesis, validation, decision]
+    steps:
+      - id: conflict
+        title: Check employment and provenance
+        instruction: Identify overlap, ownership, confidentiality, time-allocation, and provenance concerns first.
+        kind: gate
+      - id: problem
+        title: Validate the problem
+        instruction: Record the user, frequency, severity, current solution, and strength of direct evidence.
+        kind: reason
+      - id: science
+        title: Test scientific plausibility
+        instruction: Review mechanism, prior art, novelty, performance target, and cheapest falsification.
+        kind: reason
+      - id: market
+        title: Map customer and value chain
+        instruction: Identify payer, buyer, user, suppliers, incumbents, bottlenecks, and adoption barriers.
+        kind: reason
+      - id: safety
+        title: Review regulation and safety
+        instruction: Record likely pathways, hazards, standards, evidence gaps, and qualified advice needed.
+        kind: gate
+      - id: economics
+        title: Model techno-economics
+        instruction: Preserve inputs, unit economics, capital intensity, utilization, scale, and sensitivity.
+        kind: tool
+        effects: [read, compute, write]
+      - id: experiment
+        title: Choose the next proof point
+        instruction: Design the cheapest decisive experiment with controls and stop conditions.
+        kind: reason
+      - id: decision
+        title: Prepare the human decision
+        instruction: Recommend continue, pause, combine, license, publish, or stop with confidence and evidence gaps.
+        kind: gate
+
+  - id: call_family_member
+    display_name: Call Family Member
+    description: Prepare a considerate family call while keeping initiation approval-gated.
+    tags: [family, relationship, call, reminder]
+    steps:
+      - id: context
+        title: Review relationship context
+        instruction: Read only permitted contact cadence, important dates, and open follow-ups.
+        kind: inspect
+      - id: timing
+        title: Find a suitable time
+        instruction: Propose a time while respecting work, sleep, travel, and personal boundaries.
+        kind: reason
+      - id: prepare
+        title: Prepare talking points
+        instruction: Draft a short, human set of prompts rather than a scripted conversation.
+        kind: synthesize
+        effects: [read, draft]
+      - id: approval
+        title: Request call approval
+        instruction: Never initiate the call without explicit approval at action time.
+        kind: gate
+        effects: [call]
+      - id: follow_up
+        title: Record user-approved follow-up
+        instruction: Store only the follow-up the user wants remembered.
+        kind: record
+        effects: [write]
+
+guild_defaults:
+  commons: [working, long_term, personal]
+  home: [working, long_term, personal]
+  life_admin: [working, long_term, personal]
+  wellbeing: [working, long_term, personal]
+  science_lab: [working, long_term, exploration]
+  venture_studio: [working, long_term, exploration]
+  engineering: [working, long_term, exploration]
+  finance: [working, long_term, personal]
+  communications: [working, long_term, personal]
+  employment: [working, long_term, employer_authorized]
+  venture_exploration: [working, long_term, exploration]
+  energy: [working, long_term, exploration]
+  satcom: [working, long_term, exploration]
+  medical_deeptech: [working, long_term, exploration]
+
+guild_policies:
+  employment: [employment_separation]
+  venture_exploration: [employment_separation]
+  energy: [employment_separation]
+  satcom: [employment_separation]
+  medical_deeptech: [employment_separation, medical_safety]
+  communications: [outbound_approval]
+  home: [outbound_approval]

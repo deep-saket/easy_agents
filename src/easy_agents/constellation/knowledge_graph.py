@@ -114,7 +114,7 @@ class OverlaySpecialist(BaseModel):
     guild: str
     templates: list[str] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
-    status: str = "planned"
+    status: str = "sandboxed"
 
 
 class OverlayComponent(BaseModel):

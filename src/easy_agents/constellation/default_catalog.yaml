@@ -273,6 +273,7 @@ specialists:
     capability_ids: [product.shape, customer.discovery]
     tags: [product, feature, roadmap, customer, ux, analytics]
     liaison: true
+    status: sandboxed
   - id: market_researcher
     display_name: Market Researcher
     purpose: Research markets, competitors, customers, positioning, and pricing.
@@ -293,6 +294,7 @@ specialists:
     capability_ids: [startup.plan_operations, finance.analyze, communications.draft]
     tags: [startup, business, operations, hiring, fundraising, investor, runway]
     liaison: true
+    status: sandboxed
   - id: finance_controller
     display_name: Finance Controller
     purpose: Analyze personal and startup finances while keeping payments and regulated decisions human-controlled.

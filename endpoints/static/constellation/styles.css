@@ -610,6 +610,38 @@ kbd {
 .inspector-actions button { padding: 8px; font-size: 10px; }
 .inspector-actions button:hover { color: var(--accent); border-color: rgba(110, 231, 210, 0.3); }
 
+.mission-section textarea {
+  width: 100%;
+  margin-top: 9px;
+  padding: 9px 10px;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  outline: none;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.025);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.mission-section textarea:focus { border-color: rgba(110, 231, 210, 0.42); }
+.mission-section > button { width: 100%; margin-top: 7px; padding: 9px; color: var(--accent); border-color: rgba(110, 231, 210, 0.3); background: var(--accent-soft); font-size: 10px; }
+.mission-section > button:disabled { cursor: wait; opacity: 0.55; }
+
+.mission-result {
+  display: grid;
+  gap: 6px;
+  margin-top: 9px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(110, 231, 210, 0.04);
+}
+
+.mission-result strong { color: var(--accent); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; }
+.mission-result p { margin: 0; color: #bccbd1; font-size: 10px; line-height: 1.5; white-space: pre-wrap; }
+.mission-result small { color: #c7a977; font-size: 9px; line-height: 1.4; }
+
 .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
 .tag { padding: 4px 7px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: rgba(255, 255, 255, 0.025); font-size: 9px; }
 .count-badge { min-width: 20px; padding: 2px 6px; border-radius: 999px; color: var(--muted); background: rgba(255, 255, 255, 0.05); font-size: 9px; text-align: center; }

@@ -22,7 +22,7 @@ def test_knowledge_graph_contains_roster_and_shared_components() -> None:
     assert graph.counts["specialist"] >= 60
     assert graph.counts["guild"] >= 10
     assert nodes["specialist:personal_steward"].status == "active"
-    assert nodes["specialist:opportunity_portfolio_steward"].status == "planned"
+    assert nodes["specialist:opportunity_portfolio_steward"].status == "sandboxed"
     assert nodes["tool:memory_search"].status == "implemented"
     assert nodes["memory:employer_authorized"].kind == "memory"
     assert nodes["playbook:opportunity_validation"].kind == "playbook"
@@ -94,6 +94,7 @@ def test_constellation_ui_serves_local_assets() -> None:
     assert page.status_code == 200
     assert "Constellation Map" in page.text
     assert "Find anything" in page.text
+    assert "Sandbox mission" in page.text
     assert script.status_code == 200
     assert "knowledge-graph" in script.text
     assert styles.status_code == 200

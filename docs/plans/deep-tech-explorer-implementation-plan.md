@@ -1,10 +1,20 @@
 # Personal and Deep-Tech Explorer Implementation Plan
 
-Status: proposed execution plan
+Status: execution in progress; declarative fleet slice implemented
 
 Branch reviewed: `saket/framework_update`
 
 Repository snapshot: 2026-09-22
+
+Implemented in the current branch: all 70 current and proposed Specialists now
+compile into validated active or sandboxed Charters over nine shared Playbooks,
+four central policy profiles, six memory scopes, deterministic routing, bounded
+Work orders, a local-model advisory path, CLI/API contracts, and a Control Room
+sandbox launcher. This completes the roster/runtime shape of Release 1 and a
+safe non-durable portion of Releases 2 and 3. Durable Runs, resumable Gates,
+connector-backed effects, artifact persistence, and domain evaluation suites
+remain open; sandboxed Charters are not equivalent to approved autonomous
+agents.
 
 ## Outcome
 

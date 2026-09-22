@@ -27,55 +27,55 @@ components:
     kind: playbook
     label: Route & Synthesize
     description: Classify a mission, delegate bounded work, collect typed results, and synthesize an answer.
-    status: planned
+    status: implemented
     tags: [route, delegate, synthesize]
   - id: research_with_provenance
     kind: playbook
     label: Research with Provenance
     description: Plan research, gather sources, extract claims, verify evidence, and preserve citations.
-    status: planned
+    status: implemented
     tags: [research, evidence, citation]
   - id: analyze_and_compare
     kind: playbook
     label: Analyze & Compare
     description: Normalize options, calculate metrics, score trade-offs, and explain uncertainty.
-    status: planned
+    status: implemented
     tags: [analysis, comparison, uncertainty]
   - id: plan_and_operate
     kind: playbook
     label: Plan & Operate
     description: Inspect state, propose an action, cross Gates, execute, verify, and record.
-    status: planned
+    status: implemented
     tags: [plan, operate, approval]
   - id: design_run_evaluate
     kind: playbook
     label: Design · Run · Evaluate
     description: Turn a falsifiable hypothesis into a reproducible, evaluated experiment.
-    status: planned
+    status: implemented
     tags: [experiment, reproducibility, evaluation]
   - id: adversarial_review
     kind: playbook
     label: Adversarial Review
     description: Review an artifact against a rubric and separate blocking from non-blocking findings.
-    status: planned
+    status: implemented
     tags: [review, red-team, risk]
   - id: scheduled_review
     kind: playbook
     label: Scheduled Review
     description: Wake on a schedule, inspect state, create a digest, and propose follow-up work.
-    status: planned
+    status: implemented
     tags: [schedule, routine, digest]
   - id: opportunity_validation
     kind: playbook
     label: Opportunity Validation
     description: Move a thesis through conflict, problem, science, market, regulation, economics, experiment, and decision Gates.
-    status: planned
+    status: implemented
     tags: [opportunity, thesis, falsification, decision]
   - id: call_family_member
     kind: playbook
     label: Call Family Member
     description: Check contact cadence, find a suitable time, prepare talking points, request approval, and record follow-ups.
-    status: planned
+    status: implemented
     tags: [family, reminder, call, approval]
 
   - id: working
@@ -94,19 +94,19 @@ components:
     kind: memory
     label: Personal Vault
     description: Private life, household, relationship, preference, and routine memory scope.
-    status: planned
+    status: defined
     tags: [personal, private, household]
   - id: employer_authorized
     kind: memory
     label: Employer-Authorized Vault
     description: Explicitly authorized work material isolated from personal and exploration data.
-    status: planned
+    status: defined
     tags: [employment, confidential, isolated]
   - id: exploration
     kind: memory
     label: Exploration Vault
     description: Independent opportunity theses, public evidence, experiments, decisions, and learnings.
-    status: planned
+    status: defined
     tags: [exploration, thesis, experiment]
   - id: future_company
     kind: memory
@@ -189,28 +189,28 @@ components:
     kind: policy
     label: Outbound Approval Gate
     description: Blocks messages, calls, purchases, payments, publishing, and submissions until approved.
-    status: planned
+    status: implemented
     tags: [approval, outbound, side-effect]
     risk: high
   - id: employment_separation
     kind: policy
     label: Employment Separation
     description: Denies cross-scope access and flags possible confidentiality or invention-assignment overlap.
-    status: planned
+    status: implemented
     tags: [employment, confidentiality, scope]
     risk: critical
   - id: medical_safety
     kind: policy
     label: Medical Safety Boundary
     description: Prevents diagnosis, prescription, unsupported clinical claims, or unapproved sensitive-data use.
-    status: planned
+    status: implemented
     tags: [medical, clinical, safety]
     risk: critical
   - id: offline_strict
     kind: policy
     label: Strict Offline Boundary
     description: Denies non-loopback network access unless a Run selects an approved network profile.
-    status: planned
+    status: implemented
     tags: [offline, network, privacy]
     risk: high
 
@@ -233,8 +233,8 @@ components:
   - id: mission_runtime
     kind: service
     label: Mission Runtime
-    description: Future durable Runs, Work orders, events, budgets, cancellation, and restart recovery.
-    status: planned
+    description: Compiles Charters and Playbooks into permission-bounded local advisory Missions and Work orders.
+    status: implemented
     tags: [runtime, work-order, durable]
   - id: artifact_store
     kind: service

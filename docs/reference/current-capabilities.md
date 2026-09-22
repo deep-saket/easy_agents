@@ -43,6 +43,7 @@ Concrete agents may assemble different graphs directly with LangGraph. `Collecti
 | Configuration | YAML defaults, repository `.env` loading, environment overrides through `AppSettings` | Core tests pass; one stale dotenv naming test remains | [Configuration](./functionalities/configuration.md) |
 | Constellation feature intake | Versioned starter Roster, overlapping Guild membership, feature fit analysis, risk inference, and proposed Draft Charters | Offline first slice; lexical matching only, and it does not scaffold, persist, activate, or execute agents | [Constellation feature intake](./functionalities/constellation-feature-intake.md) |
 | Constellation Map | Typed knowledge-graph API and dependency-free local UI for Specialists, Circles, capabilities, tools, memory scopes, Playbooks, policies, models, and services | Interactive topology is implemented; memory nodes describe boundaries and do not expose stored records | [Constellation Knowledge Graph](../guides/constellation-map.md) |
+| Specialist fleet | 70 manifest-compiled agents, deterministic routing, nine shared Playbooks, scoped Work orders, central policy decisions, local-model advisory execution, CLI and API | 14 existing Charters are active; 56 new or startup-conditional Charters are sandboxed pending domain evaluation and approved connectors | [Run the Specialist Fleet](../guides/run-specialist-fleet.md) |
 
 ## Reusable Node Catalog
 
@@ -120,11 +121,10 @@ The brainstorming agent, coding agent, and generic orchestrator are placeholders
 
 The following roadmap concepts do not exist as stable platform features today:
 
-- a declarative `agent.yaml` manifest and loader
-- an `easy-agents` command-line interface
+- independent user-authored `agent.yaml` files with migration, diff, and lock operations (the current fleet compiles typed Charters from the validated Constellation graph)
 - installable capability packs
-- a persistent runtime registry that discovers, versions, and selects runnable agents (the feature-intake Roster is static planning metadata)
-- centralized permission, approval, budget, and policy enforcement
+- a persistent runtime registry with installed-version locks and activation history (the current registry is read-only and rebuilt from packaged catalogs)
+- durable/resumable approval records, budgets, and effect execution (the fleet policy engine currently blocks or gates an advisory Mission before model execution)
 - durable cross-agent handoffs and resumable checkpoints
 - process or container isolation for arbitrary tools
 - a single canonical run/event schema across every agent
@@ -138,6 +138,7 @@ Do not copy CLI commands or manifest examples from the roadmap and expect them t
 - Run repository examples from the checkout root because the distribution name (`easy_agent`) and current `src.*` imports are not yet aligned as a stable public package API.
 - The shared graph state contains domain fields that should eventually move into agent-specific state extensions.
 - Most graph execution and tool execution is synchronous.
+- Fleet Specialists currently produce policy-governed advisory results and Work orders; they do not imply that every declared connector or domain calculator exists.
 - The Graph Builder validates structure and exports scaffolding; dependency wiring remains manual.
 - The complete test suite mixes isolated tests with integration/provider checks and does not yet consistently mark them.
 - Some existing agents use different LLM call conventions or configuration paths, so a model adapter that works in one runtime is not automatically verified for every runtime.

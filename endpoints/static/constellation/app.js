@@ -55,7 +55,7 @@ const PRESETS = {
   full: new Set(KIND_ORDER),
 };
 
-const PLANNED_STATUSES = new Set(["planned", "proposed", "dormant", "scaffolded"]);
+const PLANNED_STATUSES = new Set(["planned", "proposed", "dormant", "scaffolded", "sandboxed"]);
 
 const elements = {
   graph: document.getElementById("graph"),
@@ -102,6 +102,10 @@ const elements = {
   metadataList: document.getElementById("metadata-list"),
   focusNeighbors: document.getElementById("focus-neighbors"),
   releaseNode: document.getElementById("release-node"),
+  missionSection: document.getElementById("mission-section"),
+  missionInput: document.getElementById("mission-input"),
+  runMission: document.getElementById("run-mission"),
+  missionResult: document.getElementById("mission-result"),
 };
 
 const state = {
@@ -603,6 +607,10 @@ function renderInspector(node) {
   elements.inspectorId.textContent = node.id;
   elements.inspectorDescription.textContent = node.description || "No description recorded.";
   elements.focusNeighbors.textContent = state.focusId === node.id ? "Show full graph" : "Focus relationships";
+  elements.missionSection.classList.toggle("hidden", node.kind !== "specialist");
+  elements.missionInput.value = "";
+  elements.missionResult.replaceChildren();
+  elements.missionResult.classList.add("hidden");
 
   elements.inspectorTags.replaceChildren();
   for (const tag of node.tags || []) {
@@ -677,6 +685,57 @@ function revealAndSelect(nodeId) {
   applyFilters();
   selectNode(nodeId);
   window.setTimeout(() => fitView(), 80);
+}
+
+async function runSandboxMission() {
+  const node = state.nodeById.get(state.selectedId);
+  const objective = elements.missionInput.value.trim();
+  if (!node || node.kind !== "specialist") return;
+  if (objective.length < 3) {
+    renderMissionResult("Input needed", "Describe a bounded task in at least three characters.", []);
+    return;
+  }
+  const originalLabel = elements.runMission.textContent;
+  elements.runMission.disabled = true;
+  elements.runMission.textContent = "Planning…";
+  try {
+    const response = await fetch("/api/missions/run", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        objective,
+        specialist_id: node.id.replace(/^specialist:/, ""),
+      }),
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || `Mission request failed (${response.status}).`);
+    const result = payload.results?.[0];
+    renderMissionResult(
+      payload.status || "planned",
+      result?.response || payload.synthesis || "No result returned.",
+      payload.warnings || [],
+    );
+  } catch (error) {
+    renderMissionResult("Failed", error instanceof Error ? error.message : String(error), []);
+  } finally {
+    elements.runMission.disabled = false;
+    elements.runMission.textContent = originalLabel;
+  }
+}
+
+function renderMissionResult(status, response, warnings) {
+  elements.missionResult.replaceChildren();
+  const heading = document.createElement("strong");
+  heading.textContent = status.replaceAll("_", " ");
+  const copy = document.createElement("p");
+  copy.textContent = response;
+  elements.missionResult.append(heading, copy);
+  for (const warning of warnings) {
+    const note = document.createElement("small");
+    note.textContent = warning;
+    elements.missionResult.append(note);
+  }
+  elements.missionResult.classList.remove("hidden");
 }
 
 function showTooltip(event, node) {
@@ -857,6 +916,7 @@ function bindEvents() {
     position.fy = null;
     startSimulation(0.28);
   });
+  elements.runMission.addEventListener("click", runSandboxMission);
 
   window.addEventListener("resize", () => {
     startSimulation(0.15);

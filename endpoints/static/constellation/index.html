@@ -78,7 +78,7 @@
             <label class="switch-row">
               <input id="show-planned" type="checkbox" checked />
               <span class="switch"></span>
-              <span>Planned & dormant</span>
+              <span>Sandboxed, planned & dormant</span>
             </label>
           </section>
 
@@ -169,6 +169,13 @@
               <button id="focus-neighbors" type="button">Focus relationships</button>
               <button id="release-node" type="button">Release position</button>
             </div>
+
+            <section id="mission-section" class="mission-section hidden">
+              <p class="section-label">Sandbox mission</p>
+              <textarea id="mission-input" rows="4" placeholder="Give this Specialist a bounded task…"></textarea>
+              <button id="run-mission" type="button">Build safe plan</button>
+              <div id="mission-result" class="mission-result hidden" aria-live="polite"></div>
+            </section>
 
             <section>
               <p class="section-label">Tags</p>

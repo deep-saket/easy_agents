@@ -52,13 +52,15 @@ Edges are typed relationships such as `member of`, `can use`, `uses template`,
 - Toggle individual node types and lifecycle groups.
 - Select a node to inspect metadata and every direct relationship.
 - Select a relationship in the inspector to navigate to the other node.
+- Select a Specialist, enter a Sandbox mission, and build its policy-aware plan.
 - Focus on one node's immediate neighborhood.
 - Drag a node to pin it; release it from the inspector.
 - Pan the canvas, scroll to zoom, or use Fit View.
 - Turn relationship labels on when inspecting a smaller subgraph.
 
-The interface uses no CDN or external JavaScript dependency and calls only the
-local `/api/knowledge-graph` endpoint.
+The interface uses no CDN or external JavaScript dependency. It reads the local
+`/api/knowledge-graph` endpoint and submits sandbox tasks only to the local
+`/api/missions/run` endpoint.
 
 ## Data sources
 

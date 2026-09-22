@@ -12,6 +12,7 @@
 - **Classify a new feature:** [Feature Intake and Draft Charters](./guides/feature-intake.md)
 - **Use the Mac-hosted model:** [Local Gemma Integration](./guides/use-local-gemma.md)
 - **Explore agents and components:** [Constellation Knowledge Graph](./guides/constellation-map.md)
+- **Run any Specialist:** [Complete Specialist Fleet](./guides/run-specialist-fleet.md)
 - **Plan the employed deep-tech explorer system:** [Personal and Deep-Tech Explorer Implementation Plan](./plans/deep-tech-explorer-implementation-plan.md)
 - **Understand the target platform:** [Offline Agent Platform Roadmap](./plans/offline-agent-platform-roadmap.md)
 

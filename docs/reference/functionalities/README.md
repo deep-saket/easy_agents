@@ -24,12 +24,13 @@ The status labels mean:
 | [Concrete agents](./agents.md) | Mixed | Simple, MailMind, Conversation Manager, and two specialist smokes passed; Collection Agent had 117 passes and 22 failures |
 | [Constellation feature intake](./constellation-feature-intake.md) | Verified first slice | Fourteen focused offline tests passed for Roster validation, lifecycle filtering, all four decisions, risk/network gates, determinism, and the local API |
 | [Constellation Map](../../guides/constellation-map.md) | Verified | Five graph/API/UI contract tests, JavaScript syntax validation, and browser interaction checks passed; 147 typed nodes and 269 valid relationships load locally |
+| [Specialist fleet](../../guides/run-specialist-fleet.md) | Verified safe runtime | Eleven focused tests compile and execute all 70 Charters, then verify routing, scope isolation, approval Gates, offline and medical blocking, team Work orders, local-model prompts, custom rosters, CLI, and API |
 
 Focused counts overlap because some tests validate more than one capability. Do not add the rows to derive the repository total.
 
 ## Broad Test Run Excluding the Explicit Live Test
 
-The repository collected 289 tests. The explicitly live Groq connectivity test was excluded because it uses a configured account and the network:
+The repository collected 300 tests. The explicitly live Groq connectivity test was excluded because it uses a configured account and the network:
 
 ```bash
 python -m pytest -q --ignore=tests/test_groq_connectivity.py
@@ -38,7 +39,7 @@ python -m pytest -q --ignore=tests/test_groq_connectivity.py
 Result:
 
 ```text
-258 passed, 1 skipped, 30 failed
+269 passed, 1 skipped, 30 failed
 ```
 
 The 30 failures were distributed as follows:
@@ -104,7 +105,8 @@ python -m pytest -q tests/test_graph_builder_api.py
 # Constellation feature intake and knowledge graph
 PYTHONPATH=src python -m pytest -q \
   tests/test_constellation_feature_intake.py \
-  tests/test_constellation_knowledge_graph.py
+  tests/test_constellation_knowledge_graph.py \
+  tests/test_fleet_runtime.py
 
 # MailMind
 python -m pytest -q \

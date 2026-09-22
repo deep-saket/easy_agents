@@ -14,6 +14,7 @@ Start here:
 - [Feature Intake and Draft Charters](./docs/guides/feature-intake.md)
 - [Use the Mac-Hosted Gemma Model](./docs/guides/use-local-gemma.md)
 - [Explore the Constellation Knowledge Graph](./docs/guides/constellation-map.md)
+- [Run the Complete Specialist Fleet](./docs/guides/run-specialist-fleet.md)
 - [Personal Constellation Delivery Plan](./docs/plans/personal-constellation-plan.md)
 - [Personal and Deep-Tech Explorer Implementation Plan](./docs/plans/deep-tech-explorer-implementation-plan.md)
 - [Documentation Index](./docs/README.md)
@@ -42,6 +43,14 @@ memory scopes, Playbooks, policies, models, and platform services:
 ```
 
 Open `http://127.0.0.1:8030`.
+
+List, route, or safely run any of the 70 compiled Specialist Charters:
+
+```bash
+PYTHONPATH=src .venv/bin/python -m easy_agents.fleet.cli list
+PYTHONPATH=src .venv/bin/python -m easy_agents.fleet.cli route \
+  "calculate a satellite RF link budget"
+```
 
 ## Conversation Manager
 
