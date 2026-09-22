@@ -14,6 +14,7 @@ Start here:
 - [Feature Intake and Draft Charters](./docs/guides/feature-intake.md)
 - [Use the Mac-Hosted Gemma Model](./docs/guides/use-local-gemma.md)
 - [Personal Constellation Delivery Plan](./docs/plans/personal-constellation-plan.md)
+- [Personal and Deep-Tech Explorer Implementation Plan](./docs/plans/deep-tech-explorer-implementation-plan.md)
 - [Documentation Index](./docs/README.md)
 - [Framework Overview](./docs/architecture/framework-overview.md)
 - [Conversation Management Architecture](./docs/architecture/conversation-management.md)

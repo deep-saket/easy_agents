@@ -11,6 +11,7 @@
 - **Design the personal agent system:** [Personal Agent Constellation](./vision/personal-agent-constellation.md)
 - **Classify a new feature:** [Feature Intake and Draft Charters](./guides/feature-intake.md)
 - **Use the Mac-hosted model:** [Local Gemma Integration](./guides/use-local-gemma.md)
+- **Plan the employed deep-tech explorer system:** [Personal and Deep-Tech Explorer Implementation Plan](./plans/deep-tech-explorer-implementation-plan.md)
 - **Understand the target platform:** [Offline Agent Platform Roadmap](./plans/offline-agent-platform-roadmap.md)
 
 The capability reference describes implemented behavior. The roadmap describes future work, including manifest-driven agents and a platform CLI that do not exist yet.
@@ -59,6 +60,7 @@ These pages reserve planned roles; they do not describe complete runnable agents
 - [Documentation Plan](./plans/documentation-plan.md)
 - [Offline Agent Platform Roadmap](./plans/offline-agent-platform-roadmap.md)
 - [Personal Constellation Gap and Delivery Plan](./plans/personal-constellation-plan.md)
+- [Personal and Deep-Tech Explorer Implementation Plan](./plans/deep-tech-explorer-implementation-plan.md)
 - [Memory Vector Index Plan](./plans/memory-vector-index-plan.md)
 - [Refactor Fix Plan](./plans/refactor-fix-plan.md)
 - [Docstring Rules](./conventions/docstring-rules.md)

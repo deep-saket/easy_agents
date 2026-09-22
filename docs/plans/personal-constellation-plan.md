@@ -6,6 +6,13 @@ Branch reviewed: `saket/framework_update`
 
 Repository snapshot: 2026-09-13
 
+Domain sequencing update: the user is currently employed and exploring
+deep-tech opportunities rather than operating a startup. The
+[Personal and Deep-Tech Explorer Implementation Plan](./deep-tech-explorer-implementation-plan.md)
+therefore makes employment separation and opportunity validation the next
+domain priorities; Venture Studio operations remain conditional on a validated
+thesis.
+
 ## Outcome
 
 This plan extends the [Offline Agent Platform Roadmap](./offline-agent-platform-roadmap.md)
