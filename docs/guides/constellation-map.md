@@ -1,11 +1,14 @@
 # Constellation Knowledge Graph
 
-Status: implemented local UI
+Status: implemented topology, live monitoring, and replay UI
 
 The Constellation Map visualizes active and planned Specialists together with
 the reusable components that connect them. It is a topology and architecture
 view: Circles, capabilities, tools, memory scopes, Playbooks, policies, models,
 and platform services are all first-class nodes.
+
+The same Control Room now overlays realtime execution. The topology continues
+to describe what exists; Live and Replay show what the fleet is doing.
 
 ## Run it
 
@@ -58,9 +61,32 @@ Edges are typed relationships such as `member of`, `can use`, `uses template`,
 - Pan the canvas, scroll to zoom, or use Fit View.
 - Turn relationship labels on when inspecting a smaller subgraph.
 
+## Monitor and replay Missions
+
+Use the mode switch in the top bar:
+
+- **Map** keeps the original topology and catalog counters.
+- **Live** loads a durable operations snapshot, then follows the local SSE
+  stream. Specialist, Playbook, policy, model, tool, and memory nodes show
+  runtime state. Bright directional edges represent actual recent activity.
+- **Replay** disconnects live-follow and reconstructs the same runtime overlay
+  from ordered events. Drag the timeline scrubber or choose a Mission in the
+  right panel.
+
+The Live view shows active Mission, running Specialist, and attention counts.
+Runtime status and attention filters are available on the left. Selecting any
+catalog node adds its retained activity to the inspector.
+
+Waiting approval, blocked, failed, running, and completed states use text and
+shape treatments as well as color. Enable **Reduce motion** to stop pulsing
+rings and moving activity strokes.
+
+The browser reconnects from its last durable event sequence. A connection loss
+marks the view stale without clearing the last known graph state.
+
 The interface uses no CDN or external JavaScript dependency. It reads the local
-`/api/knowledge-graph` endpoint and submits sandbox tasks only to the local
-`/api/missions/run` endpoint.
+knowledge-graph and operations APIs, subscribes to `/api/events/stream`, and
+submits sandbox tasks only to the local `/api/missions/run` endpoint.
 
 ## Data sources
 
@@ -107,3 +133,6 @@ counts: node totals by kind
 
 Because the UI consumes this generic contract, future domain packs can add
 nodes and relationships without adding new visualization code.
+
+The monitoring endpoints and privacy boundary are documented in
+[Realtime Monitoring and Tracing](../reference/functionalities/observability.md).

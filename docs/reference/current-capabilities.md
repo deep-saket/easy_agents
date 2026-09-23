@@ -37,13 +37,13 @@ Concrete agents may assemble different graphs directly with LangGraph. `Collecti
 | Memory | Working memory; hot, warm, and cold layers; DuckDB and JSONL/archive backends; typed memory; indexing and hybrid retrieval | Broad implementation; persistence and retrieval choices still require manual wiring | [Memory and retrieval](./functionalities/memory.md) |
 | Model adapters | Hugging Face/local models, FunctionGemma, native Mac `gemma-4-E4B` completions, OpenAI, Groq, NVIDIA, arbitrary endpoints, OpenAI-compatible servers | Mac Gemma mocked and live loopback contracts pass; the checked-in hosted remote regression suite currently fails | [Model adapters](./functionalities/models.md) |
 | Channels and sources | Mock/Twilio WhatsApp, Gmail source/sender, Pipecat and voice-processing interfaces | Local/fake contracts pass; live services were not tested | [Channels, sources, and voice](./functionalities/channels-and-voice.md) |
-| Observability | Structured logs, JSONL/stdout trace sinks, turn/node/tool traces | Smoke verified; no unified operations dashboard or cross-agent run model yet | [Observability](./functionalities/observability.md) |
+| Observability | Versioned correlated events, pre-storage redaction, SQLite history, rebuildable projections, SSE, Mission/Run APIs, alerts, and Map/Live/Replay Control Room modes | Fleet Runtime is wired end to end; older standalone agents require explicit `trace_sink` wiring, and durable approval/cancel controls remain pending | [Observability](./functionalities/observability.md) |
 | Graph Builder | Local web UI, node/agent catalog, structural validation, JSON export, Python scaffold export | API tests pass; exported Python is not yet a runnable generated application | [Graph Builder](./functionalities/graph-builder.md) |
 | Agent composition | `AgentNode` can invoke any object with `run()` and optionally expose its result as observation/response | Implemented in-process; discovery, permissions, budgets, and durable handoffs are not centralized | [Agent runtime and nodes](./functionalities/agent-runtime-and-nodes.md) |
 | Configuration | YAML defaults, repository `.env` loading, environment overrides through `AppSettings` | Core tests pass; one stale dotenv naming test remains | [Configuration](./functionalities/configuration.md) |
 | Constellation feature intake | Versioned starter Roster, overlapping Guild membership, feature fit analysis, risk inference, and proposed Draft Charters | Offline first slice; lexical matching only, and it does not scaffold, persist, activate, or execute agents | [Constellation feature intake](./functionalities/constellation-feature-intake.md) |
 | Constellation Map | Typed knowledge-graph API and dependency-free local UI for Specialists, Circles, capabilities, tools, memory scopes, Playbooks, policies, models, and services | Interactive topology is implemented; memory nodes describe boundaries and do not expose stored records | [Constellation Knowledge Graph](../guides/constellation-map.md) |
-| Specialist fleet | 70 manifest-compiled agents, deterministic routing, nine shared Playbooks, scoped Work orders, central policy decisions, local-model advisory execution, CLI and API | 14 existing Charters are active; 56 new or startup-conditional Charters are sandboxed pending domain evaluation and approved connectors | [Run the Specialist Fleet](../guides/run-specialist-fleet.md) |
+| Specialist fleet | 70 manifest-compiled agents, deterministic routing, nine shared Playbooks, scoped Work orders, central policy decisions, local-model advisory execution, CLI/API, and a realtime whole-fleet audit | 14 existing Charters are active; 56 new or startup-conditional Charters are sandboxed pending domain evaluation and approved connectors; the audit validates runtime wiring, not domain correctness | [Run the Specialist Fleet](../guides/run-specialist-fleet.md) |
 
 ## Reusable Node Catalog
 
@@ -127,7 +127,7 @@ The following roadmap concepts do not exist as stable platform features today:
 - durable/resumable approval records, budgets, and effect execution (the fleet policy engine currently blocks or gates an advisory Mission before model execution)
 - durable cross-agent handoffs and resumable checkpoints
 - process or container isolation for arbitrary tools
-- a single canonical run/event schema across every agent
+- automatic wiring of the canonical event pipeline into every older standalone agent
 - a packaged runtime with a stable public import namespace
 - automatic Charter/Playbook scaffolding, evaluation, installation, or activation from a feature proposal
 

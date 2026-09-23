@@ -7,6 +7,7 @@ cd "$PROJECT_ROOT"
 
 CONSTELLATION_HOST="${CONSTELLATION_HOST:-127.0.0.1}"
 CONSTELLATION_PORT="${CONSTELLATION_PORT:-8030}"
+CONSTELLATION_GRACEFUL_SHUTDOWN_SECONDS="${CONSTELLATION_GRACEFUL_SHUTDOWN_SECONDS:-3}"
 
 if command -v lsof >/dev/null 2>&1 \
   && lsof -tiTCP:"$CONSTELLATION_PORT" -sTCP:LISTEN >/dev/null; then
@@ -16,4 +17,5 @@ fi
 
 .venv/bin/uvicorn endpoints.constellation:app \
   --host "$CONSTELLATION_HOST" \
-  --port "$CONSTELLATION_PORT"
+  --port "$CONSTELLATION_PORT" \
+  --timeout-graceful-shutdown "$CONSTELLATION_GRACEFUL_SHUTDOWN_SECONDS"

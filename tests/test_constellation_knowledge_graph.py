@@ -95,7 +95,14 @@ def test_constellation_ui_serves_local_assets() -> None:
     assert "Constellation Map" in page.text
     assert "Find anything" in page.text
     assert "Sandbox mission" in page.text
+    assert "Control Room mode" in page.text
+    assert "Execution timeline" in page.text
+    assert "Test all 70 agents" in page.text
+    assert "Mac Gemma · external local service" in page.text
     assert script.status_code == 200
     assert "knowledge-graph" in script.text
+    assert "events/stream" in script.text
+    assert "rebuildReplay" in script.text
+    assert "models/mac-gemma/status" in script.text
     assert styles.status_code == 200
     assert "--specialist" in styles.text

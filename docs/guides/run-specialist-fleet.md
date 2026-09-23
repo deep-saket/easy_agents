@@ -91,7 +91,10 @@ Start the Mac model service described in
 
 The runtime supplies the model with the selected Charter, Playbook, policy
 profiles, and memory-scope boundary. Model text is advisory: it cannot bypass
-the policy engine or claim that an external action happened.
+the policy engine or claim that an external action happened. The client calls
+the separately managed Mac-serving repository over
+`http://127.0.0.1:8080/v1/completions`; no model weights or serving code are
+installed in this repository.
 
 ## Gates and safety examples
 
@@ -124,9 +127,34 @@ Start the graph UI:
 ./run/constellation.sh
 ```
 
-Open `http://127.0.0.1:8030`, select a Specialist, enter a bounded task under
-**Sandbox mission**, and select **Build safe plan**. The inspector displays the
-policy-aware result without invoking an external action.
+Open `http://127.0.0.1:8030`, select a Specialist, and enter a bounded task
+under **Sandbox mission**. Choose **Mac Gemma · external local service** for a
+real model-backed advisory Run, or **Deterministic plan · no model** for the
+policy-aware plan only. Neither choice invokes an external effect.
+
+To exercise the complete roster, switch to **Live** and select
+**Test all 70 agents**. The Control Room creates one correlated validation
+Mission, runs every compiled Specialist with the local model and network
+disabled, and shows the per-agent result in realtime. The completed Mission is
+retained in **Replay** for inspection.
+
+## Validate the complete fleet
+
+The fleet audit is deliberately safe and deterministic. For each registered
+Specialist it:
+
+- instantiates the shared runtime from the Specialist Charter;
+- submits the same bounded advisory objective with read-only effects;
+- forces `llm=None`, denies network access, and invokes no external connector;
+- records the selected Playbook, Run ID, duration, warnings, and terminal
+  outcome;
+- continues after an individual failure so the report always covers the whole
+  roster.
+
+An agent passes when it reaches `planned` or `completed`. This validates roster
+compilation, policy evaluation, Playbook selection, lifecycle execution,
+observability persistence, and replay correlation. It does not validate the
+scientific correctness of a domain answer or a real connector.
 
 ## API
 
@@ -135,8 +163,10 @@ The local API exposes the same contracts used by the CLI and UI:
 ```text
 GET  /api/fleet
 GET  /api/fleet/{specialist_id}
+GET  /api/models/mac-gemma/status
 POST /api/missions/route
 POST /api/missions/run
+POST /api/fleet/test
 ```
 
 Example:
@@ -146,15 +176,27 @@ curl -s http://127.0.0.1:8030/api/missions/run \
   -H 'Content-Type: application/json' \
   -d '{
     "objective": "calculate a satellite RF link budget",
-    "specialist_id": "rf_link_budget_specialist"
+    "specialist_id": "rf_link_budget_specialist",
+    "model_id": "mac_gemma"
   }'
 ```
+
+Run the safe whole-fleet audit:
+
+```bash
+curl -s -X POST http://127.0.0.1:8030/api/fleet/test
+```
+
+The response includes aggregate counts and one result for each registered
+Specialist. All Runs share the returned `mission_id` and can be inspected in
+the monitoring timeline.
 
 ## Current boundary
 
 This release builds and runs the whole roster as policy-governed advisory
-agents. It does not yet claim that every domain connector exists. Durable
-Mission persistence, resumable approvals, artifact storage, evaluated domain
+agents. It does not yet claim that every domain connector exists. The event
+history and Mission projections are durable, but resumable execution
+checkpoints, resumable approvals, artifact storage, evaluated domain
 calculators, scheduled wakeups, and real approved call/purchase/submission
 connectors remain later platform increments. Those components can be added
 once and reused by every authorized Charter.
@@ -164,8 +206,11 @@ Implementation:
 - `src/easy_agents/fleet/models.py`
 - `src/easy_agents/fleet/registry.py`
 - `src/easy_agents/fleet/policy.py`
+- `src/easy_agents/fleet/model_profiles.py`
 - `src/easy_agents/fleet/runtime.py`
 - `src/easy_agents/fleet/runtime_catalog.yaml`
 - `src/easy_agents/fleet/cli.py`
 
-Tests: `tests/test_fleet_runtime.py`
+Tests: `tests/test_fleet_runtime.py` (15 focused tests, including external-model
+selection, empty-output failure handling, and a correlated 70-Specialist
+validation Mission)

@@ -80,6 +80,12 @@ portable usage fields, bounded retry, credential redaction, JSON parsing, and
 Pydantic validation. It reads `GEMMA_API_BASE` and the optional
 `MAC_SERVING_API_KEY`.
 
+The Specialist Fleet wraps this adapter in a reusable `mac_gemma` profile. The
+profile points only at the documented loopback API in the separate Mac-serving
+repository, disables the problematic blank-line stop for agent prompts, and is
+selectable per Mission from the API, CLI, and Control Room. Routing, policy,
+approval Gates, and external-effect authority remain deterministic.
+
 The served `gemma-4-E4B` is a pretrained base model. Existing agents that rely
 on instruction following or exact JSON require task-specific evaluation before
 using this provider. See [Use the Mac-Hosted Gemma Model](../../guides/use-local-gemma.md).

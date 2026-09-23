@@ -4,9 +4,12 @@ Status: implemented and live-smoke verified
 
 Contract version: `1.0.0`
 
-The framework can call the native Apple Silicon Gemma service directly as an
-inference dependency. It does not depend on or import code from the serving
-repository.
+The framework calls the native Apple Silicon Gemma service as an external
+inference dependency. Model weights, llama.cpp, process ownership, and serving
+configuration stay in
+`/Users/saketm10/Projects/foundation-ai-platform/mac-serving`. This repository
+does not vendor, import, or modify that serving repository; it uses only the
+loopback HTTP contract below.
 
 ## Service contract
 
@@ -54,12 +57,14 @@ The Easy Agents client never starts or exposes that persistent process.
 
 ```bash
 local-gemma complete "The capital of India is" \
-  --max-tokens 32 --temperature 0 --json
+  --max-tokens 32 --temperature 0.2 --stop __END_NEVER__ --json
 ```
 
 The JSON form reports text, finish reason, and portable token usage. This is a
 base-model continuation: phrase prompts as text the model should continue. Do
-not assume system/user chat semantics.
+not assume system/user chat semantics. The explicit sentinel stop avoids the
+developer CLI's default blank-line stop, which may terminate a continuation
+before useful Fleet content appears.
 
 ## Python API
 
@@ -101,9 +106,9 @@ EASY_AGENT_LLM_PROVIDER=mac_gemma
 EASY_AGENT_LLM_MODEL_NAME=gemma-4-E4B
 GEMMA_API_BASE=http://127.0.0.1:8080
 # MAC_SERVING_API_KEY=only-if-the-service-requires-it
-EASY_AGENT_LLM_MAX_NEW_TOKENS=128
+EASY_AGENT_LLM_MAX_NEW_TOKENS=256
 EASY_AGENT_LLM_TIMEOUT_SECONDS=300
-EASY_AGENT_LLM_TEMPERATURE=0
+EASY_AGENT_LLM_TEMPERATURE=0.2
 EASY_AGENT_LLM_TOP_P=0.95
 ```
 
@@ -112,6 +117,26 @@ representation, and redacted from bounded error diagnostics. Never put a real
 key in committed YAML, `.env.example`, tests, prompts, or trace output.
 
 ## Use with current agents
+
+The Specialist Fleet and Control Room expose two per-Mission choices:
+
+- `mac_gemma`: calls the external service after a readiness check;
+- `none`: builds a deterministic policy-aware plan without inference.
+
+In the Control Room, select a Specialist and choose **Mac Gemma · external
+local service**. The UI displays readiness from
+`GET /api/models/mac-gemma/status` and sends `model_id: "mac_gemma"` only to
+the Easy Agents server. It never puts `MAC_SERVING_API_KEY` in browser code.
+
+The Fleet profile defaults to 256 output tokens, temperature `0.2`, top-p
+`0.95`, and no blank-line stop. Empty model output is treated as a failed Run,
+not a completed Mission.
+
+Because `gemma-4-E4B` is a pretrained completion model, the Fleet sends it a
+short Specialist-labelled document continuation instead of the longer
+instruction/chat prompt used by other adapters. Routing, memory boundaries,
+policy checks, approval Gates, and effect permissions are enforced before the
+model call; the generated advisory text is marked unverified in the result.
 
 MailMind accepts the shared environment configuration above.
 
@@ -193,4 +218,17 @@ The live smoke is opt-in and calls only the loopback service:
 ```bash
 RUN_LOCAL_GEMMA_LIVE=1 PYTHONPATH=src \
   pytest -q tests/test_mac_gemma_live.py
+```
+
+The Fleet API tests inject a fake Gemma client; they never start or contact the
+external serving repository. A real end-to-end check requires both services:
+
+```bash
+# Terminal 1: external serving repository
+cd /Users/saketm10/Projects/foundation-ai-platform/mac-serving
+.venv/bin/mac-serve serve
+
+# Terminal 2: this repository
+cd /Users/saketm10/Projects/openclaw_agents
+./run/constellation.sh
 ```

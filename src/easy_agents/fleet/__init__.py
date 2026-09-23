@@ -1,9 +1,16 @@
 """Declarative, policy-governed Specialist fleet runtime."""
 
+from easy_agents.fleet.model_profiles import (
+    MAC_GEMMA_PROFILE_ID,
+    build_fleet_mac_gemma,
+    mac_gemma_status,
+)
 from easy_agents.fleet.models import (
     AgentResult,
     ApprovalRequest,
     FleetMissionResult,
+    FleetValidationItem,
+    FleetValidationReport,
     MemoryScopeSpec,
     MissionRequest,
     MissionStatus,
@@ -23,8 +30,11 @@ __all__ = [
     "AgentResult",
     "ApprovalRequest",
     "FleetMissionResult",
+    "FleetValidationItem",
+    "FleetValidationReport",
     "FleetRegistry",
     "FleetRuntime",
+    "MAC_GEMMA_PROFILE_ID",
     "MemoryScopeSpec",
     "MissionRequest",
     "MissionStatus",
@@ -38,4 +48,6 @@ __all__ = [
     "SpecialistManifest",
     "SpecialistStatus",
     "WorkOrder",
+    "build_fleet_mac_gemma",
+    "mac_gemma_status",
 ]

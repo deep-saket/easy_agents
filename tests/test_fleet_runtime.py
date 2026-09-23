@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from easy_agents.constellation import ConstellationDirectory
 from easy_agents.constellation.api import create_app
 from easy_agents.fleet import (
+    MAC_GEMMA_PROFILE_ID,
     FleetRegistry,
     FleetRuntime,
     MissionRequest,
@@ -16,6 +17,8 @@ from easy_agents.fleet import (
     SpecialistStatus,
 )
 from easy_agents.fleet.cli import main as fleet_cli_main
+from easy_agents.fleet.model_profiles import build_fleet_mac_gemma
+from easy_agents.observability import EventFilter, ObservabilityPipeline
 
 
 class FakeLocalModel:
@@ -29,6 +32,27 @@ class FakeLocalModel:
     def generate(self, system_prompt: str, user_prompt: str) -> str:
         self.calls.append((system_prompt, user_prompt))
         return "Evidence is incomplete. Next action: validate the highest-risk assumption."
+
+
+class FakeGemmaModel(FakeLocalModel):
+    """Ready external-service double for API model selection tests."""
+
+    model_name = "gemma-4-E4B"
+    base_url = "http://127.0.0.1:8080"
+
+    @staticmethod
+    def is_ready() -> bool:
+        return True
+
+    @staticmethod
+    def list_models() -> list[str]:
+        return ["gemma-4-E4B"]
+
+
+class EmptyLocalModel(FakeGemmaModel):
+    def generate(self, system_prompt: str, user_prompt: str) -> str:
+        self.calls.append((system_prompt, user_prompt))
+        return "\n\n"
 
 
 def test_registry_compiles_the_complete_roster_from_shared_components() -> None:
@@ -183,6 +207,31 @@ def test_local_model_receives_charter_playbook_and_policy_context() -> None:
     assert "Mission:" in model.calls[0][1]
 
 
+def test_empty_model_completion_fails_instead_of_claiming_success() -> None:
+    model = EmptyLocalModel()
+    operations = ObservabilityPipeline.memory()
+    runtime = FleetRuntime(
+        models={MAC_GEMMA_PROFILE_ID: model},
+        event_recorder=operations,
+    )
+
+    result = runtime.run(
+        MissionRequest(
+            objective="Compare two supplied storage concepts.",
+            specialist_id="energy_systems_scout",
+            model_id=MAC_GEMMA_PROFILE_ID,
+        )
+    )
+
+    assert result.status == MissionStatus.FAILED
+    assert result.results[0].used_model == "gemma-4-E4B"
+    assert "empty completion" in " ".join(result.warnings)
+    assert "model.failed" in {
+        event.event_type
+        for event in operations.events(EventFilter(mission_id=result.mission_id, limit=200))
+    }
+
+
 def test_team_run_creates_permission_bounded_work_orders() -> None:
     runtime = FleetRuntime()
 
@@ -203,6 +252,32 @@ def test_team_run_creates_permission_bounded_work_orders() -> None:
         )
 
 
+def test_fleet_validation_exercises_every_specialist_in_one_traced_mission() -> None:
+    operations = ObservabilityPipeline.memory()
+    runtime = FleetRuntime(event_recorder=operations)
+
+    report = runtime.validate_all()
+
+    assert report.status == "passed"
+    assert report.tested_count == 70
+    assert report.passed_count == 70
+    assert report.failed_count == 0
+    assert len(report.results) == 70
+    assert {item.specialist_id for item in report.results} == set(
+        runtime.registry.specialists
+    )
+    assert all(item.passed and item.outcome == MissionStatus.PLANNED for item in report.results)
+
+    events = operations.events(
+        EventFilter(mission_id=report.mission_id, limit=2_000)
+    )
+    assert events[0].event_type == "mission.created"
+    assert "fleet_validation.started" in {event.event_type for event in events}
+    assert "fleet_validation.completed" in {event.event_type for event in events}
+    assert events[-1].event_type == "mission.completed"
+    assert len({event.run_id for event in events if event.run_id}) == 70
+
+
 def test_fleet_api_lists_routes_inspects_and_runs_agents() -> None:
     client = TestClient(create_app())
 
@@ -219,6 +294,7 @@ def test_fleet_api_lists_routes_inspects_and_runs_agents() -> None:
             "specialist_id": "rf_link_budget_specialist",
         },
     )
+    validation = client.post("/api/fleet/test")
 
     assert fleet.status_code == 200
     assert fleet.json()["summary"]["specialists"] == 70
@@ -228,6 +304,53 @@ def test_fleet_api_lists_routes_inspects_and_runs_agents() -> None:
     assert route.json()["candidates"][0]["specialist_id"] == "rf_link_budget_specialist"
     assert run.status_code == 200
     assert run.json()["status"] == "planned"
+    assert validation.status_code == 200
+    assert validation.json()["status"] == "passed"
+    assert validation.json()["tested_count"] == 70
+
+
+def test_fleet_api_reports_and_uses_external_mac_gemma() -> None:
+    model = FakeGemmaModel()
+    client = TestClient(create_app(gemma_client=model))
+
+    status = client.get("/api/models/mac-gemma/status")
+    run = client.post(
+        "/api/missions/run",
+        json={
+            "objective": "Compare two supplied storage concepts.",
+            "specialist_id": "energy_systems_scout",
+            "model_id": MAC_GEMMA_PROFILE_ID,
+        },
+    )
+
+    assert status.status_code == 200
+    assert status.json()["ready"] is True
+    assert status.json()["models"] == ["gemma-4-E4B"]
+    assert status.json()["external_service"] is True
+    assert run.status_code == 200
+    assert run.json()["status"] == "completed"
+    assert run.json()["results"][0]["used_model"] == "gemma-4-E4B"
+    assert model.calls
+    assert model.calls[0][0] == ""
+    assert model.calls[0][1].endswith(
+        'Energy Systems Scout assessment of the Mission "Compare two supplied '
+        'storage concepts.": '
+    )
+
+
+def test_fleet_mac_gemma_profile_uses_environment_and_no_blank_line_stop(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("GEMMA_API_BASE", "http://127.0.0.1:18091")
+    monkeypatch.setenv("EASY_AGENT_LLM_MAX_NEW_TOKENS", "96")
+    monkeypatch.setenv("EASY_AGENT_LLM_TEMPERATURE", "0.3")
+
+    client = build_fleet_mac_gemma()
+
+    assert client.base_url == "http://127.0.0.1:18091"
+    assert client.max_tokens == 96
+    assert client.temperature == 0.3
+    assert client.stop == ()
 
 
 def test_custom_constellation_api_compiles_only_its_own_specialists() -> None:

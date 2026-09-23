@@ -56,12 +56,32 @@ const PRESETS = {
 };
 
 const PLANNED_STATUSES = new Set(["planned", "proposed", "dormant", "scaffolded", "sandboxed"]);
+const TERMINAL_ACTIONS = new Set(["completed", "failed", "blocked", "cancelled", "denied", "rejected"]);
+const STREAM_EVENT_TYPES = [
+  "mission.created", "mission.routed", "mission.started", "mission.completed", "mission.failed", "mission.cancelled",
+  "work_order.created", "work_order.queued", "work_order.started", "work_order.completed", "work_order.blocked", "work_order.failed",
+  "specialist.selected", "specialist.started", "specialist.completed", "specialist.failed",
+  "playbook.started", "playbook.completed", "playbook.failed",
+  "step.started", "step.planned", "step.completed", "step.waiting", "step.failed",
+  "handoff.requested", "handoff.accepted", "handoff.completed", "handoff.rejected",
+  "policy.allowed", "policy.blocked",
+  "approval.requested", "approval.approved", "approval.denied", "approval.expired",
+  "tool.requested", "tool.started", "tool.completed", "tool.failed",
+  "model.requested", "model.started", "model.completed", "model.failed",
+  "memory.read", "memory.write", "memory.denied", "memory.deleted",
+  "artifact.created", "artifact.updated", "artifact.deleted",
+  "node.started", "node.state_changed", "node.completed", "node.failed", "transition.selected",
+  "worker.online", "worker.offline", "worker.heartbeat", "resource.sampled", "stream.gap_detected",
+  "alert.opened", "alert.acknowledged", "alert.resolved",
+  "fleet_validation.started", "fleet_validation.completed", "fleet_validation.agent_failed",
+];
 
 const elements = {
   graph: document.getElementById("graph"),
   viewport: document.getElementById("viewport"),
   edgeLayer: document.getElementById("edge-layer"),
   edgeLabelLayer: document.getElementById("edge-label-layer"),
+  activityEdgeLayer: document.getElementById("activity-edge-layer"),
   nodeLayer: document.getElementById("node-layer"),
   graphStage: document.getElementById("graph-stage"),
   loading: document.getElementById("graph-loading"),
@@ -80,8 +100,11 @@ const elements = {
   zoomOut: document.getElementById("zoom-out"),
   resetView: document.getElementById("reset-view"),
   statSpecialists: document.getElementById("stat-specialists"),
+  statSpecialistsLabel: document.getElementById("stat-specialists-label"),
   statComponents: document.getElementById("stat-components"),
+  statComponentsLabel: document.getElementById("stat-components-label"),
   statRelations: document.getElementById("stat-relations"),
+  statRelationsLabel: document.getElementById("stat-relations-label"),
   visibleNodes: document.getElementById("visible-nodes"),
   apiState: document.getElementById("api-state"),
   statusText: document.getElementById("status-text"),
@@ -90,6 +113,7 @@ const elements = {
   legend: document.getElementById("legend"),
   inspectorEmpty: document.getElementById("inspector-empty"),
   inspector: document.getElementById("inspector"),
+  closeInspector: document.getElementById("close-inspector"),
   inspectorKind: document.getElementById("inspector-kind"),
   inspectorStatus: document.getElementById("inspector-status"),
   inspectorTitle: document.getElementById("inspector-title"),
@@ -104,8 +128,32 @@ const elements = {
   releaseNode: document.getElementById("release-node"),
   missionSection: document.getElementById("mission-section"),
   missionInput: document.getElementById("mission-input"),
+  missionModel: document.getElementById("mission-model"),
+  missionModelStatus: document.getElementById("mission-model-status"),
   runMission: document.getElementById("run-mission"),
   missionResult: document.getElementById("mission-result"),
+  operationsControls: document.getElementById("operations-controls"),
+  statusFilter: document.getElementById("status-filter"),
+  attentionOnly: document.getElementById("attention-only"),
+  followLive: document.getElementById("follow-live"),
+  timeline: document.getElementById("timeline"),
+  timelineTitle: document.getElementById("timeline-title"),
+  timelinePosition: document.getElementById("timeline-position"),
+  timelineScrubber: document.getElementById("timeline-scrubber"),
+  eventRail: document.getElementById("event-rail"),
+  jumpLive: document.getElementById("jump-live"),
+  operationsOverview: document.getElementById("operations-overview"),
+  operationsSummary: document.getElementById("operations-summary"),
+  missionList: document.getElementById("mission-list"),
+  missionCount: document.getElementById("mission-count"),
+  operationsEventList: document.getElementById("operations-event-list"),
+  eventCount: document.getElementById("event-count"),
+  activitySection: document.getElementById("activity-section"),
+  activityStatus: document.getElementById("activity-status"),
+  activityList: document.getElementById("activity-list"),
+  streamState: document.getElementById("stream-state"),
+  testAllAgents: document.getElementById("test-all-agents"),
+  fleetTestResult: document.getElementById("fleet-test-result"),
 };
 
 const state = {
@@ -130,6 +178,21 @@ const state = {
   simulationAlpha: 0,
   animationFrame: null,
   hasFitted: false,
+  operations: {
+    mode: "map",
+    eventSource: null,
+    events: [],
+    missions: [],
+    runs: [],
+    entities: new Map(),
+    activityEdges: [],
+    activityEdgeElements: new Map(),
+    lastSequence: 0,
+    replayCount: 0,
+    replaySequence: 0,
+    connection: "offline",
+    renderFrame: null,
+  },
 };
 
 function svgElement(name, attributes = {}) {
@@ -354,6 +417,8 @@ function renderGraph() {
   }
 
   applyHighlights();
+  applyOperationalHighlights();
+  renderActivityEdges();
   updateGraphElements();
 }
 
@@ -398,6 +463,7 @@ function updateGraphElements() {
       label.setAttribute("y", (source.y + target.y) / 2 - 3);
     }
   }
+  updateActivityEdgeElements();
 }
 
 function startSimulation(alpha = 0.55) {
@@ -592,6 +658,8 @@ function selectNode(nodeId) {
   const node = state.nodeById.get(nodeId);
   if (!node) return;
   state.selectedId = nodeId;
+  document.body.classList.add("inspector-open");
+  elements.operationsOverview.classList.add("hidden");
   renderInspector(node);
   applyHighlights();
 }
@@ -670,6 +738,7 @@ function renderInspector(node) {
     definition.textContent = typeof value === "object" ? JSON.stringify(value) : String(value);
     elements.metadataList.append(term, definition);
   }
+  renderNodeActivity(node);
 }
 
 function revealAndSelect(nodeId) {
@@ -697,7 +766,7 @@ async function runSandboxMission() {
   }
   const originalLabel = elements.runMission.textContent;
   elements.runMission.disabled = true;
-  elements.runMission.textContent = "Planning…";
+  elements.runMission.textContent = elements.missionModel.value === "mac_gemma" ? "Gemma is reasoning…" : "Planning…";
   try {
     const response = await fetch("/api/missions/run", {
       method: "POST",
@@ -705,6 +774,7 @@ async function runSandboxMission() {
       body: JSON.stringify({
         objective,
         specialist_id: node.id.replace(/^specialist:/, ""),
+        model_id: elements.missionModel.value,
       }),
     });
     const payload = await response.json();
@@ -714,6 +784,7 @@ async function runSandboxMission() {
       payload.status || "planned",
       result?.response || payload.synthesis || "No result returned.",
       payload.warnings || [],
+      result?.used_model || null,
     );
   } catch (error) {
     renderMissionResult("Failed", error instanceof Error ? error.message : String(error), []);
@@ -723,19 +794,55 @@ async function runSandboxMission() {
   }
 }
 
-function renderMissionResult(status, response, warnings) {
+function renderMissionResult(status, response, warnings, usedModel = null) {
   elements.missionResult.replaceChildren();
   const heading = document.createElement("strong");
   heading.textContent = status.replaceAll("_", " ");
   const copy = document.createElement("p");
   copy.textContent = response;
   elements.missionResult.append(heading, copy);
+  if (usedModel) {
+    const model = document.createElement("small");
+    model.textContent = `Generated by ${usedModel} through the external Mac-serving endpoint.`;
+    elements.missionResult.append(model);
+  }
   for (const warning of warnings) {
     const note = document.createElement("small");
     note.textContent = warning;
     elements.missionResult.append(note);
   }
   elements.missionResult.classList.remove("hidden");
+}
+
+function updateMissionModelControl() {
+  const usesGemma = elements.missionModel.value === "mac_gemma";
+  elements.runMission.textContent = usesGemma ? "Run with Mac Gemma" : "Build deterministic plan";
+}
+
+async function loadGemmaStatus() {
+  const gemmaOption = elements.missionModel.querySelector('option[value="mac_gemma"]');
+  try {
+    const response = await fetch("/api/models/mac-gemma/status");
+    if (!response.ok) throw new Error(`Model status returned ${response.status}`);
+    const status = await response.json();
+    if (status.ready && (status.models || []).includes("gemma-4-E4B")) {
+      gemmaOption.disabled = false;
+      elements.missionModel.value = "mac_gemma";
+      elements.missionModelStatus.textContent = "Ready · gemma-4-E4B at 127.0.0.1:8080";
+      elements.missionModelStatus.className = "model-readiness ready";
+    } else {
+      gemmaOption.disabled = true;
+      elements.missionModel.value = "none";
+      elements.missionModelStatus.textContent = "Unavailable · start the external mac-serving service";
+      elements.missionModelStatus.className = "model-readiness unavailable";
+    }
+  } catch (error) {
+    gemmaOption.disabled = true;
+    elements.missionModel.value = "none";
+    elements.missionModelStatus.textContent = "Unavailable · could not check Mac Gemma";
+    elements.missionModelStatus.className = "model-readiness unavailable";
+  }
+  updateMissionModelControl();
 }
 
 function showTooltip(event, node) {
@@ -833,6 +940,511 @@ function updateViewHeading() {
     : titles[state.preset] || titles.custom;
 }
 
+function graphEntityKey(entity) {
+  if (!entity || !entity.kind || !entity.id) return null;
+  const key = `${entity.kind}:${entity.id}`;
+  return state.nodeById.has(key) ? key : null;
+}
+
+function runtimeStatus(event) {
+  if (event.status) return String(event.status);
+  const action = event.event_type.split(".").at(-1);
+  return {
+    created: "queued",
+    requested: "waiting",
+    started: "running",
+    completed: "completed",
+    failed: "failed",
+    blocked: "blocked",
+    denied: "denied",
+    cancelled: "cancelled",
+  }[action] || action;
+}
+
+function applyOperationalEvent(event, { addToTimeline = false } = {}) {
+  const sequence = Number(event.sequence || 0);
+  if (addToTimeline) {
+    if (state.operations.events.some((item) => Number(item.sequence) === sequence)) return;
+    state.operations.events.push(event);
+    state.operations.events.sort((left, right) => Number(left.sequence) - Number(right.sequence));
+    if (state.operations.events.length > 500) state.operations.events.splice(0, state.operations.events.length - 500);
+  }
+  state.operations.lastSequence = Math.max(state.operations.lastSequence, sequence);
+
+  const area = event.event_type.split(".", 1)[0];
+  const action = event.event_type.split(".").at(-1);
+  const seen = new Set();
+  for (const entity of [event.actor, event.subject]) {
+    const key = graphEntityKey(entity);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    const current = state.operations.entities.get(key) || {
+      entity_key: key,
+      kind: entity.kind,
+      id: entity.id,
+      status: "idle",
+      active_run_ids: [],
+      event_count: 0,
+      error_count: 0,
+    };
+    const activeRuns = new Set(current.active_run_ids || []);
+    if (area === entity.kind && event.run_id) {
+      if (action === "started") activeRuns.add(event.run_id);
+      if (TERMINAL_ACTIONS.has(action)) activeRuns.delete(event.run_id);
+      current.status = activeRuns.size ? "running" : runtimeStatus(event);
+    } else if (!current.last_sequence) {
+      current.status = "idle";
+    }
+    current.active_run_ids = [...activeRuns];
+    current.event_count += 1;
+    current.error_count += ["error", "critical"].includes(event.severity) ? 1 : 0;
+    current.last_sequence = sequence;
+    current.last_event_type = event.event_type;
+    current.summary = event.summary;
+    current.mission_id = event.mission_id;
+    current.run_id = event.run_id;
+    state.operations.entities.set(key, current);
+  }
+
+  if (event.mission_id && area === "mission") {
+    let mission = state.operations.missions.find((item) => item.mission_id === event.mission_id);
+    if (!mission) {
+      mission = {
+        mission_id: event.mission_id,
+        specialist_ids: [],
+        run_ids: [],
+        event_count: 0,
+      };
+      state.operations.missions.unshift(mission);
+    }
+    mission.status = runtimeStatus(event);
+    mission.summary = event.summary;
+    mission.last_sequence = sequence;
+    mission.last_event_type = event.event_type;
+    mission.updated_at = event.occurred_at;
+    mission.event_count = Number(mission.event_count || 0) + 1;
+  }
+  if (event.mission_id && event.actor?.kind === "specialist") {
+    const mission = state.operations.missions.find((item) => item.mission_id === event.mission_id);
+    if (mission && !(mission.specialist_ids || []).includes(event.actor.id)) {
+      mission.specialist_ids = [...(mission.specialist_ids || []), event.actor.id];
+    }
+  }
+  addActivityEdge(event);
+}
+
+function addActivityEdge(event) {
+  const source = graphEntityKey(event.actor);
+  const target = graphEntityKey(event.subject);
+  if (!source || !target || source === target) return;
+  const edge = {
+    id: event.event_id,
+    source,
+    target,
+    severity: event.severity,
+    sequence: Number(event.sequence || 0),
+    eventType: event.event_type,
+  };
+  state.operations.activityEdges.push(edge);
+  if (state.operations.activityEdges.length > 36) state.operations.activityEdges.shift();
+}
+
+function resetOperationalProjection() {
+  state.operations.entities = new Map();
+  state.operations.missions = [];
+  state.operations.runs = [];
+  state.operations.activityEdges = [];
+  state.operations.lastSequence = 0;
+}
+
+function loadProjectionSnapshot(snapshot) {
+  state.operations.lastSequence = Number(snapshot.last_sequence || 0);
+  state.operations.missions = [...(snapshot.missions || [])];
+  state.operations.runs = [...(snapshot.runs || [])];
+  state.operations.entities = new Map(Object.entries(snapshot.entities || {}));
+  state.operations.events = [...(snapshot.recent_events || [])];
+  state.operations.activityEdges = [];
+  for (const event of state.operations.events.slice(-36)) addActivityEdge(event);
+  state.operations.replayCount = state.operations.events.length;
+}
+
+async function loadOperationsSnapshot() {
+  setStreamState("connecting", "Connecting live stream");
+  const response = await fetch("/api/operations/snapshot");
+  if (!response.ok) throw new Error(`Operations API returned ${response.status}`);
+  const snapshot = await response.json();
+  loadProjectionSnapshot(snapshot);
+  renderOperations();
+  return snapshot;
+}
+
+function closeEventStream() {
+  if (state.operations.eventSource) state.operations.eventSource.close();
+  state.operations.eventSource = null;
+}
+
+function connectEventStream() {
+  closeEventStream();
+  if (state.operations.mode !== "live") return;
+  const source = new EventSource(`/api/events/stream?after_sequence=${state.operations.lastSequence}`);
+  state.operations.eventSource = source;
+  source.onopen = () => setStreamState("live", "Live · local event stream");
+  source.onerror = () => setStreamState("reconnecting", "Reconnecting · last state retained");
+  const receive = (message) => {
+    try {
+      const event = JSON.parse(message.data);
+      applyOperationalEvent(event, { addToTimeline: true });
+      if (state.operations.mode === "live") {
+        state.operations.replayCount = state.operations.events.length;
+        scheduleOperationsRender();
+      }
+    } catch (error) {
+      setStreamState("stale", `Malformed event · ${error.message}`);
+    }
+  };
+  for (const eventType of STREAM_EVENT_TYPES) source.addEventListener(eventType, receive);
+}
+
+function scheduleOperationsRender() {
+  if (state.operations.renderFrame !== null) return;
+  state.operations.renderFrame = requestAnimationFrame(() => {
+    state.operations.renderFrame = null;
+    renderOperations();
+  });
+}
+
+function setStreamState(connection, label) {
+  state.operations.connection = connection;
+  elements.streamState.textContent = label;
+  if (state.operations.mode !== "map") {
+    elements.apiState.textContent = connection;
+    elements.apiState.className = `health-pill ${connection === "live" ? "ok" : connection === "stale" ? "error" : "loading"}`;
+  }
+}
+
+async function setMode(mode) {
+  if (!new Set(["map", "live", "replay"]).has(mode)) return;
+  state.operations.mode = mode;
+  document.body.classList.toggle("operations-mode", mode !== "map");
+  document.querySelectorAll(".mode-button").forEach((button) => {
+    button.classList.toggle("active", button.dataset.mode === mode);
+  });
+  elements.operationsControls.classList.toggle("hidden", mode === "map");
+  elements.timeline.classList.toggle("hidden", mode === "map");
+
+  if (mode === "map") {
+    closeEventStream();
+    setGraphCounters();
+    elements.streamState.textContent = "Local Control Room";
+    elements.apiState.textContent = "Local graph ready";
+    elements.apiState.className = "health-pill ok";
+    elements.operationsOverview.classList.add("hidden");
+    if (!state.selectedId) elements.inspectorEmpty.classList.remove("hidden");
+    applyOperationalHighlights();
+    renderActivityEdges();
+    return;
+  }
+
+  elements.inspectorEmpty.classList.add("hidden");
+  if (!state.selectedId) elements.operationsOverview.classList.remove("hidden");
+  try {
+    if (!state.operations.events.length || mode === "live") await loadOperationsSnapshot();
+    if (state.operations.mode !== mode) return;
+    if (mode === "live") {
+      state.operations.replayCount = state.operations.events.length;
+      connectEventStream();
+    } else {
+      closeEventStream();
+      state.operations.replayCount = state.operations.events.length;
+      rebuildReplay(state.operations.replayCount);
+      setStreamState("replaying", "Replay · durable event history");
+    }
+    renderOperations();
+  } catch (error) {
+    setStreamState("stale", "Operations unavailable");
+    elements.operationsSummary.textContent = error.message;
+  }
+}
+
+function rebuildReplay(count) {
+  const events = state.operations.events;
+  resetOperationalProjection();
+  const bounded = Math.max(0, Math.min(Number(count), events.length));
+  for (const event of events.slice(0, bounded)) applyOperationalEvent(event);
+  state.operations.replayCount = bounded;
+  state.operations.replaySequence = bounded ? Number(events[bounded - 1].sequence || 0) : 0;
+  renderOperations();
+}
+
+function setGraphCounters() {
+  elements.statSpecialists.textContent = String(state.graph.counts.specialist || 0);
+  const componentCount = state.graph.nodes.length - (state.graph.counts.specialist || 0) - (state.graph.counts.guild || 0);
+  elements.statComponents.textContent = String(componentCount);
+  elements.statRelations.textContent = String(state.graph.edges.length);
+  elements.statSpecialistsLabel.textContent = "specialists";
+  elements.statComponentsLabel.textContent = "components";
+  elements.statRelationsLabel.textContent = "relationships";
+}
+
+function renderOperations() {
+  if (state.operations.mode === "map") return;
+  const missions = [...state.operations.missions].sort(
+    (left, right) => Number(right.last_sequence || 0) - Number(left.last_sequence || 0),
+  );
+  const activeMissionStatuses = new Set(["queued", "routed", "running", "waiting", "awaiting_approval"]);
+  const attentionStatuses = new Set(["failed", "blocked", "denied", "waiting", "awaiting_approval"]);
+  const activeMissions = missions.filter((mission) => activeMissionStatuses.has(mission.status)).length;
+  const runningSpecialists = [...state.operations.entities.values()].filter(
+    (entity) => entity.kind === "specialist" && entity.status === "running",
+  ).length;
+  const attention = missions.filter((mission) => attentionStatuses.has(mission.status)).length;
+  elements.statSpecialists.textContent = String(activeMissions);
+  elements.statComponents.textContent = String(runningSpecialists);
+  elements.statRelations.textContent = String(attention);
+  elements.statSpecialistsLabel.textContent = "active missions";
+  elements.statComponentsLabel.textContent = "running agents";
+  elements.statRelationsLabel.textContent = "attention";
+
+  elements.operationsSummary.textContent = `${activeMissions} active Mission${activeMissions === 1 ? "" : "s"} · sequence ${state.operations.lastSequence}`;
+  elements.missionCount.textContent = String(missions.length);
+  elements.missionList.replaceChildren();
+  for (const mission of missions.slice(0, 10)) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `mission-card status-${mission.status || "unknown"}`;
+    const title = document.createElement("strong");
+    title.textContent = mission.summary || shortId(mission.mission_id);
+    const status = document.createElement("span");
+    status.className = "runtime-label";
+    status.textContent = String(mission.status || "unknown").replaceAll("_", " ");
+    const meta = document.createElement("span");
+    meta.textContent = `${(mission.specialist_ids || []).length} Specialist(s) · ${shortId(mission.mission_id)}`;
+    button.append(title, status, meta);
+    button.addEventListener("click", () => openMissionReplay(mission.mission_id));
+    elements.missionList.append(button);
+  }
+  if (!missions.length) elements.missionList.append(emptyOperationMessage("No Missions have emitted events yet."));
+
+  const visibleEvents = filteredOperationalEvents().slice(-12).reverse();
+  elements.eventCount.textContent = String(state.operations.events.length);
+  elements.operationsEventList.replaceChildren();
+  for (const event of visibleEvents) {
+    elements.operationsEventList.append(operationEventButton(event));
+  }
+  if (!visibleEvents.length) elements.operationsEventList.append(emptyOperationMessage("No events match the current filter."));
+
+  renderTimeline();
+  applyOperationalHighlights();
+  renderActivityEdges();
+  if (state.selectedId) renderNodeActivity(state.nodeById.get(state.selectedId));
+}
+
+function filteredOperationalEvents() {
+  const status = elements.statusFilter.value;
+  const attention = new Set(["failed", "blocked", "denied", "waiting", "awaiting_approval"]);
+  return state.operations.events.filter((event) => {
+    const eventStatus = runtimeStatus(event);
+    if (status !== "all" && eventStatus !== status) return false;
+    if (elements.attentionOnly.checked && !attention.has(eventStatus) && !["error", "critical", "warning"].includes(event.severity)) return false;
+    return true;
+  });
+}
+
+function operationEventButton(event) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = `operation-event severity-${event.severity || "info"}`;
+  const title = document.createElement("strong");
+  title.textContent = event.summary;
+  const meta = document.createElement("span");
+  meta.textContent = `#${event.sequence} · ${event.event_type} · ${formatTime(event.occurred_at)}`;
+  button.append(title, meta);
+  button.addEventListener("click", () => replayToSequence(Number(event.sequence)));
+  return button;
+}
+
+function emptyOperationMessage(copy) {
+  const message = document.createElement("p");
+  message.className = "description";
+  message.textContent = copy;
+  return message;
+}
+
+function renderTimeline() {
+  const events = filteredOperationalEvents();
+  const replayIndex = state.operations.mode === "live"
+    ? events.length
+    : events.filter((event) => Number(event.sequence) <= state.operations.replaySequence).length;
+  elements.timelineTitle.textContent = state.operations.mode === "live" ? "Live events" : "Deterministic replay";
+  elements.timelineScrubber.max = String(events.length);
+  elements.timelineScrubber.value = String(replayIndex);
+  elements.timelinePosition.textContent = `${replayIndex} / ${events.length}`;
+  elements.jumpLive.classList.toggle("hidden", state.operations.mode === "live");
+  elements.eventRail.replaceChildren();
+  const start = Math.max(0, events.length - 36);
+  events.slice(start).forEach((event, offset) => {
+    const absoluteIndex = start + offset + 1;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `event-chip ${event.severity || "info"}${absoluteIndex === replayIndex ? " active" : ""}`;
+    const title = document.createElement("strong");
+    title.textContent = event.event_type;
+    const meta = document.createElement("span");
+    meta.textContent = `#${event.sequence} · ${formatTime(event.occurred_at)}`;
+    button.append(title, meta);
+    button.addEventListener("click", () => replayToSequence(Number(event.sequence)));
+    elements.eventRail.append(button);
+  });
+  if (state.operations.mode === "live" && elements.followLive.checked) {
+    elements.eventRail.scrollLeft = elements.eventRail.scrollWidth;
+  }
+}
+
+async function openMissionReplay(missionId) {
+  await setMode("replay");
+  const response = await fetch(`/api/missions/${encodeURIComponent(missionId)}/timeline?limit=2000`);
+  if (!response.ok) return;
+  const payload = await response.json();
+  state.operations.events = payload.events || [];
+  state.operations.replayCount = state.operations.events.length;
+  elements.timelineTitle.textContent = `Mission ${shortId(missionId)}`;
+  rebuildReplay(state.operations.replayCount);
+}
+
+async function runFleetValidation() {
+  if (state.operations.mode !== "live") await setMode("live");
+  const originalLabel = elements.testAllAgents.textContent;
+  elements.testAllAgents.disabled = true;
+  elements.testAllAgents.textContent = "Testing all agents…";
+  elements.fleetTestResult.className = "fleet-test-result";
+  elements.fleetTestResult.replaceChildren();
+  const pending = document.createElement("strong");
+  pending.textContent = "Fleet validation running";
+  const note = document.createElement("span");
+  note.textContent = "All compiled Specialists are being checked in safe no-model, no-network mode.";
+  elements.fleetTestResult.append(pending, note);
+  elements.fleetTestResult.classList.remove("hidden");
+  try {
+    const response = await fetch("/api/fleet/test", { method: "POST" });
+    const report = await response.json();
+    if (!response.ok) throw new Error(report.detail || `Fleet validation failed (${response.status}).`);
+    renderFleetValidationResult(report);
+  } catch (error) {
+    elements.fleetTestResult.className = "fleet-test-result failed";
+    elements.fleetTestResult.replaceChildren();
+    const heading = document.createElement("strong");
+    heading.textContent = "Validation request failed";
+    const detail = document.createElement("span");
+    detail.textContent = error instanceof Error ? error.message : String(error);
+    elements.fleetTestResult.append(heading, detail);
+  } finally {
+    elements.testAllAgents.disabled = false;
+    elements.testAllAgents.textContent = originalLabel;
+  }
+}
+
+function renderFleetValidationResult(report) {
+  const passed = report.status === "passed" && report.failed_count === 0;
+  elements.fleetTestResult.className = `fleet-test-result${passed ? "" : " failed"}`;
+  elements.fleetTestResult.replaceChildren();
+  const heading = document.createElement("strong");
+  heading.textContent = passed ? "All agents passed" : `${report.failed_count} agent(s) failed`;
+  const detail = document.createElement("span");
+  detail.textContent = `${report.passed_count}/${report.tested_count} passed · ${Math.round(report.duration_ms)} ms · ${shortId(report.validation_id)}`;
+  elements.fleetTestResult.append(heading, detail);
+  const failures = (report.results || []).filter((item) => !item.passed).slice(0, 8);
+  for (const failure of failures) {
+    const row = document.createElement("span");
+    row.textContent = `${failure.specialist_name}: ${failure.error_type || failure.outcome}`;
+    elements.fleetTestResult.append(row);
+  }
+}
+
+function replayToSequence(sequence) {
+  if (state.operations.mode !== "replay") {
+    setMode("replay").then(() => replayToSequence(sequence));
+    return;
+  }
+  const count = state.operations.events.filter((event) => Number(event.sequence) <= sequence).length;
+  rebuildReplay(count);
+}
+
+function applyOperationalHighlights() {
+  for (const node of state.visibleNodes) {
+    const element = state.nodeElements.get(node.id);
+    if (!element) continue;
+    for (const className of [...element.classList]) {
+      if (className.startsWith("runtime-")) element.classList.remove(className);
+    }
+    if (state.operations.mode === "map") continue;
+    const activity = state.operations.entities.get(node.id);
+    const status = String(activity?.status || "idle");
+    if (activity && status !== "idle") element.classList.add(`runtime-${status}`);
+    const selectedStatus = elements.statusFilter.value;
+    const attention = new Set(["failed", "blocked", "denied", "waiting", "awaiting_approval"]);
+    const filtered = (selectedStatus !== "all" && status !== selectedStatus)
+      || (elements.attentionOnly.checked && !attention.has(status));
+    element.classList.toggle("runtime-filtered", filtered);
+    element.setAttribute("aria-label", `${node.label}, ${KIND_LABELS[node.kind] || node.kind}, runtime ${status}`);
+  }
+}
+
+function renderActivityEdges() {
+  elements.activityEdgeLayer.replaceChildren();
+  state.operations.activityEdgeElements.clear();
+  if (state.operations.mode === "map") return;
+  const visibleIds = new Set(state.visibleNodes.map((node) => node.id));
+  for (const edge of state.operations.activityEdges) {
+    if (!visibleIds.has(edge.source) || !visibleIds.has(edge.target)) continue;
+    const line = svgElement("line", {
+      class: `activity-edge ${["error", "critical"].includes(edge.severity) ? "error" : edge.severity === "warning" ? "warning" : ""}`,
+      "data-activity-id": edge.id,
+    });
+    elements.activityEdgeLayer.append(line);
+    state.operations.activityEdgeElements.set(edge.id, line);
+  }
+  updateActivityEdgeElements();
+}
+
+function updateActivityEdgeElements() {
+  for (const edge of state.operations.activityEdges) {
+    const element = state.operations.activityEdgeElements.get(edge.id);
+    const source = state.positions.get(edge.source);
+    const target = state.positions.get(edge.target);
+    if (!element || !source || !target) continue;
+    element.setAttribute("x1", source.x);
+    element.setAttribute("y1", source.y);
+    element.setAttribute("x2", target.x);
+    element.setAttribute("y2", target.y);
+  }
+}
+
+function renderNodeActivity(node) {
+  if (!node || state.operations.mode === "map") {
+    elements.activitySection.classList.add("hidden");
+    return;
+  }
+  const activity = state.operations.entities.get(node.id);
+  const events = state.operations.events.filter((event) => (
+    graphEntityKey(event.actor) === node.id || graphEntityKey(event.subject) === node.id
+  )).slice(-8).reverse();
+  elements.activitySection.classList.remove("hidden");
+  elements.activityStatus.textContent = activity?.status || "idle";
+  elements.activityList.replaceChildren();
+  for (const event of events) elements.activityList.append(operationEventButton(event));
+  if (!events.length) elements.activityList.append(emptyOperationMessage("No retained activity for this entity."));
+}
+
+function shortId(identifier) {
+  const value = String(identifier || "unknown");
+  return value.length > 18 ? `${value.slice(0, 9)}…${value.slice(-6)}` : value;
+}
+
+function formatTime(value) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "unknown time" : date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
 function setPreset(name) {
   state.preset = name;
   state.enabledKinds = new Set(PRESETS[name]);
@@ -846,6 +1458,9 @@ function setPreset(name) {
 }
 
 function bindEvents() {
+  document.querySelectorAll(".mode-button").forEach((button) => {
+    button.addEventListener("click", () => setMode(button.dataset.mode));
+  });
   document.querySelectorAll(".preset").forEach((button) => {
     button.addEventListener("click", () => setPreset(button.dataset.preset));
   });
@@ -862,7 +1477,10 @@ function bindEvents() {
   elements.showActive.addEventListener("change", () => applyFilters());
   elements.showPlanned.addEventListener("change", () => applyFilters());
   elements.showEdgeLabels.addEventListener("change", () => renderGraph());
-  elements.reduceMotion.addEventListener("change", () => startSimulation(0.08));
+  elements.reduceMotion.addEventListener("change", () => {
+    document.body.classList.toggle("reduce-motion", elements.reduceMotion.checked);
+    startSimulation(0.08);
+  });
   elements.toggleTypes.addEventListener("click", () => {
     const allEnabled = KIND_ORDER.filter((kind) => state.graph.counts[kind]).every((kind) => state.enabledKinds.has(kind));
     state.enabledKinds = allEnabled ? new Set() : new Set(KIND_ORDER);
@@ -886,8 +1504,15 @@ function bindEvents() {
     }
     state.selectedId = null;
     state.focusId = null;
+    document.body.classList.remove("inspector-open");
     elements.inspector.classList.add("hidden");
-    elements.inspectorEmpty.classList.remove("hidden");
+    if (state.operations.mode === "map") {
+      elements.inspectorEmpty.classList.remove("hidden");
+      elements.operationsOverview.classList.add("hidden");
+    } else {
+      elements.inspectorEmpty.classList.add("hidden");
+      elements.operationsOverview.classList.remove("hidden");
+    }
     applyHighlights();
   });
   elements.graph.addEventListener("wheel", (event) => {
@@ -917,6 +1542,29 @@ function bindEvents() {
     startSimulation(0.28);
   });
   elements.runMission.addEventListener("click", runSandboxMission);
+  elements.missionModel.addEventListener("change", updateMissionModelControl);
+  elements.closeInspector.addEventListener("click", () => {
+    document.body.classList.remove("inspector-open");
+  });
+  elements.statusFilter.addEventListener("change", renderOperations);
+  elements.attentionOnly.addEventListener("change", renderOperations);
+  elements.followLive.addEventListener("change", renderTimeline);
+  elements.jumpLive.addEventListener("click", () => setMode("live"));
+  elements.testAllAgents.addEventListener("click", runFleetValidation);
+  elements.timelineScrubber.addEventListener("input", () => {
+    const filtered = filteredOperationalEvents();
+    const position = Number(elements.timelineScrubber.value);
+    if (position <= 0) {
+      if (state.operations.mode !== "replay") {
+        setMode("replay").then(() => rebuildReplay(0));
+      } else {
+        rebuildReplay(0);
+      }
+      return;
+    }
+    const event = filtered[Math.min(position, filtered.length) - 1];
+    if (event) replayToSequence(Number(event.sequence));
+  });
 
   window.addEventListener("resize", () => {
     startSimulation(0.15);
@@ -928,6 +1576,7 @@ function bindEvents() {
       elements.search.focus();
     }
     if (event.key === "Escape") {
+      document.body.classList.remove("inspector-open");
       elements.search.value = "";
       state.query = "";
       state.focusId = null;
@@ -938,16 +1587,14 @@ function bindEvents() {
 
 async function initialize() {
   bindEvents();
+  loadGemmaStatus();
   try {
     const response = await fetch("/api/knowledge-graph");
     if (!response.ok) throw new Error(`Graph API returned ${response.status}`);
     const graph = await response.json();
     state.graph = graph;
     state.nodeById = new Map(graph.nodes.map((node) => [node.id, node]));
-    elements.statSpecialists.textContent = String(graph.counts.specialist || 0);
-    const componentCount = graph.nodes.length - (graph.counts.specialist || 0) - (graph.counts.guild || 0);
-    elements.statComponents.textContent = String(componentCount);
-    elements.statRelations.textContent = String(graph.edges.length);
+    setGraphCounters();
     elements.apiState.textContent = "Local graph ready";
     elements.apiState.className = "health-pill ok";
     elements.loading.classList.add("hidden");

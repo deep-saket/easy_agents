@@ -6,6 +6,7 @@ import argparse
 import json
 from typing import Any
 
+from easy_agents.fleet.model_profiles import MAC_GEMMA_PROFILE_ID, build_fleet_mac_gemma
 from easy_agents.fleet.models import MissionRequest, SpecialistStatus
 from easy_agents.fleet.registry import FleetRegistry
 from easy_agents.fleet.runtime import FleetRuntime
@@ -89,10 +90,10 @@ def main(argv: list[str] | None = None) -> int:
             approved_effects=args.approved_effects or [],
             allow_network=args.allow_network,
             team_size=args.team_size,
+            model_id=MAC_GEMMA_PROFILE_ID if llm is not None else "none",
         )
-        payload = FleetRuntime(registry=registry, llm=llm).run(request).model_dump(
-            mode="json"
-        )
+        models = {MAC_GEMMA_PROFILE_ID: llm} if llm is not None else {}
+        payload = FleetRuntime(registry=registry, models=models).run(request).model_dump(mode="json")
     print(json.dumps(payload, indent=None if args.compact else 2, sort_keys=True))
     return 0
 
@@ -100,9 +101,7 @@ def main(argv: list[str] | None = None) -> int:
 def _build_model(name: str) -> Any | None:
     if name == "none":
         return None
-    from llm.mac_gemma import MacGemmaLLM
-
-    client = MacGemmaLLM()
+    client = build_fleet_mac_gemma()
     client.require_ready()
     return client
 

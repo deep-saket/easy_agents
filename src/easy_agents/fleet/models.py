@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from enum import Enum
 from typing import Any, Literal
 
@@ -133,6 +134,7 @@ class MissionRequest(BaseModel):
     approved_effects: list[str] = Field(default_factory=list)
     allow_network: bool = False
     team_size: int = Field(default=1, ge=1, le=8)
+    model_id: Literal["none", "mac_gemma"] = "none"
     context: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -225,3 +227,34 @@ class FleetMissionResult(BaseModel):
     results: list[AgentResult]
     synthesis: str
     warnings: list[str] = Field(default_factory=list)
+
+
+class FleetValidationItem(BaseModel):
+    """Result of safely instantiating and planning with one Specialist."""
+
+    specialist_id: str
+    specialist_name: str
+    lifecycle_status: SpecialistStatus
+    source_status: str
+    outcome: MissionStatus
+    passed: bool
+    playbook_id: str | None = None
+    run_id: str | None = None
+    duration_ms: float = Field(ge=0)
+    warning_count: int = Field(default=0, ge=0)
+    error_type: str | None = None
+
+
+class FleetValidationReport(BaseModel):
+    """One correlated, side-effect-free validation of the entire Roster."""
+
+    validation_id: str
+    mission_id: str
+    status: Literal["passed", "failed"]
+    started_at: datetime
+    finished_at: datetime
+    duration_ms: float = Field(ge=0)
+    tested_count: int = Field(ge=0)
+    passed_count: int = Field(ge=0)
+    failed_count: int = Field(ge=0)
+    results: list[FleetValidationItem]

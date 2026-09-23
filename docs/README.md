@@ -13,6 +13,7 @@
 - **Use the Mac-hosted model:** [Local Gemma Integration](./guides/use-local-gemma.md)
 - **Explore agents and components:** [Constellation Knowledge Graph](./guides/constellation-map.md)
 - **Run any Specialist:** [Complete Specialist Fleet](./guides/run-specialist-fleet.md)
+- **Plan live fleet operations:** [Realtime Monitoring and Tracing Plan](./plans/realtime-monitoring-and-tracing-plan.md)
 - **Plan the employed deep-tech explorer system:** [Personal and Deep-Tech Explorer Implementation Plan](./plans/deep-tech-explorer-implementation-plan.md)
 - **Understand the target platform:** [Offline Agent Platform Roadmap](./plans/offline-agent-platform-roadmap.md)
 
@@ -63,6 +64,7 @@ These pages reserve planned roles; they do not describe complete runnable agents
 - [Offline Agent Platform Roadmap](./plans/offline-agent-platform-roadmap.md)
 - [Personal Constellation Gap and Delivery Plan](./plans/personal-constellation-plan.md)
 - [Personal and Deep-Tech Explorer Implementation Plan](./plans/deep-tech-explorer-implementation-plan.md)
+- [Realtime Monitoring and Tracing Plan](./plans/realtime-monitoring-and-tracing-plan.md)
 - [Memory Vector Index Plan](./plans/memory-vector-index-plan.md)
 - [Refactor Fix Plan](./plans/refactor-fix-plan.md)
 - [Docstring Rules](./conventions/docstring-rules.md)
