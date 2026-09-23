@@ -116,7 +116,14 @@ def test_fleet_emits_a_complete_correlated_mission_tree() -> None:
     events = pipeline.events(EventFilter(mission_id=result.mission_id, limit=2_000))
     event_types = [event.event_type for event in events]
     run_ids = {event.run_id for event in events if event.run_id}
-    assert event_types[0:3] == ["mission.created", "mission.routed", "mission.started"]
+    assert event_types[0:6] == [
+        "mission.created",
+        "wormhole.accepted",
+        "galaxy.entered",
+        "circle.selected",
+        "mission.routed",
+        "mission.started",
+    ]
     assert "work_order.created" in event_types
     assert "specialist.selected" in event_types
     assert "specialist.started" in event_types

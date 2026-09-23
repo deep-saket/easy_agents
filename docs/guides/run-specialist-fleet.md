@@ -50,9 +50,19 @@ Routing is deterministic and does not start a model:
   "calculate a satellite RF link budget"
 ```
 
-The result contains ranked Specialists, matched terms, lifecycle state, and
-Guild membership. Only the selected Specialists are instantiated for a
-Mission; registering 70 agents does not keep 70 model loops alive.
+Every request enters the Galaxy through the reusable **Wormhole**. It first
+selects the Galaxy, then one or more Circles, and finally ranks Specialists
+inside those Circles. The result contains the Wormhole, selected Galaxy,
+ranked Circles, Specialist candidates,
+matched terms, lifecycle state, and concrete routing paths. Only the selected
+Specialists are instantiated for a Mission; registering 70 agents does not
+keep 70 model loops alive.
+
+In the canonical vocabulary, an agent is a **Planet**. Circles may contain
+**Rocky Planets** (specialists) and **Giant Planets** (broad non-specialists),
+plus non-agent Components. This runtime currently compiles the existing Rocky
+Planet Roster through `SpecialistManifest`; Giant Planet does not yet have a
+separate executable manifest type.
 
 ## Build a deterministic safe plan
 
@@ -94,7 +104,9 @@ profiles, and memory-scope boundary. Model text is advisory: it cannot bypass
 the policy engine or claim that an external action happened. The client calls
 the separately managed Mac-serving repository over
 `http://127.0.0.1:8080/v1/completions`; no model weights or serving code are
-installed in this repository.
+installed in this repository. In the Galaxy topology, this shared external
+service is a **Rogue Star**: it belongs to no Galaxy and can be reused by
+multiple Galaxies through explicit policy-controlled access.
 
 ## Gates and safety examples
 
@@ -132,8 +144,13 @@ under **Sandbox mission**. Choose **Mac Gemma · external local service** for a
 real model-backed advisory Run, or **Deterministic plan · no model** for the
 policy-aware plan only. Neither choice invokes an external effect.
 
+Alternatively, type the request into the **Wormhole** above the map.
+The UI calls the local entry API and focuses the graph on the resulting
+Wormhole → Galaxy → Circle → Rocky Planet Trajectory before you
+inspect or run the Specialist.
+
 To exercise the complete roster, switch to **Live** and select
-**Test all 70 agents**. The Control Room creates one correlated validation
+**Test all 70 planets**. The Control Room creates one correlated validation
 Mission, runs every compiled Specialist with the local model and network
 disabled, and shows the per-agent result in realtime. The completed Mission is
 retained in **Replay** for inspection.
@@ -164,6 +181,8 @@ The local API exposes the same contracts used by the CLI and UI:
 GET  /api/fleet
 GET  /api/fleet/{specialist_id}
 GET  /api/models/mac-gemma/status
+POST /api/wormhole/route
+POST /api/entrypoint/route  # compatibility alias
 POST /api/missions/route
 POST /api/missions/run
 POST /api/fleet/test
@@ -204,6 +223,7 @@ once and reused by every authorized Charter.
 Implementation:
 
 - `src/easy_agents/fleet/models.py`
+- `src/easy_agents/fleet/gateway.py`
 - `src/easy_agents/fleet/registry.py`
 - `src/easy_agents/fleet/policy.py`
 - `src/easy_agents/fleet/model_profiles.py`
@@ -211,6 +231,6 @@ Implementation:
 - `src/easy_agents/fleet/runtime_catalog.yaml`
 - `src/easy_agents/fleet/cli.py`
 
-Tests: `tests/test_fleet_runtime.py` (15 focused tests, including external-model
-selection, empty-output failure handling, and a correlated 70-Specialist
-validation Mission)
+Tests: `tests/test_fleet_runtime.py` (18 focused tests, including hierarchical
+entry routing, external-model selection, empty-output failure handling, and a
+correlated 70-Specialist validation Mission)

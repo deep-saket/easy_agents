@@ -121,6 +121,37 @@ def test_router_selects_domain_specialists_without_starting_models() -> None:
         assert registry.route(objective, limit=1)[0].specialist_id == expected
 
 
+def test_wormhole_routes_through_galaxy_and_circle() -> None:
+    runtime = FleetRuntime()
+
+    route = runtime.route_plan(
+        MissionRequest(objective="calculate a satellite RF link budget")
+    )
+
+    assert route.wormhole_id == "service:wormhole"
+    assert route.galaxy_id == "personal"
+    assert route.circles[0].circle_id == "satcom"
+    assert route.circles[0].selected_specialist_ids == [
+        "rf_link_budget_specialist"
+    ]
+    assert route.candidates[0].specialist_id == "rf_link_budget_specialist"
+    assert route.paths[0].model_dump() == {
+        "wormhole_id": "service:wormhole",
+        "galaxy_id": "personal",
+        "circle_id": "satcom",
+        "specialist_id": "rf_link_budget_specialist",
+    }
+
+
+def test_wormhole_falls_back_to_commons() -> None:
+    route = FleetRuntime().route_plan(
+        MissionRequest(objective="Help me think about this unusual thing")
+    )
+
+    assert route.circles[0].circle_id == "commons"
+    assert route.candidates[0].specialist_id == "personal_steward"
+
+
 def test_memory_scopes_are_isolated_between_employment_and_exploration() -> None:
     runtime = FleetRuntime()
 
@@ -226,10 +257,14 @@ def test_empty_model_completion_fails_instead_of_claiming_success() -> None:
     assert result.status == MissionStatus.FAILED
     assert result.results[0].used_model == "gemma-4-E4B"
     assert "empty completion" in " ".join(result.warnings)
-    assert "model.failed" in {
+    event_types = {
         event.event_type
         for event in operations.events(EventFilter(mission_id=result.mission_id, limit=200))
     }
+    assert "wormhole.accepted" in event_types
+    assert "galaxy.entered" in event_types
+    assert "circle.selected" in event_types
+    assert "model.failed" in event_types
 
 
 def test_team_run_creates_permission_bounded_work_orders() -> None:
@@ -243,6 +278,9 @@ def test_team_run_creates_permission_bounded_work_orders() -> None:
     )
 
     assert len(result.routed_specialists) == 3
+    assert result.routing.wormhole_id == "service:wormhole"
+    assert result.routing.galaxy_id == "personal"
+    assert result.routing.paths
     assert len(result.results) == 3
     assert len({item.work_order.id for item in result.results}) == 3
     for item in result.results:
@@ -301,12 +339,32 @@ def test_fleet_api_lists_routes_inspects_and_runs_agents() -> None:
     assert specialist.status_code == 200
     assert specialist.json()["status"] == "sandboxed"
     assert route.status_code == 200
+    assert route.json()["wormhole_id"] == "service:wormhole"
+    assert route.json()["galaxy_id"] == "personal"
+    assert route.json()["circles"][0]["circle_id"] == "satcom"
     assert route.json()["candidates"][0]["specialist_id"] == "rf_link_budget_specialist"
     assert run.status_code == 200
     assert run.json()["status"] == "planned"
     assert validation.status_code == 200
     assert validation.json()["status"] == "passed"
     assert validation.json()["tested_count"] == 70
+
+
+def test_wormhole_api_exposes_hierarchical_route() -> None:
+    client = TestClient(create_app())
+
+    response = client.post(
+        "/api/wormhole/route",
+        json={"objective": "plan groceries and pantry restocking"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["wormhole_name"] == "Wormhole"
+    assert payload["galaxy_name"] == "Personal Agent Galaxy"
+    assert "constellation_id" not in payload
+    assert payload["circles"][0]["circle_id"] == "home"
+    assert payload["paths"][0]["specialist_id"] == "shopping_pantry_specialist"
 
 
 def test_fleet_api_reports_and_uses_external_mac_gemma() -> None:

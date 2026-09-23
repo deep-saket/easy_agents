@@ -4,8 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark" />
-    <title>Constellation Map · Easy Agents</title>
-    <link rel="stylesheet" href="/static/styles.css" />
+    <title>Galaxy Map · Easy Agents</title>
+    <link rel="stylesheet" href="/static/styles.css?v=galaxy-guide-7" />
   </head>
   <body>
     <div class="shell">
@@ -16,12 +16,12 @@
           </div>
           <div>
             <p class="eyebrow">Easy Agents · Control Room</p>
-            <h1>Constellation Map</h1>
+            <h1>Personal Agent Galaxy</h1>
           </div>
         </div>
 
         <div class="top-stats" aria-label="Graph summary">
-          <div><strong id="stat-specialists">—</strong><span id="stat-specialists-label">specialists</span></div>
+          <div><strong id="stat-specialists">—</strong><span id="stat-specialists-label">rocky planets</span></div>
           <div><strong id="stat-components">—</strong><span id="stat-components-label">components</span></div>
           <div><strong id="stat-relations">—</strong><span id="stat-relations-label">relationships</span></div>
         </div>
@@ -31,6 +31,7 @@
             <button class="mode-button active" data-mode="map" type="button">Map</button>
             <button class="mode-button" data-mode="live" type="button">Live</button>
             <button class="mode-button" data-mode="replay" type="button">Replay</button>
+            <button class="mode-button" data-mode="guide" type="button">Guide</button>
           </div>
           <span id="api-state" class="health-pill loading">Connecting</span>
           <button id="fit-view" class="icon-button" type="button" title="Fit graph to view" aria-label="Fit graph to view">⌗</button>
@@ -43,7 +44,7 @@
             <label class="field-label" for="search">Find anything</label>
             <div class="search-wrap">
               <span aria-hidden="true">⌕</span>
-              <input id="search" type="search" placeholder="Agent, tool, memory…" autocomplete="off" />
+              <input id="search" type="search" placeholder="Planet, tool, memory…" autocomplete="off" />
               <kbd>/</kbd>
             </div>
           </section>
@@ -52,7 +53,7 @@
             <p class="section-label">View</p>
             <div class="segmented" role="group" aria-label="Graph preset">
               <button class="preset active" data-preset="overview" type="button">Overview</button>
-              <button class="preset" data-preset="agents" type="button">Agents</button>
+              <button class="preset" data-preset="agents" type="button">Planets</button>
               <button class="preset" data-preset="components" type="button">Components</button>
               <button class="preset" data-preset="full" type="button">Full</button>
             </div>
@@ -123,7 +124,7 @@
               <span class="switch"></span>
               <span>Follow live activity</span>
             </label>
-            <button id="test-all-agents" class="fleet-test-button" type="button">Test all 70 agents</button>
+            <button id="test-all-agents" class="fleet-test-button" type="button">Test all 70 planets</button>
             <div id="fleet-test-result" class="fleet-test-result hidden" aria-live="polite"></div>
           </section>
 
@@ -133,7 +134,7 @@
           </div>
         </aside>
 
-        <main id="graph-stage" class="graph-stage" aria-label="Constellation knowledge graph">
+        <main id="graph-stage" class="graph-stage" aria-label="Galaxy knowledge graph">
           <div class="stage-heading">
             <div>
               <p id="view-kicker" class="eyebrow">All circles</p>
@@ -141,6 +142,27 @@
             </div>
             <div class="visible-count"><strong id="visible-nodes">—</strong> nodes in view</div>
           </div>
+
+          <section id="constellation-entry" class="constellation-entry" aria-label="Talk to the Galaxy">
+            <div class="entry-heading">
+              <div>
+                <p class="section-label">Wormhole</p>
+                <strong>What should the Galaxy handle?</strong>
+              </div>
+              <span class="entry-flow">Wormhole → Galaxy → Circle → Planet</span>
+            </div>
+            <div class="entry-controls">
+              <input
+                id="entry-objective"
+                type="text"
+                minlength="3"
+                placeholder="Plan groceries, explore an energy idea, call mom…"
+                autocomplete="off"
+              />
+              <button id="route-entry" type="button">Route</button>
+            </div>
+            <div id="entry-result" class="entry-result hidden" aria-live="polite"></div>
+          </section>
 
           <svg id="graph" role="img" aria-label="Interactive agent relationship graph">
             <defs>
@@ -162,8 +184,8 @@
 
           <div id="graph-loading" class="graph-message">
             <div class="loader"></div>
-            <strong>Mapping the constellation</strong>
-            <span>Loading agents and components…</span>
+            <strong>Mapping the galaxy</strong>
+            <span>Loading planets and components…</span>
           </div>
           <div id="graph-empty" class="graph-message hidden">
             <strong>No matching nodes</strong>
@@ -240,7 +262,7 @@
 
             <section id="mission-section" class="mission-section hidden">
               <p class="section-label">Sandbox mission</p>
-              <textarea id="mission-input" rows="4" placeholder="Give this Specialist a bounded task…"></textarea>
+              <textarea id="mission-input" rows="4" placeholder="Give this Planet a bounded task…"></textarea>
               <label class="field-label mission-model-label" for="mission-model">Reasoning model</label>
               <select id="mission-model">
                 <option value="mac_gemma">Mac Gemma · external local service</option>
@@ -258,7 +280,7 @@
 
             <section>
               <div class="section-heading">
-                <p class="section-label">Relationships</p>
+                <p class="section-label">Orbits / relationships</p>
                 <span id="relationship-count" class="count-badge"></span>
               </div>
               <div id="relationship-list" class="relationship-list"></div>
@@ -278,15 +300,255 @@
             </section>
           </div>
         </aside>
+
+        <article id="guide-panel" class="guide-panel hidden" aria-label="Galaxy terminology guide">
+          <div class="guide-wrap">
+            <header class="guide-hero">
+              <div>
+                <p class="eyebrow">Galaxy Guide</p>
+                <h2>One language for the whole agent system</h2>
+                <p>
+                  These terms describe ownership, routing, collaboration, safety, and
+                  observability. The metaphor organizes the system; precise technical
+                  contracts still govern what every Planet can do.
+                </p>
+              </div>
+              <span class="guide-version">Canonical vocabulary</span>
+            </header>
+
+            <nav class="guide-nav" aria-label="Guide sections">
+              <a href="#guide-route-title">Route</a>
+              <a href="#guide-nesting-title">Nested systems</a>
+              <a href="#guide-structure-title">Definitions</a>
+              <a href="#guide-solar-title">Solar System</a>
+              <a href="#guide-work-title">Execution</a>
+              <a href="#guide-ops-title">Operations</a>
+            </nav>
+
+            <section class="guide-section" aria-labelledby="guide-route-title">
+              <div class="guide-section-heading">
+                <p class="section-label">Ingress and routing</p>
+                <h3 id="guide-route-title">How a Mission enters the system</h3>
+              </div>
+              <div class="guide-flow" aria-label="Portal to Planet route">
+                <div><strong>Portal</strong><span>Human-facing channel</span></div>
+                <i aria-hidden="true">→</i>
+                <div><strong>Wormhole</strong><span>Gateway at the boundary</span></div>
+                <i aria-hidden="true">→</i>
+                <div><strong>Galaxy</strong><span>Entire owned ecosystem</span></div>
+                <i aria-hidden="true">→</i>
+                <div><strong>Circle</strong><span>Domain grouping</span></div>
+                <i aria-hidden="true">→</i>
+                <div><strong>Planet</strong><span>Rocky or Giant</span></div>
+              </div>
+              <article class="guide-example">
+                <div class="example-prompt">
+                  <span>Example Mission</span>
+                  <blockquote>“Plan next week’s groceries and tell me what is missing from the pantry.”</blockquote>
+                </div>
+                <ol class="mission-walkthrough">
+                  <li><b>1</b><div><strong>Portal captures intent</strong><span>The request may arrive through chat, voice, CLI, or API.</span></div></li>
+                  <li><b>2</b><div><strong>Wormhole creates a Trajectory</strong><span>It routes into the Personal Agent Galaxy without granting new permissions.</span></div></li>
+                  <li><b>3</b><div><strong>Galaxy selects the Circle</strong><span>The request enters the Home Circle directly.</span></div></li>
+                  <li><b>4</b><div><strong>A Planet receives a Work Order</strong><span>The Shopping &amp; Pantry Rocky Planet plans the task using its bounded Solar System.</span></div></li>
+                </ol>
+              </article>
+            </section>
+
+            <section class="guide-section" aria-labelledby="guide-nesting-title">
+              <div class="guide-section-heading">
+                <p class="section-label">Illustrated architecture</p>
+                <h3 id="guide-nesting-title">Think in boundaries, connected graphs, and groups</h3>
+              </div>
+              <div class="nesting-layout">
+                <div class="boundary-diagram" role="img" aria-label="Wormhole entering a Galaxy connected directly to Home and Life Admin Circles, a Constellation overlay spanning both Circles, and a Mac Gemma Rogue Star outside the Galaxy">
+                  <div class="boundary-wormhole"><span>◎</span><strong>Wormhole</strong><small>outside boundary</small></div>
+                  <div class="boundary-rogue-star"><span>★</span><strong>Mac Gemma</strong><small>Rogue Star · shared external model</small></div>
+                  <div class="boundary-arrow" aria-hidden="true">→</div>
+                  <div class="galaxy-boundary">
+                    <span class="boundary-label">Personal Agent Galaxy</span>
+                    <div class="circle-grid">
+                      <div class="circle-cluster home-cluster">
+                        <strong>Home Circle</strong>
+                        <span>Rocky Planet · Shopping &amp; Pantry</span>
+                        <span>Giant Planet · Household Assistant</span>
+                      </div>
+                      <div class="circle-cluster admin-cluster">
+                        <strong>Life Admin Circle</strong>
+                        <span>Giant Planet · Schedule Coordinator</span>
+                        <span>Rocky Planet · Document Coordinator</span>
+                      </div>
+                    </div>
+                    <div class="constellation-overlay">
+                      <span>Household Planning Constellation</span>
+                      <small>connected subgraph spanning parts of both Circles</small>
+                    </div>
+                    <div class="shared-component">Component · shared Vault + policy Gate</div>
+                  </div>
+                </div>
+                <aside class="illustration-notes">
+                  <div><b>1</b><p><strong>The Wormhole is outside.</strong> It is the controlled entrance into the owned Galaxy.</p></div>
+                  <div><b>2</b><p><strong>The Galaxy connects directly to Circles.</strong> Routing selects a Circle without passing through a Constellation.</p></div>
+                  <div><b>3</b><p><strong>A Constellation is a connected overlay.</strong> It draws selected Planets and Components from parts of one or more Circles.</p></div>
+                  <div><b>4</b><p><strong>A Circle contains Circle Members.</strong> They may be Rocky Planets, Giant Planets, or non-agent Components.</p></div>
+                  <div><b>5</b><p><strong>A Rogue Star remains outside every Galaxy.</strong> Multiple Galaxies may access it through explicit, policy-controlled Orbits.</p></div>
+                </aside>
+              </div>
+            </section>
+
+            <section class="guide-section" aria-labelledby="guide-structure-title">
+              <div class="guide-section-heading">
+                <p class="section-label">Structure</p>
+                <h3 id="guide-structure-title">What each layer means</h3>
+              </div>
+              <div class="guide-grid guide-grid-primary">
+                <article class="term-card featured">
+                  <span class="term-symbol">◎</span>
+                  <div><h4>Wormhole</h4><p>The single logical ingress gateway at the Galaxy boundary. It accepts a Mission and creates an explainable Trajectory without granting additional authority.</p></div>
+                </article>
+                <article class="term-card featured">
+                  <span class="term-symbol">✹</span>
+                  <div><h4>Galaxy</h4><p>The top-level ownership and isolation boundary. It connects directly to the Circles belonging to one person or organization.</p></div>
+                </article>
+                <article class="term-card featured">
+                  <span class="term-symbol">★</span>
+                  <div><h4>Rogue Star</h4><p>A shared external resource that belongs to no Galaxy. Multiple Galaxies may access it through explicit, governed connections; Mac Gemma is the current example.</p></div>
+                </article>
+                <article class="term-card featured">
+                  <span class="term-symbol">✶</span>
+                  <div><h4>Constellation</h4><p>A connected operational subgraph drawn from selected parts of one or more Circles. It is an overlay, not a routing or ownership layer.</p></div>
+                </article>
+                <article class="term-card featured">
+                  <span class="term-symbol">◌</span>
+                  <div><h4>Circle</h4><p>A Galaxy-level responsibility or domain grouping such as Home, Energy, or Satellite Communications. It contains Planets and Components.</p></div>
+                </article>
+                <article class="term-card featured">
+                  <span class="term-symbol">●</span>
+                  <div><h4>Planet</h4><p>The user-facing name for an autonomous Agent inside a Circle. Every Planet is classified as either Rocky or Giant.</p></div>
+                </article>
+                <article class="term-card featured">
+                  <span class="term-symbol">R</span>
+                  <div><h4>Rocky Planet</h4><p>A specialist Agent with a narrow domain or task Charter, such as RF link-budget analysis or pantry planning.</p></div>
+                </article>
+                <article class="term-card featured">
+                  <span class="term-symbol">G</span>
+                  <div><h4>Giant Planet</h4><p>A non-specialist Agent with a broad Charter that coordinates varied routine work and delegates deep expertise when needed.</p></div>
+                </article>
+                <article class="term-card featured">
+                  <span class="term-symbol">◇</span>
+                  <div><h4>Circle Member</h4><p>The umbrella term for anything assigned to a Circle: a Rocky Planet, Giant Planet, or Component.</p></div>
+                </article>
+                <article class="term-card featured">
+                  <span class="term-symbol">C</span>
+                  <div><h4>Component</h4><p>A non-agent Circle Member such as a capability, tool, Vault, Playbook, Gate, model, or service.</p></div>
+                </article>
+                <article class="term-card featured">
+                  <span class="term-symbol">☼</span>
+                  <div><h4>Solar System</h4><p>A Planet-centered view of its directly connected tools, capabilities, Playbooks, memories, policies, models, and services.</p></div>
+                </article>
+              </div>
+              <div class="guide-distinction">
+                <div><strong>Circle ≠ Constellation</strong><span>A Circle groups a domain. A Constellation connects selected parts of one or more Circles.</span></div>
+                <div><strong>Rocky ≠ Giant</strong><span>Both are Planets. A Rocky Planet is specialist; a Giant Planet is broad and non-specialist.</span></div>
+                <div><strong>Planet ≠ Component</strong><span>A Planet decides and acts under a Charter. A Component enables or constrains that work.</span></div>
+                <div><strong>Galaxy ≠ Rogue Star</strong><span>A Galaxy owns its internal system. A Rogue Star is external and may be shared across Galaxies.</span></div>
+              </div>
+            </section>
+
+            <section class="guide-section" aria-labelledby="guide-solar-title">
+              <div class="guide-section-heading">
+                <p class="section-label">Planet neighborhood</p>
+                <h3 id="guide-solar-title">A Solar System is everything a Planet can directly reach</h3>
+              </div>
+              <div class="solar-layout">
+                <div class="solar-diagram" role="img" aria-label="Shopping and Pantry Rocky Planet connected to a tool, memory vault, Playbook, policy Gate, Rogue Star, and capability">
+                  <div class="solar-ring ring-one"></div>
+                  <div class="solar-ring ring-two"></div>
+                  <div class="solar-core"><span>R</span><strong>Shopping &amp; Pantry</strong><small>Rocky Planet</small></div>
+                  <div class="solar-node solar-tool"><b>T</b><span>Inventory tool</span></div>
+                  <div class="solar-node solar-memory"><b>M</b><span>Pantry Vault</span></div>
+                  <div class="solar-node solar-playbook"><b>P</b><span>Restock Playbook</span></div>
+                  <div class="solar-node solar-policy"><b>!</b><span>Purchase Gate</span></div>
+                  <div class="solar-node solar-model"><b>★</b><span>Mac Gemma · Rogue Star</span></div>
+                  <div class="solar-node solar-capability"><b>C</b><span>Plan shopping</span></div>
+                </div>
+                <div class="solar-explanation">
+                  <article><strong>Direct connections define the view</strong><p>The Solar System is computed from graph Orbits. It is not another agent or process.</p></article>
+                  <article><strong>Shared components create overlap</strong><p>Two Planets can share the same Vault, Playbook, model, or policy while keeping separate Charters.</p></article>
+                  <article><strong>Authority stays bounded</strong><p>Planning a purchase may be allowed, while placing the order still stops at the Purchase Gate.</p></article>
+                </div>
+              </div>
+            </section>
+
+            <section class="guide-section" aria-labelledby="guide-choice-title">
+              <div class="guide-section-heading">
+                <p class="section-label">Choosing the right term</p>
+                <h3 id="guide-choice-title">Which term fits?</h3>
+              </div>
+              <div class="choice-grid">
+                <article><span class="choice-question">“Group all energy-related roles.”</span><strong>Use a Circle</strong><p>Energy is a domain grouping, even when its members have different Charters and tools.</p></article>
+                <article><span class="choice-question">“Connect selected Home and Life Admin members for household planning.”</span><strong>Use a Constellation</strong><p>The workflow is a connected subgraph spanning parts of two Circles.</p></article>
+                <article><span class="choice-question">“Perform an RF link-budget review.”</span><strong>Use a Rocky Planet</strong><p>The task needs narrow specialist expertise and one accountable Charter.</p></article>
+                <article><span class="choice-question">“Coordinate whatever routine work arrives today.”</span><strong>Use a Giant Planet</strong><p>The role needs a broad Charter and can delegate narrow work to Rocky Planets.</p></article>
+                <article><span class="choice-question">“Attach a shared calculation tool or Vault.”</span><strong>Use a Component</strong><p>It enables Planets but does not independently own goals or make decisions.</p></article>
+                <article><span class="choice-question">“Share one externally hosted model across several Galaxies.”</span><strong>Use a Rogue Star</strong><p>The resource stays outside every Galaxy and is reached through governed Orbits.</p></article>
+                <article><span class="choice-question">“Combine scientific, market, and regulatory perspectives for one decision.”</span><strong>Use a Crew</strong><p>Several Planets collaborate temporarily while retaining individual accountability.</p></article>
+              </div>
+            </section>
+
+            <section class="guide-section" aria-labelledby="guide-work-title">
+              <div class="guide-section-heading">
+                <p class="section-label">Work and execution</p>
+                <h3 id="guide-work-title">How the Galaxy gets work done</h3>
+              </div>
+              <div class="guide-grid">
+                <article class="term-card"><div><h4>Mission</h4><p>A user goal submitted to the Galaxy.</p></div></article>
+                <article class="term-card"><div><h4>Trajectory</h4><p>The explainable route from Wormhole through Galaxy and Circle to the selected Planet.</p></div></article>
+                <article class="term-card"><div><h4>Crew</h4><p>A temporary set of Rocky and/or Giant Planets collaborating on one Mission.</p></div></article>
+                <article class="term-card"><div><h4>Work Order</h4><p>A bounded delegation carrying scope, effects, memory boundary, approvals, and trace identifiers.</p></div></article>
+                <article class="term-card"><div><h4>Flight Plan</h4><p>The selected Playbook and ordered steps used to execute a Work Order.</p></div></article>
+                <article class="term-card"><div><h4>Gate</h4><p>A policy or human-approval boundary before a protected action.</p></div></article>
+              </div>
+              <div class="execution-story" aria-label="Mission execution lifecycle">
+                <div><b>01</b><strong>Mission</strong><span>User states the desired outcome.</span></div>
+                <i aria-hidden="true">→</i>
+                <div><b>02</b><strong>Trajectory</strong><span>Wormhole explains who should handle it.</span></div>
+                <i aria-hidden="true">→</i>
+                <div><b>03</b><strong>Work Order</strong><span>Scope and permissions become machine-readable.</span></div>
+                <i aria-hidden="true">→</i>
+                <div><b>04</b><strong>Flight Plan</strong><span>A Playbook provides ordered steps.</span></div>
+                <i aria-hidden="true">→</i>
+                <div><b>05</b><strong>Gate</strong><span>Protected effects wait for policy or approval.</span></div>
+                <i aria-hidden="true">→</i>
+                <div><b>06</b><strong>Mission Log</strong><span>Every decision and outcome remains traceable.</span></div>
+              </div>
+            </section>
+
+            <section class="guide-section" aria-labelledby="guide-ops-title">
+              <div class="guide-section-heading">
+                <p class="section-label">Graph and operations</p>
+                <h3 id="guide-ops-title">How the system is governed and observed</h3>
+              </div>
+              <div class="guide-grid">
+                <article class="term-card"><div><h4>Orbit</h4><p>A typed graph relationship such as member of, can use, reads, governs, dispatches to, or accesses external.</p></div></article>
+                <article class="term-card"><div><h4>Roster</h4><p>The registered set of available Rocky and Giant Planet Charters.</p></div></article>
+                <article class="term-card"><div><h4>Vault</h4><p>An explicit, scoped, and auditable memory or data-isolation boundary.</p></div></article>
+                <article class="term-card"><div><h4>Observatory</h4><p>The monitoring and replay capability. Control Room is the product-facing interface.</p></div></article>
+                <article class="term-card"><div><h4>Mission Log</h4><p>The correlated event history for routing, Planets, models, tools, approvals, and outcomes.</p></div></article>
+                <article class="term-card"><div><h4>Charter</h4><p>The declarative contract defining a Planet’s purpose, permissions, memory scopes, and lifecycle.</p></div></article>
+              </div>
+            </section>
+          </div>
+        </article>
       </div>
 
       <footer class="statusbar">
         <span><i class="live-dot"></i><span id="stream-state">Local Control Room</span></span>
         <span id="status-text">Waiting for graph data</span>
-        <span>Catalog + deep-tech plan overlay</span>
+        <span>Personal Operations Constellation · catalog + deep-tech overlay</span>
       </footer>
     </div>
 
-    <script type="module" src="/static/app.js"></script>
+    <script type="module" src="/static/app.js?v=galaxy-guide-7"></script>
   </body>
 </html>

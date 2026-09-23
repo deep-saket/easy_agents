@@ -217,12 +217,50 @@ class RouteCandidate(BaseModel):
     guilds: list[str]
 
 
+class CircleRouteCandidate(BaseModel):
+    """Explainable Circle selected by the Galaxy Wormhole."""
+
+    circle_id: str
+    display_name: str
+    score: float = Field(ge=0.0, le=1.0)
+    matched_terms: list[str] = Field(default_factory=list)
+    status: str
+    selected_specialist_ids: list[str] = Field(default_factory=list)
+
+
+class RoutingPath(BaseModel):
+    """One concrete Wormhole → Galaxy → Circle → Specialist path."""
+
+    wormhole_id: str
+    galaxy_id: str
+    circle_id: str
+    specialist_id: str
+
+
+class GalaxyRoutePlan(BaseModel):
+    """Hierarchical route into a Galaxy and one or more Circles."""
+
+    objective: str
+    wormhole_id: str = "service:wormhole"
+    wormhole_name: str = "Wormhole"
+    galaxy_id: str = "personal"
+    galaxy_name: str = "Personal Agent Galaxy"
+    circles: list[CircleRouteCandidate]
+    candidates: list[RouteCandidate]
+    paths: list[RoutingPath]
+
+
+# Compatibility alias for code written before Constellation left the route path.
+ConstellationRoutePlan = GalaxyRoutePlan
+
+
 class FleetMissionResult(BaseModel):
     """Root Mission result containing one or more Specialist results."""
 
     mission_id: str
     objective: str
     status: MissionStatus
+    routing: GalaxyRoutePlan
     routed_specialists: list[RouteCandidate]
     results: list[AgentResult]
     synthesis: str

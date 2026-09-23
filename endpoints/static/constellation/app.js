@@ -1,6 +1,9 @@
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 const KIND_ORDER = [
+  "galaxy",
+  "rogue_star",
+  "constellation",
   "specialist",
   "guild",
   "capability",
@@ -13,7 +16,10 @@ const KIND_ORDER = [
 ];
 
 const KIND_LABELS = {
-  specialist: "Specialists",
+  galaxy: "Galaxies",
+  rogue_star: "Rogue Stars",
+  constellation: "Constellations",
+  specialist: "Rocky Planets",
   guild: "Circles",
   capability: "Capabilities",
   tool: "Tools",
@@ -24,7 +30,16 @@ const KIND_LABELS = {
   service: "Services",
 };
 
+const LEGEND_LABELS = {
+  guild: "circle",
+  rogue_star: "rogue star",
+  specialist: "rocky planet",
+};
+
 const KIND_COLORS = {
+  galaxy: "#6ee7d2",
+  rogue_star: "#ffcf5c",
+  constellation: "#f7df83",
   specialist: "#b99cff",
   guild: "#ffb866",
   capability: "#52c7e8",
@@ -37,7 +52,10 @@ const KIND_COLORS = {
 };
 
 const KIND_GLYPHS = {
-  specialist: "S",
+  galaxy: "✹",
+  rogue_star: "★",
+  constellation: "✶",
+  specialist: "R",
   guild: "◌",
   capability: "C",
   tool: "T",
@@ -49,16 +67,16 @@ const KIND_GLYPHS = {
 };
 
 const PRESETS = {
-  overview: new Set(["specialist", "guild", "tool", "memory", "playbook", "policy", "model", "service"]),
-  agents: new Set(["specialist", "guild"]),
-  components: new Set(["guild", "capability", "tool", "memory", "playbook", "policy", "model", "service"]),
+  overview: new Set(["galaxy", "rogue_star", "constellation", "specialist", "guild", "tool", "memory", "playbook", "policy", "model", "service"]),
+  agents: new Set(["galaxy", "rogue_star", "constellation", "specialist", "guild", "service"]),
+  components: new Set(["galaxy", "rogue_star", "constellation", "guild", "capability", "tool", "memory", "playbook", "policy", "model", "service"]),
   full: new Set(KIND_ORDER),
 };
 
 const PLANNED_STATUSES = new Set(["planned", "proposed", "dormant", "scaffolded", "sandboxed"]);
 const TERMINAL_ACTIONS = new Set(["completed", "failed", "blocked", "cancelled", "denied", "rejected"]);
 const STREAM_EVENT_TYPES = [
-  "mission.created", "mission.routed", "mission.started", "mission.completed", "mission.failed", "mission.cancelled",
+  "mission.created", "wormhole.accepted", "galaxy.entered", "circle.selected", "mission.routed", "mission.started", "mission.completed", "mission.failed", "mission.cancelled",
   "work_order.created", "work_order.queued", "work_order.started", "work_order.completed", "work_order.blocked", "work_order.failed",
   "specialist.selected", "specialist.started", "specialist.completed", "specialist.failed",
   "playbook.started", "playbook.completed", "playbook.failed",
@@ -154,6 +172,11 @@ const elements = {
   streamState: document.getElementById("stream-state"),
   testAllAgents: document.getElementById("test-all-agents"),
   fleetTestResult: document.getElementById("fleet-test-result"),
+  entryPanel: document.getElementById("constellation-entry"),
+  guidePanel: document.getElementById("guide-panel"),
+  entryObjective: document.getElementById("entry-objective"),
+  routeEntry: document.getElementById("route-entry"),
+  entryResult: document.getElementById("entry-result"),
 };
 
 const state = {
@@ -178,6 +201,11 @@ const state = {
   simulationAlpha: 0,
   animationFrame: null,
   hasFitted: false,
+  entryRouting: {
+    nodeIds: new Set(),
+    edgeKeys: new Set(),
+    plan: null,
+  },
   operations: {
     mode: "map",
     eventSource: null,
@@ -216,7 +244,15 @@ function truncate(value, limit = 29) {
   return value.length > limit ? `${value.slice(0, limit - 1)}…` : value;
 }
 
+function relationshipKey(left, right) {
+  return [left, right].sort().join("|");
+}
+
 function nodeRadius(node) {
+  if (node.metadata?.entrypoint) return 15;
+  if (node.kind === "galaxy") return 23;
+  if (node.kind === "rogue_star") return 17;
+  if (node.kind === "constellation") return 19;
   if (node.kind === "guild") return 16;
   if (node.kind === "specialist") return 11;
   if (node.kind === "playbook" || node.kind === "service") return 9;
@@ -290,9 +326,18 @@ function applyFilters({ reheat = true } = {}) {
     nodes = nodes.filter((node) => expanded.has(node.id));
   }
 
+  if (state.entryRouting.nodeIds.size) {
+    nodes = nodes.filter((node) => state.entryRouting.nodeIds.has(node.id));
+  }
+
   const visibleIds = new Set(nodes.map((node) => node.id));
   const edges = state.graph.edges.filter(
-    (edge) => visibleIds.has(edge.source) && visibleIds.has(edge.target),
+    (edge) => visibleIds.has(edge.source)
+      && visibleIds.has(edge.target)
+      && (!edge.metadata?.routing_only
+        || state.entryRouting.edgeKeys.has(relationshipKey(edge.source, edge.target)))
+      && !(edge.kind === "member_of"
+        && state.entryRouting.edgeKeys.has(relationshipKey(edge.source, edge.target))),
   );
   state.visibleNodes = nodes.map(prepareSimulationNode);
   state.visibleEdges = edges;
@@ -328,6 +373,13 @@ function anchorFor(node) {
   const rect = elements.graph.getBoundingClientRect();
   const width = Math.max(rect.width, 700);
   const height = Math.max(rect.height, 520);
+  if (state.entryRouting.nodeIds.size) {
+    const y = height * 0.7;
+    if (node.metadata?.entrypoint) return { x: width * 0.08, y };
+    if (node.kind === "galaxy") return { x: width * 0.32, y };
+    if (node.kind === "guild") return { x: width * 0.62, y };
+    if (node.kind === "specialist") return { x: width * 0.88, y };
+  }
   const guilds = state.graph.nodes.filter((item) => item.kind === "guild");
   const guildIndex = Math.max(0, guilds.findIndex((item) => item.id === `guild:${node.group}`));
   const groupAngle = (guildIndex / Math.max(guilds.length, 1)) * Math.PI * 2 - Math.PI / 2;
@@ -344,13 +396,17 @@ function anchorFor(node) {
       y: height / 2 + Math.sin(angle) * Math.min(width, height) * 0.2,
     };
   }
+  if (node.kind === "galaxy") return { x: width * 0.5, y: height * 0.42 };
+  if (node.kind === "constellation") return { x: width * 0.5, y: height * 0.58 };
   if (node.kind === "specialist") return guildAnchor;
   if (node.kind === "playbook") return { x: width * 0.5, y: height * 0.14 };
   if (node.kind === "memory") return { x: width * 0.12, y: height * 0.48 };
   if (node.kind === "tool") return { x: width * 0.88, y: height * 0.48 };
   if (node.kind === "policy") return { x: width * 0.18, y: height * 0.82 };
   if (node.kind === "model") return { x: width * 0.82, y: height * 0.15 };
-  if (node.kind === "service") return { x: width * 0.5, y: height * 0.5 };
+  if (node.kind === "rogue_star") return { x: width * 0.9, y: height * 0.18 };
+  if (node.metadata?.entrypoint) return { x: width * 0.5, y: height * 0.18 };
+  if (node.kind === "service") return { x: width * 0.5, y: height * 0.58 };
   return { x: width * 0.79, y: height * 0.75 };
 }
 
@@ -381,7 +437,7 @@ function renderGraph() {
   for (const node of state.visibleNodes) {
     const radius = nodeRadius(node);
     const group = svgElement("g", {
-      class: `graph-node kind-${node.kind}${isPlanned(node) ? " planned" : ""}`,
+      class: `graph-node kind-${node.kind}${isPlanned(node) ? " planned" : ""}${node.metadata?.entrypoint ? " entrypoint" : ""}`,
       role: "button",
       tabindex: "0",
       "aria-label": `${node.label}, ${KIND_LABELS[node.kind] || node.kind}`,
@@ -425,20 +481,31 @@ function renderGraph() {
 function applyHighlights() {
   const highlight = state.selectedId ? neighborhood(state.selectedId) : null;
   const query = state.query.trim().toLowerCase();
+  const routed = state.entryRouting.nodeIds.size > 0;
   for (const node of state.visibleNodes) {
     const element = state.nodeElements.get(node.id);
     if (!element) continue;
     const haystack = [node.label, node.id, ...(node.tags || [])].join(" ").toLowerCase();
+    const routeHighlight = state.entryRouting.nodeIds.has(node.id);
     element.classList.toggle("selected", node.id === state.selectedId);
-    element.classList.toggle("dimmed", Boolean(highlight && !highlight.has(node.id)));
+    element.classList.toggle("route-highlight", routeHighlight);
+    element.classList.toggle(
+      "dimmed",
+      Boolean((highlight && !highlight.has(node.id)) || (routed && !routeHighlight)),
+    );
     element.classList.toggle("search-hit", Boolean(query && haystack.includes(query)));
   }
   for (const edge of state.visibleEdges) {
     const element = state.edgeElements.get(edge.id);
     if (!element) continue;
     const connected = edge.source === state.selectedId || edge.target === state.selectedId;
+    const routeHighlight = state.entryRouting.edgeKeys.has(relationshipKey(edge.source, edge.target));
     element.classList.toggle("emphasis", connected);
-    element.classList.toggle("dimmed", Boolean(state.selectedId && !connected));
+    element.classList.toggle("route-highlight", routeHighlight);
+    element.classList.toggle(
+      "dimmed",
+      Boolean((state.selectedId && !connected) || (routed && !routeHighlight)),
+    );
   }
 }
 
@@ -650,7 +717,13 @@ function fitView() {
   const scale = Math.max(0.25, Math.min(1.45, Math.min(rect.width / width, rect.height / height) * 0.9));
   state.transform.k = scale;
   state.transform.x = (rect.width - width * scale) / 2 - minX * scale;
-  state.transform.y = (rect.height - height * scale) / 2 - minY * scale;
+  if (state.entryRouting.nodeIds.size) {
+    const topInset = elements.entryPanel.offsetTop + elements.entryPanel.offsetHeight + 16;
+    const availableHeight = Math.max(rect.height - topInset, 100);
+    state.transform.y = topInset + (availableHeight - height * scale) / 2 - minY * scale;
+  } else {
+    state.transform.y = (rect.height - height * scale) / 2 - minY * scale;
+  }
   applyTransform();
 }
 
@@ -674,7 +747,9 @@ function renderInspector(node) {
   elements.inspectorTitle.textContent = node.label;
   elements.inspectorId.textContent = node.id;
   elements.inspectorDescription.textContent = node.description || "No description recorded.";
-  elements.focusNeighbors.textContent = state.focusId === node.id ? "Show full graph" : "Focus relationships";
+  elements.focusNeighbors.textContent = state.focusId === node.id
+    ? "Show full graph"
+    : node.kind === "specialist" ? "View Solar System" : "Focus relationships";
   elements.missionSection.classList.toggle("hidden", node.kind !== "specialist");
   elements.missionInput.value = "";
   elements.missionResult.replaceChildren();
@@ -695,7 +770,9 @@ function renderInspector(node) {
   }
 
   const relationships = state.graph.edges
-    .filter((edge) => edge.source === node.id || edge.target === node.id)
+    .filter((edge) => (edge.source === node.id || edge.target === node.id)
+      && !(edge.kind === "member_of"
+        && state.entryRouting.edgeKeys.has(relationshipKey(edge.source, edge.target))))
     .map((edge) => ({
       edge,
       outgoing: edge.source === node.id,
@@ -845,6 +922,141 @@ async function loadGemmaStatus() {
   updateMissionModelControl();
 }
 
+async function routeThroughEntrypoint() {
+  const objective = elements.entryObjective.value.trim();
+  if (objective.length < 3) {
+    renderEntrypointError("Describe a Mission in at least three characters.");
+    return;
+  }
+  const originalLabel = elements.routeEntry.textContent;
+  elements.routeEntry.disabled = true;
+  elements.routeEntry.textContent = "Routing…";
+  try {
+    const response = await fetch("/api/wormhole/route", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ objective, team_size: 1 }),
+    });
+    const plan = await response.json();
+    if (!response.ok) throw new Error(plan.detail || `Wormhole returned ${response.status}.`);
+    applyEntrypointRoute(plan);
+    renderEntrypointResult(plan);
+  } catch (error) {
+    renderEntrypointError(error instanceof Error ? error.message : String(error));
+  } finally {
+    elements.routeEntry.disabled = false;
+    elements.routeEntry.textContent = originalLabel;
+  }
+}
+
+function applyEntrypointRoute(plan) {
+  const galaxyNodeId = `galaxy:${plan.galaxy_id}`;
+  const nodeIds = new Set([plan.wormhole_id, galaxyNodeId]);
+  const edgeKeys = new Set();
+  edgeKeys.add(relationshipKey(plan.wormhole_id, galaxyNodeId));
+  for (const path of plan.paths || []) {
+    const circleNodeId = `guild:${path.circle_id}`;
+    const specialistNodeId = `specialist:${path.specialist_id}`;
+    nodeIds.add(circleNodeId);
+    nodeIds.add(specialistNodeId);
+    edgeKeys.add(relationshipKey(galaxyNodeId, circleNodeId));
+    edgeKeys.add(relationshipKey(circleNodeId, specialistNodeId));
+  }
+  for (const nodeId of nodeIds) state.positions.delete(nodeId);
+  state.entryRouting = { nodeIds, edgeKeys, plan };
+  state.enabledKinds.add("service");
+  state.enabledKinds.add("galaxy");
+  state.enabledKinds.add("guild");
+  state.enabledKinds.add("specialist");
+  state.domain = "all";
+  state.query = "";
+  state.focusId = null;
+  state.selectedId = null;
+  elements.domainFilter.value = "all";
+  elements.search.value = "";
+  renderTypeFilters();
+  applyFilters();
+  window.setTimeout(() => fitView(), 100);
+}
+
+function renderEntrypointResult(plan) {
+  elements.entryResult.replaceChildren();
+  elements.entryResult.className = "entry-result";
+  const summary = document.createElement("div");
+  summary.className = "entry-summary";
+  const copy = document.createElement("span");
+  const strong = document.createElement("strong");
+  strong.textContent = "Route ready";
+  copy.append(strong, document.createTextNode(" · select the Rocky Planet to inspect or run it"));
+  const clear = document.createElement("button");
+  clear.className = "entry-clear";
+  clear.type = "button";
+  clear.textContent = "Clear route";
+  clear.addEventListener("click", clearEntrypointRoute);
+  summary.append(copy, clear);
+  elements.entryResult.append(summary);
+
+  const circles = new Map((plan.circles || []).map((item) => [item.circle_id, item]));
+  const specialists = new Map((plan.candidates || []).map((item) => [item.specialist_id, item]));
+  for (const path of plan.paths || []) {
+    const circle = circles.get(path.circle_id);
+    const specialist = specialists.get(path.specialist_id);
+    const row = document.createElement("div");
+    row.className = "entry-route";
+    const routeCopy = document.createElement("div");
+    routeCopy.className = "entry-route-copy";
+    const wormhole = document.createElement("strong");
+    wormhole.textContent = plan.wormhole_name;
+    const firstArrow = document.createElement("span");
+    firstArrow.className = "entry-route-arrow";
+    firstArrow.textContent = "→";
+    const galaxyLabel = document.createElement("span");
+    galaxyLabel.textContent = plan.galaxy_name;
+    const galaxyArrow = document.createElement("span");
+    galaxyArrow.className = "entry-route-arrow";
+    galaxyArrow.textContent = "→";
+    const circleLabel = document.createElement("span");
+    circleLabel.textContent = circle?.display_name || path.circle_id;
+    const secondArrow = document.createElement("span");
+    secondArrow.className = "entry-route-arrow";
+    secondArrow.textContent = "→";
+    const specialistLabel = document.createElement("span");
+    specialistLabel.textContent = specialist?.display_name || path.specialist_id;
+    routeCopy.append(
+      wormhole,
+      firstArrow,
+      galaxyLabel,
+      galaxyArrow,
+      circleLabel,
+      secondArrow,
+      specialistLabel,
+    );
+    const inspect = document.createElement("button");
+    inspect.type = "button";
+    inspect.textContent = "Inspect";
+    inspect.addEventListener("click", () => selectNode(`specialist:${path.specialist_id}`));
+    row.append(routeCopy, inspect);
+    elements.entryResult.append(row);
+  }
+}
+
+function renderEntrypointError(message) {
+  elements.entryResult.replaceChildren();
+  elements.entryResult.className = "entry-result";
+  const error = document.createElement("span");
+  error.className = "entry-error";
+  error.textContent = message;
+  elements.entryResult.append(error);
+}
+
+function clearEntrypointRoute() {
+  state.entryRouting = { nodeIds: new Set(), edgeKeys: new Set(), plan: null };
+  elements.entryResult.replaceChildren();
+  elements.entryResult.classList.add("hidden");
+  applyFilters();
+  window.setTimeout(() => fitView(), 100);
+}
+
 function showTooltip(event, node) {
   elements.tooltip.replaceChildren();
   const title = document.createElement("strong");
@@ -903,7 +1115,7 @@ function renderLegend() {
     const dot = document.createElement("i");
     dot.className = "legend-dot";
     const label = document.createElement("span");
-    label.textContent = kind === "guild" ? "circle" : kind;
+    label.textContent = LEGEND_LABELS[kind] || kind;
     item.append(dot, label);
     elements.legend.append(item);
   }
@@ -930,7 +1142,7 @@ function updateViewHeading() {
       : "All circles";
   const titles = {
     overview: "Your personal agent system",
-    agents: "Specialists and their circles",
+    agents: "Planets and their Circles",
     components: "Reusable platform components",
     full: "Complete knowledge graph",
     custom: "Custom constellation view",
@@ -1123,14 +1335,27 @@ function setStreamState(connection, label) {
 }
 
 async function setMode(mode) {
-  if (!new Set(["map", "live", "replay"]).has(mode)) return;
+  if (!new Set(["map", "live", "replay", "guide"]).has(mode)) return;
   state.operations.mode = mode;
-  document.body.classList.toggle("operations-mode", mode !== "map");
+  const operationsMode = mode === "live" || mode === "replay";
+  document.body.classList.toggle("operations-mode", operationsMode);
+  document.body.classList.toggle("guide-mode", mode === "guide");
   document.querySelectorAll(".mode-button").forEach((button) => {
     button.classList.toggle("active", button.dataset.mode === mode);
   });
-  elements.operationsControls.classList.toggle("hidden", mode === "map");
-  elements.timeline.classList.toggle("hidden", mode === "map");
+  elements.operationsControls.classList.toggle("hidden", !operationsMode);
+  elements.timeline.classList.toggle("hidden", !operationsMode);
+  elements.guidePanel.classList.toggle("hidden", mode !== "guide");
+
+  if (mode === "guide") {
+    closeEventStream();
+    document.body.classList.remove("inspector-open");
+    elements.streamState.textContent = "Galaxy Guide";
+    elements.statusText.textContent = "Canonical terminology reference";
+    elements.apiState.textContent = "Reference";
+    elements.apiState.className = "health-pill ok";
+    return;
+  }
 
   if (mode === "map") {
     closeEventStream();
@@ -1181,7 +1406,7 @@ function setGraphCounters() {
   const componentCount = state.graph.nodes.length - (state.graph.counts.specialist || 0) - (state.graph.counts.guild || 0);
   elements.statComponents.textContent = String(componentCount);
   elements.statRelations.textContent = String(state.graph.edges.length);
-  elements.statSpecialistsLabel.textContent = "specialists";
+  elements.statSpecialistsLabel.textContent = "rocky planets";
   elements.statComponentsLabel.textContent = "components";
   elements.statRelationsLabel.textContent = "relationships";
 }
@@ -1202,7 +1427,7 @@ function renderOperations() {
   elements.statComponents.textContent = String(runningSpecialists);
   elements.statRelations.textContent = String(attention);
   elements.statSpecialistsLabel.textContent = "active missions";
-  elements.statComponentsLabel.textContent = "running agents";
+  elements.statComponentsLabel.textContent = "running planets";
   elements.statRelationsLabel.textContent = "attention";
 
   elements.operationsSummary.textContent = `${activeMissions} active Mission${activeMissions === 1 ? "" : "s"} · sequence ${state.operations.lastSequence}`;
@@ -1218,7 +1443,7 @@ function renderOperations() {
     status.className = "runtime-label";
     status.textContent = String(mission.status || "unknown").replaceAll("_", " ");
     const meta = document.createElement("span");
-    meta.textContent = `${(mission.specialist_ids || []).length} Specialist(s) · ${shortId(mission.mission_id)}`;
+    meta.textContent = `${(mission.specialist_ids || []).length} Planet(s) · ${shortId(mission.mission_id)}`;
     button.append(title, status, meta);
     button.addEventListener("click", () => openMissionReplay(mission.mission_id));
     elements.missionList.append(button);
@@ -1315,13 +1540,13 @@ async function runFleetValidation() {
   if (state.operations.mode !== "live") await setMode("live");
   const originalLabel = elements.testAllAgents.textContent;
   elements.testAllAgents.disabled = true;
-  elements.testAllAgents.textContent = "Testing all agents…";
+  elements.testAllAgents.textContent = "Testing all planets…";
   elements.fleetTestResult.className = "fleet-test-result";
   elements.fleetTestResult.replaceChildren();
   const pending = document.createElement("strong");
   pending.textContent = "Fleet validation running";
   const note = document.createElement("span");
-  note.textContent = "All compiled Specialists are being checked in safe no-model, no-network mode.";
+  note.textContent = "All compiled Rocky Planets are being checked in safe no-model, no-network mode.";
   elements.fleetTestResult.append(pending, note);
   elements.fleetTestResult.classList.remove("hidden");
   try {
@@ -1348,7 +1573,7 @@ function renderFleetValidationResult(report) {
   elements.fleetTestResult.className = `fleet-test-result${passed ? "" : " failed"}`;
   elements.fleetTestResult.replaceChildren();
   const heading = document.createElement("strong");
-  heading.textContent = passed ? "All agents passed" : `${report.failed_count} agent(s) failed`;
+  heading.textContent = passed ? "All planets passed" : `${report.failed_count} planet(s) failed`;
   const detail = document.createElement("span");
   detail.textContent = `${report.passed_count}/${report.tested_count} passed · ${Math.round(report.duration_ms)} ms · ${shortId(report.validation_id)}`;
   elements.fleetTestResult.append(heading, detail);
@@ -1543,6 +1768,13 @@ function bindEvents() {
   });
   elements.runMission.addEventListener("click", runSandboxMission);
   elements.missionModel.addEventListener("change", updateMissionModelControl);
+  elements.routeEntry.addEventListener("click", routeThroughEntrypoint);
+  elements.entryObjective.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      routeThroughEntrypoint();
+    }
+  });
   elements.closeInspector.addEventListener("click", () => {
     document.body.classList.remove("inspector-open");
   });

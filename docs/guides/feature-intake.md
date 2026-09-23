@@ -205,7 +205,7 @@ The first slice is deliberately small:
 - it does not install, evaluate, promote, quarantine, or retire Specialists;
 - it does not inspect runtime health or resource availability;
 - its local API is an unauthenticated development surface, not the finished
-  Gateway or Control Room;
+  Wormhole or Control Room;
 - it cannot execute the requested feature;
 - a human should review low-confidence results and all domain/risk boundaries.
 

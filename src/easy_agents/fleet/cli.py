@@ -17,7 +17,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     parser = argparse.ArgumentParser(
         prog="easy-agents",
-        description="Inspect, route, and safely run the Personal Agent Constellation.",
+        description="Inspect, route, and safely run the Personal Agent Galaxy.",
     )
     parser.add_argument("--compact", action="store_true", help="Print compact JSON.")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -72,13 +72,13 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "inspect":
         payload = registry.get_specialist(args.specialist_id).model_dump(mode="json")
     elif args.command == "route":
-        payload = {
-            "objective": " ".join(args.objective),
-            "candidates": [
-                item.model_dump(mode="json")
-                for item in registry.route(" ".join(args.objective), limit=args.limit)
-            ],
-        }
+        objective = " ".join(args.objective)
+        payload = FleetRuntime(registry=registry).route_plan(
+            MissionRequest(
+                objective=objective,
+                team_size=max(1, min(args.limit, 8)),
+            )
+        ).model_dump(mode="json")
     else:
         llm = _build_model(args.model)
         request = MissionRequest(

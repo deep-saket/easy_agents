@@ -217,12 +217,15 @@ components:
   - id: mac_gemma
     kind: model
     label: Mac Gemma · gemma-4-E4B
-    description: Loopback llama.cpp completions model for evaluated local inference tasks.
+    description: Shared external loopback model that can serve multiple Galaxies without belonging to any one Galaxy.
     status: live
-    tags: [local, gemma, completion, loopback]
+    tags: [local, gemma, completion, loopback, rogue-star, external-shared]
     metadata:
       endpoint: http://127.0.0.1:8080/v1/completions
       context_tokens: 16384
+      topology_role: rogue_star
+      galaxy_membership: external
+      shared_across_galaxies: true
 
   - id: feature_architect
     kind: service

@@ -10,6 +10,7 @@ from uuid import uuid4
 from easy_agents.fleet.models import (
     AgentResult,
     ApprovalRequest,
+    GalaxyRoutePlan,
     FleetMissionResult,
     FleetValidationItem,
     FleetValidationReport,
@@ -24,6 +25,7 @@ from easy_agents.fleet.models import (
     StepResult,
     WorkOrder,
 )
+from easy_agents.fleet.gateway import WormholeRouter
 from easy_agents.fleet.policy import PolicyDecision, PolicyEngine, infer_effects
 from easy_agents.fleet.registry import FleetRegistry
 from easy_agents.observability import EntityReference, Severity
@@ -656,6 +658,7 @@ class FleetRuntime:
         self.models = dict(models or {})
         self.event_recorder = event_recorder
         self.policy_engine = PolicyEngine(self.registry)
+        self.wormhole = WormholeRouter(self.registry)
 
     def agent(
         self,
@@ -676,25 +679,12 @@ class FleetRuntime:
     def route(self, request: MissionRequest) -> list[RouteCandidate]:
         """Returns the selected team in execution order."""
 
-        if request.specialist_id:
-            manifest = self.registry.get_specialist(request.specialist_id)
-            explicit = RouteCandidate(
-                specialist_id=manifest.id,
-                display_name=manifest.display_name,
-                score=1.0,
-                matched_terms=["explicit-selection"],
-                status=manifest.status,
-                guilds=manifest.guilds,
-            )
-            if request.team_size == 1:
-                return [explicit]
-            additional = [
-                item
-                for item in self.registry.route(request.objective, limit=request.team_size + 1)
-                if item.specialist_id != manifest.id
-            ]
-            return [explicit, *additional[: request.team_size - 1]]
-        return self.registry.route(request.objective, limit=request.team_size)
+        return self.route_plan(request).candidates
+
+    def route_plan(self, request: MissionRequest) -> GalaxyRoutePlan:
+        """Routes one Mission through the Wormhole, Galaxy, and Circles."""
+
+        return self.wormhole.route(request)
 
     def run(self, request: MissionRequest) -> FleetMissionResult:
         """Executes one safe local Mission across the routed team."""
@@ -715,7 +705,8 @@ class FleetRuntime:
             },
         )
         try:
-            candidates = self.route(request)
+            routing = self.route_plan(request)
+            candidates = routing.candidates
         except Exception as exc:
             self._record_mission(
                 "mission.failed",
@@ -728,6 +719,45 @@ class FleetRuntime:
             )
             raise
         self._record_mission(
+            "wormhole.accepted",
+            mission_id=mission_id,
+            summary="Wormhole accepted the Mission",
+            status="accepted",
+            actor=EntityReference(kind="service", id="wormhole"),
+            attributes={
+                "wormhole_id": routing.wormhole_id,
+                "galaxy_id": routing.galaxy_id,
+                "circle_count": len(routing.circles),
+            },
+        )
+        self._record_mission(
+            "galaxy.entered",
+            mission_id=mission_id,
+            summary=f"Entered {routing.galaxy_name}",
+            status="selected",
+            actor=EntityReference(kind="service", id="wormhole"),
+            subject=EntityReference(kind="galaxy", id=routing.galaxy_id),
+            attributes={
+                "galaxy_id": routing.galaxy_id,
+                "galaxy_name": routing.galaxy_name,
+            },
+        )
+        for circle in routing.circles:
+            self._record_mission(
+                "circle.selected",
+                mission_id=mission_id,
+                summary=f"Selected Circle {circle.display_name}",
+                status="selected",
+                actor=EntityReference(kind="galaxy", id=routing.galaxy_id),
+                subject=EntityReference(kind="guild", id=circle.circle_id),
+                attributes={
+                    "circle_id": circle.circle_id,
+                    "score": circle.score,
+                    "matched_terms": circle.matched_terms,
+                    "specialist_ids": circle.selected_specialist_ids,
+                },
+            )
+        self._record_mission(
             "mission.routed",
             mission_id=mission_id,
             summary=f"Mission routed to {len(candidates)} Specialist(s)",
@@ -735,6 +765,9 @@ class FleetRuntime:
             attributes={
                 "candidate_count": len(candidates),
                 "candidate_ids": [item.specialist_id for item in candidates],
+                "circle_ids": [item.circle_id for item in routing.circles],
+                "wormhole_id": routing.wormhole_id,
+                "galaxy_id": routing.galaxy_id,
                 "matched_terms": sorted(
                     {term for item in candidates for term in item.matched_terms}
                 ),
@@ -775,6 +808,7 @@ class FleetRuntime:
             mission_id=mission_id,
             objective=request.objective,
             status=status,
+            routing=routing,
             routed_specialists=candidates,
             results=results,
             synthesis=_synthesize(results),
@@ -953,6 +987,8 @@ class FleetRuntime:
         severity: Severity = Severity.INFO,
         duration_ms: float | None = None,
         attributes: dict[str, Any] | None = None,
+        actor: EntityReference | None = None,
+        subject: EntityReference | None = None,
     ) -> None:
         if self.event_recorder is None:
             return
@@ -963,7 +999,8 @@ class FleetRuntime:
                 status=status,
                 severity=severity,
                 mission_id=mission_id,
-                actor=EntityReference(kind="service", id="fleet_runtime"),
+                actor=actor or EntityReference(kind="service", id="fleet_runtime"),
+                subject=subject,
                 duration_ms=duration_ms,
                 attributes=attributes,
             )

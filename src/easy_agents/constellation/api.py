@@ -21,7 +21,13 @@ from easy_agents.fleet.model_profiles import (
     build_fleet_mac_gemma,
     mac_gemma_status,
 )
-from easy_agents.fleet.models import FleetMissionResult, FleetValidationReport, MissionRequest
+from easy_agents.fleet.gateway import WORMHOLE_ID
+from easy_agents.fleet.models import (
+    GalaxyRoutePlan,
+    FleetMissionResult,
+    FleetValidationReport,
+    MissionRequest,
+)
 from easy_agents.fleet.registry import FleetRegistry
 from easy_agents.fleet.runtime import FleetRuntime
 from easy_agents.observability import ObservabilityPipeline
@@ -69,6 +75,9 @@ def create_app(
             "model_profiles": {
                 MAC_GEMMA_PROFILE_ID: {"configured": True, "external": True}
             },
+            "entrypoint": WORMHOLE_ID,
+            "galaxy": "personal",
+            "constellations": 1,
         }
 
     @app.get("/api/models/mac-gemma/status")
@@ -109,16 +118,27 @@ def create_app(
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         return manifest.model_dump(mode="json")
 
-    @app.post("/api/missions/route")
-    def route_mission(request: MissionRequest) -> dict[str, object]:
-        """Returns explainable routing candidates without running a model."""
+    def route_through_wormhole(request: MissionRequest) -> GalaxyRoutePlan:
+        """Returns the full Wormhole route without executing a Specialist."""
 
-        return {
-            "objective": request.objective,
-            "candidates": [
-                item.model_dump(mode="json") for item in fleet_runtime.route(request)
-            ],
-        }
+        try:
+            return fleet_runtime.route_plan(request)
+        except (KeyError, ValueError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    app.post(
+        "/api/wormhole/route",
+        response_model=GalaxyRoutePlan,
+    )(route_through_wormhole)
+    app.post(
+        "/api/entrypoint/route",
+        response_model=GalaxyRoutePlan,
+        include_in_schema=False,
+    )(route_through_wormhole)
+    app.post(
+        "/api/missions/route",
+        response_model=GalaxyRoutePlan,
+    )(route_through_wormhole)
 
     @app.post("/api/missions/run", response_model=FleetMissionResult)
     def run_mission(request: MissionRequest) -> FleetMissionResult:

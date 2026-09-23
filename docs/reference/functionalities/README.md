@@ -23,14 +23,14 @@ The status labels mean:
 | [Configuration](./configuration.md) | Partially verified | Four config tests and the corrected `.env.example` load passed; one stale dotenv naming test failed |
 | [Concrete agents](./agents.md) | Mixed | Simple, MailMind, Conversation Manager, and two specialist smokes passed; Collection Agent had 117 passes and 22 failures |
 | [Constellation feature intake](./constellation-feature-intake.md) | Verified first slice | Fourteen focused offline tests passed for Roster validation, lifecycle filtering, all four decisions, risk/network gates, determinism, and the local API |
-| [Constellation Map](../../guides/constellation-map.md) | Verified | Five graph/API/UI contract tests, JavaScript syntax validation, and browser interaction checks passed; 147 typed nodes and 269 valid relationships load locally |
-| [Specialist fleet](../../guides/run-specialist-fleet.md) | Verified safe runtime | Fifteen focused tests compile and execute all 70 Charters, then verify routing, scope isolation, approval Gates, offline and medical blocking, team Work orders, the correlated whole-fleet audit, external Mac Gemma selection and readiness, local-model prompts, custom rosters, CLI, and API |
+| [Galaxy Map](../../guides/constellation-map.md) | Verified | Graph/API/UI contract tests, JavaScript syntax validation, and browser interaction checks passed; typed nodes and relationships load locally, with direct Galaxy-to-Circle ownership, Constellation overlays, Circle Member metadata, a shared external Mac Gemma Rogue Star, and route-only dispatch edges |
+| [Specialist fleet](../../guides/run-specialist-fleet.md) | Verified safe runtime | Focused tests compile and execute all 70 Rocky Planet Charters, then verify Wormhole → Galaxy → Circle → Planet routing, scope isolation, approval Gates, offline and medical blocking, team Work orders, the correlated whole-fleet audit, external Mac Gemma selection and readiness, local-model prompts, custom rosters, CLI, and API |
 
 Focused counts overlap because some tests validate more than one capability. Do not add the rows to derive the repository total.
 
 ## Broad Test Run Excluding the Explicit Live Test
 
-The repository collected 312 tests. The explicitly live Groq connectivity test was excluded because it uses a configured account and the network:
+The repository collected 315 tests. The explicitly live Groq connectivity test was excluded because it uses a configured account and the network:
 
 ```bash
 python -m pytest -q --ignore=tests/test_groq_connectivity.py
@@ -39,7 +39,7 @@ python -m pytest -q --ignore=tests/test_groq_connectivity.py
 Result:
 
 ```text
-281 passed, 1 skipped, 30 failed
+284 passed, 1 skipped, 30 failed
 ```
 
 The 30 failures were distributed as follows:

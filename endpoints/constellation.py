@@ -1,4 +1,4 @@
-"""Local Constellation knowledge-graph UI and API application."""
+"""Local Galaxy knowledge-graph UI and API application."""
 
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ def create_app(
         observability=observability or ObservabilityPipeline.default(),
         gemma_client=gemma_client,
     )
-    app.title = "Easy Agents Constellation Map"
+    app.title = "Easy Agents Galaxy Map"
     app.mount(
         "/static",
         StaticFiles(directory=STATIC_DIR),

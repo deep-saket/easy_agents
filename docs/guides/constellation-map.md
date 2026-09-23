@@ -1,14 +1,33 @@
-# Constellation Knowledge Graph
+# Galaxy Knowledge Graph
 
 Status: implemented topology, live monitoring, and replay UI
 
-The Constellation Map visualizes active and planned Specialists together with
+The Galaxy Map visualizes active and planned Rocky Planets together with
 the reusable components that connect them. It is a topology and architecture
 view: Circles, capabilities, tools, memory scopes, Playbooks, policies, models,
 and platform services are all first-class nodes.
 
 The same Control Room now overlays realtime execution. The topology continues
 to describe what exists; Live and Replay show what the fleet is doing.
+
+The canonical vocabulary is defined in
+[Galaxy Terminology](../architecture/galaxy-terminology.md).
+
+## Talk to the Galaxy
+
+The **Wormhole** is the single logical entry point. Enter a Mission in the
+panel above the graph and select **Route**. The local router
+returns and highlights an explainable path:
+
+```text
+Wormhole → Personal Agent Galaxy → Circle → Planet
+```
+
+For example, “calculate a satellite RF link budget” routes through the
+Satellite Communications Circle to the RF & Link-Budget Rocky Planet. Routing is
+deterministic and does not invoke a model. Select **Inspect** on the result to
+open that Planet and optionally run the bounded Mission with the selected
+model profile.
 
 ## Run it
 
@@ -33,8 +52,12 @@ terminate another process.
 
 | Node | Meaning |
 | --- | --- |
-| Specialist | Active Roster entry or planned Charter from the deep-tech implementation plan |
-| Circle | A many-to-many responsibility or domain group |
+| Galaxy | The top-level owned system entered through the Wormhole |
+| Rogue Star | A shared external resource owned by no Galaxy and accessible to multiple Galaxies through governed Orbits; Mac Gemma is the current example |
+| Constellation | A connected subgraph overlay drawn from selected parts of one or more Circles; it is not a routing layer |
+| Circle | A Galaxy-level responsibility or domain group containing Planets and Components |
+| Rocky Planet | A narrow specialist agent: an active Roster entry or planned Charter from the deep-tech implementation plan |
+| Giant Planet | A broad non-specialist agent that coordinates varied work and delegates narrow expertise |
 | Capability | A declared operation available to one or more Specialists |
 | Tool | A concrete reusable implementation such as memory search or email draft |
 | Memory | A data scope or storage boundary |
@@ -43,11 +66,32 @@ terminate another process.
 | Model | A configured inference dependency |
 | Service | Shared platform infrastructure rather than a conversational agent |
 
-Edges are typed relationships such as `member of`, `can use`, `uses template`,
-`implements`, `reads`, `writes`, `governs`, `guards`, and `routes to`.
+**Circle Member** is the umbrella term for anything assigned to a Circle. A
+**Planet** is an agent member: either a **Rocky Planet** with a narrow
+specialist Charter or a **Giant Planet** with a broad non-specialist Charter. A
+non-agent member is a **Component**, such as a capability, tool, memory Vault,
+Playbook, policy, model, or service. The current executable graph contains
+Rocky Planet nodes; Giant Planets are defined for the forthcoming manifest
+migration.
+
+A **Rogue Star** is outside the Circle Member taxonomy because it is outside
+every Galaxy. Access does not imply ownership. The graph marks Mac Gemma as a
+Rogue Star while retaining `model:mac_gemma` as its stable technical identifier
+and `model` as its underlying resource kind.
+
+Edges are typed relationships such as `routes to Circle`, `dispatches to`,
+`member of`, `can use`, `uses template`, `implements`, `reads`, `writes`,
+`governs`, and `guards`. Circle-to-Specialist dispatch edges are shown when an
+entry route is active so the normal overview remains readable.
 
 ## Interact with it
 
+- Open the **Guide** tab for the canonical hierarchy, terminology cards, and
+  the Circle-versus-Constellation, Rocky-versus-Giant,
+  Planet-versus-Component, and Galaxy-versus-Rogue-Star distinctions. It
+  also includes nested-boundary and Solar System illustrations, a concrete
+  grocery Mission walkthrough, term-selection examples, and the complete
+  Mission-to-Mission-Log lifecycle.
 - Search by name, identifier, description, or tag.
 - Switch between Overview, Agents, Components, and Full presets.
 - Filter to a Circle such as Employment Boundary, Energy, Satellite
@@ -55,7 +99,7 @@ Edges are typed relationships such as `member of`, `can use`, `uses template`,
 - Toggle individual node types and lifecycle groups.
 - Select a node to inspect metadata and every direct relationship.
 - Select a relationship in the inspector to navigate to the other node.
-- Select a Specialist, enter a Sandbox mission, and build its policy-aware plan.
+- Select a Rocky Planet, enter a Sandbox mission, and build its policy-aware plan.
 - Focus on one node's immediate neighborhood.
 - Drag a node to pin it; release it from the inspector.
 - Pan the canvas, scroll to zoom, or use Fit View.
@@ -121,6 +165,20 @@ The graph is available independently of the UI:
 ```bash
 curl http://127.0.0.1:8030/api/knowledge-graph
 ```
+
+Route a natural-language Mission through the same entry point:
+
+```bash
+curl -s http://127.0.0.1:8030/api/wormhole/route \
+  -H 'Content-Type: application/json' \
+  -d '{"objective":"plan groceries and pantry restocking"}'
+```
+
+The route response includes `wormhole_id`, `galaxy_id`, ranked `circles`, Rocky
+Planet `candidates` (technical Specialist records), and concrete `paths`. Constellations remain visible in
+the topology but are intentionally absent from the routing response.
+`/api/missions/route` and the legacy `/api/entrypoint/route` remain compatible
+aliases for the same contract.
 
 The response contains:
 

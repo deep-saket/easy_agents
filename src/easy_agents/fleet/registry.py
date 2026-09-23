@@ -274,7 +274,7 @@ class FleetRegistry:
         model_ids = {
             node.id.removeprefix("model:")
             for node in self.graph.nodes
-            if node.kind == "model"
+            if node.kind == "model" or node.metadata.get("resource_kind") == "model"
         } | {item.id for item in packaged_components if item.kind == "model"}
         for manifest in self.specialists.values():
             references = {

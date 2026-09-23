@@ -13,6 +13,9 @@ from easy_agents.constellation.directory import ConstellationDirectory
 
 
 GraphNodeKind = Literal[
+    "galaxy",
+    "rogue_star",
+    "constellation",
     "specialist",
     "guild",
     "capability",
@@ -177,6 +180,66 @@ def build_knowledge_graph(
     nodes: list[KnowledgeGraphNode] = []
     edges: list[KnowledgeGraphEdge] = []
 
+    nodes.append(
+        KnowledgeGraphNode(
+            id="service:wormhole",
+            kind="service",
+            label="Wormhole",
+            description=(
+                "The Galaxy's single ingress router. It accepts a Mission, selects "
+                "one or more Circles, and produces an explainable Trajectory."
+            ),
+            status="implemented",
+            tags=["entrypoint", "wormhole", "route", "dispatch", "conversation"],
+            metadata={
+                "entrypoint": True,
+                "route_api": "/api/wormhole/route",
+                "flow": "Wormhole → Galaxy → Circle → Planet",
+            },
+        )
+    )
+    nodes.append(
+        KnowledgeGraphNode(
+            id="galaxy:personal",
+            kind="galaxy",
+            label="Personal Agent Galaxy",
+            description=(
+                "The top-level owned system containing this user's Circles, "
+                "connected Constellation overlays, governance, and shared services."
+            ),
+            status="active",
+            tags=["personal", "ownership-boundary", "agent-system"],
+            metadata={"default": True},
+        )
+    )
+    nodes.append(
+        KnowledgeGraphNode(
+            id="constellation:personal_operations",
+            kind="constellation",
+            label="Personal Operations Constellation",
+            description=(
+                "A connected operational subgraph drawn from parts of one or more "
+                "Circles for personal life, employment, scientific exploration, "
+                "and venture discovery. It is an overlay, not a routing layer."
+            ),
+            status="active",
+            tags=["personal", "work", "science", "venture", "connected-system"],
+            metadata={
+                "galaxy_id": "personal",
+                "default": True,
+                "routing_layer": False,
+                "circle_scope": "one_or_more_partial",
+            },
+        )
+    )
+    edges.append(
+        _edge(
+            source="service:wormhole",
+            target="galaxy:personal",
+            kind="enters_galaxy",
+            label="enters Galaxy",
+        )
+    )
     for guild in active_directory.guilds.values():
         nodes.append(
             KnowledgeGraphNode(
@@ -186,6 +249,14 @@ def build_knowledge_graph(
                 description=guild.purpose,
                 status="active",
                 tags=guild.tags,
+                metadata={
+                    "member_term": "Circle Member",
+                    "member_types": [
+                        "Rocky Planet",
+                        "Giant Planet",
+                        "Component",
+                    ],
+                },
             )
         )
 
@@ -218,7 +289,12 @@ def build_knowledge_graph(
                 status=specialist.status.value,
                 group=specialist.guilds[0],
                 tags=specialist.tags,
-                metadata={"liaison": specialist.liaison, "source": "roster"},
+                metadata={
+                    "agent_type": "specialist",
+                    "planet_class": "rocky_planet",
+                    "liaison": specialist.liaison,
+                    "source": "roster",
+                },
             )
         )
         for guild_id in specialist.guilds:
@@ -253,26 +329,67 @@ def build_knowledge_graph(
                 description=guild.description,
                 status="planned",
                 tags=guild.tags,
+                metadata={
+                    "member_term": "Circle Member",
+                    "member_types": [
+                        "Rocky Planet",
+                        "Giant Planet",
+                        "Component",
+                    ],
+                },
             )
         )
         known_ids.add(node_id)
 
+    for node in [item for item in nodes if item.kind == "guild"]:
+        edges.append(
+            _edge(
+                source="galaxy:personal",
+                target=node.id,
+                kind="contains_circle",
+                label="contains Circle",
+            )
+        )
+        edges.append(
+            _edge(
+                source="constellation:personal_operations",
+                target=node.id,
+                kind="spans_circle",
+                label="spans part of Circle",
+            )
+        )
+
     for component in active_overlay.components:
         node_id = f"{component.kind}:{component.id}"
+        is_rogue_star = component.metadata.get("topology_role") == "rogue_star"
+        node_kind: GraphNodeKind = "rogue_star" if is_rogue_star else component.kind
+        component_metadata = dict(component.metadata)
+        if is_rogue_star:
+            component_metadata["resource_kind"] = component.kind
         nodes.append(
             KnowledgeGraphNode(
                 id=node_id,
-                kind=component.kind,
+                kind=node_kind,
                 label=component.label,
                 description=component.description,
                 status=component.status,
                 group=component.group,
                 tags=component.tags,
                 risk=component.risk,
-                metadata=component.metadata,
+                metadata=component_metadata,
             )
         )
         known_ids.add(node_id)
+        if is_rogue_star:
+            edges.append(
+                _edge(
+                    source="galaxy:personal",
+                    target=node_id,
+                    kind="accesses_external",
+                    label="accesses Rogue Star",
+                    metadata={"ownership": False, "cross_galaxy": True},
+                )
+            )
 
     for specialist in active_overlay.specialists:
         specialist_id = f"specialist:{specialist.id}"
@@ -285,7 +402,11 @@ def build_knowledge_graph(
                 status=specialist.status,
                 group=specialist.guild,
                 tags=specialist.tags,
-                metadata={"source": "deep-tech-plan"},
+                metadata={
+                    "agent_type": "specialist",
+                    "planet_class": "rocky_planet",
+                    "source": "deep-tech-plan",
+                },
             )
         )
         edges.append(
@@ -306,6 +427,17 @@ def build_knowledge_graph(
                 )
             )
         known_ids.add(specialist_id)
+
+    for membership in [item for item in edges if item.kind == "member_of"]:
+        edges.append(
+            _edge(
+                source=membership.target,
+                target=membership.source,
+                kind="dispatches_to",
+                label="dispatches to",
+                metadata={"routing_only": True},
+            )
+        )
 
     for relation in active_overlay.relations:
         edges.append(

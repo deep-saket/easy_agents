@@ -27,6 +27,20 @@ def test_knowledge_graph_contains_roster_and_shared_components() -> None:
     assert nodes["memory:employer_authorized"].kind == "memory"
     assert nodes["playbook:opportunity_validation"].kind == "playbook"
     assert nodes["model:mac_gemma"].metadata["context_tokens"] == 16_384
+    assert nodes["model:mac_gemma"].kind == "rogue_star"
+    assert nodes["model:mac_gemma"].metadata["resource_kind"] == "model"
+    assert nodes["model:mac_gemma"].metadata["galaxy_membership"] == "external"
+    assert nodes["model:mac_gemma"].metadata["shared_across_galaxies"] is True
+    assert nodes["service:wormhole"].metadata["entrypoint"] is True
+    assert nodes["galaxy:personal"].kind == "galaxy"
+    assert nodes["constellation:personal_operations"].kind == "constellation"
+    assert nodes["constellation:personal_operations"].metadata["routing_layer"] is False
+    assert nodes["guild:home"].metadata["member_types"] == [
+        "Rocky Planet",
+        "Giant Planet",
+        "Component",
+    ]
+    assert nodes["specialist:personal_steward"].metadata["planet_class"] == "rocky_planet"
 
 
 def test_knowledge_graph_relationships_have_valid_endpoints() -> None:
@@ -46,6 +60,39 @@ def test_knowledge_graph_relationships_have_valid_endpoints() -> None:
     assert any(
         edge.source == "tool:email_send"
         and edge.target == "capability:communications.send"
+        for edge in graph.edges
+    )
+    assert any(
+        edge.source == "service:wormhole"
+        and edge.target == "galaxy:personal"
+        and edge.kind == "enters_galaxy"
+        for edge in graph.edges
+    )
+    assert any(
+        edge.source == "galaxy:personal"
+        and edge.target == "guild:energy"
+        and edge.kind == "contains_circle"
+        for edge in graph.edges
+    )
+    assert any(
+        edge.source == "galaxy:personal"
+        and edge.target == "model:mac_gemma"
+        and edge.kind == "accesses_external"
+        and edge.metadata["ownership"] is False
+        and edge.metadata["cross_galaxy"] is True
+        for edge in graph.edges
+    )
+    assert any(
+        edge.source == "constellation:personal_operations"
+        and edge.target == "guild:energy"
+        and edge.kind == "spans_circle"
+        for edge in graph.edges
+    )
+    assert any(
+        edge.source == "guild:energy"
+        and edge.target == "specialist:energy_systems_scout"
+        and edge.kind == "dispatches_to"
+        and edge.metadata["routing_only"] is True
         for edge in graph.edges
     )
 
@@ -92,17 +139,35 @@ def test_constellation_ui_serves_local_assets() -> None:
     styles = client.get("/static/styles.css")
 
     assert page.status_code == 200
-    assert "Constellation Map" in page.text
+    assert "Personal Agent Galaxy" in page.text
     assert "Find anything" in page.text
     assert "Sandbox mission" in page.text
     assert "Control Room mode" in page.text
+    assert ">Guide<" in page.text
+    assert "One language for the whole agent system" in page.text
+    assert "Circle ≠ Constellation" in page.text
+    assert "Rocky ≠ Giant" in page.text
+    assert "Planet ≠ Component" in page.text
+    assert "Rocky Planet" in page.text
+    assert "Giant Planet" in page.text
+    assert "Rogue Star" in page.text
+    assert "Galaxy ≠ Rogue Star" in page.text
+    assert "Circle Member" in page.text
+    assert "Think in boundaries, connected graphs, and groups" in page.text
+    assert "A Solar System is everything a Planet can directly reach" in page.text
+    assert "Plan next week’s groceries" in page.text
+    assert "Mission execution lifecycle" in page.text
     assert "Execution timeline" in page.text
-    assert "Test all 70 agents" in page.text
+    assert "Test all 70 planets" in page.text
     assert "Mac Gemma · external local service" in page.text
+    assert "What should the Galaxy handle?" in page.text
+    assert "Wormhole → Galaxy → Circle → Planet" in page.text
     assert script.status_code == 200
     assert "knowledge-graph" in script.text
     assert "events/stream" in script.text
     assert "rebuildReplay" in script.text
     assert "models/mac-gemma/status" in script.text
+    assert "wormhole/route" in script.text
     assert styles.status_code == 200
     assert "--specialist" in styles.text
+    assert "--rogue-star" in styles.text
