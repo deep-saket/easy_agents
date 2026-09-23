@@ -18,6 +18,7 @@ flowchart LR
     Home --> Rocky[Rocky Planet]
     Home --> Giant[Giant Planet]
     Home --> Component[Component]
+    Component --> Satellite[Satellite]
     Constellation[Constellation] -. connected subgraph .-> Home
     Constellation -. connected subgraph .-> Admin
     Rocky --> SolarSystem[Solar System]
@@ -36,9 +37,10 @@ flowchart LR
 | **Planet** | The user-facing term for an autonomous, accountable agent with a Charter, capabilities, policies, memory access, and lifecycle status. Every Planet is classified as either Rocky or Giant. A Planet is not necessarily a permanently running process. |
 | **Rocky Planet** | A specialist agent with a narrow domain or task Charter, such as RF link-budget analysis, clinical-evidence review, or pantry planning. It owns bounded expert work and can be reused wherever that expertise is needed. |
 | **Giant Planet** | A non-specialist agent with a broad, reusable Charter for varied routine work, coordination, triage, or synthesis. It delegates narrow expert work to Rocky Planets when the task exceeds its Charter. |
-| **Component** | A non-agent Circle Member that enables or constrains work: a capability, tool, Vault, Playbook, Gate or policy, model, or service. A Component does not independently own a Mission or make agentic decisions. |
+| **Component** | A non-agent Circle Member that enables or constrains work: a capability, Satellite, Vault, Playbook, Gate or policy, model, or service. A Component does not independently own a Mission or make agentic decisions. |
+| **Satellite** | A callable tool that orbits a Planet by providing one bounded operation, such as searching memory, calculating a link budget, drafting an email, or checking inventory. A Satellite is a specialized Component, not an agent: it cannot own a Mission or make independent decisions. One implementation may be assigned to several Planets through separate Orbits. Stable technical identifiers may continue to use `tool:*`, and runtime events may continue to use `tool.*`. |
 | **Constellation** | A connected operational subgraph drawn from selected parts of one or more Circles. It can include Planets, Components, and their typed relationships. It is an overlay used to describe a coherent connected system—not an ownership container and not a required routing hop. |
-| **Solar System** | A Planet-centered view containing that Planet and everything directly connected to it: tools, capabilities, Playbooks, memory scopes, policies, models, services, and neighboring responsibilities. Solar Systems may overlap when components are shared. |
+| **Solar System** | A Planet-centered view containing that Planet and everything directly connected to it: Satellites, capabilities, Playbooks, memory scopes, policies, models, services, and neighboring responsibilities. Solar Systems may overlap when components are shared. |
 
 The ownership and routing path is **Wormhole → Galaxy → Circle → Planet**; it is
 not a requirement to run one process per entity. A Constellation is a connected
@@ -67,7 +69,7 @@ because that Galaxy can access it.
 | **Roster** | The registered set of available Rocky and Giant Planet Charters. This is distinct from a Mission's temporary Crew. |
 | **Vault** | A memory or data-isolation boundary. Access is explicit, scoped, and auditable. |
 | **Observatory** | The monitoring and replay capability for the whole Galaxy. **Control Room** remains the product-facing UI name. |
-| **Mission Log** | The correlated event history for routing, Work Orders, model calls, tools, policy decisions, approvals, and outcomes. |
+| **Mission Log** | The correlated event history for routing, Work Orders, model calls, Satellite invocations, policy decisions, approvals, and outcomes. |
 | **Charter** | The declarative contract defining a Planet's purpose, capabilities, policies, memory scopes, and lifecycle state. |
 
 ## Naming rules
@@ -84,8 +86,13 @@ because that Galaxy can access it.
 - Use **Planet** in user-facing language for an agent. Use **Rocky Planet** for
   a narrow specialist Charter and **Giant Planet** for a broad non-specialist
   Charter. Technical APIs may retain `agent` and `specialist` for compatibility.
+- Use **Satellite** in user-facing language for a callable tool. A Satellite is
+  a specialized Component connected to a Planet by an Orbit. Technical APIs,
+  identifiers, implementation classes, and trace events may retain `tool` for
+  compatibility until the versioned domain-model migration is complete.
 - Use **Circle Member** only as the umbrella category. Use **Component** for a
-  non-agent member such as a tool, Vault, Playbook, policy, model, or service.
+  non-agent member such as a Satellite, Vault, Playbook, policy, model, or
+  service.
 - Use **Solar System** only for the dynamic neighborhood around a Planet;
   it is a graph view, not another independently executing agent.
 - Preserve exact engineering terms such as Work Order, policy, capability,
@@ -109,6 +116,9 @@ Personal Operations Constellation
 
 Mac Gemma · gemma-4-E4B
 └── Rogue Star outside the Galaxy, reachable through governed access
+
+Memory Search · tool:memory_search
+└── Satellite Component, assignable to one or more Planets through Orbits
 ```
 
 The current executable Roster is represented by technical `SpecialistManifest`

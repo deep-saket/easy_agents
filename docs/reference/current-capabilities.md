@@ -4,7 +4,7 @@ This page describes the code that exists in the repository today. It is intentio
 
 ## What the Repository Is
 
-`easy_agents` is an early-stage, graph-native Python framework plus several concrete agent applications. Its strongest reusable foundations are typed tools, graph nodes, working and long-term memory, tracing, model adapters, and agent-as-node composition.
+`easy_agents` is an early-stage, graph-native Python framework plus several concrete agent applications. Its strongest reusable foundations are typed Satellites (tool contracts), graph nodes, working and long-term memory, tracing, model adapters, and agent-as-node composition.
 
 It is local-first, not automatically air-gapped. The graph runtime, deterministic tools, local storage, graph builder, and mock channels can run without hosted services. Hosted LLMs, Gmail, Twilio, remote voice backends, and initial downloads of local model weights require external access.
 
@@ -33,7 +33,7 @@ Concrete agents may assemble different graphs directly with LangGraph. `Collecti
 | Agent contract | Minimal `BaseAgent` with identity, optional LLM, structured logging, trace sink, and `run()` | Small and usable; return type is deliberately not standardized yet | [Agent runtime and nodes](./functionalities/agent-runtime-and-nodes.md) |
 | Shared graph runtime | `GraphAgent` with memory retrieval, ReAct planning, tool execution, reflection, and response nodes | Usable internal runtime; graph topology is fixed in the class and execution is synchronous | [Agent runtime and nodes](./functionalities/agent-runtime-and-nodes.md) |
 | Reusable nodes | Agent delegation, approval, intent, memory read/write, ReAct, reflection, response, routing, tools, WhatsApp | Implemented; the shared state still contains several collection-specific fields | [Agent runtime and nodes](./functionalities/agent-runtime-and-nodes.md) |
-| Tool system | `BaseTool`, `ToolRegistry`, schema catalog export, `ToolExecutor`, input/output validation, logging, optional memory capture | Strong reusable foundation; execution is synchronous and policy enforcement is not centralized | [Tools and execution](./functionalities/tools.md) |
+| Satellite/tool system | `BaseTool`, `ToolRegistry`, schema catalog export, `ToolExecutor`, input/output validation, logging, optional memory capture | Strong reusable foundation; execution is synchronous and policy enforcement is not centralized | [Satellites and execution](./functionalities/tools.md) |
 | Memory | Working memory; hot, warm, and cold layers; DuckDB and JSONL/archive backends; typed memory; indexing and hybrid retrieval | Broad implementation; persistence and retrieval choices still require manual wiring | [Memory and retrieval](./functionalities/memory.md) |
 | Model adapters | Hugging Face/local models, FunctionGemma, native Mac `gemma-4-E4B` completions, OpenAI, Groq, NVIDIA, arbitrary endpoints, OpenAI-compatible servers | Mac Gemma mocked and live loopback contracts pass; the checked-in hosted remote regression suite currently fails | [Model adapters](./functionalities/models.md) |
 | Channels and sources | Mock/Twilio WhatsApp, Gmail source/sender, Pipecat and voice-processing interfaces | Local/fake contracts pass; live services were not tested | [Channels, sources, and voice](./functionalities/channels-and-voice.md) |
@@ -42,7 +42,7 @@ Concrete agents may assemble different graphs directly with LangGraph. `Collecti
 | Agent composition | `AgentNode` can invoke any object with `run()` and optionally expose its result as observation/response | Implemented in-process; discovery, permissions, budgets, and durable handoffs are not centralized | [Agent runtime and nodes](./functionalities/agent-runtime-and-nodes.md) |
 | Configuration | YAML defaults, repository `.env` loading, environment overrides through `AppSettings` | Core tests pass; one stale dotenv naming test remains | [Configuration](./functionalities/configuration.md) |
 | Constellation feature intake | Versioned starter Roster, overlapping Guild membership, feature fit analysis, risk inference, and proposed Draft Charters | Offline first slice; lexical matching only, and it does not scaffold, persist, activate, or execute agents | [Constellation feature intake](./functionalities/constellation-feature-intake.md) |
-| Galaxy Map | Typed knowledge-graph API and dependency-free local UI for the Wormhole, Galaxy, Rogue Stars, Constellation overlays, Circles, Planets, capabilities, tools, memory scopes, Playbooks, policies, models, and services | Interactive topology and Wormhole → Galaxy → Circle → Planet route highlighting are implemented; Circle Member terminology distinguishes Rocky and Giant Planets from non-agent Components; Mac Gemma is modeled as an external, cross-Galaxy Rogue Star | [Galaxy Knowledge Graph](../guides/constellation-map.md) |
+| Galaxy Map | Typed knowledge-graph API and dependency-free local UI for the Wormhole, Galaxy, Rogue Stars, Constellation overlays, Circles, Planets, capabilities, Satellites, memory scopes, Playbooks, policies, models, and services | Interactive topology and Wormhole → Galaxy → Circle → Planet route highlighting are implemented; Circle Member terminology distinguishes Rocky and Giant Planets from non-agent Components; callable tools appear as Satellites; Mac Gemma is modeled as an external, cross-Galaxy Rogue Star | [Galaxy Knowledge Graph](../guides/constellation-map.md) |
 | Specialist fleet | One reusable Wormhole, hierarchical Galaxy and Circle routing, 70 manifest-compiled Rocky Planets, nine shared Playbooks, scoped Work orders, central policy decisions, local-model advisory execution, CLI/API, and a realtime whole-fleet audit | 14 existing Charters are active; 56 new or startup-conditional Charters are sandboxed; Giant Planet is defined in the canonical model but does not yet have a separate runtime manifest type | [Run the Specialist Fleet](../guides/run-specialist-fleet.md) |
 
 ## Reusable Node Catalog
@@ -62,16 +62,20 @@ The public exports in `src.nodes` currently include:
 
 All reusable nodes accept the shared `AgentState` shape and return a partial state update. LangGraph merges those updates during execution.
 
-## Tool Contract
+## Satellite (Tool) Contract
 
-A reusable tool declares four things:
+A reusable Satellite declares four things through the existing technical tool
+contract:
 
 1. a unique `name`
 2. a human-readable `description`
 3. a Pydantic `input_schema`
 4. a Pydantic `output_schema`
 
-`ToolExecutor` validates the input, invokes the tool, validates the output, records a structured tool log, and can write success or failure events to memory. The built-in examples include safe arithmetic and unit conversion; email and memory capabilities add domain-oriented tools.
+`ToolExecutor` validates the input, invokes the Satellite's tool implementation,
+validates the output, records a structured tool log, and can write success or
+failure events to memory. The built-in examples include safe arithmetic and
+unit conversion; email and memory capabilities add domain-oriented Satellites.
 
 See [Create an Agent](../guides/create-an-agent.md) for a complete tool-using example.
 

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark" />
     <title>Galaxy Map · Easy Agents</title>
-    <link rel="stylesheet" href="/static/styles.css?v=galaxy-guide-7" />
+    <link rel="stylesheet" href="/static/styles.css?v=galaxy-guide-8" />
   </head>
   <body>
     <div class="shell">
@@ -44,7 +44,7 @@
             <label class="field-label" for="search">Find anything</label>
             <div class="search-wrap">
               <span aria-hidden="true">⌕</span>
-              <input id="search" type="search" placeholder="Planet, tool, memory…" autocomplete="off" />
+              <input id="search" type="search" placeholder="Planet, Satellite, memory…" autocomplete="off" />
               <kbd>/</kbd>
             </div>
           </section>
@@ -440,17 +440,22 @@
                 </article>
                 <article class="term-card featured">
                   <span class="term-symbol">C</span>
-                  <div><h4>Component</h4><p>A non-agent Circle Member such as a capability, tool, Vault, Playbook, Gate, model, or service.</p></div>
+                  <div><h4>Component</h4><p>A non-agent Circle Member such as a capability, Satellite, Vault, Playbook, Gate, model, or service.</p></div>
+                </article>
+                <article class="term-card featured">
+                  <span class="term-symbol">S</span>
+                  <div><h4>Satellite</h4><p>A callable tool Component that gives a Planet one bounded operation. It executes when invoked but does not independently reason or own a Mission.</p></div>
                 </article>
                 <article class="term-card featured">
                   <span class="term-symbol">☼</span>
-                  <div><h4>Solar System</h4><p>A Planet-centered view of its directly connected tools, capabilities, Playbooks, memories, policies, models, and services.</p></div>
+                  <div><h4>Solar System</h4><p>A Planet-centered view of its directly connected Satellites, capabilities, Playbooks, memories, policies, models, and services.</p></div>
                 </article>
               </div>
               <div class="guide-distinction">
                 <div><strong>Circle ≠ Constellation</strong><span>A Circle groups a domain. A Constellation connects selected parts of one or more Circles.</span></div>
                 <div><strong>Rocky ≠ Giant</strong><span>Both are Planets. A Rocky Planet is specialist; a Giant Planet is broad and non-specialist.</span></div>
                 <div><strong>Planet ≠ Component</strong><span>A Planet decides and acts under a Charter. A Component enables or constrains that work.</span></div>
+                <div><strong>Planet ≠ Satellite</strong><span>A Planet reasons and owns work. A Satellite is a bounded tool invoked by an authorized Planet.</span></div>
                 <div><strong>Galaxy ≠ Rogue Star</strong><span>A Galaxy owns its internal system. A Rogue Star is external and may be shared across Galaxies.</span></div>
               </div>
             </section>
@@ -461,11 +466,11 @@
                 <h3 id="guide-solar-title">A Solar System is everything a Planet can directly reach</h3>
               </div>
               <div class="solar-layout">
-                <div class="solar-diagram" role="img" aria-label="Shopping and Pantry Rocky Planet connected to a tool, memory vault, Playbook, policy Gate, Rogue Star, and capability">
+                <div class="solar-diagram" role="img" aria-label="Shopping and Pantry Rocky Planet connected to a Satellite, memory vault, Playbook, policy Gate, Rogue Star, and capability">
                   <div class="solar-ring ring-one"></div>
                   <div class="solar-ring ring-two"></div>
                   <div class="solar-core"><span>R</span><strong>Shopping &amp; Pantry</strong><small>Rocky Planet</small></div>
-                  <div class="solar-node solar-tool"><b>T</b><span>Inventory tool</span></div>
+                  <div class="solar-node solar-tool"><b>S</b><span>Inventory Satellite</span></div>
                   <div class="solar-node solar-memory"><b>M</b><span>Pantry Vault</span></div>
                   <div class="solar-node solar-playbook"><b>P</b><span>Restock Playbook</span></div>
                   <div class="solar-node solar-policy"><b>!</b><span>Purchase Gate</span></div>
@@ -486,11 +491,11 @@
                 <h3 id="guide-choice-title">Which term fits?</h3>
               </div>
               <div class="choice-grid">
-                <article><span class="choice-question">“Group all energy-related roles.”</span><strong>Use a Circle</strong><p>Energy is a domain grouping, even when its members have different Charters and tools.</p></article>
+                <article><span class="choice-question">“Group all energy-related roles.”</span><strong>Use a Circle</strong><p>Energy is a domain grouping, even when its members have different Charters and Satellites.</p></article>
                 <article><span class="choice-question">“Connect selected Home and Life Admin members for household planning.”</span><strong>Use a Constellation</strong><p>The workflow is a connected subgraph spanning parts of two Circles.</p></article>
                 <article><span class="choice-question">“Perform an RF link-budget review.”</span><strong>Use a Rocky Planet</strong><p>The task needs narrow specialist expertise and one accountable Charter.</p></article>
                 <article><span class="choice-question">“Coordinate whatever routine work arrives today.”</span><strong>Use a Giant Planet</strong><p>The role needs a broad Charter and can delegate narrow work to Rocky Planets.</p></article>
-                <article><span class="choice-question">“Attach a shared calculation tool or Vault.”</span><strong>Use a Component</strong><p>It enables Planets but does not independently own goals or make decisions.</p></article>
+                <article><span class="choice-question">“Attach a shared calculation function.”</span><strong>Use a Satellite</strong><p>It is a callable tool Component that can orbit one or more Planets without becoming an agent.</p></article>
                 <article><span class="choice-question">“Share one externally hosted model across several Galaxies.”</span><strong>Use a Rogue Star</strong><p>The resource stays outside every Galaxy and is reached through governed Orbits.</p></article>
                 <article><span class="choice-question">“Combine scientific, market, and regulatory perspectives for one decision.”</span><strong>Use a Crew</strong><p>Several Planets collaborate temporarily while retaining individual accountability.</p></article>
               </div>
@@ -534,7 +539,7 @@
                 <article class="term-card"><div><h4>Roster</h4><p>The registered set of available Rocky and Giant Planet Charters.</p></div></article>
                 <article class="term-card"><div><h4>Vault</h4><p>An explicit, scoped, and auditable memory or data-isolation boundary.</p></div></article>
                 <article class="term-card"><div><h4>Observatory</h4><p>The monitoring and replay capability. Control Room is the product-facing interface.</p></div></article>
-                <article class="term-card"><div><h4>Mission Log</h4><p>The correlated event history for routing, Planets, models, tools, approvals, and outcomes.</p></div></article>
+                <article class="term-card"><div><h4>Mission Log</h4><p>The correlated event history for routing, Planets, models, Satellite invocations, approvals, and outcomes.</p></div></article>
                 <article class="term-card"><div><h4>Charter</h4><p>The declarative contract defining a Planet’s purpose, permissions, memory scopes, and lifecycle.</p></div></article>
               </div>
             </section>
@@ -549,6 +554,6 @@
       </footer>
     </div>
 
-    <script type="module" src="/static/app.js?v=galaxy-guide-7"></script>
+    <script type="module" src="/static/app.js?v=galaxy-guide-8"></script>
   </body>
 </html>

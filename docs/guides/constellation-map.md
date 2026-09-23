@@ -4,8 +4,8 @@ Status: implemented topology, live monitoring, and replay UI
 
 The Galaxy Map visualizes active and planned Rocky Planets together with
 the reusable components that connect them. It is a topology and architecture
-view: Circles, capabilities, tools, memory scopes, Playbooks, policies, models,
-and platform services are all first-class nodes.
+view: Circles, capabilities, Satellites, memory scopes, Playbooks, policies,
+models, and platform services are all first-class nodes.
 
 The same Control Room now overlays realtime execution. The topology continues
 to describe what exists; Live and Replay show what the fleet is doing.
@@ -58,8 +58,8 @@ terminate another process.
 | Circle | A Galaxy-level responsibility or domain group containing Planets and Components |
 | Rocky Planet | A narrow specialist agent: an active Roster entry or planned Charter from the deep-tech implementation plan |
 | Giant Planet | A broad non-specialist agent that coordinates varied work and delegates narrow expertise |
-| Capability | A declared operation available to one or more Specialists |
-| Tool | A concrete reusable implementation such as memory search or email draft |
+| Capability | A declared operation available to one or more Planets |
+| Satellite | A callable tool Component that gives a Planet one bounded operation, such as memory search or email drafting |
 | Memory | A data scope or storage boundary |
 | Playbook | A reusable workflow or graph template |
 | Policy | A central rule or approval boundary |
@@ -69,7 +69,7 @@ terminate another process.
 **Circle Member** is the umbrella term for anything assigned to a Circle. A
 **Planet** is an agent member: either a **Rocky Planet** with a narrow
 specialist Charter or a **Giant Planet** with a broad non-specialist Charter. A
-non-agent member is a **Component**, such as a capability, tool, memory Vault,
+non-agent member is a **Component**, such as a capability, Satellite, memory Vault,
 Playbook, policy, model, or service. The current executable graph contains
 Rocky Planet nodes; Giant Planets are defined for the forthcoming manifest
 migration.
@@ -78,6 +78,13 @@ A **Rogue Star** is outside the Circle Member taxonomy because it is outside
 every Galaxy. Access does not imply ownership. The graph marks Mac Gemma as a
 Rogue Star while retaining `model:mac_gemma` as its stable technical identifier
 and `model` as its underlying resource kind.
+
+A **Satellite** is the canonical user-facing name for a callable tool. It
+orbits a Planet through an explicit graph relationship and performs a bounded
+operation; it does not reason independently or own a Mission. One Satellite
+implementation may be shared by multiple Planets. For compatibility, its
+stable node identifier remains `tool:<id>`, its API `kind` remains `tool`, and
+observability events remain `tool.*` during the staged migration.
 
 Edges are typed relationships such as `routes to Circle`, `dispatches to`,
 `member of`, `can use`, `uses template`, `implements`, `reads`, `writes`,
@@ -111,7 +118,7 @@ Use the mode switch in the top bar:
 
 - **Map** keeps the original topology and catalog counters.
 - **Live** loads a durable operations snapshot, then follows the local SSE
-  stream. Specialist, Playbook, policy, model, tool, and memory nodes show
+  stream. Planet, Playbook, policy, model, Satellite, and memory nodes show
   runtime state. Bright directional edges represent actual recent activity.
 - **Replay** disconnects live-follow and reconstructs the same runtime overlay
   from ordered events. Drag the timeline scrubber or choose a Mission in the
@@ -140,7 +147,7 @@ The API combines two validated sources:
    supplies the current Roster, Circles, capabilities, lifecycle status, and
    ownership edges.
 2. [`knowledge_graph.yaml`](../../src/easy_agents/constellation/knowledge_graph.yaml)
-   supplies planned deep-tech roles and reusable memory, tool, Playbook,
+   supplies planned deep-tech roles and reusable memory, Satellite/tool, Playbook,
    policy, model, and service nodes.
 
 The typed projection lives in

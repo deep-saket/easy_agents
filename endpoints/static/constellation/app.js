@@ -22,7 +22,7 @@ const KIND_LABELS = {
   specialist: "Rocky Planets",
   guild: "Circles",
   capability: "Capabilities",
-  tool: "Tools",
+  tool: "Satellites",
   memory: "Memory",
   playbook: "Playbooks",
   policy: "Policies",
@@ -34,6 +34,7 @@ const LEGEND_LABELS = {
   guild: "circle",
   rogue_star: "rogue star",
   specialist: "rocky planet",
+  tool: "satellite",
 };
 
 const KIND_COLORS = {
@@ -58,7 +59,7 @@ const KIND_GLYPHS = {
   specialist: "R",
   guild: "◌",
   capability: "C",
-  tool: "T",
+  tool: "S",
   memory: "M",
   playbook: "P",
   policy: "!",

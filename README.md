@@ -1,6 +1,6 @@
 # easy_agents
 
-`easy_agents` is a graph-native agent framework for building tool-using, memory-aware workflows with reusable nodes, flexible LLM backends, and channel integrations such as WhatsApp and Gmail.
+`easy_agents` is a graph-native agent framework for building Satellite-enabled (tool-using), memory-aware workflows with reusable nodes, flexible LLM backends, and channel integrations such as WhatsApp and Gmail.
 
 Project documentation lives under [docs/](./docs/README.md).
 
@@ -37,7 +37,7 @@ PYTHONPATH=src python -m easy_agents.constellation.cli \
 
 This command only produces a proposal. It does not run the requested workflow, persist a new agent, grant permissions, or activate generated code.
 
-Visualize active and planned Specialists together with their Circles, tools,
+Visualize active and planned Rocky Planets together with their Circles, Satellites,
 memory scopes, Playbooks, policies, models, and platform services:
 
 ```bash

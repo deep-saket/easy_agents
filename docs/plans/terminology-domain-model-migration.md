@@ -21,6 +21,7 @@ CircleMember
 │   ├── RockyPlanet   # specialist agent
 │   └── GiantPlanet   # broad non-specialist agent
 └── Component
+    └── Satellite      # callable tool
 ```
 
 Mac Gemma is a `RogueStar`: an external shared resource referenced by access
@@ -31,7 +32,8 @@ Orbits, never contained by a Galaxy.
 1. A `Galaxy` directly owns `Circle` objects; a `Constellation` is never placed
    between them in an ownership or routing hierarchy.
 2. A `Circle` contains `CircleMember` references. A member is a `Planet` or a
-   non-agent `Component`.
+   non-agent `Component`; every callable tool is represented by the specialized
+   `Satellite` Component.
 3. Every `Planet` is exactly one of `RockyPlanet` or `GiantPlanet`.
 4. `RockyPlanet` and `GiantPlanet` inherit the same Charter, policy, memory,
    execution, and observability contracts from `Planet`.
@@ -56,7 +58,7 @@ src/easy_agents/galaxy/
 ├── __init__.py
 ├── enums.py             # stable string enums and discriminators
 ├── identity.py          # EntityId and typed references
-├── members.py           # CircleMember and Component
+├── members.py           # CircleMember, Component, and Satellite
 ├── planets.py           # Planet, RockyPlanet, GiantPlanet
 ├── charters.py          # Charter and lifecycle contracts
 ├── circles.py            # Circle and CircleMembership
@@ -103,6 +105,11 @@ classDiagram
       +ComponentKind component_kind
       +CapabilityBindings bindings
     }
+    class Satellite {
+      +str tool_id
+      +InputSchema input_schema
+      +OutputSchema output_schema
+    }
     class Circle {
       +CircleId id
       +set~EntityRef~ members
@@ -138,6 +145,7 @@ classDiagram
 
     CircleMember <|-- Planet
     CircleMember <|-- Component
+    Component <|-- Satellite
     Planet <|-- RockyPlanet
     Planet <|-- GiantPlanet
     Galaxy "1" o-- "many" Circle
@@ -179,8 +187,10 @@ class GiantPlanet(Planet):
 ```
 
 `PlanetRunner` executes either subclass through the same Charter, Playbook,
-Gate, model, tool, memory, and tracing interfaces. Giant-specific coordination
-is a policy/Playbook difference, not a separate runtime framework.
+Gate, model, Satellite, memory, and tracing interfaces. Giant-specific
+coordination is a policy/Playbook difference, not a separate runtime framework.
+The Satellite adapter delegates to the existing `BaseTool`, `ToolRegistry`, and
+`ToolExecutor` contracts so terminology does not duplicate execution code.
 
 ## Terminology-to-code map
 
@@ -194,7 +204,8 @@ is a policy/Playbook difference, not a separate runtime framework.
 | Planet | `Planet` base model | agent and Specialist abstractions |
 | Rocky Planet | `RockyPlanet` | `SpecialistDefinition`, `SpecialistManifest`, `SpecialistAgent` |
 | Giant Planet | `GiantPlanet` | new broad-agent manifest using the same runtime |
-| Component | `Component` | capability, tool, memory, Playbook, policy, model, service nodes |
+| Component | `Component` | capability, memory, Playbook, policy, model, service nodes |
+| Satellite | `Satellite` Component | `BaseTool`, `ToolRegistry`, `ToolExecutor`, and `tool:*` graph nodes |
 | Constellation | `Constellation` graph view | current graph node and older catalog/package naming |
 | Solar System | `SolarSystem` projection | one-hop neighborhood computed by the UI |
 | Rogue Star | `RogueStar` external resource | external Mac Gemma model profile |
@@ -247,7 +258,7 @@ canonical terms.
 
 ### Phase 1 — Add the domain package without changing behavior
 
-- Add enums, typed IDs, `CircleMember`, `Component`, `Planet`, `RockyPlanet`,
+- Add enums, typed IDs, `CircleMember`, `Component`, `Satellite`, `Planet`, `RockyPlanet`,
   `GiantPlanet`, `Charter`, and unit tests.
 - Convert one existing Specialist manifest through a v1-to-v2 adapter and prove
   round-trip stability.
@@ -261,7 +272,7 @@ and do not change current runtime outputs.
 
 - Replace stringly typed `GraphNodeKind` usage with canonical enums.
 - Build graph nodes from `Galaxy`, `Circle`, Planet subclasses, `Component`,
-  `Constellation`, and `RogueStar` objects.
+  `Satellite`, `Constellation`, and `RogueStar` objects.
 - Validate that every Constellation subgraph is connected.
 - Reject Galaxy containment edges targeting Rogue Stars.
 - Compute Solar Systems through a projection service.
@@ -275,7 +286,7 @@ Rogue Star, and topology snapshots are deterministic.
 - Rename `GalaxyRoutePlan` to `Trajectory`; retain a compatibility alias.
 - Make `Wormhole.route()` return Circle and Planet references only.
 - Introduce `PlanetRunner` and run both subclasses through the existing policy,
-  Playbook, model, memory, tool, and event services.
+  Playbook, model, memory, Satellite/tool, and event services.
 - Add Giant Planet delegation policy and bounded Rocky Planet handoffs.
 
 Exit criteria: one Rocky Planet and one Giant Planet can execute the same safe
@@ -322,7 +333,9 @@ migrations, historical documents, and domain-specific natural-language names.
 
 - discriminated deserialization returns `RockyPlanet` or `GiantPlanet`;
 - a Planet cannot be both subclasses or neither subclass;
-- a Component cannot receive a Work Order;
+- a Component, including a Satellite, cannot receive a Work Order;
+- a Satellite can execute only when invoked by an authorized Planet and may be
+  shared by multiple Planets through explicit Orbits;
 - a Circle accepts valid Circle Members and rejects dangling references;
 - a Constellation must be connected and span at least one Circle;
 - a Galaxy cannot contain a Rogue Star;
@@ -343,6 +356,7 @@ migrations, historical documents, and domain-specific natural-language names.
 
 - route and run one Rocky Planet;
 - route a broad Mission to a Giant Planet, then delegate to a Rocky Planet;
+- invoke a Satellite through a policy-approved Planet Orbit;
 - access Mac Gemma through a policy-approved Rogue Star Orbit;
 - block a missing or unauthorized Rogue Star Orbit;
 - inspect both Planet classes and the Rogue Star in Map, Live, and Replay;

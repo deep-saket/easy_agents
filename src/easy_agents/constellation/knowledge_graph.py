@@ -366,6 +366,11 @@ def build_knowledge_graph(
         component_metadata = dict(component.metadata)
         if is_rogue_star:
             component_metadata["resource_kind"] = component.kind
+        elif component.kind == "tool":
+            # Keep the stable technical ``tool:*`` contract while exposing the
+            # canonical Galaxy-domain name to APIs and user interfaces.
+            component_metadata.setdefault("topology_role", "satellite")
+            component_metadata.setdefault("canonical_term", "Satellite")
         nodes.append(
             KnowledgeGraphNode(
                 id=node_id,

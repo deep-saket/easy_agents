@@ -1,8 +1,14 @@
-# Tools and Execution
+# Satellites (Tools) and Execution
 
 Status: shared tool framework verified; Collection Agent's domain tool flows are partially verified.
 
-## Tool Contract
+**Satellite** is the canonical Galaxy term for a callable tool. In the current
+implementation, every Satellite is backed by the existing `BaseTool`,
+`ToolRegistry`, and `ToolExecutor` contracts. Stable `tool:*` identifiers,
+Python class names, and `tool.*` observability events remain unchanged during
+the compatibility migration.
+
+## Satellite Contract
 
 Every `BaseTool` declares:
 
@@ -35,9 +41,9 @@ Expected result: `42`.
 
 Without a repository, `ToolExecutor` uses `NullToolLogRepository`. Add a real repository when audit history is required.
 
-## Shared Tools
+## Shared Satellites
 
-| Tool | Function | Side effect |
+| Satellite (`tool:*` ID) | Function | Side effect |
 | --- | --- | --- |
 | `calculate` | Evaluates restricted arithmetic syntax | None |
 | `unit_convert` | Converts supported length, weight, and temperature units | None |
@@ -53,7 +59,7 @@ Without a repository, `ToolExecutor` uses `NullToolLogRepository`. Add a real re
 
 MailMind also supplies `MailMindSummaryTool`, which groups email information by actionability and impact.
 
-## Collection Agent Tools
+## Collection Agent Satellites
 
 Collection Agent has domain-specific tools for:
 
@@ -71,7 +77,9 @@ Collection Agent has domain-specific tools for:
 
 The Collection Memory Helper adds `update_key_event_memory`.
 
-These tools use local data/runtime repositories in tests, but several represent real-world side effects. Production adapters need approval, idempotency, timeout, retry, and authorization enforcement outside the model.
+These Satellites use local data/runtime repositories in tests, but several
+represent real-world side effects. Production adapters need approval,
+idempotency, timeout, retry, and authorization enforcement outside the model.
 
 ## Verification
 

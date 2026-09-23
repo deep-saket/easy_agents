@@ -31,7 +31,7 @@ The capability reference describes implemented behavior. The roadmap describes f
 ## Function Reference
 
 - [Agent Runtime and Reusable Nodes](./reference/functionalities/agent-runtime-and-nodes.md)
-- [Tools and Execution](./reference/functionalities/tools.md)
+- [Satellites (Tools) and Execution](./reference/functionalities/tools.md)
 - [Memory and Retrieval](./reference/functionalities/memory.md)
 - [Model Adapters](./reference/functionalities/models.md)
 - [Channels, Sources, and Voice](./reference/functionalities/channels-and-voice.md)

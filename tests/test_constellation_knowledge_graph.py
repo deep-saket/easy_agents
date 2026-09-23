@@ -24,6 +24,8 @@ def test_knowledge_graph_contains_roster_and_shared_components() -> None:
     assert nodes["specialist:personal_steward"].status == "active"
     assert nodes["specialist:opportunity_portfolio_steward"].status == "sandboxed"
     assert nodes["tool:memory_search"].status == "implemented"
+    assert nodes["tool:memory_search"].metadata["topology_role"] == "satellite"
+    assert nodes["tool:memory_search"].metadata["canonical_term"] == "Satellite"
     assert nodes["memory:employer_authorized"].kind == "memory"
     assert nodes["playbook:opportunity_validation"].kind == "playbook"
     assert nodes["model:mac_gemma"].metadata["context_tokens"] == 16_384
@@ -151,6 +153,8 @@ def test_constellation_ui_serves_local_assets() -> None:
     assert "Rocky Planet" in page.text
     assert "Giant Planet" in page.text
     assert "Rogue Star" in page.text
+    assert "Satellite" in page.text
+    assert "Planet ≠ Satellite" in page.text
     assert "Galaxy ≠ Rogue Star" in page.text
     assert "Circle Member" in page.text
     assert "Think in boundaries, connected graphs, and groups" in page.text
@@ -171,3 +175,5 @@ def test_constellation_ui_serves_local_assets() -> None:
     assert styles.status_code == 200
     assert "--specialist" in styles.text
     assert "--rogue-star" in styles.text
+    assert "--satellite" in styles.text
+    assert 'tool: "Satellites"' in script.text

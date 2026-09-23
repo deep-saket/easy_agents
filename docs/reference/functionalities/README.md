@@ -14,7 +14,7 @@ The status labels mean:
 | Functionality | Status | Evidence |
 | --- | --- | --- |
 | [Agent runtime and reusable nodes](./agent-runtime-and-nodes.md) | Verified | 16 focused tests passed; `GraphAgent`, `ApprovalNode`, `RouterNode`, and trace smokes passed |
-| [Tools and execution](./tools.md) | Verified for shared tools; collection tools partial | 13 shared-tool/source tests passed; registry/catalog/executor smoke passed; collection suite is mixed |
+| [Satellites (tools) and execution](./tools.md) | Verified for shared Satellites; collection Satellites partial | 13 shared-tool/source tests passed; registry/catalog/executor smoke passed; collection suite is mixed |
 | [Memory and retrieval](./memory.md) | Verified | 13 storage/type/vector tests passed, plus 9 memory-node tests in the runtime group |
 | [Model adapters](./models.md) | Partially verified | 26 local/model-contract tests and one opt-in Mac Gemma live smoke passed; five remote adapters passed an isolated transport smoke; seven checked-in remote regression tests failed |
 | [Channels, sources, and voice](./channels-and-voice.md) | Verified locally; live services unverified | 21 channel/voice tests passed; six fake-backed Gmail tool tests passed |
@@ -23,7 +23,7 @@ The status labels mean:
 | [Configuration](./configuration.md) | Partially verified | Four config tests and the corrected `.env.example` load passed; one stale dotenv naming test failed |
 | [Concrete agents](./agents.md) | Mixed | Simple, MailMind, Conversation Manager, and two specialist smokes passed; Collection Agent had 117 passes and 22 failures |
 | [Constellation feature intake](./constellation-feature-intake.md) | Verified first slice | Fourteen focused offline tests passed for Roster validation, lifecycle filtering, all four decisions, risk/network gates, determinism, and the local API |
-| [Galaxy Map](../../guides/constellation-map.md) | Verified | Graph/API/UI contract tests, JavaScript syntax validation, and browser interaction checks passed; typed nodes and relationships load locally, with direct Galaxy-to-Circle ownership, Constellation overlays, Circle Member metadata, a shared external Mac Gemma Rogue Star, and route-only dispatch edges |
+| [Galaxy Map](../../guides/constellation-map.md) | Verified | Graph/API/UI contract tests, JavaScript syntax validation, and browser interaction checks passed; typed nodes and relationships load locally, with direct Galaxy-to-Circle ownership, Constellation overlays, Circle Member metadata, callable tool Components presented as Satellites, a shared external Mac Gemma Rogue Star, and route-only dispatch edges |
 | [Specialist fleet](../../guides/run-specialist-fleet.md) | Verified safe runtime | Focused tests compile and execute all 70 Rocky Planet Charters, then verify Wormhole → Galaxy → Circle → Planet routing, scope isolation, approval Gates, offline and medical blocking, team Work orders, the correlated whole-fleet audit, external Mac Gemma selection and readiness, local-model prompts, custom rosters, CLI, and API |
 
 Focused counts overlap because some tests validate more than one capability. Do not add the rows to derive the repository total.
