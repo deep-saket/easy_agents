@@ -1,0 +1,127 @@
+version: 2
+galaxies:
+  - id: personal
+    display_name: Personal Galaxy
+    description: Minimal personal-assistant Galaxy.
+    circle_ids: [home]
+    external_access:
+      - galaxy_id: personal
+        rogue_star_id: local_model
+        allowed_effects: [inference]
+        allowed_hosts: [127.0.0.1]
+        allow_network: false
+        requires_approval: false
+    tags: [personal, example]
+    default: true
+circles:
+  - id: home
+    display_name: Home
+    purpose: Coordinates household responsibilities.
+    members:
+      - {kind: planet, id: pantry_planner}
+      - {kind: component, id: plan_shopping}
+      - {kind: satellite, id: inventory_lookup}
+      - {kind: component, id: home_vault}
+      - {kind: component, id: shopping_plan}
+      - {kind: component, id: purchase_gate}
+    tags: [household]
+    legacy_ids: []
+planets:
+  - id: pantry_planner
+    display_name: Pantry Planner
+    description: Specialist for groceries and pantry planning.
+    member_kind: planet
+    circle_ids: [home]
+    status: active
+    tags: [groceries, pantry]
+    legacy_ids: []
+    planet_class: rocky
+    charter:
+      purpose: Plan household shopping without placing an order.
+      capability_ids: [plan_shopping]
+      satellite_ids: [inventory_lookup]
+      vault_ids: [home_vault]
+      playbook_ids: [shopping_plan]
+      gate_ids: [purchase_gate]
+      model_ids: [local_model]
+      allowed_effects: [read, draft]
+      prohibited_actions: [purchase without approval]
+    expertise: [grocery planning, inventory]
+    specialization_boundary: Plans lists but never purchases products.
+components:
+  - id: plan_shopping
+    display_name: Plan Shopping
+    description: Builds a bounded grocery plan.
+    member_kind: component
+    circle_ids: [home]
+    status: active
+    tags: []
+    legacy_ids: []
+    component_kind: capability
+    capability_ids: [plan_shopping]
+  - id: home_vault
+    display_name: Home Vault
+    description: Stores household preferences.
+    member_kind: component
+    circle_ids: [home]
+    status: active
+    tags: []
+    legacy_ids: []
+    component_kind: vault
+    capability_ids: []
+    sensitivity: private
+    writable: true
+    retention: user-controlled
+  - id: shopping_plan
+    display_name: Shopping Plan
+    description: Orders safe planning steps.
+    member_kind: component
+    circle_ids: [home]
+    status: active
+    tags: []
+    legacy_ids: []
+    component_kind: playbook
+    capability_ids: []
+  - id: purchase_gate
+    display_name: Purchase Gate
+    description: Requires approval before a purchase.
+    member_kind: component
+    circle_ids: [home]
+    status: active
+    tags: []
+    legacy_ids: []
+    component_kind: gate
+    capability_ids: []
+    allowed_effects: [read, draft]
+    approval_effects: [purchase]
+    denied_effects: []
+    external_network: approval
+  - id: inventory_lookup
+    display_name: Inventory Lookup
+    description: Reads pantry inventory.
+    member_kind: component
+    circle_ids: [home]
+    status: active
+    tags: []
+    legacy_ids: [tool:inventory_lookup]
+    component_kind: satellite
+    capability_ids: []
+    tool_id: inventory_lookup
+    effects: [read]
+    input_schema_name: InventoryQuery
+    output_schema_name: InventoryResult
+    network_required: false
+    approval_required: false
+    idempotent: true
+    timeout_seconds: 10.0
+    max_attempts: 2
+rogue_stars:
+  - id: local_model
+    display_name: Local Model
+    description: Shared loopback inference service.
+    resource_kind: model
+    endpoint: http://127.0.0.1:8080/v1/completions
+    model_name: example-model
+    tags: [loopback]
+    legacy_ids: []
+constellations: []

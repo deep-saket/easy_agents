@@ -69,6 +69,7 @@ collection-speech-tools = "speech.cli:main"
 constellation-intake = "easy_agents.constellation.cli:main"
 easy-agents = "easy_agents.fleet.cli:main"
 local-gemma = "llm.mac_gemma_cli:main"
+easy-agents-galaxy = "easy_agents.galaxy.cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

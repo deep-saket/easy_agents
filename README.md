@@ -4,6 +4,9 @@
 
 Project documentation lives under [docs/](./docs/README.md).
 
+To create a typed Galaxy, Circle, Rocky or Giant Planet, Satellite, Rogue Star,
+and Wormhole-routed runtime, follow [Build Your Own Galaxy](./docs/guides/build-your-galaxy.md).
+
 Start here:
 
 - [Getting Started](./docs/getting-started.md)

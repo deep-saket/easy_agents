@@ -8,6 +8,7 @@
 - **Understand what works today:** [Current Capabilities](./reference/current-capabilities.md)
 - **Inspect one tested capability:** [Functionality Catalog and Test Matrix](./reference/functionalities/README.md)
 - **Build a new agent:** [Create an Agent](./guides/create-an-agent.md)
+- **Build a complete Galaxy:** [Build Your Own Galaxy](./guides/build-your-galaxy.md)
 - **Design the personal agent system:** [Personal Agent Constellation](./vision/personal-agent-constellation.md)
 - **Use the shared system vocabulary:** [Galaxy Terminology](./architecture/galaxy-terminology.md)
 - **Migrate code to that vocabulary:** [Terminology-First Domain Model Migration](./plans/terminology-domain-model-migration.md)
@@ -24,6 +25,7 @@ The capability reference describes implemented behavior. The roadmap describes f
 ## Architecture
 
 - [Galaxy Terminology](./architecture/galaxy-terminology.md)
+- [ADR 0001: Canonical Galaxy Vocabulary](./architecture/decisions/0001-canonical-galaxy-vocabulary.md)
 - [Framework Overview](./architecture/framework-overview.md)
 - [Conversation Management Architecture](./architecture/conversation-management.md)
 - [Memory Architecture](./architecture/memory-architecture.md)
@@ -40,6 +42,8 @@ The capability reference describes implemented behavior. The roadmap describes f
 - [Configuration](./reference/functionalities/configuration.md)
 - [Concrete Agents](./reference/functionalities/agents.md)
 - [Constellation Feature Intake](./reference/functionalities/constellation-feature-intake.md)
+- [Canonical Galaxy Domain](./reference/functionalities/galaxy-domain.md)
+- [Galaxy Domain API](./reference/galaxy-domain-api.md)
 
 ## Working and Experimental Agents
 

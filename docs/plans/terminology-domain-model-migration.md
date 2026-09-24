@@ -1,6 +1,6 @@
 # Terminology-First Domain Model Migration
 
-Status: approved terminology; active living implementation plan
+Status: canonical foundation implemented; compatibility migration and production hardening active
 
 Branch baseline: `saket/framework_update`
 
@@ -39,14 +39,14 @@ boundary must remain explicit while each legacy implementation is replaced.
 | Area | Current implementation | Migration state |
 | --- | --- | --- |
 | Canonical vocabulary | Architecture guide, Control Room Guide, and feature documentation define Galaxy, Circle, Planet classes, Component, Satellite, Constellation, Solar System, Wormhole, and Rogue Star | Implemented as product language |
-| Wormhole routing | `easy_agents.fleet.gateway.WormholeRouter` routes Galaxy → Circle → Rocky Planet and returns `GalaxyRoutePlan` / `RoutingPath` | Working v1 implementation; canonical contracts pending |
-| Planet runtime | `SpecialistManifest`, `SpecialistAgent`, `FleetRegistry`, and `FleetRuntime` compile and run 70 specialist roles | Working v1 implementation; Rocky/Giant inheritance pending |
-| Satellites | Existing `BaseTool`, `ToolRegistry`, and `ToolExecutor`; graph nodes retain `tool:*` IDs and `kind=tool` with `topology_role=satellite` | Canonical UI/documentation projection implemented; typed `Satellite` adapter pending |
-| Rogue Stars | Mac Gemma is projected outside Galaxy ownership with governed access metadata and live readiness checks | Graph contract implemented; typed `RogueStar` and `AccessOrbit` pending |
-| Topology | Typed v1 graph projection with direct Galaxy → Circle ownership, Constellation overlay edges, and route-only dispatch edges | Working v1 implementation; canonical aggregate source pending |
+| Wormhole routing | Canonical `Wormhole` returns a `Trajectory`; v1 `WormholeRouter` remains available | Canonical deterministic routing implemented; v1 remains a compatibility surface |
+| Planet runtime | Shared `PlanetRunner` and `GalaxyRuntime` execute Rocky and Giant subclasses; `FleetRuntime` still runs the existing 70-role application | Canonical synchronous runtime implemented; durable budget/cancellation/delegation orchestration pending |
+| Satellites | Typed `Satellite` adapts existing tools and `SatelliteExecutor` authorizes calls before `ToolExecutor` | Canonical contract and authorization wrapper implemented; durable timeout/retry isolation pending |
+| Rogue Stars | Typed `RogueStar` and `AccessOrbit` model Mac Gemma outside Galaxy ownership | Implemented with exact effect/host and loopback checks |
+| Topology | `build_topology()` produces validated, deterministic version-2 nodes and Orbits | Canonical source implemented; current Control Room still consumes the v1 compatibility projection |
 | Observatory | Durable SQLite event store, redaction, projection, SSE live stream, and replay | Working v1 implementation; canonical event aliases pending |
-| Public interfaces | Local FastAPI, CLI, and dependency-free Control Room use v1 schemas and legacy technical identifiers | Compatibility surface; v2 APIs pending |
-| Persistence schemas | Catalog, fleet catalog, graph overlay, and trace events are version 1 | Versioned migration and golden fixtures pending |
+| Public interfaces | Additive v2 Galaxy/topology/list/routing APIs and `easy-agents-galaxy` CLI coexist with v1 | Canonical read/route interfaces implemented; event and Control Room source migration pending |
+| Persistence schemas | Canonical YAML snapshot version 2 loads, validates, and round-trips; existing catalogs/events remain version 1 | Read-only v1 adapter implemented; write migration, checksums, rollback, and golden corpus pending |
 | Security posture | Local-first service with policy checks and redaction; HTTP endpoints are not an authenticated multi-user boundary | Must remain loopback-only until the hardening gates in this plan pass |
 
 The focused Galaxy/fleet/observability suite is green. The broader repository
@@ -89,6 +89,9 @@ Planet:
 ```text
 src/easy_agents/galaxy/
 ├── __init__.py
+├── builder.py           # convenience composition with derived membership
+├── catalog.py           # version-2 YAML load, dump, and save helpers
+├── cli.py               # validate, show, and route commands
 ├── enums.py             # stable string enums and discriminators
 ├── identity.py          # EntityId and typed references
 ├── members.py           # CircleMember and Component
@@ -105,7 +108,9 @@ src/easy_agents/galaxy/
 ├── registry.py           # GalaxyRegistry and indexes
 ├── runtime.py            # GalaxyRuntime over reusable executors
 ├── routing.py            # Wormhole and routing policy
+├── satellite_runtime.py  # policy wrapper over technical ToolExecutor
 ├── schemas.py            # versioned serialization contracts
+├── terminology.py        # canonical term-to-contract matrix
 └── compatibility.py      # old-name loaders and aliases only
 ```
 
@@ -368,9 +373,9 @@ relevant controls before the next layer depends on it.
 
 ### Phase 0 — Freeze the language
 
-Progress: **partially complete**. Canonical documentation and Control Room
-labels exist; the architecture decision record and automated terminology checks
-remain.
+Progress: **substantially complete**. Canonical documentation, the accepted ADR,
+the programmatic terminology matrix, public-contract checks, and Control Room
+labels exist. Repository-wide product-language linting remains.
 
 - Treat `docs/architecture/galaxy-terminology.md` as the source of truth.
 - Add an architecture decision record stating that vocabulary changes require
@@ -388,8 +393,9 @@ canonical terms.
 
 ### Phase 1 — Add the domain package without changing behavior
 
-Progress: **pending**. The current `easy_agents.constellation` and
-`easy_agents.fleet` packages remain the adapters and source behavior.
+Progress: **implemented foundation**. `easy_agents.galaxy` now provides the
+immutable typed contracts, deterministic YAML v2 serialization, v1 adapter,
+and invariant tests. Broader property/fuzz coverage remains hardening work.
 
 - Add enums, typed IDs, `CircleMember`, `Component`, `Satellite`, `Planet`, `RockyPlanet`,
   `GiantPlanet`, `Charter`, and unit tests.
@@ -409,8 +415,10 @@ and do not change current runtime outputs.
 
 ### Phase 2 — Move graph topology to canonical entities
 
-Progress: **pending**, with the current v1 projection already expressing the
-intended Galaxy, Circle, Satellite, Constellation, and Rogue Star labels.
+Progress: **implemented canonical projection**. Version-2 topology is built
+from the canonical registry, validates identifiers/endpoints/counts, computes
+Solar Systems, and keeps Rogue Stars outside ownership. Migrating the Control
+Room's data source and adding query-size limits remain.
 
 - Replace stringly typed `GraphNodeKind` usage with canonical enums.
 - Build graph nodes from `Galaxy`, `Circle`, Planet subclasses, `Component`,
@@ -429,8 +437,11 @@ Rogue Star, and topology snapshots are deterministic.
 
 ### Phase 3 — Generalize routing and execution around Planet
 
-Progress: **pending**, with `WormholeRouter` and `FleetRuntime` serving as the
-behavioral baseline.
+Progress: **first execution slice implemented**. `Wormhole`, `Trajectory`,
+`PlanetRunner`, and `GalaxyRuntime` execute both Planet subclasses through one
+handler contract; grants only narrow, team size is bounded, and Satellite calls
+are authorized. Durable cancellation, complete budget counters, recursive
+delegation execution, and cycle detection remain.
 
 - Replace Specialist-only candidates with `PlanetCandidate`.
 - Rename `GalaxyRoutePlan` to `Trajectory`; retain a compatibility alias.
@@ -450,8 +461,10 @@ Mission contract; delegation cannot widen permissions.
 
 ### Phase 4 — Migrate registry, manifests, and feature intake
 
-Progress: **pending**. All current records remain v1 and must continue loading
-through explicit adapters throughout this phase.
+Progress: **partially implemented**. `GalaxyRegistry`, `GalaxyBuilder`, YAML v2,
+and a read-only adapter convert all 70 current roles to Rocky Planets while
+preserving legacy IDs. Feature intake changes and a reversible write migration
+with source checksums remain.
 
 - Introduce `GalaxyRegistry`, `Roster`, and canonical YAML schema v2.
 - Convert all 70 current Specialists to Rocky Planet records mechanically.
@@ -470,8 +483,10 @@ and the feature architect can propose either Planet class.
 
 ### Phase 5 — Migrate APIs, events, CLI, and Control Room
 
-Progress: **pending**, with canonical user-facing labels already projected over
-v1 technical kinds in the current Control Room.
+Progress: **partially implemented**. Additive v2 snapshot, topology, entity-list,
+and Wormhole route APIs plus the canonical CLI are available. Canonical event
+aliases, authenticated non-loopback operation, stable error codes, and full
+Control Room source migration remain.
 
 - Add v2 APIs and canonical CLI output.
 - Project `planet.*`, `circle.*`, `galaxy.*`, `constellation.*`, and
