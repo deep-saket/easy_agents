@@ -451,6 +451,7 @@ When the Control Room service is running:
 | `GET /api/v2/satellites` | Satellite policy and operability metadata |
 | `GET /api/v2/rogue-stars` | External shared resources |
 | `POST /api/v2/wormhole/route` | Route a Mission without executing effects |
+| `POST /api/v2/wormhole/chat` | Route and answer a conversational Mission with Mac Gemma |
 
 Version-1 endpoints remain available during migration.
 

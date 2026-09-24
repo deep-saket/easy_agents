@@ -13,6 +13,7 @@ Start here:
 - [Current Capabilities and Limitations](./docs/reference/current-capabilities.md)
 - [Functionality Catalog and Test Matrix](./docs/reference/functionalities/README.md)
 - [Create an Agent](./docs/guides/create-an-agent.md)
+- [Chat with Your Galaxy](./docs/guides/chat-with-your-galaxy.md)
 - [Personal Agent Constellation](./docs/vision/personal-agent-constellation.md)
 - [Galaxy Terminology](./docs/architecture/galaxy-terminology.md)
 - [Terminology-First Domain Model Migration](./docs/plans/terminology-domain-model-migration.md)

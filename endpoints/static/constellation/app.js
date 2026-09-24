@@ -178,6 +178,15 @@ const elements = {
   entryObjective: document.getElementById("entry-objective"),
   routeEntry: document.getElementById("route-entry"),
   entryResult: document.getElementById("entry-result"),
+  chatPanel: document.getElementById("chat-panel"),
+  chatTranscript: document.getElementById("chat-transcript"),
+  chatForm: document.getElementById("chat-form"),
+  chatInput: document.getElementById("chat-input"),
+  chatSend: document.getElementById("chat-send"),
+  newChat: document.getElementById("new-chat"),
+  chatModelState: document.getElementById("chat-model-state"),
+  chatRouteStatus: document.getElementById("chat-route-status"),
+  chatRouteContext: document.getElementById("chat-route-context"),
 };
 
 const state = {
@@ -206,6 +215,12 @@ const state = {
     nodeIds: new Set(),
     edgeKeys: new Set(),
     plan: null,
+  },
+  chat: {
+    conversationId: null,
+    sending: false,
+    gemmaReady: false,
+    visualizationRoute: null,
   },
   operations: {
     mode: "map",
@@ -904,23 +919,233 @@ async function loadGemmaStatus() {
     if (!response.ok) throw new Error(`Model status returned ${response.status}`);
     const status = await response.json();
     if (status.ready && (status.models || []).includes("gemma-4-E4B")) {
+      state.chat.gemmaReady = true;
       gemmaOption.disabled = false;
       elements.missionModel.value = "mac_gemma";
       elements.missionModelStatus.textContent = "Ready · gemma-4-E4B at 127.0.0.1:8080";
       elements.missionModelStatus.className = "model-readiness ready";
+      elements.chatModelState.textContent = "Gemma ready · 127.0.0.1:8080";
+      elements.chatModelState.className = "chat-model-state ready";
     } else {
+      state.chat.gemmaReady = false;
       gemmaOption.disabled = true;
       elements.missionModel.value = "none";
       elements.missionModelStatus.textContent = "Unavailable · start the external mac-serving service";
       elements.missionModelStatus.className = "model-readiness unavailable";
+      elements.chatModelState.textContent = "Gemma unavailable";
+      elements.chatModelState.className = "chat-model-state unavailable";
     }
   } catch (error) {
+    state.chat.gemmaReady = false;
     gemmaOption.disabled = true;
     elements.missionModel.value = "none";
     elements.missionModelStatus.textContent = "Unavailable · could not check Mac Gemma";
     elements.missionModelStatus.className = "model-readiness unavailable";
+    elements.chatModelState.textContent = "Gemma status unavailable";
+    elements.chatModelState.className = "chat-model-state unavailable";
   }
   updateMissionModelControl();
+}
+
+function appendChatMessage(role, content, payload = null, extraClass = "") {
+  const message = document.createElement("article");
+  message.className = `chat-message ${role}${extraClass ? ` ${extraClass}` : ""}`;
+  const avatar = document.createElement("span");
+  avatar.className = "chat-avatar";
+  avatar.setAttribute("aria-hidden", "true");
+  avatar.textContent = role === "user" ? "U" : "✹";
+  const bubble = document.createElement("div");
+  bubble.className = "chat-bubble";
+  const heading = document.createElement("strong");
+  heading.textContent = role === "user" ? "You" : "Personal Agent Galaxy";
+  const copy = document.createElement("p");
+  copy.textContent = content;
+  bubble.append(heading, copy);
+
+  if (payload) {
+    const meta = document.createElement("div");
+    meta.className = "chat-message-meta";
+    const planet = payload.route_context?.planets?.[0];
+    for (const label of [
+      payload.status,
+      planet?.display_name,
+      payload.used_model,
+    ].filter(Boolean)) {
+      const chip = document.createElement("span");
+      chip.textContent = String(label).replaceAll("_", " ");
+      meta.append(chip);
+    }
+    bubble.append(meta);
+    if (payload.visualization_route) {
+      const mapButton = document.createElement("button");
+      mapButton.type = "button";
+      mapButton.className = "chat-map-button";
+      mapButton.textContent = "Show this route on the Map";
+      mapButton.addEventListener("click", async () => {
+        applyEntrypointRoute(payload.visualization_route);
+        await setMode("map");
+      });
+      bubble.append(mapButton);
+    }
+  }
+  message.append(avatar, bubble);
+  elements.chatTranscript.append(message);
+  elements.chatTranscript.scrollTop = elements.chatTranscript.scrollHeight;
+  return message;
+}
+
+function chatRouteStep(glyph, label, detail, kind = "") {
+  const step = document.createElement("div");
+  step.className = `chat-route-step${kind ? ` ${kind}` : ""}`;
+  const icon = document.createElement("span");
+  icon.className = "chat-route-glyph";
+  icon.textContent = glyph;
+  const copy = document.createElement("div");
+  const title = document.createElement("strong");
+  title.textContent = label;
+  const caption = document.createElement("small");
+  caption.textContent = detail;
+  copy.append(title, caption);
+  step.append(icon, copy);
+  return step;
+}
+
+function chatRouteGroup(label) {
+  const group = document.createElement("section");
+  group.className = "chat-route-group";
+  const heading = document.createElement("span");
+  heading.textContent = label;
+  group.append(heading);
+  return group;
+}
+
+function renderChatRoute(payload) {
+  const context = payload.route_context;
+  elements.chatRouteContext.replaceChildren();
+  elements.chatRouteStatus.textContent = String(payload.status || "completed").replaceAll("_", " ");
+
+  const direct = chatRouteGroup("Direct Mission route");
+  direct.append(chatRouteStep("◎", "Wormhole", "Controlled Galaxy ingress"));
+  direct.append(chatRouteStep("✹", context.galaxy.display_name, "Galaxy ownership boundary"));
+  for (const circle of context.circles || []) {
+    direct.append(chatRouteStep("◌", circle.display_name, "Selected Circle"));
+  }
+  for (const planet of context.planets || []) {
+    direct.append(chatRouteStep("R", planet.display_name, "Accountable routed Planet"));
+  }
+  elements.chatRouteContext.append(direct);
+
+  if (context.constellations?.length) {
+    const overlays = chatRouteGroup("Constellation context · not a route hop");
+    for (const constellation of context.constellations) {
+      overlays.append(chatRouteStep("✶", constellation.display_name, "Connected operational overlay", "constellation"));
+    }
+    elements.chatRouteContext.append(overlays);
+  }
+
+  const tools = chatRouteGroup("Available Satellites");
+  if (context.available_satellites?.length) {
+    const chips = document.createElement("div");
+    chips.className = "chat-route-chips";
+    for (const satellite of context.available_satellites) {
+      const chip = document.createElement("span");
+      chip.className = "chat-route-chip";
+      chip.textContent = satellite.display_name;
+      chips.append(chip);
+    }
+    tools.append(chips);
+    const invocation = document.createElement("p");
+    invocation.className = "entry-error";
+    invocation.textContent = context.invoked_satellites?.length
+      ? `${context.invoked_satellites.length} Satellite(s) invoked for this answer.`
+      : "No Satellite was invoked; the Planet answered with model reasoning only.";
+    tools.append(invocation);
+  } else {
+    const empty = document.createElement("p");
+    empty.className = "entry-error";
+    empty.textContent = "The selected Planet declares no callable Satellite for this Mission.";
+    tools.append(empty);
+  }
+  elements.chatRouteContext.append(tools);
+
+  if (context.rogue_stars?.length) {
+    const external = chatRouteGroup("External reasoning resource");
+    for (const star of context.rogue_stars) {
+      external.append(chatRouteStep("★", star.display_name, "Rogue Star · external local model", "rogue-star"));
+    }
+    elements.chatRouteContext.append(external);
+  }
+}
+
+async function submitChat(event) {
+  event?.preventDefault();
+  const message = elements.chatInput.value.trim();
+  if (state.chat.sending || message.length < 3) return;
+  appendChatMessage("user", message);
+  elements.chatInput.value = "";
+  const pending = appendChatMessage("assistant", "Routing through the Wormhole and waiting for the selected Planet…", null, "pending");
+  state.chat.sending = true;
+  elements.chatSend.disabled = true;
+  elements.chatSend.textContent = "Galaxy is thinking…";
+  try {
+    const body = { message };
+    if (state.chat.conversationId) body.conversation_id = state.chat.conversationId;
+    const response = await fetch("/api/v2/wormhole/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || `Wormhole chat returned ${response.status}.`);
+    state.chat.conversationId = payload.conversation_id;
+    state.chat.visualizationRoute = payload.visualization_route;
+    pending.remove();
+    appendChatMessage(
+      "assistant",
+      payload.answer,
+      payload,
+      payload.status === "completed" ? "" : "error",
+    );
+    renderChatRoute(payload);
+    elements.statusText.textContent = `Mission ${shortId(payload.mission_id)} · ${payload.route_context.planets?.[0]?.display_name || "Planet"}`;
+  } catch (error) {
+    pending.remove();
+    appendChatMessage(
+      "assistant",
+      error instanceof Error ? error.message : String(error),
+      null,
+      "error",
+    );
+    elements.chatRouteStatus.textContent = "Failed";
+  } finally {
+    state.chat.sending = false;
+    elements.chatSend.disabled = false;
+    elements.chatSend.textContent = "Send through Wormhole";
+    elements.chatInput.focus();
+  }
+}
+
+function resetChat() {
+  state.chat.conversationId = null;
+  state.chat.visualizationRoute = null;
+  for (const message of [...elements.chatTranscript.querySelectorAll(".chat-message")].slice(1)) {
+    message.remove();
+  }
+  elements.chatRouteStatus.textContent = "Waiting";
+  elements.chatRouteContext.replaceChildren();
+  const empty = document.createElement("div");
+  empty.className = "chat-route-empty";
+  const glyph = document.createElement("span");
+  glyph.setAttribute("aria-hidden", "true");
+  glyph.textContent = "◎";
+  const title = document.createElement("strong");
+  title.textContent = "No Mission routed yet";
+  const copy = document.createElement("p");
+  copy.textContent = "Your route, Constellation context, available Satellites, and model will appear here.";
+  empty.append(glyph, title, copy);
+  elements.chatRouteContext.append(empty);
+  elements.chatInput.value = "";
+  elements.chatInput.focus();
 }
 
 async function routeThroughEntrypoint() {
@@ -1336,17 +1561,32 @@ function setStreamState(connection, label) {
 }
 
 async function setMode(mode) {
-  if (!new Set(["map", "live", "replay", "guide"]).has(mode)) return;
+  if (!new Set(["chat", "map", "live", "replay", "guide"]).has(mode)) return;
   state.operations.mode = mode;
   const operationsMode = mode === "live" || mode === "replay";
   document.body.classList.toggle("operations-mode", operationsMode);
+  document.body.classList.toggle("chat-mode", mode === "chat");
   document.body.classList.toggle("guide-mode", mode === "guide");
   document.querySelectorAll(".mode-button").forEach((button) => {
     button.classList.toggle("active", button.dataset.mode === mode);
   });
   elements.operationsControls.classList.toggle("hidden", !operationsMode);
   elements.timeline.classList.toggle("hidden", !operationsMode);
+  elements.chatPanel.classList.toggle("hidden", mode !== "chat");
   elements.guidePanel.classList.toggle("hidden", mode !== "guide");
+
+  if (mode === "chat") {
+    closeEventStream();
+    document.body.classList.remove("inspector-open");
+    elements.streamState.textContent = "Wormhole Chat";
+    elements.statusText.textContent = state.chat.conversationId
+      ? `Conversation ${shortId(state.chat.conversationId)}`
+      : "Ready for a new Mission";
+    elements.apiState.textContent = state.chat.gemmaReady ? "Gemma ready" : "Gemma unavailable";
+    elements.apiState.className = `health-pill ${state.chat.gemmaReady ? "ok" : "error"}`;
+    window.setTimeout(() => elements.chatInput.focus(), 0);
+    return;
+  }
 
   if (mode === "guide") {
     closeEventStream();
@@ -1776,6 +2016,14 @@ function bindEvents() {
       routeThroughEntrypoint();
     }
   });
+  elements.chatForm.addEventListener("submit", submitChat);
+  elements.chatInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      submitChat(event);
+    }
+  });
+  elements.newChat.addEventListener("click", resetChat);
   elements.closeInspector.addEventListener("click", () => {
     document.body.classList.remove("inspector-open");
   });
@@ -1804,7 +2052,7 @@ function bindEvents() {
     window.setTimeout(() => fitView(), 100);
   });
   window.addEventListener("keydown", (event) => {
-    if (event.key === "/" && document.activeElement !== elements.search) {
+    if (event.key === "/" && state.operations.mode !== "chat" && document.activeElement !== elements.search) {
       event.preventDefault();
       elements.search.focus();
     }

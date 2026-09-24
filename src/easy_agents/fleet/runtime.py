@@ -66,7 +66,8 @@ class SpecialistAgent:
         run_id = f"run-{uuid4()}"
         started = perf_counter()
         playbook = self._select_playbook(request)
-        effects = sorted(set(request.requested_effects) | infer_effects(request.objective))
+        inferred_effects = set() if request.advisory_only else infer_effects(request.objective)
+        effects = sorted(set(request.requested_effects) | inferred_effects)
         requested_scope = request.memory_scope or self._default_scope()
         permissions = PermissionGrant(
             effects=effects,
@@ -784,7 +785,14 @@ class FleetRuntime:
             manifest = self.registry.get_specialist(candidate.specialist_id)
             requested_scope = request.memory_scope or _preferred_scope(manifest)
             permissions = PermissionGrant(
-                effects=sorted(set(request.requested_effects) | infer_effects(request.objective)),
+                effects=sorted(
+                    set(request.requested_effects)
+                    | (
+                        set()
+                        if request.advisory_only
+                        else infer_effects(request.objective)
+                    )
+                ),
                 memory_scopes=[requested_scope],
                 allow_network=request.allow_network,
             )

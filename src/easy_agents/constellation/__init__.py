@@ -1,5 +1,14 @@
 """Personal agent constellation discovery and feature-intake primitives."""
 
+from easy_agents.constellation.chat import (
+    ChatEntity,
+    ChatRouteContext,
+    ChatTurn,
+    ConversationStore,
+    WormholeChatRequest,
+    WormholeChatResponse,
+    WormholeChatService,
+)
 from easy_agents.constellation.directory import ConstellationDirectory
 from easy_agents.constellation.feature_intake import FeatureIntakeService
 from easy_agents.constellation.knowledge_graph import (
@@ -23,8 +32,12 @@ from easy_agents.constellation.models import (
 
 __all__ = [
     "CapabilityDefinition",
+    "ChatEntity",
+    "ChatRouteContext",
+    "ChatTurn",
     "ConstellationCatalog",
     "ConstellationDirectory",
+    "ConversationStore",
     "DraftCharter",
     "FeatureDecision",
     "FeatureIntakeService",
@@ -37,5 +50,8 @@ __all__ = [
     "LifecycleStatus",
     "RiskLevel",
     "SpecialistDefinition",
+    "WormholeChatRequest",
+    "WormholeChatResponse",
+    "WormholeChatService",
     "build_knowledge_graph",
 ]

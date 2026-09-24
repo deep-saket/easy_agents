@@ -47,7 +47,8 @@ class PolicyEngine:
         """Returns allow, approval, or block without executing an effect."""
 
         del playbook  # The first policy slice gates requested effects, not inert plan steps.
-        effects = sorted(set(request.requested_effects) | infer_effects(request.objective))
+        inferred_effects = set() if request.advisory_only else infer_effects(request.objective)
+        effects = sorted(set(request.requested_effects) | inferred_effects)
         approved = set(request.approved_effects)
         memory_scope = request.memory_scope or _default_scope(manifest)
         reasons: list[str] = []

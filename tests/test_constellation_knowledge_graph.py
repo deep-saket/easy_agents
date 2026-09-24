@@ -145,6 +145,10 @@ def test_constellation_ui_serves_local_assets() -> None:
     assert "Find anything" in page.text
     assert "Sandbox mission" in page.text
     assert "Control Room mode" in page.text
+    assert ">Chat<" in page.text
+    assert "Talk to your agent Galaxy" in page.text
+    assert "Send through Wormhole" in page.text
+    assert "A Constellation is supporting graph context" in page.text
     assert ">Guide<" in page.text
     assert "One language for the whole agent system" in page.text
     assert "Circle ≠ Constellation" in page.text
@@ -172,6 +176,8 @@ def test_constellation_ui_serves_local_assets() -> None:
     assert "rebuildReplay" in script.text
     assert "models/mac-gemma/status" in script.text
     assert "wormhole/route" in script.text
+    assert "v2/wormhole/chat" in script.text
+    assert "renderChatRoute" in script.text
     assert styles.status_code == 200
     assert "--specialist" in styles.text
     assert "--rogue-star" in styles.text

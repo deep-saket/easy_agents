@@ -9,6 +9,7 @@
 - **Inspect one tested capability:** [Functionality Catalog and Test Matrix](./reference/functionalities/README.md)
 - **Build a new agent:** [Create an Agent](./guides/create-an-agent.md)
 - **Build a complete Galaxy:** [Build Your Own Galaxy](./guides/build-your-galaxy.md)
+- **Chat with the system:** [Chat with Your Galaxy](./guides/chat-with-your-galaxy.md)
 - **Design the personal agent system:** [Personal Agent Constellation](./vision/personal-agent-constellation.md)
 - **Use the shared system vocabulary:** [Galaxy Terminology](./architecture/galaxy-terminology.md)
 - **Migrate code to that vocabulary:** [Terminology-First Domain Model Migration](./plans/terminology-domain-model-migration.md)

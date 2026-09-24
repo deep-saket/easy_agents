@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark" />
     <title>Galaxy Map · Easy Agents</title>
-    <link rel="stylesheet" href="/static/styles.css?v=galaxy-guide-8" />
+    <link rel="stylesheet" href="/static/styles.css?v=wormhole-chat-1" />
   </head>
   <body>
     <div class="shell">
@@ -28,6 +28,7 @@
 
         <div class="top-actions">
           <div class="mode-switch" role="group" aria-label="Control Room mode">
+            <button class="mode-button" data-mode="chat" type="button">Chat</button>
             <button class="mode-button active" data-mode="map" type="button">Map</button>
             <button class="mode-button" data-mode="live" type="button">Live</button>
             <button class="mode-button" data-mode="replay" type="button">Replay</button>
@@ -301,6 +302,61 @@
           </div>
         </aside>
 
+        <article id="chat-panel" class="chat-panel hidden" aria-label="Chat with the Galaxy">
+          <div class="chat-layout">
+            <section class="chat-conversation">
+              <header class="chat-header">
+                <div>
+                  <p class="eyebrow">Wormhole Chat</p>
+                  <h2>Talk to your agent Galaxy</h2>
+                  <p>Every message is routed to a bounded Planet and answered by the external Mac Gemma Rogue Star.</p>
+                </div>
+                <div class="chat-header-actions">
+                  <span id="chat-model-state" class="chat-model-state">Checking Gemma…</span>
+                  <button id="new-chat" type="button">New conversation</button>
+                </div>
+              </header>
+
+              <div id="chat-transcript" class="chat-transcript" aria-live="polite" aria-label="Conversation">
+                <article class="chat-message assistant">
+                  <span class="chat-avatar" aria-hidden="true">✹</span>
+                  <div class="chat-bubble">
+                    <strong>Personal Agent Galaxy</strong>
+                    <p>Tell me what you need. I’ll send it through the Wormhole, show the route, and ask the selected Planet to answer.</p>
+                  </div>
+                </article>
+              </div>
+
+              <form id="chat-form" class="chat-composer">
+                <label class="sr-only" for="chat-input">Message the Galaxy</label>
+                <textarea id="chat-input" rows="3" maxlength="12000" placeholder="Plan my day, explore an energy opportunity, calculate a link budget…" required></textarea>
+                <div class="chat-composer-footer">
+                  <span>Enter to send · Shift+Enter for a new line</span>
+                  <button id="chat-send" type="submit">Send through Wormhole</button>
+                </div>
+              </form>
+            </section>
+
+            <aside class="chat-route-sidebar" aria-label="Current chat trajectory">
+              <div class="chat-route-heading">
+                <p class="section-label">Current trajectory</p>
+                <span id="chat-route-status" class="status-pill">Waiting</span>
+              </div>
+              <div id="chat-route-context" class="chat-route-context">
+                <div class="chat-route-empty">
+                  <span aria-hidden="true">◎</span>
+                  <strong>No Mission routed yet</strong>
+                  <p>Your route, Constellation context, available Satellites, and model will appear here.</p>
+                </div>
+              </div>
+              <div class="chat-semantics-note">
+                <strong>How to read this</strong>
+                <p>The direct route is Wormhole → Galaxy → Circle → Planet. A Constellation is supporting graph context; Satellites are tools available to the Planet and appear as invoked only after a real tool call.</p>
+              </div>
+            </aside>
+          </div>
+        </article>
+
         <article id="guide-panel" class="guide-panel hidden" aria-label="Galaxy terminology guide">
           <div class="guide-wrap">
             <header class="guide-hero">
@@ -554,6 +610,6 @@
       </footer>
     </div>
 
-    <script type="module" src="/static/app.js?v=galaxy-guide-8"></script>
+    <script type="module" src="/static/app.js?v=wormhole-chat-1"></script>
   </body>
 </html>

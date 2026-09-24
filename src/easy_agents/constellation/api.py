@@ -7,6 +7,11 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException
 
+from easy_agents.constellation.chat import (
+    WormholeChatRequest,
+    WormholeChatResponse,
+    WormholeChatService,
+)
 from easy_agents.constellation.directory import ConstellationDirectory
 from easy_agents.constellation.feature_intake import FeatureIntakeService
 from easy_agents.constellation.knowledge_graph import (
@@ -65,6 +70,11 @@ def create_app(
         models={MAC_GEMMA_PROFILE_ID: active_gemma},
         event_recorder=operations,
     )
+    chat_service = WormholeChatService(
+        registry=galaxy_registry,
+        fleet_runtime=fleet_runtime,
+    )
+
     @asynccontextmanager
     async def lifespan(_: FastAPI):
         yield
@@ -175,6 +185,25 @@ def create_app(
 
         try:
             return canonical_wormhole.route(mission)
+        except (KeyError, ValueError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post("/api/v2/wormhole/chat", response_model=WormholeChatResponse)
+    def chat_through_wormhole(
+        request: WormholeChatRequest,
+    ) -> WormholeChatResponse:
+        """Routes a conversational Mission and answers through the selected Planet."""
+
+        if not active_gemma.is_ready():
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Mac Gemma is not ready at 127.0.0.1:8080. Start the "
+                    "external mac-serving service before chatting."
+                ),
+            )
+        try:
+            return chat_service.chat(request)
         except (KeyError, ValueError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 

@@ -135,6 +135,13 @@ class MissionRequest(BaseModel):
     allow_network: bool = False
     team_size: int = Field(default=1, ge=1, le=8)
     model_id: Literal["none", "mac_gemma"] = "none"
+    advisory_only: bool = Field(
+        default=False,
+        description=(
+            "Treat action words as planning context and authorize only effects "
+            "listed explicitly in requested_effects."
+        ),
+    )
     context: dict[str, Any] = Field(default_factory=dict)
 
 

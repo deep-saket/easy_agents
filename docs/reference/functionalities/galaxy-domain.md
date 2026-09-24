@@ -21,6 +21,9 @@ The implementation includes:
 - a read-only adapter for all 70 current version-1 specialist roles;
 - canonical topology projection with duplicate and dangling-edge validation;
 - additive local version-2 HTTP APIs and the `easy-agents-galaxy` CLI; and
+- a Control Room Chat mode that routes through the Wormhole, executes the
+  selected Planet with Mac Gemma, preserves bounded ephemeral turn context,
+  and explains Constellation, Satellite, and Rogue Star context; and
 - a public terminology matrix plus an accepted vocabulary ADR.
 
 ## Safety boundaries
@@ -49,6 +52,10 @@ The existing Control Room, event stream, and legacy applications continue to
 use compatibility projections while their migration proceeds. Local HTTP
 services must remain loopback-only until principal authentication, Galaxy
 authorization, rate limits, and concurrency limits are implemented.
+
+Chat history is an in-process convenience, not durable Vault memory. Chat shows
+declared Satellites but does not report one as invoked unless a real technical
+tool execution completes.
 
 ## Verification
 
