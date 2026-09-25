@@ -47,7 +47,7 @@ PYTHONPATH=src python -m easy_agents.constellation.cli \
 Run the loopback-only development API:
 
 ```bash
-PYTHONPATH=src uvicorn easy_agents.constellation.api:app \
+PYTHONPATH=src uvicorn --factory easy_agents.constellation.api:create_app \
   --host 127.0.0.1 --port 8030
 ```
 

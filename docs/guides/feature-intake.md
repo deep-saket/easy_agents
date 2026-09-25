@@ -107,7 +107,7 @@ The same contracts are exposed for a future Control Room or another local
 client:
 
 ```bash
-PYTHONPATH=src uvicorn easy_agents.constellation.api:app \
+PYTHONPATH=src uvicorn --factory easy_agents.constellation.api:create_app \
   --host 127.0.0.1 --port 8030
 ```
 

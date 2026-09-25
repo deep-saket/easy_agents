@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi.testclient import TestClient
 
 from easy_agents.constellation import ChatTurn, ConversationStore
 from easy_agents.constellation.api import create_app
+from easy_agents.observability import EventFilter, ObservabilityPipeline
 
 
 class FakeGemma:
@@ -48,7 +51,9 @@ class UnreadyGemma(FakeGemma):
 
 def test_wormhole_chat_routes_executes_and_explains_context() -> None:
     model = FakeGemma()
-    client = TestClient(create_app(gemma_client=model))
+    client = TestClient(
+        create_app(gemma_client=model, chat_history=ConversationStore())
+    )
 
     response = client.post(
         "/api/v2/wormhole/chat",
@@ -76,7 +81,9 @@ def test_wormhole_chat_routes_executes_and_explains_context() -> None:
 
 def test_wormhole_chat_retains_bounded_prior_turn_context() -> None:
     model = FakeGemma()
-    client = TestClient(create_app(gemma_client=model))
+    client = TestClient(
+        create_app(gemma_client=model, chat_history=ConversationStore())
+    )
 
     first = client.post(
         "/api/v2/wormhole/chat",
@@ -97,8 +104,38 @@ def test_wormhole_chat_retains_bounded_prior_turn_context() -> None:
     assert "Assistant:" in model.calls[1][1]
 
 
+def test_wormhole_chat_deletes_server_side_conversation() -> None:
+    model = FakeGemma()
+    client = TestClient(
+        create_app(gemma_client=model, chat_history=ConversationStore())
+    )
+    first = client.post(
+        "/api/v2/wormhole/chat",
+        json={"message": "Help me plan my day"},
+    ).json()
+
+    deleted = client.delete(
+        f"/api/v2/wormhole/conversations/{first['conversation_id']}"
+    )
+    restarted = client.post(
+        "/api/v2/wormhole/chat",
+        json={
+            "message": "Start without the prior context",
+            "conversation_id": first["conversation_id"],
+        },
+    )
+
+    assert deleted.status_code == 200
+    assert deleted.json()["deleted"] is True
+    assert restarted.status_code == 200
+    assert "Help me plan my day" not in model.calls[1][1]
+    assert restarted.json()["retained_turns"] == 2
+
+
 def test_wormhole_chat_is_advisory_even_when_message_names_external_actions() -> None:
-    client = TestClient(create_app(gemma_client=FakeGemma()))
+    client = TestClient(
+        create_app(gemma_client=FakeGemma(), chat_history=ConversationStore())
+    )
 
     response = client.post(
         "/api/v2/wormhole/chat",
@@ -116,7 +153,9 @@ def test_wormhole_chat_is_advisory_even_when_message_names_external_actions() ->
 
 
 def test_wormhole_chat_fails_cleanly_when_gemma_is_unavailable() -> None:
-    client = TestClient(create_app(gemma_client=UnreadyGemma()))
+    client = TestClient(
+        create_app(gemma_client=UnreadyGemma(), chat_history=ConversationStore())
+    )
 
     response = client.post(
         "/api/v2/wormhole/chat",
@@ -143,3 +182,116 @@ def test_conversation_store_evicts_old_turns_and_threads() -> None:
 
     assert store.read("chat-one") == ()
     assert [item.content for item in store.read("chat-two")] == ["new", "answer"]
+
+
+def test_conversation_store_persists_and_resets_sqlite_history(tmp_path: Path) -> None:
+    path = tmp_path / "chat.db"
+    first = ConversationStore(db_path=path, max_turns=4)
+    first.append(
+        "chat-persistent",
+        ChatTurn(role="user", content="remember this"),
+        ChatTurn(role="assistant", content="remembered"),
+    )
+    first.close()
+
+    restored = ConversationStore(db_path=path, max_turns=4)
+    assert [item.content for item in restored.read("chat-persistent")] == [
+        "remember this",
+        "remembered",
+    ]
+    restored.clear("chat-persistent")
+    assert restored.read("chat-persistent") == ()
+    restored.close()
+
+
+def test_wormhole_chat_executes_and_traces_local_satellite(
+    tmp_path: Path,
+) -> None:
+    operations = ObservabilityPipeline.memory()
+    client = TestClient(
+        create_app(
+            gemma_client=FakeGemma(),
+            observability=operations,
+            chat_history=ConversationStore(),
+            data_dir=tmp_path,
+        )
+    )
+
+    response = client.post(
+        "/api/v2/wormhole/chat",
+        json={"message": "Convert 5 miles to km"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["trajectory"]["planet_ids"] == ["personal_steward"]
+    assert payload["satellite_invocations"][0]["satellite"]["id"] == "unit_convert"
+    assert payload["satellite_invocations"][0]["output"]["converted_value"] == 8.04672
+    assert payload["route_context"]["invoked_satellites"][0]["id"] == "unit_convert"
+    assert "8.04672 km" in payload["answer"]
+    events = operations.events(
+        EventFilter(mission_id=payload["mission_id"], limit=200)
+    )
+    assert "satellite.started" in {item.event_type for item in events}
+    assert "satellite.completed" in {item.event_type for item in events}
+
+
+def test_wormhole_chat_writes_and_retrieves_durable_memory(
+    tmp_path: Path,
+) -> None:
+    first_client = TestClient(
+        create_app(
+            gemma_client=FakeGemma(),
+            chat_history=ConversationStore(),
+            data_dir=tmp_path,
+        )
+    )
+
+    written = first_client.post(
+        "/api/v2/wormhole/chat",
+        json={"message": "Remember that my grocery day is Saturday"},
+    )
+    restored_client = TestClient(
+        create_app(
+            gemma_client=FakeGemma(),
+            chat_history=ConversationStore(),
+            data_dir=tmp_path,
+        )
+    )
+    recalled = restored_client.post(
+        "/api/v2/wormhole/chat",
+        json={"message": "What do you remember about grocery day?"},
+    )
+
+    assert written.status_code == 200
+    assert written.json()["route_context"]["invoked_satellites"][0]["id"] == "memory_write"
+    assert recalled.status_code == 200
+    assert recalled.json()["route_context"]["invoked_satellites"][0]["id"] == "memory_search"
+    assert "grocery day is Saturday" in recalled.json()["answer"]
+
+
+def test_runtime_readiness_separates_executable_and_disabled_features(
+    tmp_path: Path,
+) -> None:
+    client = TestClient(
+        create_app(
+            gemma_client=FakeGemma(),
+            chat_history=ConversationStore(db_path=tmp_path / "chat.db"),
+        )
+    )
+
+    response = client.get("/api/v2/readiness")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "operational"
+    assert payload["planets"]["advisory_executable"] == 70
+    assert payload["planets"]["autonomous_effects_enabled"] == 0
+    assert payload["satellites"]["locally_executable"] == [
+        "calculate",
+        "memory_search",
+        "memory_write",
+        "unit_convert",
+    ]
+    assert "email_send" in payload["satellites"]["not_enabled_in_chat"]
+    assert payload["chat"]["persistent"] is True

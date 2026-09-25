@@ -24,7 +24,7 @@ The status labels mean:
 | [Concrete agents](./agents.md) | Mixed | Simple, MailMind, Conversation Manager, and two specialist smokes passed; Collection Agent had 117 passes and 22 failures |
 | [Constellation feature intake](./constellation-feature-intake.md) | Verified first slice | Fourteen focused offline tests passed for Roster validation, lifecycle filtering, all four decisions, risk/network gates, determinism, and the local API |
 | [Canonical Galaxy domain](./galaxy-domain.md) | Verified foundation | 18 focused tests pass for domain invariants, Rocky/Giant execution, monotonic grants, Satellite authorization, YAML v2 round-trip, all-70-role v1 adaptation, topology, Wormhole routing, v2 API, CLI, terminology, and public documentation |
-| [Wormhole Chat](../../guides/chat-with-your-galaxy.md) | Verified local interface | API tests cover routed execution, context, prior turns, bounded eviction, and unavailable Gemma; UI contracts and browser checks cover Chat mode, trajectory context, and Map handoff |
+| [Wormhole Chat](../../guides/chat-with-your-galaxy.md) | Verified local runtime | API tests cover routed execution, persistent bounded history, deletion/reset, local Satellite authorization and results, durable memory recall, truthful readiness, unavailable Gemma, and correlated Satellite events; UI contracts and browser checks cover Chat mode, invoked-tool evidence, trajectory context, and Map handoff |
 | [Galaxy Map](../../guides/constellation-map.md) | Verified | Graph/API/UI contract tests, JavaScript syntax validation, and browser interaction checks passed; typed nodes and relationships load locally, with direct Galaxy-to-Circle ownership, Constellation overlays, Circle Member metadata, callable tool Components presented as Satellites, a shared external Mac Gemma Rogue Star, and route-only dispatch edges |
 | [Specialist fleet](../../guides/run-specialist-fleet.md) | Verified safe runtime | Focused tests compile and execute all 70 Rocky Planet Charters, then verify Wormhole → Galaxy → Circle → Planet routing, scope isolation, approval Gates, offline and medical blocking, team Work orders, the correlated whole-fleet audit, external Mac Gemma selection and readiness, local-model prompts, custom rosters, CLI, and API |
 
@@ -32,7 +32,7 @@ Focused counts overlap because some tests validate more than one capability. Do 
 
 ## Broad Test Run Excluding the Explicit Live Test
 
-The repository collected 338 tests. The explicitly live Groq connectivity test was excluded because it uses a configured account and the network:
+The repository collected 343 tests. The explicitly live Groq connectivity test was excluded because it uses a configured account and the network:
 
 ```bash
 python -m pytest -q --ignore=tests/test_groq_connectivity.py
@@ -41,7 +41,7 @@ python -m pytest -q --ignore=tests/test_groq_connectivity.py
 Result:
 
 ```text
-307 passed, 1 skipped, 30 failed
+312 passed, 1 skipped, 30 failed
 ```
 
 The 30 failures were distributed as follows:

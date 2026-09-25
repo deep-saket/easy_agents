@@ -55,24 +55,45 @@ The direct routing contract remains
 - Rogue Stars used for external resources. Mac Gemma is displayed outside
   Galaxy ownership even though the selected Planet is authorized to access it.
 
-The current chat execution uses model reasoning only. It does not claim that a
-Satellite ran. Future tool-aware execution can populate `invoked_satellites`
-after the existing Satellite authorization and technical executor complete a
-real call.
+Chat can execute four local, account-free Satellites today:
+
+| Satellite | Trigger examples | Effect |
+| --- | --- | --- |
+| Calculate | `Calculate 12 * (3 + 4)` | validated local compute |
+| Unit Convert | `Convert 5 miles to km` | validated local compute |
+| Memory Write | `Remember that my grocery day is Saturday` | durable local memory write |
+| Memory Search | `What do you remember about grocery day?` | scoped local memory read |
+
+These calls pass through the Planet Charter, canonical `SatelliteExecutor`,
+shared `ToolExecutor`, schema validation, and observability events. Exact tool
+evidence is authoritative for a tool-backed answer; unverified base-model
+continuation is omitted instead of being mixed into the result. The UI marks
+each local tool as `ready` and highlights only tools that actually ran.
+
+The remaining declared Satellites—Gmail fetch, stored-email operations, reply
+drafting, email send, and notification—are not enabled in Chat. Network or
+external-send behavior still requires configured providers and explicit
+approval; Chat never interprets ordinary prose as authorization for those
+effects.
 
 ## Conversations and memory
 
 The browser retains the current `conversation_id` and sends it with later
 messages. The server provides up to eight recent turns as bounded completion
 context and retains at most 20 turns per conversation and 128 conversations.
+Conversation turns persist across Control Room restarts in
+`data/galaxy_chat.db` by default. Set `EASY_AGENTS_DATA_DIR` to move all Galaxy
+chat and memory data to another local directory.
 
-This history is intentionally process-local and ephemeral. Restarting the
-Control Room clears it. It is not a Vault and should not be treated as durable
-personal memory. Durable conversation storage requires explicit Vault scope,
-retention, deletion, export, and redaction policy.
+Conversation history and long-term memory are deliberately separate. A normal
+chat turn is retained only as bounded working context. Only an explicit
+`Remember ...` command invokes Memory Write and creates a durable typed memory
+record in `data/galaxy_memory.duckdb`; an explicit recall request invokes
+Memory Search. This prevents every casual message from becoming permanent
+memory without the user's intent.
 
-Use **New conversation** to discard the browser's current conversation ID and
-start without previous-turn context.
+Use **New conversation** to delete the current bounded server-side history,
+discard the browser's conversation ID, and start without previous-turn context.
 
 ## HTTP contract
 
@@ -94,8 +115,19 @@ Continue the same conversation by passing the returned identifier:
 ```
 
 The response contains the answer, Mission status, canonical `Trajectory`,
-route context, available and invoked Satellites, the external model used, and a
-compatibility visualization route for highlighting the existing Map.
+route context, available and invoked Satellites, validated invocation outputs,
+the external model used, and a compatibility visualization route for
+highlighting the existing Map.
+
+Inspect truthful runtime readiness separately:
+
+```bash
+curl -sS http://127.0.0.1:8030/api/v2/readiness
+```
+
+The response distinguishes active and sandboxed Planets, advisory execution
+from autonomous effects, locally executable Satellites from declared but
+disabled integrations, Gemma readiness, and the chat-history backend.
 
 ## Failure behavior
 
@@ -104,10 +136,11 @@ compatibility visualization route for highlighting the existing Map.
 - Invalid or unroutable messages return HTTP 400.
 - Model/runtime failures return a failed Mission answer and remain visible in
   Live and Replay observability views.
-- Chat does not enable network access or external side effects. It submits a
-  read-only advisory Mission and remains subject to the selected Planet's
-  Charter and Gates. Words such as “call” or “buy” influence routing and the
-  requested plan but do not grant permission to perform those actions.
+- Local compute and explicit memory tools can run. Chat does not enable network
+  access or external side effects. Its Planet response remains advisory and is
+  subject to the selected Charter and Gates. Words such as “call” or “buy”
+  influence routing and the requested plan but do not grant permission to
+  perform those actions.
 
 The server should remain bound to loopback until authentication, per-principal
 Galaxy authorization, and request-rate controls are implemented.

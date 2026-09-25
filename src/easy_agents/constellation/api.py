@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
 
 from easy_agents.constellation.chat import (
+    ConversationStore,
     WormholeChatRequest,
     WormholeChatResponse,
     WormholeChatService,
@@ -21,6 +23,10 @@ from easy_agents.constellation.knowledge_graph import (
 )
 from easy_agents.constellation.models import FeatureProposal, FeatureRequest
 from easy_agents.constellation.operations_api import create_operations_router
+from easy_agents.constellation.satellite_tools import (
+    LocalSatelliteRuntime,
+    build_local_satellite_runtime,
+)
 from easy_agents.fleet.model_profiles import (
     MAC_GEMMA_PROFILE_ID,
     build_fleet_mac_gemma,
@@ -50,8 +56,16 @@ def create_app(
     directory: ConstellationDirectory | None = None,
     observability: ObservabilityPipeline | None = None,
     gemma_client: Any | None = None,
+    chat_history: ConversationStore | None = None,
+    satellite_runtime: LocalSatelliteRuntime | None = None,
+    data_dir: Path | None = None,
 ) -> FastAPI:
-    """Builds the local API consumed by the future Control Room."""
+    """Builds the local API consumed by the Control Room.
+
+    A bare factory uses isolated in-memory Chat and Satellite memory, which is
+    suitable for tests and embedding.  The standalone Control Room passes a
+    ``data_dir`` to enable durable SQLite, DuckDB, and JSONL storage.
+    """
 
     active_directory = directory or ConstellationDirectory.default()
     active_overlay = load_default_overlay() if directory is None else KnowledgeGraphOverlay()
@@ -70,19 +84,33 @@ def create_app(
         models={MAC_GEMMA_PROFILE_ID: active_gemma},
         event_recorder=operations,
     )
+    active_history = chat_history or ConversationStore(
+        db_path=data_dir / "galaxy_chat.db" if data_dir is not None else None
+    )
+    active_satellites = satellite_runtime or build_local_satellite_runtime(
+        galaxy_registry,
+        data_dir=data_dir,
+        event_recorder=operations,
+        persistent=data_dir is not None,
+    )
     chat_service = WormholeChatService(
         registry=galaxy_registry,
         fleet_runtime=fleet_runtime,
+        history=active_history,
+        satellite_runtime=active_satellites,
     )
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
         yield
+        active_history.close()
         operations.close()
 
     app = FastAPI(title="Easy Agents Constellation", lifespan=lifespan)
     app.state.observability = operations
     app.state.galaxy_registry = galaxy_registry
+    app.state.chat_service = chat_service
+    app.state.satellite_runtime = active_satellites
     app.include_router(create_operations_router(operations))
 
     @app.get("/health")
@@ -100,6 +128,8 @@ def create_app(
             "entrypoint": WORMHOLE_ID,
             "galaxy": "personal",
             "constellations": 1,
+            "chat_history": active_history.backend,
+            "executable_satellites": len(active_satellites.executable_ids),
         }
 
     @app.get("/api/models/mac-gemma/status")
@@ -107,6 +137,42 @@ def create_app(
         """Checks Mac-serving readiness without exposing credentials."""
 
         return mac_gemma_status(active_gemma)
+
+    @app.get("/api/v2/readiness")
+    def runtime_readiness() -> dict[str, object]:
+        """Reports what is truly executable versus catalogued or sandboxed."""
+
+        model = mac_gemma_status(active_gemma)
+        summary = fleet_registry.summary()
+        declared_satellites = set(galaxy_registry.satellites)
+        executable_satellites = set(active_satellites.executable_ids)
+        return {
+            "status": "operational" if model["ready"] else "degraded",
+            "gemma": model,
+            "planets": {
+                **summary,
+                "advisory_executable": summary["active"] + summary["sandboxed"],
+                "autonomous_effects_enabled": 0,
+            },
+            "satellites": {
+                "declared": len(declared_satellites),
+                "locally_executable": sorted(executable_satellites),
+                "not_enabled_in_chat": sorted(
+                    declared_satellites - executable_satellites
+                ),
+            },
+            "chat": {
+                "history_backend": active_history.backend,
+                "persistent": active_history.backend == "sqlite",
+                "max_conversations": active_history.max_conversations,
+                "max_turns": active_history.max_turns,
+            },
+            "boundaries": [
+                "Sandboxed Planets provide advisory reasoning but no autonomous effects.",
+                "Network and external-send Satellites remain disabled in Chat.",
+                "Calls, purchases, email sending, and notifications require explicit approval and configured providers.",
+            ],
+        }
 
     @app.get("/api/constellation")
     def constellation() -> dict[str, object]:
@@ -207,6 +273,13 @@ def create_app(
         except (KeyError, ValueError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    @app.delete("/api/v2/wormhole/conversations/{conversation_id}")
+    def delete_chat_conversation(conversation_id: str) -> dict[str, object]:
+        """Deletes one bounded local chat history immediately."""
+
+        chat_service.history.clear(conversation_id)
+        return {"conversation_id": conversation_id, "deleted": True}
+
     @app.get("/api/fleet")
     def fleet() -> dict[str, object]:
         """Lists every compiled active or sandboxed Specialist Charter."""
@@ -279,6 +352,3 @@ def create_app(
         return architect.assess(request)
 
     return app
-
-
-app = create_app()

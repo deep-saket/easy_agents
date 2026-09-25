@@ -374,6 +374,11 @@ def _compile_manifests(
             tool_ids.update(tool_by_playbook.get(playbook_id, set()))
         if "long_term" in memory_scopes:
             tool_ids.update({"memory_search", "memory_write"})
+        if node.id == "specialist:personal_steward":
+            # The general entry Planet owns the two side-effect-free utility
+            # Satellites so explicit arithmetic and conversions never need an
+            # unrelated domain Specialist merely to access a safe local tool.
+            tool_ids.update({"calculate", "unit_convert"})
 
         source_status = node.status
         runtime_status = (

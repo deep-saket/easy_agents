@@ -5,6 +5,7 @@ from easy_agents.constellation.chat import (
     ChatRouteContext,
     ChatTurn,
     ConversationStore,
+    SatelliteInvocation,
     WormholeChatRequest,
     WormholeChatResponse,
     WormholeChatService,
@@ -29,6 +30,12 @@ from easy_agents.constellation.models import (
     RiskLevel,
     SpecialistDefinition,
 )
+from easy_agents.constellation.satellite_tools import (
+    LocalSatellitePlanner,
+    LocalSatelliteRuntime,
+    PlannedSatelliteCall,
+    build_local_satellite_runtime,
+)
 
 __all__ = [
     "CapabilityDefinition",
@@ -48,10 +55,15 @@ __all__ = [
     "KnowledgeGraphEdge",
     "KnowledgeGraphNode",
     "LifecycleStatus",
+    "LocalSatellitePlanner",
+    "LocalSatelliteRuntime",
+    "PlannedSatelliteCall",
     "RiskLevel",
+    "SatelliteInvocation",
     "SpecialistDefinition",
     "WormholeChatRequest",
     "WormholeChatResponse",
     "WormholeChatService",
     "build_knowledge_graph",
+    "build_local_satellite_runtime",
 ]

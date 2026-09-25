@@ -450,8 +450,10 @@ When the Control Room service is running:
 | `GET /api/v2/planets` | Rocky and Giant Planets with Charters |
 | `GET /api/v2/satellites` | Satellite policy and operability metadata |
 | `GET /api/v2/rogue-stars` | External shared resources |
+| `GET /api/v2/readiness` | Executable versus declared runtime status |
 | `POST /api/v2/wormhole/route` | Route a Mission without executing effects |
 | `POST /api/v2/wormhole/chat` | Route and answer a conversational Mission with Mac Gemma |
+| `DELETE /api/v2/wormhole/conversations/{id}` | Delete one bounded chat history |
 
 Version-1 endpoints remain available during migration.
 

@@ -15,7 +15,7 @@ if command -v lsof >/dev/null 2>&1 \
   exit 1
 fi
 
-.venv/bin/uvicorn endpoints.constellation:app \
+.venv/bin/uvicorn --factory endpoints.constellation:create_app \
   --host "$CONSTELLATION_HOST" \
   --port "$CONSTELLATION_PORT" \
   --timeout-graceful-shutdown "$CONSTELLATION_GRACEFUL_SHUTDOWN_SECONDS"

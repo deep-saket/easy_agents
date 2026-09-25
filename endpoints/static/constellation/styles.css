@@ -825,6 +825,17 @@ body.guide-mode .inspector-panel { display: none; }
 .chat-model-state.ready { color: var(--accent); }
 .chat-model-state.unavailable { color: var(--danger); }
 
+.chat-runtime-state {
+  max-width: 280px;
+  color: var(--muted);
+  font-size: 8px;
+  line-height: 1.45;
+  text-align: right;
+}
+
+.chat-runtime-state.ready { color: #9eb3b9; }
+.chat-runtime-state.unavailable { color: var(--danger); }
+
 .chat-header-actions button,
 .chat-composer button,
 .chat-map-button {
@@ -999,6 +1010,30 @@ body.guide-mode .inspector-panel { display: none; }
   border-bottom: 1px solid var(--line);
 }
 
+.runtime-readiness {
+  margin-top: 14px;
+  padding: 11px;
+  border: 1px solid rgba(110, 231, 210, 0.18);
+  border-radius: 10px;
+  background: rgba(110, 231, 210, 0.035);
+}
+
+.runtime-readiness > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 7px;
+}
+
+.runtime-readiness strong,
+.runtime-readiness span { font-size: 8px; letter-spacing: 0.07em; text-transform: uppercase; }
+.runtime-readiness strong { color: #dce8eb; }
+.runtime-readiness span { color: var(--muted); }
+.runtime-readiness span.ready { color: var(--accent); }
+.runtime-readiness span.unavailable { color: var(--danger); }
+.runtime-readiness p { margin: 4px 0 0; color: var(--muted); font-size: 8px; line-height: 1.45; }
+
 .chat-route-context { margin-top: 18px; }
 
 .chat-route-empty {
@@ -1065,6 +1100,8 @@ body.guide-mode .inspector-panel { display: none; }
 
 .chat-route-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chat-route-chip { padding: 5px 7px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: rgba(255, 255, 255, 0.02); font-size: 8px; }
+.chat-route-chip.executable { border-color: rgba(110, 231, 210, 0.24); color: #a8d9d0; background: rgba(110, 231, 210, 0.05); }
+.chat-route-chip.invoked { border-color: rgba(247, 223, 131, 0.42); color: var(--constellation); background: rgba(247, 223, 131, 0.08); }
 
 .chat-semantics-note {
   margin-top: 24px;
@@ -1541,8 +1578,15 @@ button.operation-event:hover { border-color: var(--line-strong); background: rgb
   .top-actions { gap: 5px; }
   .mode-button { padding: 5px 6px; font-size: 8px; }
   .health-pill { display: none; }
-  .chat-header { padding: 18px; }
-  .chat-header-actions { display: none; }
+  .chat-header { flex-direction: column; gap: 12px; padding: 18px; }
+  .chat-header-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    width: 100%;
+    justify-items: start;
+  }
+  .chat-header-actions button { grid-column: 2; grid-row: 1 / 3; align-self: center; }
+  .chat-runtime-state { grid-column: 1; max-width: none; text-align: left; }
   .chat-header h2 { font-size: 22px; }
   .chat-transcript { padding: 18px 14px; }
   .chat-message { width: 97%; }

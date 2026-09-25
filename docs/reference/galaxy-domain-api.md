@@ -41,8 +41,9 @@ are Pydantic models with `extra="forbid"`; most are frozen after validation.
 | `GalaxyRuntime` | Composes Wormhole routing and Planet execution |
 | `SatelliteCall` | One bounded Planet-to-Satellite invocation request |
 | `SatelliteExecutor` | Authorizes Satellite calls before `ToolExecutor` |
+| `LocalSatelliteRuntime` | Plans and executes the account-free Calculate, Unit Convert, Memory Search, and Memory Write Satellites |
 | `WormholeChatService` | Composes canonical routing with FleetRuntime and Mac Gemma conversational execution |
-| `ConversationStore` | Bounded ephemeral recent-turn context for the local Chat UI |
+| `ConversationStore` | Bounded recent-turn context with in-memory and durable SQLite backends |
 
 `GalaxyRuntime` is deliberately synchronous and minimal. It enforces Charter
 scope and the Mission's maximum Planet count, but it does not yet enforce
@@ -77,10 +78,17 @@ runtime can implement them without changing the Mission schema.
 The `easy-agents-galaxy` CLI validates catalogs, prints normalized snapshots,
 and routes Missions without executing effects.
 
-The Control Room exposes `POST /api/v2/wormhole/chat`. Its response contains a
-canonical `Trajectory`, routed and supporting entity summaries, the answer,
-the model used, and the existing Map's compatibility visualization route. See
-[Chat with Your Galaxy](../guides/chat-with-your-galaxy.md).
+The Control Room exposes:
+
+- `POST /api/v2/wormhole/chat` for routed model and Satellite execution;
+- `DELETE /api/v2/wormhole/conversations/{conversation_id}` for immediate
+  bounded-history deletion; and
+- `GET /api/v2/readiness` for truthful executable-versus-declared status.
+
+The chat response contains a canonical `Trajectory`, routed and supporting
+entity summaries, validated Satellite invocations, the answer, the model used,
+and the existing Map's compatibility visualization route. See [Chat with Your
+Galaxy](../guides/chat-with-your-galaxy.md).
 
 ## Stable compatibility policy
 

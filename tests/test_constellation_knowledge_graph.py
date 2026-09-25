@@ -133,8 +133,8 @@ def test_constellation_api_exposes_knowledge_graph() -> None:
     assert len(payload["edges"]) > len(payload["nodes"])
 
 
-def test_constellation_ui_serves_local_assets() -> None:
-    client = TestClient(create_ui_app())
+def test_constellation_ui_serves_local_assets(tmp_path) -> None:
+    client = TestClient(create_ui_app(data_dir=tmp_path))
 
     page = client.get("/")
     script = client.get("/static/app.js")
@@ -148,6 +148,8 @@ def test_constellation_ui_serves_local_assets() -> None:
     assert ">Chat<" in page.text
     assert "Talk to your agent Galaxy" in page.text
     assert "Send through Wormhole" in page.text
+    assert "Checking runtime" in page.text
+    assert "Runtime reality" in page.text
     assert "A Constellation is supporting graph context" in page.text
     assert ">Guide<" in page.text
     assert "One language for the whole agent system" in page.text
@@ -174,10 +176,11 @@ def test_constellation_ui_serves_local_assets() -> None:
     assert "knowledge-graph" in script.text
     assert "events/stream" in script.text
     assert "rebuildReplay" in script.text
-    assert "models/mac-gemma/status" in script.text
+    assert "v2/readiness" in script.text
     assert "wormhole/route" in script.text
     assert "v2/wormhole/chat" in script.text
     assert "renderChatRoute" in script.text
+    assert "satelliteResultSummary" in script.text
     assert styles.status_code == 200
     assert "--specialist" in styles.text
     assert "--rogue-star" in styles.text

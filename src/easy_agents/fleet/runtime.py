@@ -687,11 +687,21 @@ class FleetRuntime:
 
         return self.wormhole.route(request)
 
-    def run(self, request: MissionRequest) -> FleetMissionResult:
-        """Executes one safe local Mission across the routed team."""
+    def run(
+        self,
+        request: MissionRequest,
+        *,
+        mission_id: str | None = None,
+    ) -> FleetMissionResult:
+        """Executes one safe local Mission across the routed team.
+
+        ``mission_id`` lets an ingress layer correlate preflight work such as
+        authorized Satellite calls with the same Mission timeline.  Ordinary
+        callers may omit it and retain collision-resistant runtime IDs.
+        """
 
         active_model = self._resolve_model(request)
-        mission_id = f"mission-{uuid4()}"
+        mission_id = mission_id or f"mission-{uuid4()}"
         mission_started = perf_counter()
         self._record_mission(
             "mission.created",

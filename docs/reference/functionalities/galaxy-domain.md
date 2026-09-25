@@ -22,8 +22,9 @@ The implementation includes:
 - canonical topology projection with duplicate and dangling-edge validation;
 - additive local version-2 HTTP APIs and the `easy-agents-galaxy` CLI; and
 - a Control Room Chat mode that routes through the Wormhole, executes the
-  selected Planet with Mac Gemma, preserves bounded ephemeral turn context,
-  and explains Constellation, Satellite, and Rogue Star context; and
+  selected Planet with Mac Gemma, persists bounded turn context, executes four
+  authorized local Satellites, and explains Constellation, Satellite, and
+  Rogue Star context; and
 - a public terminology matrix plus an accepted vocabulary ADR.
 
 ## Safety boundaries
@@ -53,9 +54,10 @@ use compatibility projections while their migration proceeds. Local HTTP
 services must remain loopback-only until principal authentication, Galaxy
 authorization, rate limits, and concurrency limits are implemented.
 
-Chat history is an in-process convenience, not durable Vault memory. Chat shows
-declared Satellites but does not report one as invoked unless a real technical
-tool execution completes.
+Chat working history persists in a bounded SQLite store but remains distinct
+from typed long-term memory. Explicit Memory Write and Memory Search commands
+use the layered memory system. Chat reports a Satellite as invoked only after
+canonical authorization and real technical tool execution complete.
 
 ## Verification
 

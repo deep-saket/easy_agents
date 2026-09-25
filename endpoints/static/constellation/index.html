@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark" />
     <title>Galaxy Map · Easy Agents</title>
-    <link rel="stylesheet" href="/static/styles.css?v=wormhole-chat-1" />
+    <link rel="stylesheet" href="/static/styles.css?v=runtime-complete-1" />
   </head>
   <body>
     <div class="shell">
@@ -309,10 +309,11 @@
                 <div>
                   <p class="eyebrow">Wormhole Chat</p>
                   <h2>Talk to your agent Galaxy</h2>
-                  <p>Every message is routed to a bounded Planet and answered by the external Mac Gemma Rogue Star.</p>
+                  <p>Every message is routed to a bounded Planet. Safe local Satellites provide exact results; Mac Gemma handles open-ended reasoning.</p>
                 </div>
                 <div class="chat-header-actions">
                   <span id="chat-model-state" class="chat-model-state">Checking Gemma…</span>
+                  <span id="chat-runtime-state" class="chat-runtime-state">Checking runtime…</span>
                   <button id="new-chat" type="button">New conversation</button>
                 </div>
               </header>
@@ -342,6 +343,15 @@
                 <p class="section-label">Current trajectory</p>
                 <span id="chat-route-status" class="status-pill">Waiting</span>
               </div>
+              <section class="runtime-readiness" aria-label="Runtime readiness">
+                <div>
+                  <strong>Runtime reality</strong>
+                  <span id="runtime-readiness-status">Checking</span>
+                </div>
+                <p id="runtime-planet-readiness">Checking Planet execution status…</p>
+                <p id="runtime-satellite-readiness">Checking Satellite execution status…</p>
+                <p id="runtime-effect-readiness">External effects remain disabled.</p>
+              </section>
               <div id="chat-route-context" class="chat-route-context">
                 <div class="chat-route-empty">
                   <span aria-hidden="true">◎</span>
@@ -610,6 +620,6 @@
       </footer>
     </div>
 
-    <script type="module" src="/static/app.js?v=wormhole-chat-1"></script>
+    <script type="module" src="/static/app.js?v=runtime-complete-1"></script>
   </body>
 </html>

@@ -185,6 +185,11 @@ const elements = {
   chatSend: document.getElementById("chat-send"),
   newChat: document.getElementById("new-chat"),
   chatModelState: document.getElementById("chat-model-state"),
+  chatRuntimeState: document.getElementById("chat-runtime-state"),
+  runtimeReadinessStatus: document.getElementById("runtime-readiness-status"),
+  runtimePlanetReadiness: document.getElementById("runtime-planet-readiness"),
+  runtimeSatelliteReadiness: document.getElementById("runtime-satellite-readiness"),
+  runtimeEffectReadiness: document.getElementById("runtime-effect-readiness"),
   chatRouteStatus: document.getElementById("chat-route-status"),
   chatRouteContext: document.getElementById("chat-route-context"),
 };
@@ -220,6 +225,7 @@ const state = {
     conversationId: null,
     sending: false,
     gemmaReady: false,
+    readiness: null,
     visualizationRoute: null,
   },
   operations: {
@@ -915,9 +921,22 @@ function updateMissionModelControl() {
 async function loadGemmaStatus() {
   const gemmaOption = elements.missionModel.querySelector('option[value="mac_gemma"]');
   try {
-    const response = await fetch("/api/models/mac-gemma/status");
-    if (!response.ok) throw new Error(`Model status returned ${response.status}`);
-    const status = await response.json();
+    const response = await fetch("/api/v2/readiness");
+    if (!response.ok) throw new Error(`Runtime readiness returned ${response.status}`);
+    const readiness = await response.json();
+    const status = readiness.gemma;
+    state.chat.readiness = readiness;
+    const localSatelliteCount = readiness.satellites?.locally_executable?.length || 0;
+    const advisoryPlanets = readiness.planets?.advisory_executable || 0;
+    const activePlanets = readiness.planets?.active || 0;
+    const historyLabel = readiness.chat?.persistent ? "persistent history" : "session history";
+    elements.chatRuntimeState.textContent = `${localSatelliteCount} local Satellites · ${advisoryPlanets} advisory Planets (${activePlanets} active) · ${historyLabel}`;
+    elements.chatRuntimeState.className = "chat-runtime-state ready";
+    elements.runtimeReadinessStatus.textContent = readiness.status;
+    elements.runtimeReadinessStatus.className = readiness.status === "operational" ? "ready" : "unavailable";
+    elements.runtimePlanetReadiness.textContent = `${activePlanets} active + ${readiness.planets?.sandboxed || 0} sandboxed = ${advisoryPlanets} advisory-capable Planets.`;
+    elements.runtimeSatelliteReadiness.textContent = `${localSatelliteCount} of ${readiness.satellites?.declared || 0} declared Satellites execute locally in Chat.`;
+    elements.runtimeEffectReadiness.textContent = `${readiness.planets?.autonomous_effects_enabled || 0} Planets have autonomous external effects; sends, calls, and purchases remain approval-gated.`;
     if (status.ready && (status.models || []).includes("gemma-4-E4B")) {
       state.chat.gemmaReady = true;
       gemmaOption.disabled = false;
@@ -943,6 +962,12 @@ async function loadGemmaStatus() {
     elements.missionModelStatus.className = "model-readiness unavailable";
     elements.chatModelState.textContent = "Gemma status unavailable";
     elements.chatModelState.className = "chat-model-state unavailable";
+    elements.chatRuntimeState.textContent = "Runtime readiness unavailable";
+    elements.chatRuntimeState.className = "chat-runtime-state unavailable";
+    elements.runtimeReadinessStatus.textContent = "Unavailable";
+    elements.runtimeReadinessStatus.className = "unavailable";
+    elements.runtimePlanetReadiness.textContent = "Could not verify Planet execution status.";
+    elements.runtimeSatelliteReadiness.textContent = "Could not verify Satellite execution status.";
   }
   updateMissionModelControl();
 }
@@ -970,6 +995,9 @@ function appendChatMessage(role, content, payload = null, extraClass = "") {
       payload.status,
       planet?.display_name,
       payload.used_model,
+      payload.satellite_invocations?.length
+        ? `${payload.satellite_invocations.length} Satellite invoked`
+        : null,
     ].filter(Boolean)) {
       const chip = document.createElement("span");
       chip.textContent = String(label).replaceAll("_", " ");
@@ -1019,6 +1047,23 @@ function chatRouteGroup(label) {
   return group;
 }
 
+function satelliteResultSummary(invocation) {
+  const output = invocation.output || {};
+  if (invocation.satellite?.id === "calculate") {
+    return `${output.expression} = ${output.result}`;
+  }
+  if (invocation.satellite?.id === "unit_convert") {
+    return `${output.original_value} ${output.from_unit} = ${output.converted_value} ${output.to_unit}`;
+  }
+  if (invocation.satellite?.id === "memory_write") {
+    return `Stored: ${output.item?.content_text || "validated memory record"}`;
+  }
+  if (invocation.satellite?.id === "memory_search") {
+    return `${output.total || 0} matching memory record(s)`;
+  }
+  return "Validated tool output returned";
+}
+
 function renderChatRoute(payload) {
   const context = payload.route_context;
   elements.chatRouteContext.replaceChildren();
@@ -1049,8 +1094,10 @@ function renderChatRoute(payload) {
     chips.className = "chat-route-chips";
     for (const satellite of context.available_satellites) {
       const chip = document.createElement("span");
-      chip.className = "chat-route-chip";
-      chip.textContent = satellite.display_name;
+      const invoked = context.invoked_satellites?.some((item) => item.id === satellite.id);
+      chip.className = `chat-route-chip${satellite.status === "executable" ? " executable" : ""}${invoked ? " invoked" : ""}`;
+      const readiness = satellite.status === "executable" ? "ready" : satellite.status;
+      chip.textContent = `${satellite.display_name}${readiness ? ` · ${readiness}` : ""}`;
       chips.append(chip);
     }
     tools.append(chips);
@@ -1067,6 +1114,21 @@ function renderChatRoute(payload) {
     tools.append(empty);
   }
   elements.chatRouteContext.append(tools);
+
+  if (payload.satellite_invocations?.length) {
+    const executed = chatRouteGroup("Invoked Satellite results");
+    for (const invocation of payload.satellite_invocations) {
+      executed.append(
+        chatRouteStep(
+          "S",
+          invocation.satellite.display_name,
+          satelliteResultSummary(invocation),
+          "satellite",
+        ),
+      );
+    }
+    elements.chatRouteContext.append(executed);
+  }
 
   if (context.rogue_stars?.length) {
     const external = chatRouteGroup("External reasoning resource");
@@ -1125,13 +1187,27 @@ async function submitChat(event) {
   }
 }
 
-function resetChat() {
+async function resetChat() {
+  const conversationId = state.chat.conversationId;
+  let deletionError = null;
+  if (conversationId) {
+    try {
+      const response = await fetch(
+        `/api/v2/wormhole/conversations/${encodeURIComponent(conversationId)}`,
+        { method: "DELETE" },
+      );
+      if (!response.ok) throw new Error(`Conversation delete returned ${response.status}.`);
+    } catch (error) {
+      deletionError = error instanceof Error ? error.message : String(error);
+    }
+  }
   state.chat.conversationId = null;
   state.chat.visualizationRoute = null;
   for (const message of [...elements.chatTranscript.querySelectorAll(".chat-message")].slice(1)) {
     message.remove();
   }
   elements.chatRouteStatus.textContent = "Waiting";
+  elements.statusText.textContent = "Ready for a new Mission";
   elements.chatRouteContext.replaceChildren();
   const empty = document.createElement("div");
   empty.className = "chat-route-empty";
@@ -1146,6 +1222,14 @@ function resetChat() {
   elements.chatRouteContext.append(empty);
   elements.chatInput.value = "";
   elements.chatInput.focus();
+  if (deletionError) {
+    appendChatMessage(
+      "assistant",
+      `The local conversation view was reset, but durable history deletion failed: ${deletionError}`,
+      null,
+      "error",
+    );
+  }
 }
 
 async function routeThroughEntrypoint() {
