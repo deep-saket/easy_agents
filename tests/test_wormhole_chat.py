@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
@@ -49,6 +50,20 @@ class UnreadyGemma(FakeGemma):
         return False
 
 
+class RepetitiveGemma(FakeGemma):
+    """Completion double whose output must never reach the final answer."""
+
+    def generate_result(self, system_prompt: str, user_prompt: str) -> SimpleNamespace:
+        self.calls.append((system_prompt, user_prompt))
+        return SimpleNamespace(
+            content="repeat " * 40,
+            finish_reason="length",
+            prompt_tokens=12,
+            completion_tokens=40,
+            total_tokens=52,
+        )
+
+
 def test_wormhole_chat_routes_executes_and_explains_context() -> None:
     model = FakeGemma()
     client = TestClient(
@@ -74,6 +89,10 @@ def test_wormhole_chat_routes_executes_and_explains_context() -> None:
     assert payload["route_context"]["invoked_satellites"] == []
     assert payload["route_context"]["rogue_stars"][0]["id"] == "mac_gemma"
     assert payload["used_model"] == "gemma-4-E4B"
+    assert payload["answer_source"] == "model"
+    assert payload["generation"]["completed"] is True
+    assert payload["generation"]["output_used"] is True
+    assert payload["generation"]["quality_status"] == "accepted"
     assert "highest-impact" in payload["answer"]
     assert model.calls
     assert model.calls[0][0] == ""
@@ -166,6 +185,47 @@ def test_wormhole_chat_fails_cleanly_when_gemma_is_unavailable() -> None:
     assert "127.0.0.1:8080" in response.json()["detail"]
 
 
+def test_wormhole_chat_runs_exact_satellite_when_gemma_is_unavailable() -> None:
+    client = TestClient(
+        create_app(gemma_client=UnreadyGemma(), chat_history=ConversationStore())
+    )
+
+    response = client.post(
+        "/api/v2/wormhole/chat",
+        json={"message": "Convert 5 miles to km"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "completed"
+    assert payload["answer_source"] == "satellite"
+    assert payload["used_model"] is None
+    assert payload["generation"] is None
+    assert "8.04672 km" in payload["answer"]
+
+
+def test_wormhole_chat_falls_back_when_model_output_is_rejected() -> None:
+    client = TestClient(
+        create_app(gemma_client=RepetitiveGemma(), chat_history=ConversationStore())
+    )
+
+    response = client.post(
+        "/api/v2/wormhole/chat",
+        json={"message": "Help me plan tomorrow"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "planned"
+    assert payload["answer_source"] == "fallback"
+    assert payload["used_model"] == "gemma-4-E4B"
+    assert payload["generation"]["completed"] is True
+    assert payload["generation"]["output_used"] is False
+    assert payload["generation"]["quality_status"] == "rejected"
+    assert "repeat repeat" not in payload["answer"]
+    assert "deterministic bounded plan" in payload["answer"]
+
+
 def test_conversation_store_evicts_old_turns_and_threads() -> None:
     store = ConversationStore(max_conversations=1, max_turns=2)
     store.append(
@@ -228,12 +288,22 @@ def test_wormhole_chat_executes_and_traces_local_satellite(
     assert payload["satellite_invocations"][0]["satellite"]["id"] == "unit_convert"
     assert payload["satellite_invocations"][0]["output"]["converted_value"] == 8.04672
     assert payload["route_context"]["invoked_satellites"][0]["id"] == "unit_convert"
+    assert payload["status"] == "completed"
+    assert payload["answer_source"] == "satellite"
+    assert payload["used_model"] is None
+    assert payload["generation"] is None
     assert "8.04672 km" in payload["answer"]
     events = operations.events(
         EventFilter(mission_id=payload["mission_id"], limit=200)
     )
     assert "satellite.started" in {item.event_type for item in events}
     assert "satellite.completed" in {item.event_type for item in events}
+    composed = next(item for item in events if item.event_type == "response.composed")
+    assert composed.status == "completed"
+    assert composed.attributes["answer_source"] == "satellite"
+    assert composed.attributes["output_used"] is False
+    assert composed.attributes["satellite_count"] == 1
+    assert operations.projector.mission(payload["mission_id"])["status"] == "completed"
 
 
 def test_wormhole_chat_writes_and_retrieves_durable_memory(
@@ -295,3 +365,42 @@ def test_runtime_readiness_separates_executable_and_disabled_features(
     ]
     assert "email_send" in payload["satellites"]["not_enabled_in_chat"]
     assert payload["chat"]["persistent"] is True
+    assert payload["commons"] == {
+        "status": "partial",
+        "summary": {
+            "operational": 12,
+            "partial": 10,
+            "declared": 4,
+            "disabled": 4,
+        },
+        "response_provenance": True,
+        "generation_quality_checks": True,
+    }
+
+
+def test_commons_readiness_audits_every_declared_component() -> None:
+    client = TestClient(
+        create_app(gemma_client=FakeGemma(), chat_history=ConversationStore())
+    )
+
+    response = client.get("/api/v2/circles/commons/readiness")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["circle_id"] == "commons"
+    assert payload["status"] == "partial"
+    assert payload["summary"] == {
+        "operational": 12,
+        "partial": 10,
+        "declared": 4,
+        "disabled": 4,
+    }
+    assert len(payload["components"]) == 30
+    by_id = {item["id"]: item for item in payload["components"]}
+    assert by_id["mission_runtime"]["runtime_status"] == "operational"
+    assert by_id["artifact_store"]["runtime_status"] == "declared"
+    assert by_id["scheduled_review"]["runtime_status"] == "partial"
+    assert by_id["gmail_fetch"]["runtime_status"] == "disabled"
+    assert payload["runtime"]["response_provenance"] is True
+    assert payload["runtime"]["generation_quality_checks"] is True
+    assert payload["runtime"]["autonomous_external_effects"] is False

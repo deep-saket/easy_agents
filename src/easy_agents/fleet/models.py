@@ -196,6 +196,29 @@ class StepResult(BaseModel):
     effects: list[str] = Field(default_factory=list)
 
 
+class GenerationEvidence(BaseModel):
+    """Portable evidence for one language-model generation attempt.
+
+    The contract distinguishes transport success from answer quality.  A
+    completed request proves that a configured model returned text; it does not
+    imply factual correctness or instruction adherence.  ``output_used`` is
+    set by the final response composer so tool-backed answers do not falsely
+    claim that model text was shown to the user.
+    """
+
+    generation_id: str
+    model_id: str
+    completed: bool
+    output_used: bool = True
+    finish_reason: str | None = None
+    prompt_tokens: int | None = Field(default=None, ge=0)
+    completion_tokens: int | None = Field(default=None, ge=0)
+    total_tokens: int | None = Field(default=None, ge=0)
+    duration_ms: float | None = Field(default=None, ge=0)
+    quality_status: Literal["accepted", "degraded", "rejected"]
+    quality_checks: list[str] = Field(default_factory=list)
+
+
 class AgentResult(BaseModel):
     """Typed result returned by one Specialist."""
 
@@ -210,6 +233,7 @@ class AgentResult(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     approvals: list[ApprovalRequest] = Field(default_factory=list)
     used_model: str | None = None
+    generation: GenerationEvidence | None = None
     work_order: WorkOrder
 
 

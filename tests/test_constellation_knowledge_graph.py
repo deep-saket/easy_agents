@@ -177,10 +177,14 @@ def test_constellation_ui_serves_local_assets(tmp_path) -> None:
     assert "events/stream" in script.text
     assert "rebuildReplay" in script.text
     assert "v2/readiness" in script.text
+    assert "runtime-commons-readiness" in page.text
+    assert "commons-core-1" in page.text
     assert "wormhole/route" in script.text
     assert "v2/wormhole/chat" in script.text
     assert "renderChatRoute" in script.text
     assert "satelliteResultSummary" in script.text
+    assert "generationEvidenceSummary" in script.text
+    assert "Answer provenance" in script.text
     assert styles.status_code == 200
     assert "--specialist" in styles.text
     assert "--rogue-star" in styles.text

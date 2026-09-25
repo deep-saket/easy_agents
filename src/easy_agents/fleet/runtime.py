@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 from time import perf_counter
 from typing import Any, Mapping
@@ -14,6 +15,7 @@ from easy_agents.fleet.models import (
     FleetMissionResult,
     FleetValidationItem,
     FleetValidationReport,
+    GenerationEvidence,
     MissionRequest,
     MissionStatus,
     PermissionGrant,
@@ -259,7 +261,7 @@ class SpecialistAgent:
                 "Model-generated content is unverified; check claims, measurements, and recommendations before relying on it."
             )
         try:
-            response, model_id = self._generate_response(
+            response, model_id, generation = self._generate_response(
                 request=request,
                 playbook=playbook,
                 decision=decision,
@@ -268,6 +270,9 @@ class SpecialistAgent:
                 run_id=run_id,
             )
         except Exception as exc:
+            failed_generation_id = str(
+                getattr(exc, "generation_id", f"generation-{uuid4()}")
+            )
             result = AgentResult(
                 run_id=run_id,
                 mission_id=active_mission_id,
@@ -279,12 +284,40 @@ class SpecialistAgent:
                 steps=self._step_results(playbook, decision, blocked=True),
                 warnings=[*warnings, f"Model error: {type(exc).__name__}: {exc}"],
                 used_model=str(getattr(self.llm, "model_name", type(self.llm).__name__)),
+                generation=GenerationEvidence(
+                    generation_id=failed_generation_id,
+                    model_id=str(
+                        getattr(self.llm, "model_name", type(self.llm).__name__)
+                    ),
+                    completed=False,
+                    output_used=False,
+                    duration_ms=getattr(exc, "generation_duration_ms", None),
+                    quality_status="rejected",
+                    quality_checks=["generation_failed"],
+                ),
                 work_order=order,
             )
             self._record_result(result, playbook=playbook, started=started)
             return result
 
-        status = MissionStatus.COMPLETED if self.llm is not None else MissionStatus.PLANNED
+        if generation is not None and generation.quality_status != "accepted":
+            disposition = (
+                " Its output was not used."
+                if generation.quality_status == "rejected"
+                else ""
+            )
+            warnings.append(
+                "Model completion passed transport checks but failed basic output checks: "
+                + ", ".join(generation.quality_checks)
+                + "."
+                + disposition
+            )
+        used_generated_output = generation is not None and generation.output_used
+        status = (
+            MissionStatus.COMPLETED
+            if used_generated_output
+            else MissionStatus.PLANNED
+        )
         result = AgentResult(
             run_id=run_id,
             mission_id=active_mission_id,
@@ -293,9 +326,14 @@ class SpecialistAgent:
             status=status,
             playbook_id=playbook.id,
             response=response,
-            steps=self._step_results(playbook, decision, completed=self.llm is not None),
+            steps=self._step_results(
+                playbook,
+                decision,
+                completed=used_generated_output,
+            ),
             warnings=warnings,
             used_model=model_id,
+            generation=generation,
             work_order=order,
         )
         self._record_result(result, playbook=playbook, started=started)
@@ -332,18 +370,19 @@ class SpecialistAgent:
         mission_id: str,
         work_order_id: str,
         run_id: str,
-    ) -> tuple[str, str | None]:
+    ) -> tuple[str, str | None, GenerationEvidence | None]:
         if self.llm is None:
-            step_lines = "\n".join(
-                f"{index}. {step.title}: {step.instruction}"
-                for index, step in enumerate(playbook.steps, start=1)
-            )
             return (
-                f"{self.manifest.display_name} is ready to handle: {request.objective}\n\n"
-                f"Playbook: {playbook.display_name}\n"
-                f"Memory scope: {decision.memory_scope}\n"
-                f"Execution plan:\n{step_lines}\n\n"
-                "No model was called. Configure the local Mac Gemma profile to produce the specialist's advisory result.",
+                self._planned_response(
+                    request=request,
+                    playbook=playbook,
+                    decision=decision,
+                    note=(
+                        "No model was called. Configure the local Mac Gemma profile "
+                        "to produce the specialist's advisory result."
+                    ),
+                ),
+                None,
                 None,
             )
 
@@ -376,6 +415,7 @@ class SpecialistAgent:
             )
         model_entity_id = "mac_gemma" if is_mac_gemma else str(model_id)
         span_id = f"span-{uuid4()}"
+        generation_id = f"generation-{uuid4()}"
         self._record(
             "model.started",
             summary=f"Model {model_id} started",
@@ -385,15 +425,41 @@ class SpecialistAgent:
             run_id=run_id,
             span_id=span_id,
             subject=EntityReference(kind="model", id=model_entity_id),
-            attributes={"model_id": str(model_id), "call_kind": "generate"},
+            attributes={
+                "model_id": str(model_id),
+                "call_kind": "generate",
+                "generation_id": generation_id,
+            },
         )
         model_started = perf_counter()
         try:
-            response = self.llm.generate(system_prompt, user_prompt)
-            response_text = str(response).strip()
+            generate_result = getattr(self.llm, "generate_result", None)
+            if callable(generate_result):
+                raw_generation = generate_result(system_prompt, user_prompt)
+                response_text = str(getattr(raw_generation, "content", "")).strip()
+                finish_reason = _optional_text(
+                    getattr(raw_generation, "finish_reason", None)
+                )
+                prompt_tokens = _optional_nonnegative_int(
+                    getattr(raw_generation, "prompt_tokens", None)
+                )
+                completion_tokens = _optional_nonnegative_int(
+                    getattr(raw_generation, "completion_tokens", None)
+                )
+                total_tokens = _optional_nonnegative_int(
+                    getattr(raw_generation, "total_tokens", None)
+                )
+            else:
+                response = self.llm.generate(system_prompt, user_prompt)
+                response_text = str(response).strip()
+                finish_reason = None
+                prompt_tokens = None
+                completion_tokens = None
+                total_tokens = None
             if not response_text:
                 raise ValueError(f"Model {model_id} returned an empty completion.")
         except Exception as exc:
+            failure_duration_ms = round((perf_counter() - model_started) * 1000, 3)
             self._record(
                 "model.failed",
                 summary=f"Model {model_id} failed",
@@ -404,14 +470,37 @@ class SpecialistAgent:
                 run_id=run_id,
                 span_id=span_id,
                 subject=EntityReference(kind="model", id=model_entity_id),
-                duration_ms=round((perf_counter() - model_started) * 1000, 3),
+                duration_ms=failure_duration_ms,
                 attributes={
                     "model_id": str(model_id),
                     "call_kind": "generate",
                     "error_type": type(exc).__name__,
+                    "generation_id": generation_id,
                 },
             )
+            try:
+                setattr(exc, "generation_id", generation_id)
+                setattr(exc, "generation_duration_ms", failure_duration_ms)
+            except Exception:
+                pass
             raise
+        duration_ms = round((perf_counter() - model_started) * 1000, 3)
+        quality_status, quality_checks = _assess_generation_quality(
+            response_text,
+            finish_reason=finish_reason,
+            response_prefix=response_prefix,
+            objective=request.objective,
+        )
+        output_used = quality_status != "rejected"
+        metrics = {
+            key: value
+            for key, value in {
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "total_tokens": total_tokens,
+            }.items()
+            if value is not None
+        }
         self._record(
             "model.completed",
             summary=f"Model {model_id} completed",
@@ -421,10 +510,68 @@ class SpecialistAgent:
             run_id=run_id,
             span_id=span_id,
             subject=EntityReference(kind="model", id=model_entity_id),
-            duration_ms=round((perf_counter() - model_started) * 1000, 3),
-            attributes={"model_id": str(model_id), "call_kind": "generate"},
+            duration_ms=duration_ms,
+            attributes={
+                "model_id": str(model_id),
+                "call_kind": "generate",
+                "generation_id": generation_id,
+                "finish_reason": finish_reason,
+                "quality_status": quality_status,
+                "quality_checks": quality_checks,
+                "output_used": output_used,
+            },
+            metrics=metrics,
         )
-        return f"{response_prefix}{response_text}", str(model_id)
+        evidence = GenerationEvidence(
+            generation_id=generation_id,
+            model_id=str(model_id),
+            completed=True,
+            output_used=output_used,
+            finish_reason=finish_reason,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=total_tokens,
+            duration_ms=duration_ms,
+            quality_status=quality_status,
+            quality_checks=quality_checks,
+        )
+        if not output_used:
+            return (
+                self._planned_response(
+                    request=request,
+                    playbook=playbook,
+                    decision=decision,
+                    note=(
+                        "The configured model returned unusable text, so the runtime "
+                        "discarded it and returned this deterministic bounded plan."
+                    ),
+                ),
+                str(model_id),
+                evidence,
+            )
+        return f"{response_prefix}{response_text}", str(model_id), evidence
+
+    def _planned_response(
+        self,
+        *,
+        request: MissionRequest,
+        playbook: PlaybookSpec,
+        decision: PolicyDecision,
+        note: str,
+    ) -> str:
+        """Builds a safe deterministic plan when no usable model text exists."""
+
+        step_lines = "\n".join(
+            f"{index}. {step.title}: {step.instruction}"
+            for index, step in enumerate(playbook.steps, start=1)
+        )
+        return (
+            f"{self.manifest.display_name} is ready to handle: {request.objective}\n\n"
+            f"Playbook: {playbook.display_name}\n"
+            f"Memory scope: {decision.memory_scope}\n"
+            f"Execution plan:\n{step_lines}\n\n"
+            f"{note}"
+        )
 
     def _record_result(
         self,
@@ -522,6 +669,7 @@ class SpecialistAgent:
         span_id: str | None = None,
         duration_ms: float | None = None,
         attributes: dict[str, Any] | None = None,
+        metrics: dict[str, int | float | None] | None = None,
     ) -> None:
         if self.event_recorder is None:
             return
@@ -539,6 +687,7 @@ class SpecialistAgent:
                 subject=subject,
                 duration_ms=duration_ms,
                 attributes=attributes,
+                metrics=metrics,
             )
         except Exception:
             return
@@ -1061,6 +1210,99 @@ def _preferred_scope(manifest: SpecialistManifest) -> str:
         if preferred in manifest.memory_scope_ids:
             return preferred
     return manifest.memory_scope_ids[0]
+
+
+_HTML_TAG_RE = re.compile(r"</?[a-zA-Z][^>]*>")
+_CONTROL_CHARACTER_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
+
+
+def _assess_generation_quality(
+    text: str,
+    *,
+    finish_reason: str | None,
+    response_prefix: str,
+    objective: str,
+) -> tuple[str, list[str]]:
+    """Applies cheap, explainable checks without claiming semantic correctness."""
+
+    checks: list[str] = []
+    if _HTML_TAG_RE.search(text):
+        checks.append("contains_html_markup")
+    if _CONTROL_CHARACTER_RE.search(text):
+        checks.append("contains_control_characters")
+    if response_prefix and response_prefix.lower() in text.lower():
+        checks.append("repeats_prompt_prefix")
+    if finish_reason in {"length", "max_tokens"}:
+        checks.append("truncated_by_token_limit")
+    words = re.findall(r"[a-z0-9']+", text.lower())
+    if len(words) < 4:
+        checks.append("too_short")
+    if len(words) >= 24 and len(set(words)) / len(words) < 0.28:
+        checks.append("high_repetition")
+    objective_lower = objective.lower()
+    if re.search(r"\b(?:concise|brief|short)\b", objective_lower) and len(words) > 100:
+        checks.append("exceeds_requested_brevity")
+    if re.search(
+        r"\b(?:one|1)\s+(?:concise\s+|short\s+|small\s+)?"
+        r"(?:idea|step|action|recommendation|option|suggestion)\b",
+        objective_lower,
+    ):
+        enumerated_items = re.findall(r"(?:^|\s)(?:\d+[.)]|[-*])\s+", text)
+        if len(enumerated_items) > 1:
+            checks.append("violates_single_item_request")
+    requested_sentences = _requested_sentence_count(objective_lower)
+    if requested_sentences is not None:
+        actual_sentences = len(re.findall(r"[.!?]+(?:\s|$)", text.strip()))
+        if actual_sentences != requested_sentences:
+            checks.append("sentence_count_mismatch")
+    rejected_checks = {
+        "contains_control_characters",
+        "exceeds_requested_brevity",
+        "repeats_prompt_prefix",
+        "sentence_count_mismatch",
+        "too_short",
+        "high_repetition",
+        "violates_single_item_request",
+    }
+    if rejected_checks.intersection(checks):
+        return "rejected", checks
+    return ("degraded" if checks else "accepted", checks)
+
+
+def _requested_sentence_count(objective: str) -> int | None:
+    """Extracts only explicit small sentence-count constraints from a Mission."""
+
+    match = re.search(
+        r"\b(one|two|three|[1-3])\s+(?:short\s+|concise\s+)?sentences?\b",
+        objective,
+    )
+    if match is None:
+        return None
+    value = match.group(1)
+    if value.isdigit():
+        return int(value)
+    return {"one": 1, "two": 2, "three": 3}[value]
+
+
+def _optional_nonnegative_int(value: Any) -> int | None:
+    """Normalizes portable token counters reported by model clients."""
+
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        normalized = int(value)
+    except (TypeError, ValueError):
+        return None
+    return normalized if normalized >= 0 else None
+
+
+def _optional_text(value: Any) -> str | None:
+    """Normalizes optional completion metadata without inventing values."""
+
+    if value is None:
+        return None
+    normalized = str(value).strip()
+    return normalized or None
 
 
 def _aggregate_status(results: list[AgentResult]) -> MissionStatus:

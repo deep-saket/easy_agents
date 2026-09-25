@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
@@ -53,6 +54,69 @@ class EmptyLocalModel(FakeGemmaModel):
     def generate(self, system_prompt: str, user_prompt: str) -> str:
         self.calls.append((system_prompt, user_prompt))
         return "\n\n"
+
+
+class EvidenceLocalModel(FakeGemmaModel):
+    """Model double that exposes the richer completion-result contract."""
+
+    def generate_result(self, system_prompt: str, user_prompt: str) -> SimpleNamespace:
+        self.calls.append((system_prompt, user_prompt))
+        return SimpleNamespace(
+            content="Compare the supplied evidence, then validate the riskiest assumption.",
+            finish_reason="stop",
+            prompt_tokens=17,
+            completion_tokens=11,
+            total_tokens=28,
+        )
+
+
+class DegradedEvidenceLocalModel(EvidenceLocalModel):
+    """Model double used to prove syntax checks do not imply answer quality."""
+
+    def generate_result(self, system_prompt: str, user_prompt: str) -> SimpleNamespace:
+        self.calls.append((system_prompt, user_prompt))
+        return SimpleNamespace(
+            content=(
+                "<blockquote>Incomplete but still useful advisory output for "
+                "review.</blockquote>"
+            ),
+            finish_reason="length",
+            prompt_tokens=17,
+            completion_tokens=9,
+            total_tokens=26,
+        )
+
+
+class RejectedEvidenceLocalModel(EvidenceLocalModel):
+    """Model double that produces a repetitive completion unsafe to display."""
+
+    def generate_result(self, system_prompt: str, user_prompt: str) -> SimpleNamespace:
+        self.calls.append((system_prompt, user_prompt))
+        return SimpleNamespace(
+            content="repeat " * 40,
+            finish_reason="length",
+            prompt_tokens=17,
+            completion_tokens=40,
+            total_tokens=57,
+        )
+
+
+class ConstraintViolatingLocalModel(EvidenceLocalModel):
+    """Model double that ignores an explicit one-item brevity constraint."""
+
+    def generate_result(self, system_prompt: str, user_prompt: str) -> SimpleNamespace:
+        self.calls.append((system_prompt, user_prompt))
+        return SimpleNamespace(
+            content=" ".join(
+                f"{index}. This is an overly detailed planning suggestion with "
+                "several extra words."
+                for index in range(1, 11)
+            ),
+            finish_reason="stop",
+            prompt_tokens=17,
+            completion_tokens=120,
+            total_tokens=137,
+        )
 
 
 def test_registry_compiles_the_complete_roster_from_shared_components() -> None:
@@ -256,15 +320,136 @@ def test_empty_model_completion_fails_instead_of_claiming_success() -> None:
 
     assert result.status == MissionStatus.FAILED
     assert result.results[0].used_model == "gemma-4-E4B"
+    assert result.results[0].generation is not None
+    assert result.results[0].generation.completed is False
+    assert result.results[0].generation.output_used is False
+    assert result.results[0].generation.quality_status == "rejected"
     assert "empty completion" in " ".join(result.warnings)
-    event_types = {
-        event.event_type
-        for event in operations.events(EventFilter(mission_id=result.mission_id, limit=200))
-    }
+    events = operations.events(EventFilter(mission_id=result.mission_id, limit=200))
+    event_types = {event.event_type for event in events}
     assert "wormhole.accepted" in event_types
     assert "galaxy.entered" in event_types
     assert "circle.selected" in event_types
     assert "model.failed" in event_types
+    failed = next(event for event in events if event.event_type == "model.failed")
+    assert (
+        failed.attributes["generation_id"]
+        == result.results[0].generation.generation_id
+    )
+
+
+def test_generation_evidence_preserves_model_completion_metadata() -> None:
+    model = EvidenceLocalModel()
+    operations = ObservabilityPipeline.memory()
+    runtime = FleetRuntime(
+        models={MAC_GEMMA_PROFILE_ID: model},
+        event_recorder=operations,
+    )
+
+    result = runtime.run(
+        MissionRequest(
+            objective="Compare two supplied storage concepts.",
+            specialist_id="energy_systems_scout",
+            model_id=MAC_GEMMA_PROFILE_ID,
+        )
+    )
+
+    evidence = result.results[0].generation
+    assert evidence is not None
+    assert evidence.completed is True
+    assert evidence.output_used is True
+    assert evidence.finish_reason == "stop"
+    assert evidence.prompt_tokens == 17
+    assert evidence.completion_tokens == 11
+    assert evidence.total_tokens == 28
+    assert evidence.quality_status == "accepted"
+    assert evidence.quality_checks == []
+    completed = next(
+        event
+        for event in operations.events(
+            EventFilter(mission_id=result.mission_id, limit=200)
+        )
+        if event.event_type == "model.completed"
+    )
+    assert completed.attributes["generation_id"] == evidence.generation_id
+    assert completed.attributes["finish_reason"] == "stop"
+    assert completed.attributes["quality_status"] == "accepted"
+    assert completed.metrics == {
+        "prompt_tokens": 17,
+        "completion_tokens": 11,
+        "total_tokens": 28,
+    }
+
+
+def test_generation_evidence_marks_syntactically_suspicious_output_degraded() -> None:
+    model = DegradedEvidenceLocalModel()
+    runtime = FleetRuntime(models={MAC_GEMMA_PROFILE_ID: model})
+
+    result = runtime.run(
+        MissionRequest(
+            objective="Compare two supplied storage concepts.",
+            specialist_id="energy_systems_scout",
+            model_id=MAC_GEMMA_PROFILE_ID,
+        )
+    )
+
+    evidence = result.results[0].generation
+    assert evidence is not None
+    assert evidence.completed is True
+    assert evidence.quality_status == "degraded"
+    assert evidence.quality_checks == [
+        "contains_html_markup",
+        "truncated_by_token_limit",
+    ]
+    assert "failed basic output checks" in " ".join(result.warnings)
+
+
+def test_generation_evidence_rejects_and_replaces_unusable_model_output() -> None:
+    model = RejectedEvidenceLocalModel()
+    runtime = FleetRuntime(models={MAC_GEMMA_PROFILE_ID: model})
+
+    result = runtime.run(
+        MissionRequest(
+            objective="Compare two supplied storage concepts.",
+            specialist_id="energy_systems_scout",
+            model_id=MAC_GEMMA_PROFILE_ID,
+        )
+    )
+
+    evidence = result.results[0].generation
+    assert evidence is not None
+    assert evidence.completed is True
+    assert evidence.output_used is False
+    assert evidence.quality_status == "rejected"
+    assert evidence.quality_checks == [
+        "truncated_by_token_limit",
+        "high_repetition",
+    ]
+    assert result.status == MissionStatus.PLANNED
+    assert "repeat repeat" not in result.synthesis
+    assert "discarded it" in result.synthesis
+    assert "Its output was not used" in " ".join(result.warnings)
+
+
+def test_generation_evidence_rejects_explicit_format_constraint_violations() -> None:
+    model = ConstraintViolatingLocalModel()
+    runtime = FleetRuntime(models={MAC_GEMMA_PROFILE_ID: model})
+
+    result = runtime.run(
+        MissionRequest(
+            objective="Give me one concise idea for organizing tomorrow.",
+            specialist_id="personal_steward",
+            model_id=MAC_GEMMA_PROFILE_ID,
+        )
+    )
+
+    evidence = result.results[0].generation
+    assert evidence is not None
+    assert evidence.output_used is False
+    assert evidence.quality_status == "rejected"
+    assert "exceeds_requested_brevity" in evidence.quality_checks
+    assert "violates_single_item_request" in evidence.quality_checks
+    assert "overly detailed planning suggestion" not in result.synthesis
 
 
 def test_team_run_creates_permission_bounded_work_orders() -> None:

@@ -94,11 +94,11 @@ class ProjectionEngine:
         mission["last_event_type"] = event.event_type
         mission["summary"] = event.summary
         status = _event_status(event)
-        if event.event_type.startswith("mission.") or status in {
-            "failed",
-            "blocked",
-            "awaiting_approval",
-        }:
+        if (
+            event.event_type.startswith("mission.")
+            or event.event_type == "response.composed"
+            or status in {"failed", "blocked", "awaiting_approval"}
+        ):
             mission["status"] = status
         if event.run_id and event.run_id not in mission["run_ids"]:
             mission["run_ids"].append(event.run_id)

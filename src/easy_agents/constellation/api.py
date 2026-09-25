@@ -14,6 +14,7 @@ from easy_agents.constellation.chat import (
     WormholeChatResponse,
     WormholeChatService,
 )
+from easy_agents.constellation.commons import build_commons_readiness
 from easy_agents.constellation.directory import ConstellationDirectory
 from easy_agents.constellation.feature_intake import FeatureIntakeService
 from easy_agents.constellation.knowledge_graph import (
@@ -146,6 +147,12 @@ def create_app(
         summary = fleet_registry.summary()
         declared_satellites = set(galaxy_registry.satellites)
         executable_satellites = set(active_satellites.executable_ids)
+        commons = build_commons_readiness(
+            galaxy_registry,
+            executable_satellites=active_satellites.executable_ids,
+            gemma_ready=bool(model["ready"]),
+            chat_history_backend=active_history.backend,
+        )
         return {
             "status": "operational" if model["ready"] else "degraded",
             "gemma": model,
@@ -167,12 +174,31 @@ def create_app(
                 "max_conversations": active_history.max_conversations,
                 "max_turns": active_history.max_turns,
             },
+            "commons": {
+                "status": commons.status,
+                "summary": commons.summary,
+                "response_provenance": commons.runtime.response_provenance,
+                "generation_quality_checks": commons.runtime.generation_quality_checks,
+            },
             "boundaries": [
                 "Sandboxed Planets provide advisory reasoning but no autonomous effects.",
                 "Network and external-send Satellites remain disabled in Chat.",
                 "Calls, purchases, email sending, and notifications require explicit approval and configured providers.",
             ],
         }
+
+    @app.get("/api/v2/circles/commons/readiness")
+    def commons_readiness() -> dict[str, object]:
+        """Returns the drift-checked implementation audit for Commons."""
+
+        model = mac_gemma_status(active_gemma)
+        report = build_commons_readiness(
+            galaxy_registry,
+            executable_satellites=active_satellites.executable_ids,
+            gemma_ready=bool(model["ready"]),
+            chat_history_backend=active_history.backend,
+        )
+        return report.model_dump(mode="json")
 
     @app.get("/api/constellation")
     def constellation() -> dict[str, object]:
@@ -260,15 +286,18 @@ def create_app(
     ) -> WormholeChatResponse:
         """Routes a conversational Mission and answers through the selected Planet."""
 
-        if not active_gemma.is_ready():
-            raise HTTPException(
-                status_code=503,
-                detail=(
-                    "Mac Gemma is not ready at 127.0.0.1:8080. Start the "
-                    "external mac-serving service before chatting."
-                ),
-            )
         try:
+            if (
+                chat_service.requires_model(request.message)
+                and not active_gemma.is_ready()
+            ):
+                raise HTTPException(
+                    status_code=503,
+                    detail=(
+                        "Mac Gemma is not ready at 127.0.0.1:8080. Start the "
+                        "external mac-serving service before chatting."
+                    ),
+                )
             return chat_service.chat(request)
         except (KeyError, ValueError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc

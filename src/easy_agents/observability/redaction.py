@@ -33,6 +33,7 @@ _SENSITIVE_KEYS = {
 
 _COMMON_ATTRIBUTE_KEYS = {
     "agent_name",
+    "answer_source",
     "alert_id",
     "approval_id",
     "candidate_count",
@@ -43,6 +44,8 @@ _COMMON_ATTRIBUTE_KEYS = {
     "effects",
     "error_code",
     "error_type",
+    "finish_reason",
+    "generation_id",
     "guilds",
     "memory_context_keys",
     "memory_scope",
@@ -53,9 +56,12 @@ _COMMON_ATTRIBUTE_KEYS = {
     "playbook_id",
     "policy_ids",
     "prompt_tokens",
+    "quality_checks",
+    "quality_status",
     "reason_count",
     "result_count",
     "route",
+    "satellite_count",
     "source_status",
     "source_event_id",
     "specialist_id",
@@ -68,6 +74,7 @@ _COMMON_ATTRIBUTE_KEYS = {
     "failed_count",
     "tool_name",
     "total_tokens",
+    "output_used",
     "warning_count",
     "validation_id",
 }

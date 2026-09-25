@@ -7,6 +7,7 @@
 - **Run something locally:** [Getting Started](./getting-started.md)
 - **Understand what works today:** [Current Capabilities](./reference/current-capabilities.md)
 - **Inspect one tested capability:** [Functionality Catalog and Test Matrix](./reference/functionalities/README.md)
+- **Inspect the shared foundation:** [Commons Circle Runtime](./reference/functionalities/commons.md)
 - **Build a new agent:** [Create an Agent](./guides/create-an-agent.md)
 - **Build a complete Galaxy:** [Build Your Own Galaxy](./guides/build-your-galaxy.md)
 - **Chat with the system:** [Chat with Your Galaxy](./guides/chat-with-your-galaxy.md)
@@ -44,6 +45,7 @@ The capability reference describes implemented behavior. The roadmap describes f
 - [Concrete Agents](./reference/functionalities/agents.md)
 - [Constellation Feature Intake](./reference/functionalities/constellation-feature-intake.md)
 - [Canonical Galaxy Domain](./reference/functionalities/galaxy-domain.md)
+- [Commons Circle Runtime](./reference/functionalities/commons.md)
 - [Galaxy Domain API](./reference/galaxy-domain-api.md)
 
 ## Working and Experimental Agents

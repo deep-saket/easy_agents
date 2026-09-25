@@ -6,6 +6,7 @@ Purpose: Composes canonical Wormhole routing with the working Fleet and Gemma ru
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from collections import OrderedDict, deque
 from pathlib import Path
@@ -17,13 +18,14 @@ from uuid import uuid4
 from pydantic import BaseModel, ConfigDict, Field
 
 from easy_agents.fleet.model_profiles import MAC_GEMMA_PROFILE_ID
-from easy_agents.fleet.models import GalaxyRoutePlan, MissionRequest
+from easy_agents.fleet.models import GenerationEvidence, GalaxyRoutePlan, MissionRequest
 from easy_agents.fleet.runtime import FleetRuntime
 from easy_agents.galaxy.enums import EntityKind
 from easy_agents.galaxy.identity import Identifier
 from easy_agents.galaxy.missions import Mission, Trajectory
 from easy_agents.galaxy.registry import GalaxyRegistry
 from easy_agents.galaxy.routing import Wormhole
+from easy_agents.observability import EntityReference
 from easy_agents.constellation.satellite_tools import (
     LocalSatelliteRuntime,
     PlannedSatelliteCall,
@@ -99,7 +101,9 @@ class WormholeChatResponse(BaseModel):
     route_context: ChatRouteContext
     satellite_invocations: tuple[SatelliteInvocation, ...] = ()
     visualization_route: GalaxyRoutePlan
+    answer_source: Literal["model", "satellite", "hybrid", "fallback"]
     used_model: str | None = None
+    generation: GenerationEvidence | None = None
     warnings: tuple[str, ...] = ()
     retained_turns: int = Field(ge=2)
 
@@ -296,12 +300,12 @@ class ConversationStore:
 
 
 class WormholeChatService:
-    """Routes a chat message and executes the selected Planet through Gemma.
+    """Routes Chat through a Planet, exact Satellites, and optional Gemma.
 
     The canonical route remains ``Wormhole → Galaxy → Circle → Planet``.
     Constellations are reported as connected overlays containing the selected
-    entities. Satellites are reported as tools available to the Planet; only a
-    future tool-execution result may put a Satellite in ``invoked_satellites``.
+    entities. Satellites are tools available to the Planet and appear in
+    ``invoked_satellites`` only after successful validated execution.
     """
 
     def __init__(
@@ -371,13 +375,16 @@ class WormholeChatService:
                 requested_effects=["read"],
                 allow_network=False,
                 team_size=1,
-                model_id=MAC_GEMMA_PROFILE_ID,
+                model_id=(
+                    "none" if satellite_invocations else MAC_GEMMA_PROFILE_ID
+                ),
                 advisory_only=True,
                 context=context,
             ),
             mission_id=mission.id,
         )
         specialist_name = fleet_result.results[0].specialist_name
+        generation = fleet_result.results[0].generation
         model_answer = self._clean_answer(
             fleet_result.synthesis,
             specialist_name=specialist_name,
@@ -389,6 +396,8 @@ class WormholeChatService:
             # hosts a pretrained base model that may echo structured context, so
             # tool-backed answers omit its unverified continuation entirely.
             model_answer = ""
+            if generation is not None:
+                generation = generation.model_copy(update={"output_used": False})
         answer = "\n\n".join(
             item for item in (verified_result, model_answer) if item
         ).strip()
@@ -403,11 +412,34 @@ class WormholeChatService:
             (item.used_model for item in fleet_result.results if item.used_model),
             None,
         )
+        if satellite_invocations:
+            answer_source: Literal["model", "satellite", "hybrid", "fallback"] = "satellite"
+        elif (
+            generation is not None
+            and generation.completed
+            and generation.output_used
+        ):
+            answer_source = "model"
+        else:
+            answer_source = "fallback"
+        response_status = (
+            "completed"
+            if satellite_invocations
+            else fleet_result.status.value
+        )
+        self._record_response_composed(
+            mission_id=mission.id,
+            planet_id=planet_id,
+            answer_source=answer_source,
+            response_status=response_status,
+            generation=generation,
+            satellite_count=len(satellite_invocations),
+        )
         return WormholeChatResponse(
             conversation_id=conversation_id,
             message_id=f"message-{uuid4().hex}",
             mission_id=fleet_result.mission_id,
-            status=fleet_result.status.value,
+            status=response_status,
             answer=answer,
             trajectory=trajectory,
             route_context=self._route_context(
@@ -416,10 +448,70 @@ class WormholeChatService:
             ),
             satellite_invocations=satellite_invocations,
             visualization_route=fleet_result.routing,
+            answer_source=answer_source,
             used_model=used_model,
+            generation=generation,
             warnings=tuple(fleet_result.warnings),
             retained_turns=len(retained),
         )
+
+    def requires_model(self, message: str) -> bool:
+        """Returns whether a message needs generation rather than a local Satellite.
+
+        Planning is deterministic and side-effect free. This check lets exact
+        compute and explicit-memory requests remain available when the optional
+        external Gemma service is offline.
+        """
+
+        if self.satellite_runtime is None:
+            return True
+        return not bool(
+            self.satellite_runtime.plan(
+                message,
+                conversation_id="readiness-probe",
+            )
+        )
+
+    def _record_response_composed(
+        self,
+        *,
+        mission_id: str,
+        planet_id: str,
+        answer_source: str,
+        response_status: str,
+        generation: GenerationEvidence | None,
+        satellite_count: int,
+    ) -> None:
+        """Records safe final-answer provenance after all sources are resolved."""
+
+        recorder = self.fleet_runtime.event_recorder
+        if recorder is None:
+            return
+        try:
+            recorder.record(
+                "response.composed",
+                summary=f"Response composed from {answer_source}",
+                status=response_status,
+                mission_id=mission_id,
+                actor=EntityReference(kind="planet", id=planet_id),
+                subject=EntityReference(kind="service", id="wormhole_chat"),
+                attributes={
+                    "answer_source": answer_source,
+                    "generation_id": (
+                        generation.generation_id if generation is not None else None
+                    ),
+                    "model_id": generation.model_id if generation is not None else None,
+                    "output_used": (
+                        generation.output_used if generation is not None else False
+                    ),
+                    "quality_status": (
+                        generation.quality_status if generation is not None else None
+                    ),
+                    "satellite_count": satellite_count,
+                },
+            )
+        except Exception:
+            return
 
     def _route_context(
         self,
@@ -635,4 +727,8 @@ class WormholeChatService:
         answer = value.removeprefix(prefix).strip()
         if prefix in answer:
             answer = answer.split(prefix, 1)[0].strip()
-        return answer
+        # The base model sometimes continues with presentational HTML. Chat is
+        # plain text, so remove tags while the generation evidence preserves a
+        # degraded quality signal for inspection.
+        answer = re.sub(r"</?[a-zA-Z][^>]*>", "", answer)
+        return re.sub(r"\n{3,}", "\n\n", answer).strip()

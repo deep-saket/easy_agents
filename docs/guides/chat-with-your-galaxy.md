@@ -116,8 +116,15 @@ Continue the same conversation by passing the returned identifier:
 
 The response contains the answer, Mission status, canonical `Trajectory`,
 route context, available and invoked Satellites, validated invocation outputs,
-the external model used, and a compatibility visualization route for
-highlighting the existing Map.
+`answer_source`, optional model `generation` evidence, and a compatibility
+visualization route for highlighting the existing Map. `used_model` means a
+model call occurred; `generation.output_used` says whether that generated text
+actually appears in the final answer.
+
+The Control Room renders the same distinction under **Answer provenance**. A
+Satellite-backed calculation or memory result is labeled as a verified
+Satellite answer and does not invoke Gemma. Open-ended advisory messages use
+Gemma and expose their generation evidence separately.
 
 Inspect truthful runtime readiness separately:
 
@@ -127,15 +134,27 @@ curl -sS http://127.0.0.1:8030/api/v2/readiness
 
 The response distinguishes active and sandboxed Planets, advisory execution
 from autonomous effects, locally executable Satellites from declared but
-disabled integrations, Gemma readiness, and the chat-history backend.
+disabled integrations, Gemma readiness, the chat-history backend, and the
+Commons readiness totals. The complete 30-component Commons audit is available
+at `/api/v2/circles/commons/readiness`; see the
+[Commons Circle runtime](../reference/functionalities/commons.md).
 
 ## Failure behavior
 
 - If Mac Gemma is not ready, the API returns HTTP 503 and the UI displays the
-  dependency error without inventing an answer.
+  dependency error for model-backed requests without inventing an answer.
+  Exact local Satellite requests continue to work without Gemma.
 - Invalid or unroutable messages return HTTP 400.
 - Model/runtime failures return a failed Mission answer and remain visible in
   Live and Replay observability views.
+- A completed model request records finish reason, tokens when available,
+  duration, final-output use, and basic output checks. `accepted` means those
+  cheap checks passed; it is not a truthfulness or instruction-following score.
+- Highly repetitive, too-short, control-character, or prompt-repeating model
+  output is rejected and replaced with the selected Planet's deterministic
+  bounded plan. The same applies to mechanically detectable violations of an
+  explicit brevity, one-item, or one-to-three-sentence request. The failed
+  evidence remains visible in the trace.
 - Local compute and explicit memory tools can run. Chat does not enable network
   access or external side effects. Its Planet response remains advisory and is
   subject to the selected Charter and Gates. Words such as “call” or “buy”
