@@ -1,14 +1,21 @@
 # Chat with Your Galaxy
 
-Status: implemented local Control Room interface
+Status: implemented local, model-planned runtime
 
-The Control Room includes a Chat mode for sending conversational Missions into
-the system. A message is processed server-side; the browser never calls the
-model service or receives its optional API key.
+The Control Room Chat is the Wormhole entry point to the Personal Agent
+Galaxy. Every natural-language message is interpreted by the external local
+Gemma service. Gemma selects a Circle, an accountable Planet, and one to five
+typed actions. The application validates that plan against schemas and the
+Planet Charter before executing anything.
 
-## Start the dependencies
+There is no keyword, regular-expression, or lexical intent router in this Chat
+path, and there is no deterministic intent fallback. Deterministic code is
+limited to safety-critical validation, authorization, storage, exact tools,
+and formatting verified results.
 
-Mac Gemma remains hosted by the separate Foundation Mac Serving repository:
+## Start Chat
+
+Mac Gemma is hosted by the separate Foundation Mac Serving repository:
 
 ```bash
 cd /Users/saketm10/Projects/foundation-ai-platform/mac-serving
@@ -22,144 +29,153 @@ cd /Users/saketm10/Projects/openclaw_agents
 ./run/constellation.sh
 ```
 
-Open `http://127.0.0.1:8030`, select **Chat**, enter a message, and press Enter
-or **Send through Wormhole**. Shift+Enter inserts a new line.
+Open `http://127.0.0.1:8030`, choose **Chat**, select a Vault, enter a message,
+and press Enter or **Send through Wormhole**. Shift+Enter inserts a new line.
 
-## What happens to a message
+## How one message runs
 
 ```text
 Chat Portal
     ↓
-Wormhole
+Gemma action planner
+    ├── selects Circle
+    ├── selects accountable Planet
+    └── selects 1–5 typed actions
     ↓
-Personal Agent Galaxy
+Schema + Planet Charter + Vault validation
     ↓
-Selected Circle
+Wormhole → Galaxy → selected Circle → selected Planet
     ↓
-Selected Rocky or Giant Planet
+Authorized local actions and Satellites
     ↓
-Policy and Playbook evaluation
+Gemma synthesis with verified local results
     ↓
-Mac Gemma Rogue Star
-    ↓
-Answer + traceable route
+Answer + plan evidence + action results + correlated trace
 ```
 
-The direct routing contract remains
-`Wormhole → Galaxy → Circle → Planet`. The interface separately shows:
+Constellations remain connected-graph context; they are not route hops.
+Satellites are tools, not agents. Mac Gemma is a Rogue Star outside Galaxy
+ownership and can be reused by multiple Galaxies.
 
-- Constellations containing the selected Circle and Planet. They are connected
-  graph overlays, not mandatory routing hops.
-- Satellites declared by the Planet's Charter. They are available tools, not
-  agents. The UI explicitly distinguishes availability from actual invocation.
-- Rogue Stars used for external resources. Mac Gemma is displayed outside
-  Galaxy ownership even though the selected Planet is authorized to access it.
+## Natural-language behavior matrix
 
-Chat can execute four local, account-free Satellites today:
+| User intent | Model action | Accountable example | Local effect |
+| --- | --- | --- | --- |
+| Ask, brainstorm, plan, or analyze | `respond` | domain Planet | advisory answer |
+| Exact arithmetic | `calculate` | Personal Steward | validated local calculation |
+| Convert units | `unit_convert` | Personal Steward | validated local conversion |
+| Explicitly retain a fact | `memory_write` | Personal Steward | write selected Vault |
+| Recall retained information | `memory_search` | Personal Steward | search selected Vault |
+| Create a document or memo | `artifact_create` | Digital Librarian | immutable artifact version |
+| Inspect artifacts | `artifact_list` | Digital Librarian | local artifact listing |
+| Add supplied evidence | `knowledge_add` | Knowledge Librarian | local cited source |
+| Search evidence | `knowledge_search` | Knowledge Librarian | ranked cited hits |
+| Summarize evidence | `knowledge_summarize` | Knowledge Librarian | extractive cited summary |
+| Check claims against sources | `knowledge_verify` | Knowledge Librarian | lexical support assessment |
+| Schedule a follow-up review | `review_create` | Safety Steward | durable local wakeup |
+| Inspect reviews | `review_list` | Safety Steward | local review listing |
+| Propose a calendar item | `calendar_propose` | Schedule Coordinator | local-only proposal |
+| Inspect the local calendar | `calendar_list` | Schedule Coordinator | local projection |
+| Inspect approval records | `approval_list` | approval-gated Planet | local approval listing |
+| Record a human approval decision | `approval_decide` | approval-gated Planet | decision only; no protected effect |
+| Inspect shared runtime health | `commons_status` | Safety Steward | Commons status and counts |
 
-| Satellite | Trigger examples | Effect |
-| --- | --- | --- |
-| Calculate | `Calculate 12 * (3 + 4)` | validated local compute |
-| Unit Convert | `Convert 5 miles to km` | validated local compute |
-| Memory Write | `Remember that my grocery day is Saturday` | durable local memory write |
-| Memory Search | `What do you remember about grocery day?` | scoped local memory read |
+A message may request several related local actions. For example, “Remember
+that the satcom idea uses optical links and schedule a review” can produce a
+`memory_write` plus `review_create` plan. One Planet must have authority for
+every action. Plans are bounded to five actions and execute in listed order.
 
-These calls pass through the Planet Charter, canonical `SatelliteExecutor`,
-shared `ToolExecutor`, schema validation, and observability events. Exact tool
-evidence is authoritative for a tool-backed answer; unverified base-model
-continuation is omitted instead of being mixed into the result. The UI marks
-each local tool as `ready` and highlights only tools that actually ran.
+Calls, emails, messages, purchases, payments, notifications, and provider
+calendar changes are intentionally absent from the action allow-list. Gemma
+may offer advisory help, but ordinary prose cannot trigger those effects.
 
-The remaining declared Satellites—Gmail fetch, stored-email operations, reply
-drafting, email send, and notification—are not enabled in Chat. Network or
-external-send behavior still requires configured providers and explicit
-approval; Chat never interprets ordinary prose as authorization for those
-effects.
+## What was broken and why
 
-## Conversations and memory
+The previous path recognized a few phrases with regexes and keywords. That
+created five practical failures:
 
-The browser retains the current `conversation_id` and sends it with later
-messages. The server provides up to eight recent turns as bounded completion
-context and retains at most 20 turns per conversation and 128 conversations.
-Conversation turns persist across Control Room restarts in
-`data/galaxy_chat.db` by default. Set `EASY_AGENTS_DATA_DIR` to move all Galaxy
-chat and memory data to another local directory.
+1. Paraphrases could miss the intended operation.
+2. A message could execute only one action.
+3. Commons artifacts, knowledge, reviews, calendar, and approvals were not
+   reachable from Chat even though their APIs worked.
+4. Circle and Planet routing could still be selected by lexical overlap.
+5. Tool-shaped messages bypassed Gemma, so behavior appeared deterministic
+   when the model service was unavailable.
 
-Conversation history and long-term memory are deliberately separate. A normal
-chat turn is retained only as bounded working context. Only an explicit
-`Remember ...` command invokes Memory Write and creates a durable typed memory
-record in `data/galaxy_memory.duckdb`; an explicit recall request invokes
-Memory Search. This prevents every casual message from becoming permanent
-memory without the user's intent.
+The new planner makes both routing and action choices through Gemma. Invalid
+JSON, argument schemas, Circle membership, or Charter authority cause a second
+model attempt with bounded error feedback. If the second plan is still
+invalid, the API fails visibly; code does not guess or repair the intent.
 
-Use **New conversation** to delete the current bounded server-side history,
-discard the browser's conversation ID, and start without previous-turn context.
+Memory retrieval also now ranks non-adjacent query-term overlap inside exactly
+one selected Vault, so “Sunday call” can retrieve “Sunday evening call.” This
+is bounded retrieval after the model selected `memory_search`, not intent
+classification.
+
+## Conversations, Vaults, and verified output
+
+The server retains at most 20 turns per conversation and 128 conversations.
+The normal launcher stores bounded history in `data/galaxy_chat.db`.
+Conversation history is not durable semantic memory.
+
+An explicit model-selected `memory_write` stores a record in one of
+`working`, `long_term`, `personal`, `employer_authorized`, `exploration`, or
+the inactive-by-default `future_company` Vault. Search never crosses the
+selected Vault. The selected Planet must declare both the memory Satellite and
+that Vault.
+
+Exact local results are rendered before model commentary. If answer generation
+is rejected but a local action completed, Chat returns only verified action
+evidence. If neither usable generation nor an action result exists, Chat fails;
+it does not emit a canned fallback.
 
 ## HTTP contract
-
-Send a message:
 
 ```bash
 curl -sS http://127.0.0.1:8030/api/v2/wormhole/chat \
   -H 'Content-Type: application/json' \
-  -d '{"message":"calculate a satellite RF link budget"}'
+  -d '{"message":"Remember that sample 42 is the control and schedule a review for 2030-10-03T09:00:00+05:30","vault_id":"exploration"}'
 ```
 
-Continue the same conversation by passing the returned identifier:
+Pass the returned `conversation_id` to continue the same conversation. The
+response contains:
 
-```json
-{
-  "message": "What assumption should I validate first?",
-  "conversation_id": "chat-..."
-}
-```
+- the answer and canonical `Trajectory`;
+- `planning` evidence with model, attempt count, selected Circle and Planet,
+  action names, and duration;
+- `action_invocations` for every completed local action;
+- compatibility `satellite_invocations` for the four tool-backed actions;
+- generation quality/provenance evidence;
+- a visualization route for Map highlighting.
 
-The response contains the answer, Mission status, canonical `Trajectory`,
-route context, available and invoked Satellites, validated invocation outputs,
-`answer_source`, optional model `generation` evidence, and a compatibility
-visualization route for highlighting the existing Map. `used_model` means a
-model call occurred; `generation.output_used` says whether that generated text
-actually appears in the final answer.
-
-The Control Room renders the same distinction under **Answer provenance**. A
-Satellite-backed calculation or memory result is labeled as a verified
-Satellite answer and does not invoke Gemma. Open-ended advisory messages use
-Gemma and expose their generation evidence separately.
-
-Inspect truthful runtime readiness separately:
-
-```bash
-curl -sS http://127.0.0.1:8030/api/v2/readiness
-```
-
-The response distinguishes active and sandboxed Planets, advisory execution
-from autonomous effects, locally executable Satellites from declared but
-disabled integrations, Gemma readiness, the chat-history backend, and the
-Commons readiness totals. The complete 30-component Commons audit is available
-at `/api/v2/circles/commons/readiness`; see the
-[Commons Circle runtime](../reference/functionalities/commons.md).
+Runtime readiness at `/api/v2/readiness` publishes the complete supported
+action list and explicitly reports `deterministic_intent_fallback: false`.
 
 ## Failure behavior
 
-- If Mac Gemma is not ready, the API returns HTTP 503 and the UI displays the
-  dependency error for model-backed requests without inventing an answer.
-  Exact local Satellite requests continue to work without Gemma.
-- Invalid or unroutable messages return HTTP 400.
-- Model/runtime failures return a failed Mission answer and remain visible in
-  Live and Replay observability views.
-- A completed model request records finish reason, tokens when available,
-  duration, final-output use, and basic output checks. `accepted` means those
-  cheap checks passed; it is not a truthfulness or instruction-following score.
-- Highly repetitive, too-short, control-character, or prompt-repeating model
-  output is rejected and replaced with the selected Planet's deterministic
-  bounded plan. The same applies to mechanically detectable violations of an
-  explicit brevity, one-item, or one-to-three-sentence request. The failed
-  evidence remains visible in the trace.
-- Local compute and explicit memory tools can run. Chat does not enable network
-  access or external side effects. Its Planet response remains advisory and is
-  subject to the selected Charter and Gates. Words such as “call” or “buy”
-  influence routing and the requested plan but do not grant permission to
-  perform those actions.
+- Gemma unavailable: HTTP 503 for every natural-language Chat request.
+- Model cannot produce an authorized plan after two attempts: HTTP 502.
+- Invalid user input, failed local action, or unusable answer with no verified
+  result: HTTP 400.
+- External effects remain disabled even after a local approval record is
+  approved; a separate authenticated provider worker would be required.
+- Planning, model generation, Satellite execution, and response composition
+  produce correlated operational events without storing message content in
+  trace attributes.
 
-The server should remain bound to loopback until authentication, per-principal
+The server should remain loopback-only until authentication, per-principal
 Galaxy authorization, and request-rate controls are implemented.
+
+## Verification
+
+```bash
+.venv/bin/python -m pytest -q \
+  tests/test_natural_language_chat.py \
+  tests/test_wormhole_chat.py \
+  tests/test_commons_runtime.py
+node --check endpoints/static/constellation/app.js
+```
+
+The behavior matrix covers all 18 actions, multi-action execution, Charter
+rejection with model-only retry, no offline rule fallback, durable memory,
+live plan evidence, API serialization, and observability.

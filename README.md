@@ -14,6 +14,8 @@ Start here:
 - [Functionality Catalog and Test Matrix](./docs/reference/functionalities/README.md)
 - [Create an Agent](./docs/guides/create-an-agent.md)
 - [Chat with Your Galaxy](./docs/guides/chat-with-your-galaxy.md)
+- [Natural-Language Chat Completion Plan](./docs/plans/natural-language-chat-completion-plan.md)
+- [Commons Circle Runtime](./docs/reference/functionalities/commons.md)
 - [Personal Agent Constellation](./docs/vision/personal-agent-constellation.md)
 - [Galaxy Terminology](./docs/architecture/galaxy-terminology.md)
 - [Terminology-First Domain Model Migration](./docs/plans/terminology-domain-model-migration.md)
@@ -48,7 +50,10 @@ memory scopes, Playbooks, policies, models, and platform services:
 ./run/constellation.sh
 ```
 
-Open `http://127.0.0.1:8030`.
+Open `http://127.0.0.1:8030`. Use **Chat** for Wormhole-routed Missions,
+**Commons** for named Vault memory, artifacts, knowledge sources, scheduled
+reviews, approvals, and local calendar proposals, and **Live/Replay** for
+operational traces.
 
 List, route, or safely run any of the 70 compiled Specialist Charters:
 

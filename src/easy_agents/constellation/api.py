@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -15,6 +16,8 @@ from easy_agents.constellation.chat import (
     WormholeChatService,
 )
 from easy_agents.constellation.commons import build_commons_readiness
+from easy_agents.constellation.commons_api import create_commons_router
+from easy_agents.constellation.commons_runtime import CommonsRuntime
 from easy_agents.constellation.directory import ConstellationDirectory
 from easy_agents.constellation.feature_intake import FeatureIntakeService
 from easy_agents.constellation.knowledge_graph import (
@@ -23,6 +26,12 @@ from easy_agents.constellation.knowledge_graph import (
     load_default_overlay,
 )
 from easy_agents.constellation.models import FeatureProposal, FeatureRequest
+from easy_agents.constellation.natural_language import (
+    NaturalLanguageActionExecutor,
+    NaturalLanguagePlanner,
+    NaturalLanguagePlanningError,
+    SUPPORTED_ACTIONS,
+)
 from easy_agents.constellation.operations_api import create_operations_router
 from easy_agents.constellation.satellite_tools import (
     LocalSatelliteRuntime,
@@ -59,6 +68,7 @@ def create_app(
     gemma_client: Any | None = None,
     chat_history: ConversationStore | None = None,
     satellite_runtime: LocalSatelliteRuntime | None = None,
+    commons_runtime: CommonsRuntime | None = None,
     data_dir: Path | None = None,
 ) -> FastAPI:
     """Builds the local API consumed by the Control Room.
@@ -88,31 +98,79 @@ def create_app(
     active_history = chat_history or ConversationStore(
         db_path=data_dir / "galaxy_chat.db" if data_dir is not None else None
     )
+    active_commons = commons_runtime or (
+        satellite_runtime.commons_runtime
+        if satellite_runtime is not None
+        else CommonsRuntime(
+            db_path=data_dir / "commons.db" if data_dir is not None else None,
+            event_recorder=operations,
+        )
+    )
+    if (
+        satellite_runtime is not None
+        and commons_runtime is not None
+        and satellite_runtime.commons_runtime is not commons_runtime
+    ):
+        raise ValueError(
+            "satellite_runtime and commons_runtime must share the same CommonsRuntime."
+        )
     active_satellites = satellite_runtime or build_local_satellite_runtime(
         galaxy_registry,
         data_dir=data_dir,
         event_recorder=operations,
         persistent=data_dir is not None,
+        commons_runtime=active_commons,
+    )
+    language_planner = NaturalLanguagePlanner(
+        llm=active_gemma,
+        registry=galaxy_registry,
+        event_recorder=operations,
+    )
+    action_executor = NaturalLanguageActionExecutor(
+        commons=active_commons,
+        satellites=active_satellites,
     )
     chat_service = WormholeChatService(
         registry=galaxy_registry,
         fleet_runtime=fleet_runtime,
         history=active_history,
         satellite_runtime=active_satellites,
+        language_planner=language_planner,
+        action_executor=action_executor,
     )
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
-        yield
-        active_history.close()
-        operations.close()
+        stop_reviews = asyncio.Event()
+
+        async def monitor_due_reviews() -> None:
+            """Transitions due reviews without performing their payload effects."""
+
+            while not stop_reviews.is_set():
+                active_commons.claim_due_reviews()
+                try:
+                    await asyncio.wait_for(stop_reviews.wait(), timeout=1.0)
+                except TimeoutError:
+                    continue
+
+        review_task = asyncio.create_task(monitor_due_reviews())
+        try:
+            yield
+        finally:
+            stop_reviews.set()
+            await review_task
+            active_history.close()
+            active_commons.close()
+            operations.close()
 
     app = FastAPI(title="Easy Agents Constellation", lifespan=lifespan)
     app.state.observability = operations
     app.state.galaxy_registry = galaxy_registry
     app.state.chat_service = chat_service
     app.state.satellite_runtime = active_satellites
+    app.state.commons_runtime = active_commons
     app.include_router(create_operations_router(operations))
+    app.include_router(create_commons_router(active_commons))
 
     @app.get("/health")
     def health() -> dict[str, object]:
@@ -130,6 +188,9 @@ def create_app(
             "galaxy": "personal",
             "constellations": 1,
             "chat_history": active_history.backend,
+            "commons_backend": active_commons.backend,
+            "commons_counts": active_commons.counts(),
+            "legacy_memories_migrated": active_satellites.legacy_memories_migrated,
             "executable_satellites": len(active_satellites.executable_ids),
         }
 
@@ -152,6 +213,7 @@ def create_app(
             executable_satellites=active_satellites.executable_ids,
             gemma_ready=bool(model["ready"]),
             chat_history_backend=active_history.backend,
+            runtime_capabilities=active_commons.capabilities(),
         )
         return {
             "status": "operational" if model["ready"] else "degraded",
@@ -173,6 +235,12 @@ def create_app(
                 "persistent": active_history.backend == "sqlite",
                 "max_conversations": active_history.max_conversations,
                 "max_turns": active_history.max_turns,
+                "planning": {
+                    "model_driven": True,
+                    "model_id": MAC_GEMMA_PROFILE_ID,
+                    "deterministic_intent_fallback": False,
+                    "supported_actions": list(SUPPORTED_ACTIONS),
+                },
             },
             "commons": {
                 "status": commons.status,
@@ -197,6 +265,7 @@ def create_app(
             executable_satellites=active_satellites.executable_ids,
             gemma_ready=bool(model["ready"]),
             chat_history_backend=active_history.backend,
+            runtime_capabilities=active_commons.capabilities(),
         )
         return report.model_dump(mode="json")
 
@@ -288,7 +357,9 @@ def create_app(
 
         try:
             if (
-                chat_service.requires_model(request.message)
+                chat_service.requires_model(
+                    request.message, vault_id=request.vault_id
+                )
                 and not active_gemma.is_ready()
             ):
                 raise HTTPException(
@@ -299,6 +370,8 @@ def create_app(
                     ),
                 )
             return chat_service.chat(request)
+        except NaturalLanguagePlanningError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
         except (KeyError, ValueError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 

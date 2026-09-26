@@ -20,6 +20,7 @@ class FakeGemma:
 
     def __init__(self) -> None:
         self.calls: list[tuple[str, str]] = []
+        self.planning_calls: list[tuple[str, str]] = []
 
     @staticmethod
     def is_ready() -> bool:
@@ -38,6 +39,43 @@ class FakeGemma:
 
         self.calls.append((system_prompt, user_prompt))
         return "Start with the highest-impact item, then review progress this evening."
+
+    def generate_json(self, system_prompt: str, user_prompt: str) -> dict[str, object]:
+        """Returns a model-shaped plan for the request at the prompt tail."""
+
+        self.planning_calls.append((system_prompt, user_prompt))
+        request = user_prompt.rsplit("Request: ", 1)[-1].split("\nPlan:", 1)[0]
+        lowered = request.lower()
+        if "rf link budget" in lowered:
+            circle_id, planet_id = "satcom", "rf_link_budget_specialist"
+            action, arguments = "respond", {}
+        elif "convert 5 miles" in lowered:
+            circle_id, planet_id = "commons", "personal_steward"
+            action = "unit_convert"
+            arguments = {"value": 5, "from_unit": "miles", "to_unit": "km"}
+        elif "remember that my grocery" in lowered:
+            circle_id, planet_id = "commons", "personal_steward"
+            action = "memory_write"
+            arguments = {"content": "My grocery day is Saturday"}
+        elif "remember about grocery" in lowered:
+            circle_id, planet_id = "commons", "personal_steward"
+            action = "memory_search"
+            arguments = {"query": "grocery day", "limit": 5}
+        else:
+            circle_id, planet_id = "commons", "personal_steward"
+            action, arguments = "respond", {}
+        return {
+            "circle_id": circle_id,
+            "planet_id": planet_id,
+            "actions": [
+                {
+                    "action": action,
+                    "arguments": arguments,
+                    "reason": "The language model selected this bounded operation.",
+                }
+            ],
+            "reasoning_summary": "Model-selected test plan.",
+        }
 
 
 class UnreadyGemma(FakeGemma):
@@ -90,6 +128,10 @@ def test_wormhole_chat_routes_executes_and_explains_context() -> None:
     assert payload["route_context"]["rogue_stars"][0]["id"] == "mac_gemma"
     assert payload["used_model"] == "gemma-4-E4B"
     assert payload["answer_source"] == "model"
+    assert payload["planning"]["circle_id"] == "satcom"
+    assert payload["planning"]["planet_id"] == "rf_link_budget_specialist"
+    assert payload["planning"]["action_names"] == ["respond"]
+    assert payload["action_invocations"] == []
     assert payload["generation"]["completed"] is True
     assert payload["generation"]["output_used"] is True
     assert payload["generation"]["quality_status"] == "accepted"
@@ -185,7 +227,7 @@ def test_wormhole_chat_fails_cleanly_when_gemma_is_unavailable() -> None:
     assert "127.0.0.1:8080" in response.json()["detail"]
 
 
-def test_wormhole_chat_runs_exact_satellite_when_gemma_is_unavailable() -> None:
+def test_wormhole_chat_does_not_use_deterministic_tool_fallback_when_gemma_is_unavailable() -> None:
     client = TestClient(
         create_app(gemma_client=UnreadyGemma(), chat_history=ConversationStore())
     )
@@ -195,16 +237,11 @@ def test_wormhole_chat_runs_exact_satellite_when_gemma_is_unavailable() -> None:
         json={"message": "Convert 5 miles to km"},
     )
 
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["status"] == "completed"
-    assert payload["answer_source"] == "satellite"
-    assert payload["used_model"] is None
-    assert payload["generation"] is None
-    assert "8.04672 km" in payload["answer"]
+    assert response.status_code == 503
+    assert "Gemma is not ready" in response.json()["detail"]
 
 
-def test_wormhole_chat_falls_back_when_model_output_is_rejected() -> None:
+def test_wormhole_chat_does_not_use_deterministic_answer_fallback() -> None:
     client = TestClient(
         create_app(gemma_client=RepetitiveGemma(), chat_history=ConversationStore())
     )
@@ -214,16 +251,8 @@ def test_wormhole_chat_falls_back_when_model_output_is_rejected() -> None:
         json={"message": "Help me plan tomorrow"},
     )
 
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["status"] == "planned"
-    assert payload["answer_source"] == "fallback"
-    assert payload["used_model"] == "gemma-4-E4B"
-    assert payload["generation"]["completed"] is True
-    assert payload["generation"]["output_used"] is False
-    assert payload["generation"]["quality_status"] == "rejected"
-    assert "repeat repeat" not in payload["answer"]
-    assert "deterministic bounded plan" in payload["answer"]
+    assert response.status_code == 400
+    assert "deterministic fallback is disabled" in response.json()["detail"]
 
 
 def test_conversation_store_evicts_old_turns_and_threads() -> None:
@@ -289,9 +318,11 @@ def test_wormhole_chat_executes_and_traces_local_satellite(
     assert payload["satellite_invocations"][0]["output"]["converted_value"] == 8.04672
     assert payload["route_context"]["invoked_satellites"][0]["id"] == "unit_convert"
     assert payload["status"] == "completed"
-    assert payload["answer_source"] == "satellite"
-    assert payload["used_model"] is None
-    assert payload["generation"] is None
+    assert payload["answer_source"] == "hybrid"
+    assert payload["used_model"] == "gemma-4-E4B"
+    assert payload["generation"]["output_used"] is True
+    assert payload["planning"]["action_names"] == ["unit_convert"]
+    assert payload["action_invocations"][0]["action"] == "unit_convert"
     assert "8.04672 km" in payload["answer"]
     events = operations.events(
         EventFilter(mission_id=payload["mission_id"], limit=200)
@@ -300,8 +331,8 @@ def test_wormhole_chat_executes_and_traces_local_satellite(
     assert "satellite.completed" in {item.event_type for item in events}
     composed = next(item for item in events if item.event_type == "response.composed")
     assert composed.status == "completed"
-    assert composed.attributes["answer_source"] == "satellite"
-    assert composed.attributes["output_used"] is False
+    assert composed.attributes["answer_source"] == "hybrid"
+    assert composed.attributes["output_used"] is True
     assert composed.attributes["satellite_count"] == 1
     assert operations.projector.mission(payload["mission_id"])["status"] == "completed"
 
@@ -368,9 +399,9 @@ def test_runtime_readiness_separates_executable_and_disabled_features(
     assert payload["commons"] == {
         "status": "partial",
         "summary": {
-            "operational": 12,
-            "partial": 10,
-            "declared": 4,
+            "operational": 23,
+            "partial": 3,
+            "declared": 0,
             "disabled": 4,
         },
         "response_provenance": True,
@@ -390,16 +421,16 @@ def test_commons_readiness_audits_every_declared_component() -> None:
     assert payload["circle_id"] == "commons"
     assert payload["status"] == "partial"
     assert payload["summary"] == {
-        "operational": 12,
-        "partial": 10,
-        "declared": 4,
+        "operational": 23,
+        "partial": 3,
+        "declared": 0,
         "disabled": 4,
     }
     assert len(payload["components"]) == 30
     by_id = {item["id"]: item for item in payload["components"]}
     assert by_id["mission_runtime"]["runtime_status"] == "operational"
-    assert by_id["artifact_store"]["runtime_status"] == "declared"
-    assert by_id["scheduled_review"]["runtime_status"] == "partial"
+    assert by_id["artifact_store"]["runtime_status"] == "operational"
+    assert by_id["scheduled_review"]["runtime_status"] == "operational"
     assert by_id["gmail_fetch"]["runtime_status"] == "disabled"
     assert payload["runtime"]["response_provenance"] is True
     assert payload["runtime"]["generation_quality_checks"] is True

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark" />
     <title>Galaxy Map · Easy Agents</title>
-    <link rel="stylesheet" href="/static/styles.css?v=commons-core-1" />
+    <link rel="stylesheet" href="/static/styles.css?v=commons-runtime-1" />
   </head>
   <body>
     <div class="shell">
@@ -30,6 +30,7 @@
           <div class="mode-switch" role="group" aria-label="Control Room mode">
             <button class="mode-button" data-mode="chat" type="button">Chat</button>
             <button class="mode-button active" data-mode="map" type="button">Map</button>
+            <button class="mode-button" data-mode="commons" type="button">Commons</button>
             <button class="mode-button" data-mode="live" type="button">Live</button>
             <button class="mode-button" data-mode="replay" type="button">Replay</button>
             <button class="mode-button" data-mode="guide" type="button">Guide</button>
@@ -309,7 +310,7 @@
                 <div>
                   <p class="eyebrow">Wormhole Chat</p>
                   <h2>Talk to your agent Galaxy</h2>
-                  <p>Every message is routed to a bounded Planet. Safe local Satellites provide exact results; Mac Gemma handles open-ended reasoning.</p>
+                  <p>Mac Gemma interprets every message and selects a Circle, accountable Planet, and typed action plan. Charter validation then permits only bounded local operations.</p>
                 </div>
                 <div class="chat-header-actions">
                   <span id="chat-model-state" class="chat-model-state">Checking Gemma…</span>
@@ -317,6 +318,12 @@
                   <button id="new-chat" type="button">New conversation</button>
                 </div>
               </header>
+
+              <details class="chat-capability-guide">
+                <summary>What natural-language Chat can do</summary>
+                <p>Advise and brainstorm; calculate and convert units; write or search a selected Vault; create or list artifacts; add, search, summarize, or verify local knowledge; create or list reviews; propose or inspect local calendar items; inspect or decide approvals; and report Commons status. One request may contain several related local actions.</p>
+                <small>Gemma plans every request. There is no keyword/regex intent router and no deterministic intent fallback. External calls, sends, purchases, and payments remain unavailable.</small>
+              </details>
 
               <div id="chat-transcript" class="chat-transcript" aria-live="polite" aria-label="Conversation">
                 <article class="chat-message assistant">
@@ -332,6 +339,9 @@
                 <label class="sr-only" for="chat-input">Message the Galaxy</label>
                 <textarea id="chat-input" rows="3" maxlength="12000" placeholder="Plan my day, explore an energy opportunity, calculate a link budget…" required></textarea>
                 <div class="chat-composer-footer">
+                  <label class="chat-vault-label" for="chat-vault">Vault
+                    <select id="chat-vault" aria-label="Memory Vault"></select>
+                  </label>
                   <span>Enter to send · Shift+Enter for a new line</span>
                   <button id="chat-send" type="submit">Send through Wormhole</button>
                 </div>
@@ -365,6 +375,88 @@
                 <p>The direct route is Wormhole → Galaxy → Circle → Planet. A Constellation is supporting graph context; Satellites are tools available to the Planet and appear as invoked only after a real tool call.</p>
               </div>
             </aside>
+          </div>
+        </article>
+
+        <article id="commons-panel" class="commons-panel hidden" aria-label="Commons local services">
+          <div class="commons-wrap">
+            <header class="commons-hero">
+              <div>
+                <p class="eyebrow">Commons Circle</p>
+                <h2>Reusable local services</h2>
+                <p>Manage bounded memory, versioned work, evidence, reviews, approvals, and local calendar proposals. Nothing here performs an external effect.</p>
+              </div>
+              <div id="commons-summary" class="commons-summary" aria-live="polite">Loading local runtime…</div>
+            </header>
+
+            <div id="commons-notice" class="commons-notice hidden" role="status"></div>
+
+            <div class="commons-grid">
+              <section class="commons-card commons-card-wide">
+                <div class="commons-card-heading">
+                  <div><p class="section-label">Named memory boundary</p><h3>Vaults</h3></div>
+                  <select id="commons-vault" aria-label="Selected Vault"></select>
+                </div>
+                <p id="commons-vault-detail" class="commons-help">Select a Vault to inspect its policy.</p>
+                <textarea id="commons-memory-content" rows="3" maxlength="50000" placeholder="A fact or preference to remember…"></textarea>
+                <div class="commons-actions">
+                  <button id="commons-memory-save" type="button">Store memory</button>
+                  <input id="commons-memory-query" type="search" placeholder="Search this Vault" />
+                  <button id="commons-memory-search" type="button">Search</button>
+                  <button id="commons-vault-export" class="secondary" type="button">Export JSON</button>
+                </div>
+                <div id="commons-memory-list" class="commons-list"></div>
+              </section>
+
+              <section class="commons-card">
+                <div class="commons-card-heading"><div><p class="section-label">Immutable versions</p><h3>Artifact Store</h3></div></div>
+                <input id="commons-artifact-id" type="text" placeholder="Artifact ID for next version (optional)" />
+                <input id="commons-artifact-name" type="text" placeholder="Artifact name" />
+                <textarea id="commons-artifact-content" rows="4" maxlength="1000000" placeholder="Artifact content…"></textarea>
+                <button id="commons-artifact-save" type="button">Save version</button>
+                <div id="commons-artifact-list" class="commons-list"></div>
+              </section>
+
+              <section class="commons-card">
+                <div class="commons-card-heading"><div><p class="section-label">Source-backed</p><h3>Knowledge</h3></div></div>
+                <input id="commons-source-title" type="text" placeholder="Source title" />
+                <textarea id="commons-source-content" rows="4" maxlength="1000000" placeholder="Paste source material…"></textarea>
+                <button id="commons-source-save" type="button">Ingest source</button>
+                <div class="commons-actions">
+                  <input id="commons-knowledge-query" type="search" placeholder="Search local sources" />
+                  <button id="commons-knowledge-search" type="button">Search</button>
+                </div>
+                <div id="commons-knowledge-list" class="commons-list"></div>
+              </section>
+
+              <section class="commons-card">
+                <div class="commons-card-heading"><div><p class="section-label">Durable wakeups</p><h3>Scheduled Reviews</h3></div></div>
+                <input id="commons-review-title" type="text" placeholder="Review title" />
+                <input id="commons-review-due" type="datetime-local" />
+                <button id="commons-review-save" type="button">Schedule review</button>
+                <div id="commons-review-list" class="commons-list"></div>
+              </section>
+
+              <section class="commons-card">
+                <div class="commons-card-heading"><div><p class="section-label">Local proposal only</p><h3>Calendar</h3></div></div>
+                <input id="commons-calendar-title" type="text" placeholder="Calendar item" />
+                <div class="commons-date-grid">
+                  <label>Starts<input id="commons-calendar-start" type="datetime-local" /></label>
+                  <label>Ends<input id="commons-calendar-end" type="datetime-local" /></label>
+                </div>
+                <button id="commons-calendar-save" type="button">Create proposal</button>
+                <div id="commons-calendar-list" class="commons-list"></div>
+              </section>
+
+              <section class="commons-card commons-card-wide">
+                <div class="commons-card-heading">
+                  <div><p class="section-label">Human Gate</p><h3>Pending Approvals</h3></div>
+                  <button id="commons-refresh" class="secondary" type="button">Refresh all</button>
+                </div>
+                <p class="commons-help">Approval records preserve bounded resume context, but approval never executes an email, purchase, call, or provider action by itself.</p>
+                <div id="commons-approval-list" class="commons-list"></div>
+              </section>
+            </div>
           </div>
         </article>
 
@@ -621,6 +713,6 @@
       </footer>
     </div>
 
-    <script type="module" src="/static/app.js?v=commons-core-1"></script>
+    <script type="module" src="/static/app.js?v=commons-runtime-1"></script>
   </body>
 </html>

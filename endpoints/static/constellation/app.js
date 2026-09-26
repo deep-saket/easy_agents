@@ -175,6 +175,7 @@ const elements = {
   fleetTestResult: document.getElementById("fleet-test-result"),
   entryPanel: document.getElementById("constellation-entry"),
   guidePanel: document.getElementById("guide-panel"),
+  commonsPanel: document.getElementById("commons-panel"),
   entryObjective: document.getElementById("entry-objective"),
   routeEntry: document.getElementById("route-entry"),
   entryResult: document.getElementById("entry-result"),
@@ -182,6 +183,7 @@ const elements = {
   chatTranscript: document.getElementById("chat-transcript"),
   chatForm: document.getElementById("chat-form"),
   chatInput: document.getElementById("chat-input"),
+  chatVault: document.getElementById("chat-vault"),
   chatSend: document.getElementById("chat-send"),
   newChat: document.getElementById("new-chat"),
   chatModelState: document.getElementById("chat-model-state"),
@@ -193,6 +195,38 @@ const elements = {
   runtimeEffectReadiness: document.getElementById("runtime-effect-readiness"),
   chatRouteStatus: document.getElementById("chat-route-status"),
   chatRouteContext: document.getElementById("chat-route-context"),
+  commonsSummary: document.getElementById("commons-summary"),
+  commonsNotice: document.getElementById("commons-notice"),
+  commonsVault: document.getElementById("commons-vault"),
+  commonsVaultDetail: document.getElementById("commons-vault-detail"),
+  commonsMemoryContent: document.getElementById("commons-memory-content"),
+  commonsMemoryQuery: document.getElementById("commons-memory-query"),
+  commonsMemorySave: document.getElementById("commons-memory-save"),
+  commonsMemorySearch: document.getElementById("commons-memory-search"),
+  commonsVaultExport: document.getElementById("commons-vault-export"),
+  commonsMemoryList: document.getElementById("commons-memory-list"),
+  commonsArtifactId: document.getElementById("commons-artifact-id"),
+  commonsArtifactName: document.getElementById("commons-artifact-name"),
+  commonsArtifactContent: document.getElementById("commons-artifact-content"),
+  commonsArtifactSave: document.getElementById("commons-artifact-save"),
+  commonsArtifactList: document.getElementById("commons-artifact-list"),
+  commonsSourceTitle: document.getElementById("commons-source-title"),
+  commonsSourceContent: document.getElementById("commons-source-content"),
+  commonsSourceSave: document.getElementById("commons-source-save"),
+  commonsKnowledgeQuery: document.getElementById("commons-knowledge-query"),
+  commonsKnowledgeSearch: document.getElementById("commons-knowledge-search"),
+  commonsKnowledgeList: document.getElementById("commons-knowledge-list"),
+  commonsReviewTitle: document.getElementById("commons-review-title"),
+  commonsReviewDue: document.getElementById("commons-review-due"),
+  commonsReviewSave: document.getElementById("commons-review-save"),
+  commonsReviewList: document.getElementById("commons-review-list"),
+  commonsCalendarTitle: document.getElementById("commons-calendar-title"),
+  commonsCalendarStart: document.getElementById("commons-calendar-start"),
+  commonsCalendarEnd: document.getElementById("commons-calendar-end"),
+  commonsCalendarSave: document.getElementById("commons-calendar-save"),
+  commonsCalendarList: document.getElementById("commons-calendar-list"),
+  commonsApprovalList: document.getElementById("commons-approval-list"),
+  commonsRefresh: document.getElementById("commons-refresh"),
 };
 
 const state = {
@@ -228,6 +262,10 @@ const state = {
     gemmaReady: false,
     readiness: null,
     visualizationRoute: null,
+  },
+  commons: {
+    loaded: false,
+    vaults: [],
   },
   operations: {
     mode: "map",
@@ -931,7 +969,8 @@ async function loadGemmaStatus() {
     const advisoryPlanets = readiness.planets?.advisory_executable || 0;
     const activePlanets = readiness.planets?.active || 0;
     const historyLabel = readiness.chat?.persistent ? "persistent history" : "session history";
-    elements.chatRuntimeState.textContent = `${localSatelliteCount} local Satellites · ${advisoryPlanets} advisory Planets (${activePlanets} active) · ${historyLabel}`;
+    const plannedActionCount = readiness.chat?.planning?.supported_actions?.length || 0;
+    elements.chatRuntimeState.textContent = `${plannedActionCount} model-planned actions · ${localSatelliteCount} local Satellites · ${advisoryPlanets} advisory Planets · ${historyLabel}`;
     elements.chatRuntimeState.className = "chat-runtime-state ready";
     elements.runtimeReadinessStatus.textContent = readiness.status;
     elements.runtimeReadinessStatus.className = readiness.status === "operational" ? "ready" : "unavailable";
@@ -1005,6 +1044,12 @@ function appendChatMessage(role, content, payload = null, extraClass = "") {
       payload.generation?.quality_status
         ? `quality ${payload.generation.quality_status}`
         : null,
+      payload.planning?.action_names?.length
+        ? `${payload.planning.action_names.length} model-planned action${payload.planning.action_names.length === 1 ? "" : "s"}`
+        : null,
+      payload.planning?.attempts
+        ? `planner attempt ${payload.planning.attempts}`
+        : null,
       payload.satellite_invocations?.length
         ? `${payload.satellite_invocations.length} Satellite invoked`
         : null,
@@ -1074,6 +1119,33 @@ function satelliteResultSummary(invocation) {
   return "Validated tool output returned";
 }
 
+function actionResultSummary(invocation) {
+  const output = invocation.output || {};
+  const counts = {
+    artifact_list: ["artifacts", "artifact"],
+    knowledge_search: ["hits", "knowledge hit"],
+    knowledge_verify: ["assessments", "claim assessment"],
+    review_list: ["reviews", "review"],
+    calendar_list: ["items", "calendar item"],
+    approval_list: ["approvals", "approval"],
+  };
+  if (["calculate", "unit_convert", "memory_write", "memory_search"].includes(invocation.action)) {
+    return satelliteResultSummary({ satellite: { id: invocation.action }, output });
+  }
+  if (counts[invocation.action]) {
+    const [key, noun] = counts[invocation.action];
+    return `${output[key]?.length || 0} ${noun}(s) returned`;
+  }
+  if (invocation.action === "artifact_create") return `${output.name || output.artifact_id} · version ${output.version}`;
+  if (invocation.action === "knowledge_add") return `${output.title || output.id} · citation ${output.id || "created"}`;
+  if (invocation.action === "knowledge_summarize") return `${output.source_count || 0} cited source(s)`;
+  if (invocation.action === "review_create") return `${output.title || output.id} · ${output.status}`;
+  if (invocation.action === "calendar_propose") return `${output.title || output.id} · ${output.status}`;
+  if (invocation.action === "approval_decide") return `${output.id || "approval"} · ${output.status}`;
+  if (invocation.action === "commons_status") return `${output.backend || "local"} backend · no external effects`;
+  return "Validated local result returned";
+}
+
 function generationEvidenceSummary(generation) {
   if (!generation) return "No language-model generation was recorded.";
   const details = [
@@ -1094,6 +1166,20 @@ function renderChatRoute(payload) {
   const context = payload.route_context;
   elements.chatRouteContext.replaceChildren();
   elements.chatRouteStatus.textContent = String(payload.status || "completed").replaceAll("_", " ");
+
+  if (payload.planning) {
+    const planning = chatRouteGroup("Model-selected plan · no rule fallback");
+    const actions = (payload.planning.action_names || []).map((item) => item.replaceAll("_", " ")).join(" → ");
+    planning.append(
+      chatRouteStep(
+        "M",
+        actions || "advisory response",
+        `${payload.planning.model_id} · attempt ${payload.planning.attempts} · ${Math.round(payload.planning.duration_ms || 0)} ms`,
+        "planning",
+      ),
+    );
+    elements.chatRouteContext.append(planning);
+  }
 
   const direct = chatRouteGroup("Direct Mission route");
   direct.append(chatRouteStep("◎", "Wormhole", "Controlled Galaxy ingress"));
@@ -1158,12 +1244,26 @@ function renderChatRoute(payload) {
     elements.chatRouteContext.append(executed);
   }
 
+  if (payload.action_invocations?.length) {
+    const actions = chatRouteGroup("Executed model-planned actions");
+    for (const invocation of payload.action_invocations) {
+      actions.append(
+        chatRouteStep(
+          "A",
+          invocation.action.replaceAll("_", " "),
+          actionResultSummary(invocation),
+          "action",
+        ),
+      );
+    }
+    elements.chatRouteContext.append(actions);
+  }
+
   const provenance = chatRouteGroup("Answer provenance");
   const sourceLabels = {
     model: "Generated by model",
     satellite: "Verified Satellite result",
     hybrid: "Satellite evidence + model synthesis",
-    fallback: "Fallback response",
   };
   provenance.append(
     chatRouteStep(
@@ -1184,6 +1284,379 @@ function renderChatRoute(payload) {
   }
 }
 
+async function commonsRequest(path, options = {}) {
+  const response = await fetch(path, options);
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.detail || `Commons API returned ${response.status}.`);
+  return payload;
+}
+
+function showCommonsNotice(message, error = false) {
+  elements.commonsNotice.textContent = message;
+  elements.commonsNotice.className = `commons-notice${error ? " error" : ""}`;
+  window.setTimeout(() => elements.commonsNotice.classList.add("hidden"), 5000);
+}
+
+function commonsEmpty(message) {
+  const item = document.createElement("p");
+  item.className = "commons-empty";
+  item.textContent = message;
+  return item;
+}
+
+function commonsListItem(title, detail, actions = []) {
+  const item = document.createElement("article");
+  item.className = "commons-list-item";
+  const copy = document.createElement("div");
+  const heading = document.createElement("strong");
+  heading.textContent = title;
+  const meta = document.createElement("span");
+  meta.textContent = detail;
+  copy.append(heading, meta);
+  item.append(copy);
+  if (actions.length) {
+    const controls = document.createElement("div");
+    controls.className = "commons-list-actions";
+    for (const action of actions) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = action.label;
+      if (action.danger) button.classList.add("danger");
+      button.addEventListener("click", action.run);
+      controls.append(button);
+    }
+    item.append(controls);
+  }
+  return item;
+}
+
+function selectedVaultId() {
+  return elements.commonsVault.value || "personal";
+}
+
+function renderVaultOptions() {
+  const commonsSelection = elements.commonsVault.value || "personal";
+  const chatSelection = elements.chatVault.value || "personal";
+  elements.commonsVault.replaceChildren();
+  elements.chatVault.replaceChildren();
+  for (const vault of state.commons.vaults) {
+    const commonsOption = document.createElement("option");
+    commonsOption.value = vault.id;
+    commonsOption.textContent = `${vault.display_name}${vault.active ? "" : " · inactive"}`;
+    elements.commonsVault.append(commonsOption);
+    const chatOption = commonsOption.cloneNode(true);
+    chatOption.disabled = !vault.active;
+    elements.chatVault.append(chatOption);
+  }
+  elements.commonsVault.value = state.commons.vaults.some((item) => item.id === commonsSelection)
+    ? commonsSelection : "personal";
+  elements.chatVault.value = state.commons.vaults.some((item) => item.id === chatSelection && item.active)
+    ? chatSelection : "personal";
+  updateVaultDetail();
+}
+
+function updateVaultDetail() {
+  const vault = state.commons.vaults.find((item) => item.id === selectedVaultId());
+  if (!vault) return;
+  elements.commonsVaultDetail.textContent = `${vault.sensitivity} · ${vault.retention} · ${vault.active ? "active" : "inactive"}${vault.writable ? " · writable" : " · read-only"}`;
+  elements.commonsMemorySave.disabled = !vault.active || !vault.writable;
+}
+
+async function loadVaultMemories() {
+  const vaultId = selectedVaultId();
+  const query = elements.commonsMemoryQuery.value.trim();
+  const memories = await commonsRequest(
+    `/api/v2/commons/vaults/${encodeURIComponent(vaultId)}/memories?query=${encodeURIComponent(query)}&limit=50`,
+  );
+  elements.commonsMemoryList.replaceChildren();
+  for (const memory of memories) {
+    elements.commonsMemoryList.append(
+      commonsListItem(
+        memory.content,
+        `${memory.memory_type} · ${new Date(memory.created_at).toLocaleString()}`,
+        [{
+          label: "Delete",
+          danger: true,
+          run: async () => {
+            try {
+              await commonsRequest(
+                `/api/v2/commons/vaults/${encodeURIComponent(vaultId)}/memories/${encodeURIComponent(memory.id)}`,
+                { method: "DELETE" },
+              );
+              await loadCommons();
+              showCommonsNotice("Memory deleted from the selected Vault.");
+            } catch (error) {
+              showCommonsNotice(error.message, true);
+            }
+          },
+        }],
+      ),
+    );
+  }
+  if (!memories.length) elements.commonsMemoryList.append(commonsEmpty("No matching memories in this Vault."));
+}
+
+async function saveVaultMemory() {
+  const content = elements.commonsMemoryContent.value.trim();
+  if (!content) return showCommonsNotice("Enter a memory before storing it.", true);
+  try {
+    await commonsRequest(`/api/v2/commons/vaults/${encodeURIComponent(selectedVaultId())}/memories`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content, tags: ["control_room"] }),
+    });
+    elements.commonsMemoryContent.value = "";
+    await loadCommons();
+    showCommonsNotice("Memory stored in the selected Vault.");
+  } catch (error) {
+    showCommonsNotice(error.message, true);
+  }
+}
+
+async function exportVault() {
+  try {
+    const payload = await commonsRequest(
+      `/api/v2/commons/vaults/${encodeURIComponent(selectedVaultId())}/export`,
+    );
+    const href = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = href;
+    link.download = `${selectedVaultId()}-vault.json`;
+    link.click();
+    URL.revokeObjectURL(href);
+    showCommonsNotice("Vault export prepared locally.");
+  } catch (error) {
+    showCommonsNotice(error.message, true);
+  }
+}
+
+function renderArtifacts(artifacts) {
+  elements.commonsArtifactList.replaceChildren();
+  for (const artifact of artifacts.slice(0, 20)) {
+    elements.commonsArtifactList.append(
+      commonsListItem(
+        artifact.name,
+        `${artifact.artifact_id} · version ${artifact.version} · ${artifact.kind}`,
+      ),
+    );
+  }
+  if (!artifacts.length) elements.commonsArtifactList.append(commonsEmpty("No artifact versions yet."));
+}
+
+async function saveArtifact() {
+  const name = elements.commonsArtifactName.value.trim();
+  const content = elements.commonsArtifactContent.value.trim();
+  if (!name || !content) return showCommonsNotice("Artifact name and content are required.", true);
+  const body = { name, content, kind: "document" };
+  if (elements.commonsArtifactId.value.trim()) body.artifact_id = elements.commonsArtifactId.value.trim();
+  try {
+    const artifact = await commonsRequest("/api/v2/commons/artifacts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    elements.commonsArtifactId.value = artifact.artifact_id;
+    elements.commonsArtifactContent.value = "";
+    await loadCommons();
+    showCommonsNotice(`Saved ${artifact.artifact_id} version ${artifact.version}.`);
+  } catch (error) {
+    showCommonsNotice(error.message, true);
+  }
+}
+
+async function ingestKnowledge() {
+  const title = elements.commonsSourceTitle.value.trim();
+  const content = elements.commonsSourceContent.value.trim();
+  if (!title || !content) return showCommonsNotice("Source title and content are required.", true);
+  try {
+    const source = await commonsRequest("/api/v2/commons/knowledge/sources", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, content, tags: ["control_room"] }),
+    });
+    elements.commonsSourceContent.value = "";
+    elements.commonsKnowledgeQuery.value = title;
+    await searchKnowledge();
+    await loadCommonsSummary();
+    showCommonsNotice(`Source ${source.id} ingested with a stable citation ID.`);
+  } catch (error) {
+    showCommonsNotice(error.message, true);
+  }
+}
+
+async function searchKnowledge() {
+  const query = elements.commonsKnowledgeQuery.value.trim();
+  if (!query) return showCommonsNotice("Enter a knowledge query.", true);
+  try {
+    const hits = await commonsRequest(`/api/v2/commons/knowledge/search?query=${encodeURIComponent(query)}&limit=20`);
+    elements.commonsKnowledgeList.replaceChildren();
+    for (const hit of hits) {
+      elements.commonsKnowledgeList.append(
+        commonsListItem(hit.title, `[${hit.source_id}] ${hit.excerpt}`),
+      );
+    }
+    if (!hits.length) elements.commonsKnowledgeList.append(commonsEmpty("No matching local source."));
+  } catch (error) {
+    showCommonsNotice(error.message, true);
+  }
+}
+
+function renderReviews(reviews) {
+  elements.commonsReviewList.replaceChildren();
+  for (const review of reviews.slice(0, 20)) {
+    const actions = ["scheduled", "due"].includes(review.status) ? [
+      { label: "Complete", run: () => decideReview(review.id, "completed") },
+      { label: "Cancel", danger: true, run: () => decideReview(review.id, "cancelled") },
+    ] : [];
+    elements.commonsReviewList.append(
+      commonsListItem(review.title, `${review.status} · ${new Date(review.due_at).toLocaleString()}`, actions),
+    );
+  }
+  if (!reviews.length) elements.commonsReviewList.append(commonsEmpty("No scheduled reviews."));
+}
+
+async function saveReview() {
+  const title = elements.commonsReviewTitle.value.trim();
+  const date = new Date(elements.commonsReviewDue.value);
+  if (!title || Number.isNaN(date.getTime())) return showCommonsNotice("Review title and due time are required.", true);
+  try {
+    await commonsRequest("/api/v2/commons/reviews", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, due_at: date.toISOString() }),
+    });
+    elements.commonsReviewTitle.value = "";
+    await loadCommons();
+    showCommonsNotice("Review wakeup scheduled.");
+  } catch (error) {
+    showCommonsNotice(error.message, true);
+  }
+}
+
+async function decideReview(reviewId, status) {
+  try {
+    await commonsRequest(`/api/v2/commons/reviews/${encodeURIComponent(reviewId)}/decision`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    await loadCommons();
+  } catch (error) {
+    showCommonsNotice(error.message, true);
+  }
+}
+
+function renderCalendar(items) {
+  elements.commonsCalendarList.replaceChildren();
+  for (const item of items.slice(0, 20)) {
+    const actions = item.status === "proposed" ? [
+      { label: "Approve locally", run: () => decideCalendar(item.id, "approved") },
+      { label: "Reject", danger: true, run: () => decideCalendar(item.id, "rejected") },
+    ] : [];
+    elements.commonsCalendarList.append(
+      commonsListItem(item.title, `${item.status} · ${new Date(item.starts_at).toLocaleString()}`, actions),
+    );
+  }
+  if (!items.length) elements.commonsCalendarList.append(commonsEmpty("No local calendar proposals."));
+}
+
+async function saveCalendarProposal() {
+  const title = elements.commonsCalendarTitle.value.trim();
+  const startsAt = new Date(elements.commonsCalendarStart.value);
+  const endsAt = new Date(elements.commonsCalendarEnd.value);
+  if (!title || Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) {
+    return showCommonsNotice("Calendar title, start, and end are required.", true);
+  }
+  try {
+    await commonsRequest("/api/v2/commons/calendar/proposals", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, starts_at: startsAt.toISOString(), ends_at: endsAt.toISOString() }),
+    });
+    elements.commonsCalendarTitle.value = "";
+    await loadCommons();
+    showCommonsNotice("Local calendar proposal created; no provider was called.");
+  } catch (error) {
+    showCommonsNotice(error.message, true);
+  }
+}
+
+async function decideCalendar(proposalId, decision) {
+  try {
+    await commonsRequest(`/api/v2/commons/calendar/${encodeURIComponent(proposalId)}/decision`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ decision }),
+    });
+    await loadCommons();
+  } catch (error) {
+    showCommonsNotice(error.message, true);
+  }
+}
+
+function renderApprovals(approvals) {
+  elements.commonsApprovalList.replaceChildren();
+  for (const approval of approvals) {
+    elements.commonsApprovalList.append(
+      commonsListItem(
+        approval.rationale,
+        `${approval.mission_id} · effects: ${approval.effects.join(", ")}`,
+        [
+          { label: "Approve record", run: () => decideApproval(approval.id, "approved") },
+          { label: "Reject", danger: true, run: () => decideApproval(approval.id, "rejected") },
+        ],
+      ),
+    );
+  }
+  if (!approvals.length) elements.commonsApprovalList.append(commonsEmpty("No pending approvals."));
+}
+
+async function decideApproval(approvalId, decision) {
+  try {
+    await commonsRequest(`/api/v2/commons/approvals/${encodeURIComponent(approvalId)}/decision`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ decision, decided_by: "control_room_user" }),
+    });
+    await loadCommons();
+    showCommonsNotice(`Approval record marked ${decision}; no external effect was executed.`);
+  } catch (error) {
+    showCommonsNotice(error.message, true);
+  }
+}
+
+async function loadCommonsSummary() {
+  const summary = await commonsRequest("/api/v2/commons/summary");
+  const counts = summary.counts || {};
+  elements.commonsSummary.textContent = `${summary.backend} · ${counts.memories || 0} memories · ${counts.artifacts || 0} artifacts · ${counts.knowledge_sources || 0} sources · ${counts.scheduled_reviews || 0} reviews`;
+}
+
+async function loadCommons() {
+  try {
+    const [summary, vaults, artifacts, reviews, calendar, approvals] = await Promise.all([
+      commonsRequest("/api/v2/commons/summary"),
+      commonsRequest("/api/v2/commons/vaults"),
+      commonsRequest("/api/v2/commons/artifacts"),
+      commonsRequest("/api/v2/commons/reviews"),
+      commonsRequest("/api/v2/commons/calendar"),
+      commonsRequest("/api/v2/commons/approvals?status=pending"),
+    ]);
+    state.commons.vaults = vaults;
+    state.commons.loaded = true;
+    renderVaultOptions();
+    const counts = summary.counts || {};
+    elements.commonsSummary.textContent = `${summary.backend} · ${counts.memories || 0} memories · ${counts.artifacts || 0} artifacts · ${counts.knowledge_sources || 0} sources · ${counts.scheduled_reviews || 0} reviews`;
+    renderArtifacts(artifacts);
+    renderReviews(reviews);
+    renderCalendar(calendar);
+    renderApprovals(approvals);
+    await loadVaultMemories();
+  } catch (error) {
+    showCommonsNotice(error.message, true);
+    elements.commonsSummary.textContent = "Commons runtime unavailable";
+  }
+}
+
 async function submitChat(event) {
   event?.preventDefault();
   const message = elements.chatInput.value.trim();
@@ -1195,7 +1668,7 @@ async function submitChat(event) {
   elements.chatSend.disabled = true;
   elements.chatSend.textContent = "Galaxy is thinking…";
   try {
-    const body = { message };
+    const body = { message, vault_id: elements.chatVault.value || "personal" };
     if (state.chat.conversationId) body.conversation_id = state.chat.conversationId;
     const response = await fetch("/api/v2/wormhole/chat", {
       method: "POST",
@@ -1690,11 +2163,12 @@ function setStreamState(connection, label) {
 }
 
 async function setMode(mode) {
-  if (!new Set(["chat", "map", "live", "replay", "guide"]).has(mode)) return;
+  if (!new Set(["chat", "map", "commons", "live", "replay", "guide"]).has(mode)) return;
   state.operations.mode = mode;
   const operationsMode = mode === "live" || mode === "replay";
   document.body.classList.toggle("operations-mode", operationsMode);
   document.body.classList.toggle("chat-mode", mode === "chat");
+  document.body.classList.toggle("commons-mode", mode === "commons");
   document.body.classList.toggle("guide-mode", mode === "guide");
   document.querySelectorAll(".mode-button").forEach((button) => {
     button.classList.toggle("active", button.dataset.mode === mode);
@@ -1702,6 +2176,7 @@ async function setMode(mode) {
   elements.operationsControls.classList.toggle("hidden", !operationsMode);
   elements.timeline.classList.toggle("hidden", !operationsMode);
   elements.chatPanel.classList.toggle("hidden", mode !== "chat");
+  elements.commonsPanel.classList.toggle("hidden", mode !== "commons");
   elements.guidePanel.classList.toggle("hidden", mode !== "guide");
 
   if (mode === "chat") {
@@ -1724,6 +2199,17 @@ async function setMode(mode) {
     elements.statusText.textContent = "Canonical terminology reference";
     elements.apiState.textContent = "Reference";
     elements.apiState.className = "health-pill ok";
+    return;
+  }
+
+  if (mode === "commons") {
+    closeEventStream();
+    document.body.classList.remove("inspector-open");
+    elements.streamState.textContent = "Commons Circle";
+    elements.statusText.textContent = "Reusable local services · no external effects";
+    elements.apiState.textContent = "Local runtime";
+    elements.apiState.className = "health-pill ok";
+    await loadCommons();
     return;
   }
 
@@ -2153,6 +2639,19 @@ function bindEvents() {
     }
   });
   elements.newChat.addEventListener("click", resetChat);
+  elements.commonsVault.addEventListener("change", () => {
+    updateVaultDetail();
+    loadVaultMemories().catch((error) => showCommonsNotice(error.message, true));
+  });
+  elements.commonsMemorySave.addEventListener("click", saveVaultMemory);
+  elements.commonsMemorySearch.addEventListener("click", () => loadVaultMemories().catch((error) => showCommonsNotice(error.message, true)));
+  elements.commonsVaultExport.addEventListener("click", exportVault);
+  elements.commonsArtifactSave.addEventListener("click", saveArtifact);
+  elements.commonsSourceSave.addEventListener("click", ingestKnowledge);
+  elements.commonsKnowledgeSearch.addEventListener("click", searchKnowledge);
+  elements.commonsReviewSave.addEventListener("click", saveReview);
+  elements.commonsCalendarSave.addEventListener("click", saveCalendarProposal);
+  elements.commonsRefresh.addEventListener("click", loadCommons);
   elements.closeInspector.addEventListener("click", () => {
     document.body.classList.remove("inspector-open");
   });
@@ -2198,6 +2697,7 @@ function bindEvents() {
 async function initialize() {
   bindEvents();
   loadGemmaStatus();
+  loadCommons();
   try {
     const response = await fetch("/api/knowledge-graph");
     if (!response.ok) throw new Error(`Graph API returned ${response.status}`);

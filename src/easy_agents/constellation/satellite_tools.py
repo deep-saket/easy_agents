@@ -10,48 +10,31 @@ canonical :class:`SatelliteExecutor` for authorization and the shared
 
 from __future__ import annotations
 
-import re
+import json
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from time import perf_counter
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from easy_agents.constellation.commons_runtime import (
+    CommonsMemoryRetriever,
+    CommonsRuntime,
+    CommonsVaultStoreAdapter,
+    VaultId,
+    VaultMemoryCreate,
+)
 from easy_agents.galaxy.missions import PermissionGrant
 from easy_agents.galaxy.registry import GalaxyRegistry
 from easy_agents.galaxy.satellite_runtime import SatelliteCall, SatelliteExecutor
 from easy_agents.observability import EntityReference, Severity
-from src.memory.layers import ColdMemoryLayer, HotMemoryLayer, WarmMemoryLayer
-from src.memory.retrieval.retriever import LayeredMemoryRetriever
-from src.memory.store import MemoryStore
 from src.tools.executor import ToolExecutor
 from src.tools.math import CalculateTool, UnitConvertTool
 from src.tools.memory_search import MemorySearchTool
 from src.tools.memory_write import MemoryWriteTool
 from src.tools.registry import ToolRegistry
-
-
-_UNIT_CONVERSION = re.compile(
-    r"\b(?:convert\s+)?(?P<value>-?\d+(?:\.\d+)?)\s*"
-    r"(?P<from>°?[a-zA-Z]+)\s+(?:to|into|in)\s+(?P<to>°?[a-zA-Z]+)\b",
-    re.IGNORECASE,
-)
-_CALCULATION = re.compile(
-    r"\b(?:calculate|compute|solve|what\s+is)\s+"
-    r"(?P<expression>[0-9().\s+\-*/%]+)",
-    re.IGNORECASE,
-)
-_MEMORY_WRITE = re.compile(
-    r"^\s*(?:please\s+)?(?:remember(?:\s+that)?|save\s+(?:this\s+)?(?:to\s+)?memory)"
-    r"\s*[:,-]?\s*(?P<fact>.+?)\s*$",
-    re.IGNORECASE,
-)
-_MEMORY_SEARCH = (
-    re.compile(r"\bwhat\s+do\s+you\s+remember\s+about\s+(?P<query>.+?)\s*[?.!]*$", re.IGNORECASE),
-    re.compile(r"\bsearch\s+(?:my\s+)?memory\s+for\s+(?P<query>.+?)\s*[?.!]*$", re.IGNORECASE),
-    re.compile(r"^\s*recall\s+(?P<query>.+?)\s*[?.!]*$", re.IGNORECASE),
-)
 
 
 class PlannedSatelliteCall(BaseModel):
@@ -60,125 +43,25 @@ class PlannedSatelliteCall(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     satellite_id: str = Field(min_length=1, max_length=128)
+    vault_id: VaultId | None = None
     arguments: dict[str, Any] = Field(default_factory=dict)
     reason: str = Field(min_length=1, max_length=300)
 
 
-class LocalSatellitePlanner:
-    """Recognizes explicit requests supported by deterministic local tools.
-
-    The planner intentionally avoids guessing.  General reasoning continues to
-    use Gemma, while exact arithmetic, unit conversion, and explicit memory
-    commands are delegated to schema-validated Satellites.  Email, calls,
-    notifications, purchases, and network tools are never selected here.
-    """
-
-    def plan(
-        self,
-        message: str,
-        *,
-        conversation_id: str,
-        available_ids: frozenset[str],
-    ) -> tuple[PlannedSatelliteCall, ...]:
-        """Returns at most one unambiguous local Satellite call."""
-
-        memory_write = _MEMORY_WRITE.search(message)
-        if memory_write and "memory_write" in available_ids:
-            fact = memory_write.group("fact").strip().rstrip(".")
-            if fact:
-                return (
-                    PlannedSatelliteCall(
-                        satellite_id="memory_write",
-                        arguments={
-                            "item": {
-                                "type": "semantic",
-                                "layer": "warm",
-                                "scope": "agent_local",
-                                "agent_id": "galaxy_chat",
-                                "content": {"fact": fact},
-                                "content_text": fact,
-                                "source_type": "user",
-                                "source_id": conversation_id,
-                                "tags": ["wormhole_chat", conversation_id],
-                                "confidence": 1.0,
-                            }
-                        },
-                        reason="The user explicitly asked to remember a fact.",
-                    ),
-                )
-
-        for pattern in _MEMORY_SEARCH:
-            match = pattern.search(message)
-            if match and "memory_search" in available_ids:
-                query = match.group("query").strip().rstrip("?.!")
-                if query:
-                    return (
-                        PlannedSatelliteCall(
-                            satellite_id="memory_search",
-                            arguments={
-                                "query": query,
-                                "filters": {
-                                    "scope": "agent_local",
-                                    "agent_id": "galaxy_chat",
-                                },
-                                "limit": 5,
-                            },
-                            reason="The user explicitly asked to retrieve local memory.",
-                        ),
-                    )
-
-        conversion = _UNIT_CONVERSION.search(message)
-        if conversion and "unit_convert" in available_ids:
-            return (
-                PlannedSatelliteCall(
-                    satellite_id="unit_convert",
-                    arguments={
-                        "value": float(conversion.group("value")),
-                        "from_unit": self._normalize_unit(conversion.group("from")),
-                        "to_unit": self._normalize_unit(conversion.group("to")),
-                    },
-                    reason="The message contains an explicit supported unit conversion.",
-                ),
-            )
-
-        calculation = _CALCULATION.search(message)
-        if calculation and "calculate" in available_ids:
-            expression = calculation.group("expression").strip().rstrip("?.!, ")
-            if expression and any(operator in expression for operator in "+-*/%"):
-                return (
-                    PlannedSatelliteCall(
-                        satellite_id="calculate",
-                        arguments={"expression": expression},
-                        reason="The message contains an explicit arithmetic expression.",
-                    ),
-                )
-        return ()
-
-    @staticmethod
-    def _normalize_unit(value: str) -> str:
-        """Normalizes common degree-symbol abbreviations for UnitConvertTool."""
-
-        return value.lower().removeprefix("°")
-
-
 @dataclass(slots=True)
 class LocalSatelliteRuntime:
-    """Reusable local-only Satellite planner and authorized executor."""
+    """Reusable local-only authorized Satellite executor.
+
+    Natural-language selection belongs to ``NaturalLanguagePlanner`` and is
+    model-driven. This class deliberately performs no intent recognition.
+    """
 
     galaxy_registry: GalaxyRegistry
     executor: SatelliteExecutor
-    planner: LocalSatellitePlanner
     executable_ids: frozenset[str]
+    commons_runtime: CommonsRuntime
+    legacy_memories_migrated: int = 0
     event_recorder: Any | None = None
-
-    def plan(self, message: str, *, conversation_id: str) -> tuple[PlannedSatelliteCall, ...]:
-        """Plans an explicit call from the runtime's executable allow-list."""
-
-        return self.planner.plan(
-            message,
-            conversation_id=conversation_id,
-            available_ids=self.executable_ids,
-        )
 
     def invoke(
         self,
@@ -204,6 +87,13 @@ class LocalSatelliteRuntime:
             },
         )
         try:
+            if call.vault_id is not None:
+                planet = self.galaxy_registry.get_planet(planet_id)
+                if call.vault_id not in planet.charter.vault_ids:
+                    raise PermissionError(
+                        f"Planet {planet_id!r} Charter does not include Vault "
+                        f"{call.vault_id!r}."
+                    )
             result = self.executor.invoke(
                 SatelliteCall(
                     planet_id=planet_id,
@@ -212,7 +102,7 @@ class LocalSatelliteRuntime:
                 ),
                 grant=PermissionGrant(
                     effects=satellite.effects,
-                    vault_ids=("long_term",),
+                    vault_ids=((call.vault_id,) if call.vault_id is not None else ()),
                     satellite_ids=(satellite.id,),
                     allow_network=False,
                 ),
@@ -281,39 +171,38 @@ def build_local_satellite_runtime(
     data_dir: Path | None = None,
     event_recorder: Any | None = None,
     persistent: bool = True,
+    commons_runtime: CommonsRuntime | None = None,
 ) -> LocalSatelliteRuntime:
     """Builds the four safe local Satellites used by Wormhole Chat.
 
     Args:
         galaxy_registry: Canonical authorization registry.
-        data_dir: Directory for durable local memory when ``persistent`` is
-            true. Defaults to the repository ``data`` directory.
+        data_dir: Directory for the durable Commons database when ``persistent``
+            is true. Defaults to the repository ``data`` directory.
         event_recorder: Optional observability pipeline.
-        persistent: Use DuckDB/JSONL layers. False uses isolated in-process
-            layers for tests and embedded API factories.
+        persistent: Use SQLite persistence. False uses an isolated in-process
+            database for tests and embedded API factories.
+        commons_runtime: Optional shared Commons runtime. Supplying it keeps
+            Chat tools and management APIs on the same Vault boundary.
     """
 
     root = data_dir or Path("data")
-    if persistent:
-        root.mkdir(parents=True, exist_ok=True)
-        warm_layer: Any = WarmMemoryLayer(root / "galaxy_memory.duckdb")
-        cold_layer: Any = ColdMemoryLayer(root / "galaxy_memory.jsonl")
-    else:
-        warm_layer = HotMemoryLayer(max_items=2_048)
-        cold_layer = HotMemoryLayer(max_items=2_048)
-    memory_store = MemoryStore(
-        hot_layer=HotMemoryLayer(max_items=256),
-        warm_layer=warm_layer,
-        cold_layer=cold_layer,
-        archive_after_days=90,
-        default_scope="agent_local",
-        agent_id="galaxy_chat",
+    active_commons = commons_runtime or CommonsRuntime(
+        db_path=(root / "commons.db") if persistent else None,
+        event_recorder=event_recorder,
     )
+    legacy_memories_migrated = 0
+    if persistent:
+        legacy_memories_migrated = migrate_legacy_chat_memory(
+            active_commons,
+            root / "galaxy_memory.duckdb",
+        )
+    memory_store = CommonsVaultStoreAdapter(active_commons)
     registry = ToolRegistry()
     for tool in (
         CalculateTool(),
         UnitConvertTool(),
-        MemorySearchTool(retriever=LayeredMemoryRetriever(memory_store)),
+        MemorySearchTool(retriever=CommonsMemoryRetriever(memory_store)),
         MemoryWriteTool(store=memory_store),
     ):
         registry.register(tool)
@@ -324,15 +213,80 @@ def build_local_satellite_runtime(
             registry=galaxy_registry,
             executor=ToolExecutor(registry=registry),
         ),
-        planner=LocalSatellitePlanner(),
         executable_ids=executable_ids,
+        commons_runtime=active_commons,
+        legacy_memories_migrated=legacy_memories_migrated,
         event_recorder=event_recorder,
     )
 
 
+def migrate_legacy_chat_memory(runtime: CommonsRuntime, db_path: Path) -> int:
+    """Imports legacy Chat memory into the Personal Vault once per record.
+
+    The previous Chat runtime stored explicit memories in a standalone DuckDB
+    file. Stable record identifiers make this migration idempotent. A missing,
+    locked, or incompatible legacy file leaves the new runtime usable; the old
+    file is never modified or deleted.
+    """
+
+    if not db_path.exists():
+        return 0
+    try:
+        import duckdb
+
+        connection = duckdb.connect(str(db_path), read_only=True)
+        try:
+            rows = connection.execute(
+                """
+                SELECT id, memory_type, content_text, source_type, source_id,
+                       tags_json, created_at
+                FROM memory_records
+                WHERE scope = 'agent_local' AND agent_id = 'galaxy_chat'
+                ORDER BY created_at
+                """
+            ).fetchall()
+        finally:
+            connection.close()
+    except Exception:
+        return 0
+
+    migrated = 0
+    for row in rows:
+        memory_id, memory_type, content, source_type, source_id, tags, created_at = row
+        if not content:
+            continue
+        try:
+            runtime.get_memory("personal", str(memory_id))
+            continue
+        except KeyError:
+            pass
+        if isinstance(tags, str):
+            try:
+                tags = json.loads(tags)
+            except json.JSONDecodeError:
+                tags = []
+        timestamp = created_at if isinstance(created_at, datetime) else datetime.now(UTC)
+        if timestamp.tzinfo is None:
+            timestamp = timestamp.replace(tzinfo=UTC)
+        runtime.add_memory(
+            "personal",
+            VaultMemoryCreate(
+                content=str(content),
+                memory_type=str(memory_type or "semantic"),
+                tags=tuple(str(item) for item in (tags or [])),
+                source_type=str(source_type or "user"),
+                source_id=str(source_id) if source_id is not None else None,
+            ),
+            memory_id=str(memory_id),
+            created_at=timestamp,
+        )
+        migrated += 1
+    return migrated
+
+
 __all__ = [
-    "LocalSatellitePlanner",
     "LocalSatelliteRuntime",
     "PlannedSatelliteCall",
     "build_local_satellite_runtime",
+    "migrate_legacy_chat_memory",
 ]

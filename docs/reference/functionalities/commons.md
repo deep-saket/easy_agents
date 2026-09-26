@@ -1,190 +1,242 @@
 # Commons Circle Runtime
 
-Status: implemented foundation with an explicit readiness audit
+Status: implemented local runtime; provider effects remain disabled
 
-Commons is the shared Circle used by every domain-specific Circle. It owns the
-reusable routing, policy, memory, observability, model-generation, and local
-Satellite foundations that should not be reimplemented inside Life Admin,
-Employment, Energy, Satcom, Medical, or a future startup Circle.
+Commons is the shared Circle used by every domain Circle. It provides reusable
+state and safety services so individual Planets do not invent incompatible
+memory, artifact, knowledge, scheduling, calendar, or approval implementations.
 
-This page describes executable behavior, not aspiration. The canonical Galaxy
-catalog defines what belongs to Commons; the readiness API separately reports
-what works end to end today.
+The Control Room exposes these services in the **Commons** tab. The same typed
+contracts are available under `/api/v2/commons` and through
+`CommonsRuntime`. With the normal launcher, all state is stored in
+`data/commons.db`.
 
-## Runtime flow
+## What works now
+
+The default Galaxy has 30 non-Planet Commons components. Runtime readiness is:
+
+| Runtime state | Count | Notes |
+| --- | ---: | --- |
+| Operational | 23 | Routing, policy, observability, local Satellites, named Vaults, artifacts, local knowledge, review scheduling, approval records, and calendar proposals |
+| Partial | 3 | Adversarial Review, Research with Provenance, and multi-Planet Route & Synthesize |
+| Declared | 0 | Every declared Commons component has an implementation or an explicit disabled boundary |
+| Disabled | 4 | Gmail Fetch, Email Search, Email Summary, and Email Classifier are not enabled in Wormhole Chat |
+
+`catalog_status` describes topology and lifecycle. It is not an execution
+claim. `/api/v2/circles/commons/readiness` derives the runtime totals from the
+active local capabilities and fails if the catalog and audit drift apart.
+
+## Architecture
 
 ```text
-User message
-    ↓
-Wormhole routing
-    ↓
-Commons policy + Mission Runtime
-    ↓
-selected Planet and Playbook
-    ├── authorized local Satellite → validated deterministic result
-    └── Mac Gemma Rogue Star       → probabilistic text generation
-    ↓
-response composer
-    ↓
-answer + source provenance + generation evidence + redacted trace
+Wormhole Chat ──┐
+Control Room ───┼── CommonsRuntime ─── SQLite (commons.db)
+Typed API ──────┘       ├── named Vault memories
+                        ├── immutable artifact versions
+                        ├── local knowledge sources + citations
+                        ├── scheduled review wakeups
+                        ├── approval decisions + resume context
+                        └── local calendar proposals
 ```
 
-The composer never treats a successful HTTP model call as proof that the answer
-is correct. It records whether model output was actually used, and exact
-Satellite results take precedence over unverified base-model text.
+The state runtime is deliberately local and predictable: validation, storage,
+exact calculations, and authorized effects do not depend on model guesses. In
+Wormhole Chat, however, natural-language intent, Circle selection, Planet
+selection, and action selection are all performed by Gemma. There is no
+deterministic intent router or fallback. An approved record is evidence of a
+human decision; it is not permission for this module to send an email, place
+an order, make a call, or modify an external calendar.
 
-## Readiness vocabulary
+## Named Vaults
 
-The implementation report uses four states:
+The runtime creates six explicit data boundaries:
 
-| State | Meaning |
-| --- | --- |
-| `operational` | The active Control Room can execute the component end to end. |
-| `partial` | A useful implementation exists, but a named dependency or workflow step is missing. |
-| `declared` | The component is present in the canonical topology but has no executable runtime. |
-| `disabled` | Code or a catalog entry exists, but the Chat boundary deliberately does not enable it. |
-
-`catalog_status: active` is not an execution claim. Catalog status controls
-topology and lifecycle; `runtime_status` records observed implementation
-readiness.
-
-## Current inventory
-
-The running default Galaxy contains 30 non-Planet Commons components:
-
-| Runtime state | Count | Components |
-| --- | ---: | --- |
-| Operational | 12 | Mission Runtime, Wormhole routing, Feature Architect, policy assessment, strict offline boundary, observability, working memory, long-term memory, Calculate, Unit Convert, Memory Write, Memory Search |
-| Partial | 10 | Adversarial Review, Exploration Vault, knowledge search, summarization, claim verification, outbound approval, Personal Vault, Research with Provenance, Route & Synthesize, Scheduled Review |
-| Declared | 4 | Artifact Store, calendar inspection, calendar proposals, Future Company Vault |
-| Disabled | 4 | Gmail Fetch, Email Search, Email Summary, Email Classifier |
-
-The counts are generated from a drift-checked matrix in
-`easy_agents.constellation.commons`. If the canonical Commons membership
-changes without a corresponding audit entry, the readiness builder fails
-instead of silently reporting an incomplete picture.
-
-## Response provenance
-
-Every Wormhole Chat response has `answer_source`:
-
-- `model`: generated model text was shown to the user.
-- `satellite`: validated Satellite output is the answer; exact local Satellite
-  requests do not invoke the model.
-- `hybrid`: reserved for an explicitly implemented, evidence-preserving
-  Satellite-plus-model synthesis path.
-- `fallback`: no completed generation supplied the final answer.
-
-When a language model is called, `generation` includes:
-
-- a correlation-safe `generation_id`
-- model identifier and completion state
-- whether its text was used in the final answer
-- finish reason and portable token counts when the adapter reports them
-- measured runtime duration
-- `accepted`, `degraded`, or `rejected` transport/output status
-- the exact basic checks that fired
-
-The basic checks detect empty or very short output, HTML markup, control
-characters, prompt-prefix repetition, high repetition, and token-limit
-truncation. They also check only a few explicit, mechanically testable format
-constraints: requested brevity, a single requested item, and a requested count
-of one to three sentences. They do **not** verify truth, general instruction
-following, citations, or safety. Severely unusable or clearly noncompliant text
-is marked `rejected`, excluded from the answer, and replaced with the Planet's
-deterministic bounded plan. Mildly degraded output remains visible with its
-warning. All model content remains advisory and unverified.
-
-## Local Satellites
-
-Four account-free Satellites execute through Chat today:
-
-| Satellite | Typical request | Result source |
+| Vault | Intended use | Default state |
 | --- | --- | --- |
-| Calculate | `Calculate 12 * (3 + 4)` | validated arithmetic |
-| Unit Convert | `Convert 5 miles to km` | validated unit conversion |
-| Memory Write | `Remember that my grocery day is Saturday` | durable scoped record |
-| Memory Search | `What do you remember about grocery day?` | scoped local retrieval |
+| `working` | temporary task and conversation support | active |
+| `long_term` | durable cross-session facts | active |
+| `personal` | private life, household, and preference memory | active |
+| `employer_authorized` | information allowed inside the employment boundary | active |
+| `exploration` | scientific and startup-opportunity exploration | active |
+| `future_company` | future-company material after an explicit lifecycle decision | inactive |
 
-Network access, email operations, notifications, calls, purchases, and other
-external effects are not granted by ordinary chat text. Provider-backed
-Satellites require explicit configuration and the approval workflow must be
-made durable and resumable before they are enabled in Chat.
+Writes and searches always name exactly one Vault. Chat defaults to `personal`;
+the selector in the Chat composer changes the boundary when Gemma selects a
+memory write or search. The planner selects a Planet whose Charter includes
+both the Memory Satellite and the requested Vault. There is no phrase matcher
+and no cross-Vault fallback.
 
-Exact local Satellite requests remain usable when Gemma is offline. Open-ended
-advisory requests return HTTP 503 until the external Rogue Star is ready.
-
-## HTTP APIs
-
-Get the compact system readiness summary:
-
-```bash
-curl -sS http://127.0.0.1:8030/api/v2/readiness
-```
-
-Get the complete Commons component audit:
+The Commons tab can write, search, export, and delete individual records. The
+API also supports a destructive whole-Vault purge, but only when the request
+contains the exact confirmation string `delete <vault_id>`.
 
 ```bash
-curl -sS http://127.0.0.1:8030/api/v2/circles/commons/readiness
-```
-
-The full response includes `summary`, runtime foundations, all component
-states, evidence, limitations, and the next implementation priorities.
-
-Send a conversational Mission:
-
-```bash
-curl -sS http://127.0.0.1:8030/api/v2/wormhole/chat \
+# Store and search one personal fact
+curl -sS http://127.0.0.1:8030/api/v2/commons/vaults/personal/memories \
   -H 'Content-Type: application/json' \
-  -d '{"message":"Help me plan my day"}'
+  -d '{"content":"Mom prefers a Sunday call","tags":["family"]}'
+
+curl -sS 'http://127.0.0.1:8030/api/v2/commons/vaults/personal/memories?query=Sunday'
+
+# Export without creating another server-side file
+curl -sS http://127.0.0.1:8030/api/v2/commons/vaults/personal/export
 ```
 
-Inspect `answer_source` and `generation.output_used` before attributing an
-answer to Gemma. A `used_model` field means a model was called; it does not by
-itself mean its text reached the final response.
+Conversation history remains separate. `data/galaxy_chat.db` contains bounded
+recent turns; `data/commons.db` contains memories that the user explicitly
+asked to retain.
 
-## Adding a reusable Commons component
+## Artifact Store
 
-1. Decide whether the reusable unit is a capability, memory scope, Playbook,
-   policy, Satellite, or service.
-2. Add it to the typed catalog and attach it to the Commons Circle.
-3. Implement the smallest shared runtime contract instead of embedding the
-   behavior in one Planet.
-4. Add an explicit entry to `_COMMONS_COMPONENTS` with evidence and a truthful
-   runtime state. The drift check will fail until this is done.
-5. For a Satellite, register it with the active `LocalSatelliteRuntime`; a
-   catalog entry alone is not executable.
-6. Add policy, authorization, failure, observability, and API tests.
-7. Promote the state to `operational` only after the Control Room path works end
-   to end.
+`POST /api/v2/commons/artifacts` creates an artifact. Supplying the returned
+`artifact_id` again creates the next immutable version. Every version has a
+SHA-256 checksum, timestamp, kind, metadata, and content. Deletion is soft:
+normal reads hide deleted versions while `include_deleted=true` retains an
+audit/recovery view.
 
-## Known gaps and implementation order
+```bash
+curl -sS http://127.0.0.1:8030/api/v2/commons/artifacts \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Energy opportunity memo","kind":"memo","content":"First thesis"}'
+```
 
-The next Commons increments are intentionally ordered by reuse and safety:
+## Local knowledge and citations
 
-1. a versioned local Artifact Store with retention and deletion controls
-2. a durable scheduler for Scheduled Review wakeups and cancellation
-3. source-backed knowledge ingestion, citations, and claim verification
-4. durable approval decisions that can safely resume paused Missions
-5. calendar adapters behind explicit account configuration and approval
+Knowledge ingestion accepts text explicitly supplied by the caller. Each
+source receives a stable `source-...` identifier and content checksum. Search
+is bounded lexical retrieval. Summaries are deterministic excerpts prefixed
+with citation identifiers.
 
-Until those increments land, the readiness endpoint keeps them visible as
-partial or declared rather than presenting the Galaxy as more capable than it
-is.
+Claim verification reports lexical coverage as `supported`, `partial`, or
+`unsupported`. This is evidence triage, not semantic proof, fact checking, or
+a substitute for reviewing the cited source.
+
+```bash
+curl -sS http://127.0.0.1:8030/api/v2/commons/knowledge/sources \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"Battery note","content":"Sodium-ion cells avoid lithium."}'
+
+curl -sS 'http://127.0.0.1:8030/api/v2/commons/knowledge/summary?query=sodium'
+```
+
+## Scheduled Reviews
+
+Scheduled Reviews are persisted with a due time, optional payload, and optional
+recurrence in days. The app lifespan runs a one-second local monitor that
+atomically moves elapsed records from `scheduled` to `due` and emits a redacted
+event. `POST /api/v2/commons/reviews/claim-due` exposes the same transition for
+workers and deterministic tests.
+
+Completing a recurring review advances its due time and returns it to
+`scheduled`; cancelling it is terminal. Becoming due does not execute the
+payload as a Mission.
+
+## Approval records
+
+Approval records persist the Mission, protected effects, rationale, and bounded
+`resume_context`. A human can decide a pending record exactly once. The context
+can later be consumed by a provider-specific worker, but this local runtime does
+not implement that worker and never auto-resumes an effect.
+
+This separation is intentional:
+
+```text
+request effect → persist pending approval → human decision → approved record
+                                                        └─ no external action here
+```
+
+## Calendar proposals
+
+Calendar APIs create, inspect, approve, reject, or cancel local proposals. They
+do not connect to Google Calendar, Outlook, or the operating system calendar.
+Approved local items appear in the Commons calendar projection and can later be
+consumed by an explicitly configured provider adapter.
+
+## API map
+
+| Area | Endpoints |
+| --- | --- |
+| Runtime | `GET /api/v2/commons/summary` |
+| Vaults | `GET/PATCH /vaults`, `POST/GET /vaults/{id}/memories`, export, record delete, confirmed purge |
+| Artifacts | `POST/GET /artifacts`, `GET/DELETE /artifacts/{id}` |
+| Knowledge | source ingest/get/delete, search, extractive summary, claim verification |
+| Reviews | create/list, claim due, complete/cancel |
+| Approvals | create/list, approve/reject/cancel |
+| Calendar | propose/list, approve/reject/cancel |
+
+All paths in the table are relative to `/api/v2/commons`.
+
+## Response provenance and local Satellites
+
+Wormhole Chat distinguishes `model`, `satellite`, and `hybrid` answers. Gemma
+plans every request first. Calculate, Unit Convert, Memory Write, and Memory
+Search execute locally through Charter and Satellite authorization; the other
+Commons services execute through the same validated action boundary. Exact
+local results take precedence over unverified model continuation. There is no
+canned or deterministic answer fallback.
+
+Those checks detect transport and obvious formatting failures; they do not
+prove truth, citation quality, or general instruction following.
+
+## Using the runtime from Python
+
+```python
+from pathlib import Path
+
+from easy_agents.constellation.commons_runtime import (
+    ArtifactCreate,
+    CommonsRuntime,
+    VaultMemoryCreate,
+)
+
+commons = CommonsRuntime(db_path=Path("data/my_galaxy_commons.db"))
+commons.add_memory(
+    "exploration",
+    VaultMemoryCreate(content="Investigate sodium-ion storage economics"),
+)
+memo = commons.create_artifact(
+    ArtifactCreate(name="Storage thesis", content="Initial evidence map")
+)
+commons.create_artifact(
+    ArtifactCreate(
+        artifact_id=memo.artifact_id,
+        name=memo.name,
+        content="Revised evidence map",
+    )
+)
+commons.close()
+```
+
+Use one `CommonsRuntime` per Galaxy process and inject that same instance into
+the API and local Satellite runtime. This ensures UI operations and Planet tool
+calls enforce the same persistence and Vault boundary.
+
+## Remaining boundaries
+
+- Adversarial Review still needs rubric-specific evaluators.
+- Research with Provenance has local sources and citations but no approved
+  primary-source connector.
+- Route & Synthesize exists in Fleet, but Chat still routes one Planet per
+  message.
+- Provider-backed calendar, email, call, purchase, and notification effects
+  require authentication, per-principal authorization, idempotency, and an
+  explicit post-approval worker.
+- The server should remain loopback-only until authentication, rate limits, and
+  per-user Galaxy authorization are implemented.
+
+See the [Commons Completion Plan](../../plans/commons-completion-plan.md) for the
+remaining sequence.
 
 ## Verification
 
-Run the focused Commons, Chat, Fleet, observability, model, and UI contracts:
-
 ```bash
-.venv/bin/python -m pytest -q \
-  tests/test_fleet_runtime.py \
-  tests/test_wormhole_chat.py \
-  tests/test_observability.py \
-  tests/test_constellation_knowledge_graph.py \
-  tests/test_mac_gemma.py
+.venv/bin/python -m pytest -q tests/test_commons_runtime.py \
+  tests/test_wormhole_chat.py tests/test_natural_language_chat.py
+node --check endpoints/static/constellation/app.js
 ```
 
-The suite covers all 30 audited components, model completion metadata,
-degraded-output detection, final-answer attribution, authoritative Satellite
-answers, redacted composition events, readiness APIs, and UI contracts.
+The tests cover every model-planned Chat action plus persistence and Vault isolation, exact-confirmation purge,
+artifact versioning and deletion, stable knowledge citations, lexical claim
+labels, recurring review transitions, approval decisions, calendar proposals,
+the complete API, multi-action requests, invalid-plan retries without a rule
+fallback, and Chat/API use of the same selected Vault.

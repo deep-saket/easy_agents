@@ -1,6 +1,6 @@
 # Functionality Catalog and Verification Matrix
 
-This catalog documents each implemented functional area separately and records how it was verified on branch `saket/framework_update` through 2026-09-25.
+This catalog documents each implemented functional area separately and records how it was verified on branch `saket/framework_update` through 2026-09-26.
 
 The status labels mean:
 
@@ -24,8 +24,8 @@ The status labels mean:
 | [Concrete agents](./agents.md) | Mixed | Simple, MailMind, Conversation Manager, and two specialist smokes passed; Collection Agent had 117 passes and 22 failures |
 | [Constellation feature intake](./constellation-feature-intake.md) | Verified first slice | Fourteen focused offline tests passed for Roster validation, lifecycle filtering, all four decisions, risk/network gates, determinism, and the local API |
 | [Canonical Galaxy domain](./galaxy-domain.md) | Verified foundation | 18 focused tests pass for domain invariants, Rocky/Giant execution, monotonic grants, Satellite authorization, YAML v2 round-trip, all-70-role v1 adaptation, topology, Wormhole routing, v2 API, CLI, terminology, and public documentation |
-| [Wormhole Chat](../../guides/chat-with-your-galaxy.md) | Verified local runtime | API tests cover routed execution, persistent bounded history, deletion/reset, local Satellite authorization and results, durable memory recall, truthful readiness, unavailable Gemma, and correlated Satellite events; UI contracts and browser checks cover Chat mode, invoked-tool evidence, trajectory context, and Map handoff |
-| [Commons Circle runtime](./commons.md) | Verified foundation; 18 components incomplete by design | A drift-checked 30-component inventory reports 12 operational, 10 partial, 4 declared, and 4 disabled; response provenance and Gemma completion evidence distinguish model calls from final-answer sources; the 56-test focused runtime group passes |
+| [Wormhole Chat](../../guides/chat-with-your-galaxy.md) | Verified model-planned local runtime | A public-API behavior matrix covers all 18 actions, multi-action execution, model-selected Circle/Planet routing, Charter rejection with model-only retry, no offline intent fallback, persistent history, durable Vault recall, generation quality, and correlated traces; the UI exposes planning evidence, action results, trajectory context, and Map handoff |
+| [Commons Circle runtime](./commons.md) | Verified local runtime; external effects disabled | A drift-checked 30-component inventory reports 23 operational, 3 partial, 0 declared, and 4 disabled; focused tests cover shared Chat/API Vault isolation, artifacts, knowledge citations, reviews, approvals, and calendar proposals |
 | [Galaxy Map](../../guides/constellation-map.md) | Verified | Graph/API/UI contract tests, JavaScript syntax validation, and browser interaction checks passed; typed nodes and relationships load locally, with direct Galaxy-to-Circle ownership, Constellation overlays, Circle Member metadata, callable tool Components presented as Satellites, a shared external Mac Gemma Rogue Star, and route-only dispatch edges |
 | [Specialist fleet](../../guides/run-specialist-fleet.md) | Verified safe runtime | Focused tests compile and execute all 70 Rocky Planet Charters, then verify Wormhole → Galaxy → Circle → Planet routing, scope isolation, approval Gates, offline and medical blocking, team Work orders, the correlated whole-fleet audit, external Mac Gemma selection and readiness, local-model prompts, custom rosters, CLI, and API |
 
@@ -110,6 +110,7 @@ PYTHONPATH=src python -m pytest -q \
   tests/test_galaxy_domain.py \
   tests/test_constellation_feature_intake.py \
   tests/test_constellation_knowledge_graph.py \
+  tests/test_commons_runtime.py \
   tests/test_wormhole_chat.py \
   tests/test_fleet_runtime.py \
   tests/test_observability.py

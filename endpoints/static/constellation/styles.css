@@ -748,6 +748,10 @@ body.chat-mode #fit-view { visibility: hidden; }
 body.chat-mode .controls-panel,
 body.chat-mode .graph-stage,
 body.chat-mode .inspector-panel { display: none; }
+body.commons-mode #fit-view { visibility: hidden; }
+body.commons-mode .controls-panel,
+body.commons-mode .graph-stage,
+body.commons-mode .inspector-panel { display: none; }
 body.guide-mode #fit-view { visibility: hidden; }
 body.guide-mode .controls-panel,
 body.guide-mode .graph-stage,
@@ -860,6 +864,21 @@ body.guide-mode .inspector-panel { display: none; }
   scrollbar-width: thin;
   scrollbar-color: #29404e transparent;
 }
+
+.chat-capability-guide {
+  margin: 12px 18px 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(110, 231, 210, 0.16);
+  border-radius: 10px;
+  background: rgba(110, 231, 210, 0.035);
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.55;
+}
+
+.chat-capability-guide summary { cursor: pointer; color: #b8d9d4; font-weight: 700; }
+.chat-capability-guide p { margin: 9px 0 5px; }
+.chat-capability-guide small { color: var(--faint); }
 
 .chat-message {
   display: flex;
@@ -990,6 +1009,8 @@ body.guide-mode .inspector-panel { display: none; }
 .chat-composer-footer span { color: var(--faint); font-size: 9px; }
 .chat-composer button { padding: 8px 11px; }
 .chat-composer button:disabled { cursor: wait; opacity: 0.52; }
+.chat-vault-label { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: 0.07em; }
+.chat-vault-label select { width: 150px; height: 29px; font-size: 9px; text-transform: none; letter-spacing: normal; }
 
 .chat-route-sidebar {
   min-width: 0;
@@ -1113,6 +1134,63 @@ body.guide-mode .inspector-panel { display: none; }
 
 .chat-semantics-note strong { color: var(--constellation); font-size: 9px; text-transform: uppercase; letter-spacing: 0.07em; }
 .chat-semantics-note p { margin: 7px 0 0; color: var(--muted); font-size: 9px; line-height: 1.55; }
+
+.commons-panel {
+  position: absolute;
+  z-index: 15;
+  inset: 0;
+  overflow: auto;
+  padding: 34px clamp(20px, 4vw, 58px) 60px;
+  background:
+    radial-gradient(circle at 75% 0%, rgba(110, 231, 210, 0.1), transparent 31%),
+    radial-gradient(circle at 5% 100%, rgba(241, 208, 111, 0.07), transparent 33%),
+    #08121b;
+  scrollbar-width: thin;
+  scrollbar-color: #29404e transparent;
+}
+
+.commons-wrap { width: min(1180px, 100%); margin: 0 auto; }
+.commons-hero { display: flex; justify-content: space-between; align-items: flex-end; gap: 28px; padding-bottom: 24px; border-bottom: 1px solid var(--line); }
+.commons-hero h2 { margin: 6px 0 8px; font-family: Georgia, "Times New Roman", serif; font-size: 34px; font-weight: 500; letter-spacing: -0.035em; }
+.commons-hero p:not(.eyebrow) { max-width: 720px; margin: 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.commons-summary { max-width: 320px; padding: 8px 11px; border: 1px solid rgba(110, 231, 210, 0.24); border-radius: 999px; color: var(--accent); background: var(--accent-soft); font-size: 9px; line-height: 1.4; text-align: right; }
+.commons-notice { position: sticky; z-index: 6; top: 10px; margin: 14px 0 -2px; padding: 10px 12px; border: 1px solid rgba(110, 231, 210, 0.28); border-radius: 9px; color: var(--accent); background: rgba(8, 30, 32, 0.96); font-size: 10px; }
+.commons-notice.error { color: var(--danger); border-color: rgba(255, 125, 125, 0.3); background: rgba(38, 16, 20, 0.96); }
+.commons-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 20px; }
+.commons-card { display: grid; align-content: start; gap: 9px; min-width: 0; padding: 17px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255, 255, 255, 0.025); }
+.commons-card-wide { grid-column: 1 / -1; }
+.commons-card-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.commons-card-heading h3 { margin: 4px 0 0; font-family: Georgia, "Times New Roman", serif; font-size: 18px; font-weight: 500; }
+.commons-card-heading select { width: min(260px, 48%); }
+.commons-card input,
+.commons-card textarea { width: 100%; border: 1px solid var(--line-strong); border-radius: 9px; outline: none; color: var(--text); background: rgba(0, 0, 0, 0.2); }
+.commons-card input { height: 38px; padding: 0 10px; }
+.commons-card textarea { padding: 10px; resize: vertical; line-height: 1.5; }
+.commons-card input:focus,
+.commons-card textarea:focus { border-color: rgba(110, 231, 210, 0.5); box-shadow: 0 0 0 3px rgba(110, 231, 210, 0.07); }
+.commons-card > button,
+.commons-actions button,
+.commons-card-heading button,
+.commons-list-actions button { width: fit-content; padding: 7px 10px; border: 1px solid rgba(110, 231, 210, 0.28); border-radius: 8px; color: var(--accent); background: var(--accent-soft); cursor: pointer; font-size: 9px; font-weight: 700; }
+.commons-card button.secondary { color: var(--muted); border-color: var(--line-strong); background: rgba(255, 255, 255, 0.025); }
+.commons-card button:disabled { cursor: not-allowed; opacity: 0.45; }
+.commons-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
+.commons-actions input { flex: 1 1 190px; }
+.commons-help { margin: 0; color: var(--muted); font-size: 9px; line-height: 1.5; }
+.commons-list { display: grid; gap: 6px; max-height: 260px; margin-top: 4px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #29404e transparent; }
+.commons-list-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 9px; background: rgba(0, 0, 0, 0.14); }
+.commons-list-item > div:first-child { min-width: 0; }
+.commons-list-item strong,
+.commons-list-item span { display: block; }
+.commons-list-item strong { overflow: hidden; color: #dce8eb; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.commons-list-item span { margin-top: 4px; color: var(--muted); font-size: 8px; line-height: 1.45; overflow-wrap: anywhere; }
+.commons-list-actions { display: flex; flex: 0 0 auto; gap: 5px; }
+.commons-list-actions button { padding: 5px 7px; }
+.commons-list-actions button.danger { color: var(--danger); border-color: rgba(255, 125, 125, 0.25); background: rgba(255, 125, 125, 0.06); }
+.commons-empty { margin: 0; padding: 12px; border: 1px dashed var(--line); border-radius: 9px; color: var(--muted); font-size: 9px; text-align: center; }
+.commons-date-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.commons-date-grid label { color: var(--muted); font-size: 8px; text-transform: uppercase; letter-spacing: 0.07em; }
+.commons-date-grid input { margin-top: 5px; color-scheme: dark; text-transform: none; letter-spacing: normal; }
 
 .guide-panel {
   position: absolute;
@@ -1548,6 +1626,11 @@ button.operation-event:hover { border-color: var(--line-strong); background: rgb
   .constellation-entry { top: 72px; left: 12px; width: calc(100% - 24px); }
   .entry-flow { display: none; }
   .guide-panel { padding: 26px 18px 52px; }
+  .commons-panel { padding: 26px 18px 52px; }
+  .commons-hero { align-items: flex-start; flex-direction: column; gap: 14px; }
+  .commons-summary { max-width: none; text-align: left; }
+  .commons-grid { grid-template-columns: 1fr; }
+  .commons-card-wide { grid-column: auto; }
   .guide-hero { align-items: flex-start; flex-direction: column; gap: 16px; }
   .guide-nav { top: -26px; }
   .guide-flow { grid-template-columns: 1fr; }
@@ -1592,7 +1675,11 @@ button.operation-event:hover { border-color: var(--line-strong); background: rgb
   .chat-message { width: 97%; }
   .chat-composer { margin: 0 12px 14px; }
   .chat-composer-footer span { display: none; }
-  .chat-composer-footer { justify-content: flex-end; }
+  .chat-composer-footer { justify-content: space-between; }
+  .chat-vault-label select { width: 120px; }
+  .commons-date-grid { grid-template-columns: 1fr; }
+  .commons-card-heading { align-items: flex-start; flex-direction: column; }
+  .commons-card-heading select { width: 100%; }
   .boundary-diagram { grid-template-columns: 1fr; gap: 10px; min-height: 610px; }
   .boundary-arrow { justify-self: center; transform: rotate(90deg); }
   .boundary-rogue-star { top: 150px; right: 12px; bottom: auto; left: auto; }

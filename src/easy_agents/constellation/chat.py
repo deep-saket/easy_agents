@@ -17,6 +17,13 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from easy_agents.constellation.commons_runtime import VaultId
+from easy_agents.constellation.natural_language import (
+    ActionInvocation,
+    NaturalLanguageActionExecutor,
+    NaturalLanguagePlanner,
+    PlanningEvidence,
+)
 from easy_agents.fleet.model_profiles import MAC_GEMMA_PROFILE_ID
 from easy_agents.fleet.models import GenerationEvidence, GalaxyRoutePlan, MissionRequest
 from easy_agents.fleet.runtime import FleetRuntime
@@ -28,7 +35,6 @@ from easy_agents.galaxy.routing import Wormhole
 from easy_agents.observability import EntityReference
 from easy_agents.constellation.satellite_tools import (
     LocalSatelliteRuntime,
-    PlannedSatelliteCall,
 )
 
 
@@ -59,6 +65,7 @@ class WormholeChatRequest(BaseModel):
     message: str = Field(min_length=3, max_length=12_000)
     conversation_id: Identifier | None = None
     reset_conversation: bool = False
+    vault_id: VaultId = "personal"
 
 
 class ChatRouteContext(BaseModel):
@@ -99,9 +106,11 @@ class WormholeChatResponse(BaseModel):
     answer: str
     trajectory: Trajectory
     route_context: ChatRouteContext
+    planning: PlanningEvidence
+    action_invocations: tuple[ActionInvocation, ...] = ()
     satellite_invocations: tuple[SatelliteInvocation, ...] = ()
     visualization_route: GalaxyRoutePlan
-    answer_source: Literal["model", "satellite", "hybrid", "fallback"]
+    answer_source: Literal["model", "satellite", "hybrid"]
     used_model: str | None = None
     generation: GenerationEvidence | None = None
     warnings: tuple[str, ...] = ()
@@ -315,6 +324,8 @@ class WormholeChatService:
         fleet_runtime: FleetRuntime,
         history: ConversationStore | None = None,
         satellite_runtime: LocalSatelliteRuntime | None = None,
+        language_planner: NaturalLanguagePlanner,
+        action_executor: NaturalLanguageActionExecutor,
     ) -> None:
         """Composes routing, Fleet execution, Satellites, and chat history."""
 
@@ -323,6 +334,8 @@ class WormholeChatService:
         self.wormhole = Wormhole(registry)
         self.history = history or ConversationStore()
         self.satellite_runtime = satellite_runtime
+        self.language_planner = language_planner
+        self.action_executor = action_executor
 
     def chat(self, request: WormholeChatRequest) -> WormholeChatResponse:
         """Routes and answers one user message with bounded prior-turn context."""
@@ -331,39 +344,55 @@ class WormholeChatService:
         if request.reset_conversation:
             self.history.clear(conversation_id)
         prior_turns = self.history.read(conversation_id)
-        mission = Mission(objective=request.message, team_size=1)
-        trajectory = self.wormhole.route(mission)
-        planned_calls = (
-            self.satellite_runtime.plan(
-                request.message,
-                conversation_id=conversation_id,
-            )
-            if self.satellite_runtime is not None
-            else ()
+        mission = Mission(
+            objective=request.message,
+            requested_vault_ids=(request.vault_id,),
+            team_size=1,
         )
-        trajectory = self._route_for_satellites(
-            mission=mission,
-            trajectory=trajectory,
-            planned_calls=planned_calls,
-        )
-        planet_id = trajectory.planet_ids[0]
-        satellite_invocations = self._invoke_satellites(
-            planned_calls,
-            planet_id=planet_id,
+        planned_turn = self.language_planner.plan(
+            request.message,
+            vault_id=request.vault_id,
             mission_id=mission.id,
         )
+        mission = mission.model_copy(
+            update={
+                "preferred_circle_id": planned_turn.plan.circle_id,
+                "preferred_planet_id": planned_turn.plan.planet_id,
+            }
+        )
+        trajectory = self.wormhole.route(mission)
+        planet_id = trajectory.planet_ids[0]
+        action_invocations = tuple(
+            invocation
+            for action in planned_turn.plan.actions
+            if (
+                invocation := self.action_executor.execute(
+                    action,
+                    planet_id=planet_id,
+                    mission_id=mission.id,
+                    vault_id=request.vault_id,
+                )
+            )
+        )
+        satellite_invocations = self._satellite_invocations(action_invocations)
         recent_history = self._format_history(prior_turns)
-        context: dict[str, Any] = {}
+        context: dict[str, Any] = {
+            "model_selected_action_plan": json.dumps(
+                planned_turn.plan.model_dump(mode="json"),
+                sort_keys=True,
+                default=str,
+            )
+        }
         if recent_history:
             context["recent_conversation"] = recent_history
-        if satellite_invocations:
-            context["verified_satellite_results"] = json.dumps(
+        if action_invocations:
+            context["verified_local_action_results"] = json.dumps(
                 [
                     {
-                        "satellite": item.satellite.id,
+                        "action": item.action,
                         "output": item.output,
                     }
-                    for item in satellite_invocations
+                    for item in action_invocations
                 ],
                 sort_keys=True,
                 default=str,
@@ -372,12 +401,18 @@ class WormholeChatService:
             MissionRequest(
                 objective=request.message,
                 specialist_id=planet_id,
+                memory_scope=(
+                    request.vault_id
+                    if any(
+                        item.action in {"memory_write", "memory_search"}
+                        for item in planned_turn.plan.actions
+                    )
+                    else None
+                ),
                 requested_effects=["read"],
                 allow_network=False,
                 team_size=1,
-                model_id=(
-                    "none" if satellite_invocations else MAC_GEMMA_PROFILE_ID
-                ),
+                model_id=MAC_GEMMA_PROFILE_ID,
                 advisory_only=True,
                 context=context,
             ),
@@ -390,19 +425,17 @@ class WormholeChatService:
             specialist_name=specialist_name,
             objective=request.message,
         )
-        verified_result = self._satellite_summary(satellite_invocations)
-        if satellite_invocations:
-            # Exact validated tool output is authoritative. The external service
-            # hosts a pretrained base model that may echo structured context, so
-            # tool-backed answers omit its unverified continuation entirely.
+        verified_result = self._action_summary(action_invocations)
+        if generation is None or not generation.output_used:
             model_answer = ""
-            if generation is not None:
-                generation = generation.model_copy(update={"output_used": False})
         answer = "\n\n".join(
             item for item in (verified_result, model_answer) if item
         ).strip()
         if not answer:
-            raise ValueError("The routed Planet returned an empty answer.")
+            raise ValueError(
+                "Gemma did not produce a usable answer, no local action result exists, "
+                "and deterministic fallback is disabled."
+            )
         retained = self.history.append(
             conversation_id,
             ChatTurn(role="user", content=request.message),
@@ -412,8 +445,14 @@ class WormholeChatService:
             (item.used_model for item in fleet_result.results if item.used_model),
             None,
         )
-        if satellite_invocations:
-            answer_source: Literal["model", "satellite", "hybrid", "fallback"] = "satellite"
+        if action_invocations and (
+            generation is not None
+            and generation.completed
+            and generation.output_used
+        ):
+            answer_source: Literal["model", "satellite", "hybrid"] = "hybrid"
+        elif action_invocations:
+            answer_source = "satellite"
         elif (
             generation is not None
             and generation.completed
@@ -421,10 +460,10 @@ class WormholeChatService:
         ):
             answer_source = "model"
         else:
-            answer_source = "fallback"
+            raise ValueError("Gemma output was rejected; deterministic fallback is disabled.")
         response_status = (
             "completed"
-            if satellite_invocations
+            if action_invocations
             else fleet_result.status.value
         )
         self._record_response_composed(
@@ -446,31 +485,25 @@ class WormholeChatService:
                 trajectory,
                 invoked_ids={item.satellite.id for item in satellite_invocations},
             ),
+            planning=planned_turn.evidence,
+            action_invocations=action_invocations,
             satellite_invocations=satellite_invocations,
             visualization_route=fleet_result.routing,
             answer_source=answer_source,
             used_model=used_model,
             generation=generation,
-            warnings=tuple(fleet_result.warnings),
+            warnings=(
+                *tuple(fleet_result.warnings),
+                "Gemma selected the Planet and action plan; no deterministic intent fallback was used.",
+            ),
             retained_turns=len(retained),
         )
 
-    def requires_model(self, message: str) -> bool:
-        """Returns whether a message needs generation rather than a local Satellite.
+    def requires_model(self, message: str, *, vault_id: VaultId = "personal") -> bool:
+        """Returns true because every natural-language plan is model-selected."""
 
-        Planning is deterministic and side-effect free. This check lets exact
-        compute and explicit-memory requests remain available when the optional
-        external Gemma service is offline.
-        """
-
-        if self.satellite_runtime is None:
-            return True
-        return not bool(
-            self.satellite_runtime.plan(
-                message,
-                conversation_id="readiness-probe",
-            )
-        )
+        del message, vault_id
+        return True
 
     def _record_response_composed(
         self,
@@ -603,73 +636,36 @@ class WormholeChatService:
             rogue_stars=rogue_stars,
         )
 
-    def _route_for_satellites(
+    def _satellite_invocations(
         self,
-        *,
-        mission: Mission,
-        trajectory: Trajectory,
-        planned_calls: tuple[PlannedSatelliteCall, ...],
-    ) -> Trajectory:
-        """Keeps the route when possible or selects a capable Planet safely."""
-
-        required = {item.satellite_id for item in planned_calls}
-        if not required:
-            return trajectory
-        selected = self.registry.get_planet(trajectory.planet_ids[0])
-        if required <= set(selected.charter.satellite_ids):
-            return trajectory
-        candidates = [
-            planet
-            for planet in self.registry.planets.values()
-            if required <= set(planet.charter.satellite_ids)
-        ]
-        if not candidates:
-            missing = ", ".join(sorted(required))
-            raise ValueError(f"No Planet Charter authorizes required Satellite(s): {missing}.")
-        priority = {"personal_steward": 0, "knowledge_librarian": 1}
-        candidates.sort(
-            key=lambda item: (
-                priority.get(item.id, 2),
-                item.status.value != "active",
-                item.display_name.lower(),
-            )
-        )
-        return self.wormhole.route(
-            mission.model_copy(update={"preferred_planet_id": candidates[0].id})
-        )
-
-    def _invoke_satellites(
-        self,
-        calls: tuple[PlannedSatelliteCall, ...],
-        *,
-        planet_id: str,
-        mission_id: str,
+        invocations: tuple[ActionInvocation, ...],
     ) -> tuple[SatelliteInvocation, ...]:
-        """Executes planned Satellites and returns their validated outputs."""
+        """Projects executed Satellite actions into the legacy trace contract."""
 
-        if not calls or self.satellite_runtime is None:
-            return ()
-        invocations: list[SatelliteInvocation] = []
-        for call in calls:
-            result = self.satellite_runtime.invoke(
-                call,
-                planet_id=planet_id,
-                mission_id=mission_id,
-            )
-            satellite = self.registry.satellites[call.satellite_id]
-            invocations.append(
+        satellite_actions = {
+            "calculate",
+            "unit_convert",
+            "memory_write",
+            "memory_search",
+        }
+        projected: list[SatelliteInvocation] = []
+        for invocation in invocations:
+            if invocation.action not in satellite_actions:
+                continue
+            satellite = self.registry.satellites[invocation.action]
+            projected.append(
                 SatelliteInvocation(
                     satellite=ChatEntity(
                         id=satellite.id,
                         display_name=satellite.display_name,
                         status="executable",
                     ),
-                    arguments=call.arguments,
-                    output=dict(result.get("output", {})),
-                    reason=call.reason,
+                    arguments=invocation.arguments,
+                    output=invocation.output,
+                    reason=invocation.reason,
                 )
             )
-        return tuple(invocations)
+        return tuple(projected)
 
     @staticmethod
     def _format_history(turns: tuple[ChatTurn, ...]) -> str:
@@ -679,14 +675,14 @@ class WormholeChatService:
         return "\n".join(lines)[-8_000:]
 
     @staticmethod
-    def _satellite_summary(
-        invocations: tuple[SatelliteInvocation, ...],
+    def _action_summary(
+        invocations: tuple[ActionInvocation, ...],
     ) -> str:
-        """Formats exact tool evidence ahead of probabilistic model commentary."""
+        """Formats verified effects without making an intent or routing decision."""
 
         lines: list[str] = []
         for invocation in invocations:
-            identifier = invocation.satellite.id
+            identifier = invocation.action
             output = invocation.output
             if identifier == "calculate":
                 lines.append(
@@ -717,6 +713,66 @@ class WormholeChatService:
                     )
                 else:
                     lines.append("Memory Search Satellite found no matching stored memory.")
+            elif identifier == "artifact_create":
+                lines.append(
+                    "Created local artifact version: "
+                    f"{output.get('name', output.get('artifact_id', 'artifact'))}."
+                )
+            elif identifier == "artifact_list":
+                lines.append(
+                    f"Listed {len(output.get('artifacts', []))} local artifact(s)."
+                )
+            elif identifier == "knowledge_add":
+                lines.append(
+                    "Added local Knowledge Source: "
+                    f"{output.get('title', output.get('source_id', 'source'))}."
+                )
+            elif identifier == "knowledge_search":
+                lines.append(
+                    f"Knowledge search returned {len(output.get('hits', []))} cited hit(s)."
+                )
+            elif identifier == "knowledge_summarize":
+                lines.append(
+                    "Produced a local extractive knowledge summary from "
+                    f"{len(output.get('citations', []))} cited source(s)."
+                )
+            elif identifier == "knowledge_verify":
+                lines.append(
+                    "Checked "
+                    f"{len(output.get('assessments', []))} claim(s) against local sources."
+                )
+            elif identifier == "review_create":
+                lines.append(
+                    "Scheduled local review: "
+                    f"{output.get('title', output.get('review_id', 'review'))}."
+                )
+            elif identifier == "review_list":
+                lines.append(
+                    f"Listed {len(output.get('reviews', []))} scheduled review(s)."
+                )
+            elif identifier == "calendar_propose":
+                lines.append(
+                    "Created local calendar proposal: "
+                    f"{output.get('title', output.get('proposal_id', 'event'))}."
+                )
+            elif identifier == "calendar_list":
+                lines.append(
+                    f"Listed {len(output.get('items', []))} local calendar item(s)."
+                )
+            elif identifier == "approval_list":
+                lines.append(
+                    f"Listed {len(output.get('approvals', []))} approval record(s)."
+                )
+            elif identifier == "approval_decide":
+                lines.append(
+                    "Recorded local approval decision: "
+                    f"{output.get('status', output.get('decision', 'updated'))}."
+                )
+            elif identifier == "commons_status":
+                lines.append(
+                    "Commons is available with local backend "
+                    f"{output.get('backend', 'unknown')}."
+                )
         return "\n".join(lines)
 
     @staticmethod

@@ -71,6 +71,7 @@ def build_commons_readiness(
     executable_satellites: frozenset[str],
     gemma_ready: bool,
     chat_history_backend: Literal["memory", "sqlite"],
+    runtime_capabilities: frozenset[str] = frozenset(),
 ) -> CommonsReadiness:
     """Builds a drift-checked Commons implementation report.
 
@@ -80,6 +81,8 @@ def build_commons_readiness(
             executor, not merely present in the catalog.
         gemma_ready: Whether the external local Rogue Star passed readiness.
         chat_history_backend: Active bounded conversation-history backend.
+        runtime_capabilities: Components backed by the active local Commons
+            runtime rather than only represented in the catalog.
 
     Raises:
         ValueError: If the catalog adds or removes a Commons component without
@@ -104,7 +107,21 @@ def build_commons_readiness(
     components: list[CommonsComponentReadiness] = []
     for identifier in sorted(declared_ids):
         item = audit_by_id[identifier]
-        if item.category == "satellite":
+        if identifier in runtime_capabilities:
+            item = item.model_copy(
+                update={
+                    "runtime_status": "operational",
+                    "evidence": (
+                        "Implemented by the active local Commons runtime and exposed through typed APIs.",
+                    ),
+                    "limitation": (
+                        "Local state only; provider-backed external effects remain disabled."
+                        if identifier in {"calendar.inspect", "calendar.propose", "outbound_approval"}
+                        else None
+                    ),
+                }
+            )
+        elif item.category == "satellite":
             if identifier in executable_satellites:
                 item = item.model_copy(
                     update={
@@ -142,11 +159,10 @@ def build_commons_readiness(
         ),
         components=tuple(components),
         next_priorities=(
-            "Add a versioned local Artifact Store with retention and deletion controls.",
-            "Add a durable scheduler for Scheduled Review wakeups and cancellation.",
-            "Implement source-backed local knowledge ingestion, citation, and claim verification.",
-            "Make approval records resumable before enabling outbound Satellites.",
-            "Add calendar adapters only behind explicit account configuration and approval.",
+            "Add rubric-specific evaluators to Adversarial Review.",
+            "Connect approved primary-source adapters to Research with Provenance.",
+            "Add multi-Planet Chat teams to Route & Synthesize.",
+            "Add external providers only behind account configuration and explicit approval.",
         ),
     )
 

@@ -146,6 +146,9 @@ def test_constellation_ui_serves_local_assets(tmp_path) -> None:
     assert "Sandbox mission" in page.text
     assert "Control Room mode" in page.text
     assert ">Chat<" in page.text
+    assert ">Commons<" in page.text
+    assert "Reusable local services" in page.text
+    assert "Named memory boundary" in page.text
     assert "Talk to your agent Galaxy" in page.text
     assert "Send through Wormhole" in page.text
     assert "Checking runtime" in page.text
@@ -178,7 +181,8 @@ def test_constellation_ui_serves_local_assets(tmp_path) -> None:
     assert "rebuildReplay" in script.text
     assert "v2/readiness" in script.text
     assert "runtime-commons-readiness" in page.text
-    assert "commons-core-1" in page.text
+    assert "commons-runtime-1" in page.text
+    assert "/api/v2/commons/summary" in script.text
     assert "wormhole/route" in script.text
     assert "v2/wormhole/chat" in script.text
     assert "renderChatRoute" in script.text
