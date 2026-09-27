@@ -47,7 +47,7 @@ class Mission(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True, str_strip_whitespace=True)
 
     id: Identifier = Field(default_factory=_mission_id)
-    objective: str = Field(min_length=3, max_length=20_000)
+    objective: str = Field(min_length=1, max_length=20_000)
     galaxy_id: GalaxyId | None = None
     preferred_circle_id: CircleId | None = None
     preferred_planet_id: PlanetId | None = None
@@ -187,7 +187,7 @@ class WorkOrder(BaseModel):
     id: Identifier = Field(default_factory=_work_order_id)
     mission_id: Identifier
     planet_id: PlanetId
-    objective: str = Field(min_length=3, max_length=20_000)
+    objective: str = Field(min_length=1, max_length=20_000)
     permission_grant: PermissionGrant
     parent_order_id: Identifier | None = None
     delegation_depth: int = Field(default=0, ge=0, le=8)

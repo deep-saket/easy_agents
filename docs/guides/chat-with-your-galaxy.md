@@ -31,6 +31,7 @@ cd /Users/saketm10/Projects/openclaw_agents
 
 Open `http://127.0.0.1:8030`, choose **Chat**, select a Vault, enter a message,
 and press Enter or **Send through Wormhole**. Shift+Enter inserts a new line.
+Every non-empty message is accepted, including short greetings such as `hi`.
 While the request is running, the transcript displays an animated processing
 card and elapsed time, and the composer remains disabled to prevent duplicate
 submission. A typical two-stage plan-and-answer turn takes 10–20 seconds on

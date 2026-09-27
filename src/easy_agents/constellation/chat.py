@@ -67,7 +67,7 @@ class WormholeChatRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True, str_strip_whitespace=True)
 
-    message: str = Field(min_length=3, max_length=12_000)
+    message: str = Field(min_length=1, max_length=12_000)
     conversation_id: Identifier | None = None
     reset_conversation: bool = False
     vault_id: VaultId = "personal"

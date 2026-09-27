@@ -126,7 +126,7 @@ class SpecialistManifest(BaseModel):
 class MissionRequest(BaseModel):
     """User or parent-agent request to the fleet runtime."""
 
-    objective: str = Field(min_length=3)
+    objective: str = Field(min_length=1)
     specialist_id: str | None = None
     preferred_playbook_id: str | None = None
     memory_scope: str | None = None

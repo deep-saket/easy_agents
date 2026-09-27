@@ -188,7 +188,7 @@ def test_constellation_ui_serves_local_assets(tmp_path) -> None:
     assert "rebuildReplay" in script.text
     assert "v2/readiness" in script.text
     assert "runtime-commons-readiness" in page.text
-    assert "identity-journal-1" in page.text
+    assert "short-message-1" in page.text
     assert "Exploration journal" in page.text
     assert "Review with Gemma" in page.text
     assert "/api/v2/commons/summary" in script.text
@@ -201,6 +201,8 @@ def test_constellation_ui_serves_local_assets(tmp_path) -> None:
     assert "payload.duration_ms" in script.text
     assert "renderChatJournal" in script.text
     assert "/review" in script.text
+    assert "state.chat.sending || !message" in script.text
+    assert "message.length < 3" not in script.text
     assert styles.status_code == 200
     assert "--specialist" in styles.text
     assert "--rogue-star" in styles.text

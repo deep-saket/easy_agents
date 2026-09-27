@@ -1799,7 +1799,7 @@ async function loadCommons() {
 async function submitChat(event) {
   event?.preventDefault();
   const message = elements.chatInput.value.trim();
-  if (state.chat.sending || message.length < 3) return;
+  if (state.chat.sending || !message) return;
   appendChatMessage("user", message);
   elements.chatInput.value = "";
   const pending = appendChatMessage(

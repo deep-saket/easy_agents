@@ -367,6 +367,24 @@ def test_wormhole_chat_uses_structured_gemma_for_ordinary_conversation() -> None
     assert model.calls == []
 
 
+def test_wormhole_chat_accepts_a_two_character_greeting() -> None:
+    """A normal “hi” must reach Gemma instead of being silently rejected."""
+
+    model = StructuredAnswerGemma()
+    client = TestClient(
+        create_app(gemma_client=model, chat_history=ConversationStore())
+    )
+
+    response = client.post(
+        "/api/v2/wormhole/chat",
+        json={"message": "hi"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["answer_source"] == "model"
+    assert "Mission: hi" in model.structured_calls[0]
+
+
 def test_wormhole_chat_routes_self_questions_to_identity_circle() -> None:
     model = StructuredAnswerGemma()
     client = TestClient(create_app(gemma_client=model, chat_history=ConversationStore()))
