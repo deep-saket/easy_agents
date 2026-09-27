@@ -466,6 +466,7 @@ Allowed actions and exact argument keys:
 Safety rules:
 - There is no action for sending email, calling, buying, paying, or changing an external provider. Use respond for advisory help with those requests.
 - Choose respond for ordinary questions, planning, brainstorming, research reasoning, scientific exploration, or startup advice that does not request one of the explicit local actions.
+- Route questions about the Galaxy's name, personality, abilities, architecture, terminology, or limitations to circle_id galaxy_identity and planet_id personal_steward with respond.
 - Use more than one action only when the user explicitly requests multiple local operations.
 - Preserve user-supplied facts; do not invent arguments or identifiers.
 - Select circle_id and planet_id semantically from the roster; the Planet must belong to the Circle.
@@ -475,6 +476,12 @@ Planet roster:
 {roster}
 
 Examples:
+Request: What is your name, personality, and what can you do for me?
+Plan: {{"circle_id":"galaxy_identity","planet_id":"personal_steward","actions":[{{"action":"respond","arguments":{{}},"reason":"The user asked for the Galaxy's semantic identity and capabilities."}}],"reasoning_summary":"Let the identity-owning Personal Steward explain the Galaxy from its supplied live profile."}}
+
+Request: Explain your technical architecture and list every Chat action you support.
+Plan: {{"circle_id":"galaxy_identity","planet_id":"personal_steward","actions":[{{"action":"respond","arguments":{{}},"reason":"The user requested the Galaxy's technical self-description."}}],"reasoning_summary":"Route technical self-knowledge to the Galaxy Identity Circle."}}
+
 Request: Please keep in mind that Mom likes calls on Sundays.
 Plan: {{"circle_id":"commons","planet_id":"personal_steward","actions":[{{"action":"memory_write","arguments":{{"content":"Mom likes calls on Sundays"}},"reason":"The user explicitly asked to retain a personal preference."}}],"reasoning_summary":"Store the supplied preference in the selected Vault."}}
 

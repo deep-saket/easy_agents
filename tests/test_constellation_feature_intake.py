@@ -175,7 +175,7 @@ def test_constellation_api_exposes_health_and_roster() -> None:
     assert health.json()["specialists"] == 16
     assert roster.status_code == 200
     assert roster.json()["version"] == 1
-    assert len(roster.json()["guilds"]) == 9
+    assert len(roster.json()["guilds"]) == 10
 
 
 def test_constellation_api_assesses_feature_requests() -> None:

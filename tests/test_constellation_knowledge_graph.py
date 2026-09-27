@@ -43,6 +43,13 @@ def test_knowledge_graph_contains_roster_and_shared_components() -> None:
         "Component",
     ]
     assert nodes["specialist:personal_steward"].metadata["planet_class"] == "rocky_planet"
+    assert nodes["guild:galaxy_identity"].label == "Galaxy Identity Circle"
+    assert any(
+        edge.source == "specialist:personal_steward"
+        and edge.target == "guild:galaxy_identity"
+        and edge.kind == "member_of"
+        for edge in graph.edges
+    )
 
 
 def test_knowledge_graph_relationships_have_valid_endpoints() -> None:
@@ -181,7 +188,9 @@ def test_constellation_ui_serves_local_assets(tmp_path) -> None:
     assert "rebuildReplay" in script.text
     assert "v2/readiness" in script.text
     assert "runtime-commons-readiness" in page.text
-    assert "commons-runtime-1" in page.text
+    assert "identity-journal-1" in page.text
+    assert "Exploration journal" in page.text
+    assert "Review with Gemma" in page.text
     assert "/api/v2/commons/summary" in script.text
     assert "wormhole/route" in script.text
     assert "v2/wormhole/chat" in script.text
@@ -189,8 +198,13 @@ def test_constellation_ui_serves_local_assets(tmp_path) -> None:
     assert "satelliteResultSummary" in script.text
     assert "generationEvidenceSummary" in script.text
     assert "Answer provenance" in script.text
+    assert "payload.duration_ms" in script.text
+    assert "renderChatJournal" in script.text
+    assert "/review" in script.text
     assert styles.status_code == 200
     assert "--specialist" in styles.text
     assert "--rogue-star" in styles.text
     assert "--satellite" in styles.text
     assert 'tool: "Satellites"' in script.text
+    assert "#6ee7d2" not in script.text
+    assert "rgba(110, 231, 210" not in styles.text

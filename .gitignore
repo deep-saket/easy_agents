@@ -11,6 +11,8 @@ data/*.db-*
 data/*.duckdb
 data/*.json
 data/tool_catalog.json
+data/conversation_journals/*.json
+data/conversation_journals/*.tmp
 data/memory/*.jsonl
 data/logs/*.jsonl
 tests/*.executed.ipynb

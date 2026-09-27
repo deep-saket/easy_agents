@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark" />
     <title>Galaxy Map · Easy Agents</title>
-    <link rel="stylesheet" href="/static/styles.css?v=commons-runtime-1" />
+    <link rel="stylesheet" href="/static/styles.css?v=identity-journal-1" />
   </head>
   <body>
     <div class="shell">
@@ -370,6 +370,18 @@
                   <p>Your route, Constellation context, available Satellites, and model will appear here.</p>
                 </div>
               </div>
+              <section id="chat-journal" class="chat-journal" aria-live="polite">
+                <div class="chat-journal-heading">
+                  <div>
+                    <p class="section-label">Exploration journal</p>
+                    <strong id="chat-journal-status">Waiting for a conversation</strong>
+                  </div>
+                  <button id="chat-journal-review" type="button" disabled>Review with Gemma</button>
+                </div>
+                <p id="chat-journal-summary">Each completed exchange is saved as structured JSON with model-generated topics, goals, decisions, opportunities, and follow-ups.</p>
+                <div id="chat-journal-tags" class="chat-journal-tags"></div>
+                <div id="chat-journal-review-result" class="chat-journal-review-result hidden"></div>
+              </section>
               <div class="chat-semantics-note">
                 <strong>How to read this</strong>
                 <p>The direct route is Wormhole → Galaxy → Circle → Planet. A Constellation is supporting graph context; Satellites are tools available to the Planet and appear as invoked only after a real tool call.</p>
@@ -713,6 +725,6 @@
       </footer>
     </div>
 
-    <script type="module" src="/static/app.js?v=commons-runtime-1"></script>
+    <script type="module" src="/static/app.js?v=identity-journal-1"></script>
   </body>
 </html>

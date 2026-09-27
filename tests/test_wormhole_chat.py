@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -46,7 +47,10 @@ class FakeGemma:
         self.planning_calls.append((system_prompt, user_prompt))
         request = user_prompt.rsplit("Request: ", 1)[-1].split("\nPlan:", 1)[0]
         lowered = request.lower()
-        if "rf link budget" in lowered:
+        if "your name" in lowered or "what can you do" in lowered or "technical architecture" in lowered:
+            circle_id, planet_id = "galaxy_identity", "personal_steward"
+            action, arguments = "respond", {}
+        elif "rf link budget" in lowered:
             circle_id, planet_id = "satcom", "rf_link_budget_specialist"
             action, arguments = "respond", {}
         elif "convert 5 miles" in lowered:
@@ -99,6 +103,90 @@ class RepetitiveGemma(FakeGemma):
             prompt_tokens=12,
             completion_tokens=40,
             total_tokens=52,
+        )
+
+
+class StructuredAnswerGemma(RepetitiveGemma):
+    """Production-shaped Gemma double with a validated structured answer path."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.structured_calls: list[str] = []
+
+    def structured_generate(self, prompt: str, schema: type) -> object:
+        """Returns a model-shaped answer without invoking raw completion."""
+
+        self.structured_calls.append(prompt)
+        return schema(
+            answer=(
+                "I can help plan work, explore technical ideas, use local memory, "
+                "and route bounded actions to specialized Planets."
+            ),
+            next_action="Tell me the specific outcome you want to achieve.",
+        )
+
+
+class RetryingStructuredAnswerGemma(StructuredAnswerGemma):
+    """Structured model double that needs model-only validation feedback."""
+
+    def structured_generate(
+        self, prompt: str, schema: type, **kwargs: object
+    ) -> object:
+        del kwargs
+        self.structured_calls.append(prompt)
+        if len(self.structured_calls) == 1:
+            raise ValueError("answer field was missing")
+        return schema(
+            answer="The corrected model response is now valid and usable.",
+            next_action="Continue with the user's requested planning task.",
+        )
+
+
+class SemanticJournalGemma(StructuredAnswerGemma):
+    """Gemma double that supports answers, journal analysis, and reviews."""
+
+    def structured_generate(
+        self, prompt: str, schema: type, **kwargs: object
+    ) -> object:
+        del kwargs
+        self.structured_calls.append(prompt)
+        if schema.__name__ == "ConversationAnalysis":
+            return schema(
+                analysis_id="analysis-test",
+                summary="The user is exploring how the Galaxy can support deep-tech work.",
+                primary_intent="understand Galaxy capabilities",
+                topics=("agent systems", "deep tech"),
+                tags=("galaxy-capabilities", "exploration"),
+                user_goals=("understand available support",),
+                named_entities=("Personal Agent Galaxy",),
+                facts_to_remember=(),
+                decisions=(),
+                opportunities=("use the Galaxy for structured exploration",),
+                constraints_or_risks=("external effects are disabled",),
+                open_questions=("which exploration should start first",),
+                suggested_follow_ups=("choose one opportunity to investigate",),
+                relevance="strategic",
+                sensitivity="ordinary",
+            )
+        if schema.__name__ == "ConversationReview":
+            return schema(
+                review_id="review-test",
+                created_at="2026-09-27T12:00:00+05:30",
+                summary="The conversation is establishing the Galaxy as a deep-tech exploration partner.",
+                recurring_themes=("agent systems", "deep tech"),
+                direction_of_travel=("move from capability discovery to one bounded exploration",),
+                decisions_and_commitments=(),
+                promising_opportunities=("structured opportunity review",),
+                unresolved_questions=("which sector to prioritize",),
+                recommended_next_steps=("select one sector and define a falsifiable question",),
+                knowledge_worth_preserving=("the user wants reusable exploration support",),
+            )
+        return schema(
+            answer=(
+                "I am the Personal Agent Galaxy. I can organize daily work and "
+                "support structured scientific and deep-tech exploration."
+            ),
+            next_action="Choose one concrete outcome for us to work on.",
         )
 
 
@@ -253,6 +341,128 @@ def test_wormhole_chat_does_not_use_deterministic_answer_fallback() -> None:
 
     assert response.status_code == 400
     assert "deterministic fallback is disabled" in response.json()["detail"]
+
+
+def test_wormhole_chat_uses_structured_gemma_for_ordinary_conversation() -> None:
+    model = StructuredAnswerGemma()
+    client = TestClient(
+        create_app(gemma_client=model, chat_history=ConversationStore())
+    )
+
+    response = client.post(
+        "/api/v2/wormhole/chat",
+        json={"message": "Hello, what kinds of things can you help me with?"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["answer_source"] == "model"
+    assert "route bounded actions" in payload["answer"]
+    assert "Next action:" in payload["answer"]
+    assert payload["generation"]["finish_reason"] == "structured_json"
+    assert payload["generation"]["quality_status"] == "accepted"
+    assert payload["generation"]["output_used"] is True
+    assert len(model.structured_calls) == 1
+    assert "what kinds of things" in model.structured_calls[0]
+    assert model.calls == []
+
+
+def test_wormhole_chat_routes_self_questions_to_identity_circle() -> None:
+    model = StructuredAnswerGemma()
+    client = TestClient(create_app(gemma_client=model, chat_history=ConversationStore()))
+
+    response = client.post(
+        "/api/v2/wormhole/chat",
+        json={"message": "What is your name and what can you do for me?"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["trajectory"]["circle_ids"] == ["galaxy_identity"]
+    assert payload["trajectory"]["planet_ids"] == ["personal_steward"]
+    assert payload["duration_ms"] > 0
+    assert "galaxy_identity_and_capabilities" in model.structured_calls[0]
+
+    identity = client.get("/api/v2/galaxy/identity")
+    assert identity.status_code == 200
+    assert identity.json()["name"] == "Personal Agent Galaxy"
+    assert identity.json()["identity_circle_id"] == "galaxy_identity"
+    assert identity.json()["technical"]["circle_count"] == 15
+    assert len(identity.json()["technical"]["supported_chat_actions"]) == 18
+    assert identity.json()["technical"]["autonomous_external_effects"] is False
+
+
+def test_wormhole_chat_captures_tagged_json_and_reviews_it(tmp_path: Path) -> None:
+    model = SemanticJournalGemma()
+    client = TestClient(
+        create_app(
+            gemma_client=model,
+            chat_history=ConversationStore(),
+            data_dir=tmp_path,
+        )
+    )
+
+    response = client.post(
+        "/api/v2/wormhole/chat",
+        json={"message": "What can you do for my deep-tech exploration?"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["duration_ms"] > 0
+    assert payload["journal"]["status"] == "pending"
+    assert payload["journal"]["tags"] == []
+    journal_path = tmp_path / "conversation_journals" / f"{payload['conversation_id']}.json"
+    assert journal_path.exists()
+    persisted = json.loads(journal_path.read_text(encoding="utf-8"))
+    assert persisted["turns"][0]["user_message"] == "What can you do for my deep-tech exploration?"
+    assert persisted["turns"][0]["assistant_message"] == payload["answer"]
+    assert persisted["turns"][0]["analysis"]["opportunities"]
+
+    fetched = client.get(
+        f"/api/v2/wormhole/conversations/{payload['conversation_id']}/journal"
+    )
+    reviewed = client.post(
+        f"/api/v2/wormhole/conversations/{payload['conversation_id']}/review"
+    )
+
+    assert fetched.status_code == 200
+    assert fetched.json()["turns"][0]["analysis_status"] == "captured"
+    assert reviewed.status_code == 200
+    assert reviewed.json()["recommended_next_steps"]
+    after_review = json.loads(journal_path.read_text(encoding="utf-8"))
+    assert after_review["latest_review"]["review_id"] == "review-test"
+
+    listed = client.get("/api/v2/wormhole/journals")
+    deleted = client.delete(
+        f"/api/v2/wormhole/conversations/{payload['conversation_id']}/journal"
+    )
+    missing = client.get(
+        f"/api/v2/wormhole/conversations/{payload['conversation_id']}/journal"
+    )
+
+    assert listed.status_code == 200
+    assert listed.json()[0]["conversation_id"] == payload["conversation_id"]
+    assert deleted.json()["deleted"] is True
+    assert missing.status_code == 404
+
+
+def test_wormhole_chat_retries_invalid_structured_answer_through_gemma() -> None:
+    model = RetryingStructuredAnswerGemma()
+    client = TestClient(
+        create_app(gemma_client=model, chat_history=ConversationStore())
+    )
+
+    response = client.post(
+        "/api/v2/wormhole/chat",
+        json={"message": "Help me plan a focused afternoon."},
+    )
+
+    assert response.status_code == 200
+    assert "corrected model response" in response.json()["answer"]
+    assert len(model.structured_calls) == 2
+    assert "previous JSON was invalid" in model.structured_calls[1]
+    assert model.calls == []
 
 
 def test_conversation_store_evicts_old_turns_and_threads() -> None:

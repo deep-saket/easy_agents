@@ -401,7 +401,7 @@ def test_v1_adapter_preserves_all_current_roles_and_technical_ids() -> None:
 
     assert registry.summary() == {
         "galaxies": 1,
-        "circles": 14,
+        "circles": 15,
         "planets": 70,
         "components": 51,
         "satellites": 11,

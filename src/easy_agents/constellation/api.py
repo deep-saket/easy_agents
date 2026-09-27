@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 
 from easy_agents.constellation.chat import (
     ConversationStore,
@@ -18,6 +18,7 @@ from easy_agents.constellation.chat import (
 from easy_agents.constellation.commons import build_commons_readiness
 from easy_agents.constellation.commons_api import create_commons_router
 from easy_agents.constellation.commons_runtime import CommonsRuntime
+from easy_agents.constellation.conversation_journal import ConversationJournal
 from easy_agents.constellation.directory import ConstellationDirectory
 from easy_agents.constellation.feature_intake import FeatureIntakeService
 from easy_agents.constellation.knowledge_graph import (
@@ -33,6 +34,7 @@ from easy_agents.constellation.natural_language import (
     SUPPORTED_ACTIONS,
 )
 from easy_agents.constellation.operations_api import create_operations_router
+from easy_agents.constellation.personality import GalaxyPersonality
 from easy_agents.constellation.satellite_tools import (
     LocalSatelliteRuntime,
     build_local_satellite_runtime,
@@ -69,6 +71,7 @@ def create_app(
     chat_history: ConversationStore | None = None,
     satellite_runtime: LocalSatelliteRuntime | None = None,
     commons_runtime: CommonsRuntime | None = None,
+    conversation_journal: ConversationJournal | None = None,
     data_dir: Path | None = None,
 ) -> FastAPI:
     """Builds the local API consumed by the Control Room.
@@ -130,6 +133,19 @@ def create_app(
         commons=active_commons,
         satellites=active_satellites,
     )
+    personality = GalaxyPersonality.from_registry(
+        galaxy_registry,
+        supported_chat_actions=SUPPORTED_ACTIONS,
+    )
+    active_journal = conversation_journal or (
+        ConversationJournal(
+            data_dir / "conversation_journals",
+            llm=active_gemma,
+            galaxy_id="personal",
+        )
+        if data_dir is not None
+        else None
+    )
     chat_service = WormholeChatService(
         registry=galaxy_registry,
         fleet_runtime=fleet_runtime,
@@ -137,6 +153,8 @@ def create_app(
         satellite_runtime=active_satellites,
         language_planner=language_planner,
         action_executor=action_executor,
+        personality=personality,
+        journal=active_journal,
     )
 
     @asynccontextmanager
@@ -169,6 +187,8 @@ def create_app(
     app.state.chat_service = chat_service
     app.state.satellite_runtime = active_satellites
     app.state.commons_runtime = active_commons
+    app.state.galaxy_personality = personality
+    app.state.conversation_journal = active_journal
     app.include_router(create_operations_router(operations))
     app.include_router(create_commons_router(active_commons))
 
@@ -188,6 +208,7 @@ def create_app(
             "galaxy": "personal",
             "constellations": 1,
             "chat_history": active_history.backend,
+            "conversation_journal": "json" if active_journal is not None else "disabled",
             "commons_backend": active_commons.backend,
             "commons_counts": active_commons.counts(),
             "legacy_memories_migrated": active_satellites.legacy_memories_migrated,
@@ -241,6 +262,11 @@ def create_app(
                     "deterministic_intent_fallback": False,
                     "supported_actions": list(SUPPORTED_ACTIONS),
                 },
+                "journal": {
+                    "enabled": active_journal is not None,
+                    "format": "one JSON document per conversation",
+                    "semantic_tagging": "model_driven",
+                },
             },
             "commons": {
                 "status": commons.status,
@@ -288,6 +314,12 @@ def create_app(
         """
 
         return galaxy_snapshot
+
+    @app.get("/api/v2/galaxy/identity", response_model=GalaxyPersonality)
+    def galaxy_identity() -> GalaxyPersonality:
+        """Returns the versioned personality and live technical self-knowledge."""
+
+        return personality
 
     @app.get("/api/v2/topology")
     def canonical_topology() -> dict[str, object]:
@@ -352,8 +384,9 @@ def create_app(
     @app.post("/api/v2/wormhole/chat", response_model=WormholeChatResponse)
     def chat_through_wormhole(
         request: WormholeChatRequest,
+        background_tasks: BackgroundTasks,
     ) -> WormholeChatResponse:
-        """Routes a conversational Mission and answers through the selected Planet."""
+        """Answers through a Planet, then tags its captured journal in background."""
 
         try:
             if (
@@ -369,7 +402,14 @@ def create_app(
                         "external mac-serving service before chatting."
                     ),
                 )
-            return chat_service.chat(request)
+            response = chat_service.chat(request)
+            if active_journal is not None and response.journal is not None:
+                background_tasks.add_task(
+                    active_journal.analyze_turn,
+                    response.conversation_id,
+                    response.message_id,
+                )
+            return response
         except NaturalLanguagePlanningError as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
         except (KeyError, ValueError) as exc:
@@ -381,6 +421,47 @@ def create_app(
 
         chat_service.history.clear(conversation_id)
         return {"conversation_id": conversation_id, "deleted": True}
+
+    @app.get("/api/v2/wormhole/journals")
+    def list_conversation_journals() -> list[dict[str, object]]:
+        """Lists durable exploration journals with newest activity first."""
+
+        if active_journal is None:
+            return []
+        return [item.model_dump(mode="json") for item in active_journal.list()]
+
+    @app.get("/api/v2/wormhole/conversations/{conversation_id}/journal")
+    def get_conversation_journal(conversation_id: str) -> dict[str, object]:
+        """Returns the complete JSON-backed journal for one conversation."""
+
+        if active_journal is None:
+            raise HTTPException(status_code=404, detail="Conversation journals are disabled.")
+        try:
+            return active_journal.get(conversation_id).model_dump(mode="json")
+        except (KeyError, ValueError) as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @app.post("/api/v2/wormhole/conversations/{conversation_id}/review")
+    def review_conversation_journal(conversation_id: str) -> dict[str, object]:
+        """Uses Gemma to create and persist a cross-turn exploration review."""
+
+        if active_journal is None:
+            raise HTTPException(status_code=404, detail="Conversation journals are disabled.")
+        if not active_gemma.is_ready():
+            raise HTTPException(status_code=503, detail="Mac Gemma is not ready for review.")
+        try:
+            return active_journal.review(conversation_id).model_dump(mode="json")
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except (RuntimeError, TypeError, ValueError) as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    @app.delete("/api/v2/wormhole/conversations/{conversation_id}/journal")
+    def delete_conversation_journal(conversation_id: str) -> dict[str, object]:
+        """Explicitly deletes one durable journal without touching other memory."""
+
+        deleted = active_journal.delete(conversation_id) if active_journal else False
+        return {"conversation_id": conversation_id, "deleted": deleted}
 
     @app.get("/api/fleet")
     def fleet() -> dict[str, object]:

@@ -1,6 +1,10 @@
 version: 1
 
 guilds:
+  - id: galaxy_identity
+    display_name: Galaxy Identity Circle
+    purpose: Own the Galaxy's name, personality, self-knowledge, capability explanations, and honest technical self-description.
+    tags: [identity, personality, self-knowledge, capabilities, architecture]
   - id: commons
     display_name: Commons
     purpose: Shared routing, knowledge, safety, identity, and automation services.
@@ -209,10 +213,10 @@ capabilities:
 specialists:
   - id: personal_steward
     display_name: Personal Steward
-    purpose: Serve as the human's front door, clarify missions, route work, and synthesize results.
-    guilds: [commons, home, life_admin, science_lab, venture_studio]
+    purpose: Serve as the human's front door, express the Galaxy's identity, explain its capabilities and architecture, clarify missions, route work, and synthesize results.
+    guilds: [galaxy_identity, commons, home, life_admin, science_lab, venture_studio]
     capability_ids: [coordination.route]
-    tags: [assistant, coordinate, route, delegate, mission]
+    tags: [assistant, identity, personality, self-knowledge, capabilities, coordinate, route, delegate, mission]
     liaison: true
   - id: knowledge_librarian
     display_name: Knowledge Librarian
@@ -312,7 +316,7 @@ specialists:
   - id: safety_steward
     display_name: Safety Steward
     purpose: Evaluate permissions, privacy, risk, approvals, and system health across every guild.
-    guilds: [commons, home, life_admin, wellbeing, science_lab, venture_studio, engineering, finance, communications]
+    guilds: [galaxy_identity, commons, home, life_admin, wellbeing, science_lab, venture_studio, engineering, finance, communications]
     capability_ids: [policy.assess, observability.inspect]
     tags: [policy, permission, privacy, safety, approval, observability]
     liaison: true

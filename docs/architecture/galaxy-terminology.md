@@ -42,6 +42,13 @@ flowchart LR
 | **Constellation** | A connected operational subgraph drawn from selected parts of one or more Circles. It can include Planets, Components, and their typed relationships. It is an overlay used to describe a coherent connected system—not an ownership container and not a required routing hop. |
 | **Solar System** | A Planet-centered view containing that Planet and everything directly connected to it: Satellites, capabilities, Playbooks, memory scopes, policies, models, services, and neighboring responsibilities. Solar Systems may overlap when components are shared. |
 
+The running Personal Agent Galaxy includes a **Galaxy Identity Circle**. It
+owns the system's name, personality, capability explanation, architectural
+self-knowledge, and honest limitations. The Personal Steward is the
+accountable Planet in that Circle as well as a liaison across other Circles.
+The personality is a versioned declarative contract supplied to Gemma; it is
+not a deterministic response template.
+
 The ownership and routing path is **Wormhole → Galaxy → Circle → Planet**; it is
 not a requirement to run one process per entity. A Constellation is a connected
 graph overlay assembled from parts of one or more Circles. It may cross Circle

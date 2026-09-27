@@ -8,6 +8,7 @@
 - **Understand what works today:** [Current Capabilities](./reference/current-capabilities.md)
 - **Inspect one tested capability:** [Functionality Catalog and Test Matrix](./reference/functionalities/README.md)
 - **Inspect the shared foundation:** [Commons Circle Runtime](./reference/functionalities/commons.md)
+- **Review captured explorations:** [Conversation Journals and Reviews](./reference/functionalities/conversation-journals.md)
 - **See what remains for Commons:** [Commons Completion Plan](./plans/commons-completion-plan.md)
 - **See the model-planned Chat implementation:** [Natural-Language Chat Completion Plan](./plans/natural-language-chat-completion-plan.md)
 - **Build a new agent:** [Create an Agent](./guides/create-an-agent.md)

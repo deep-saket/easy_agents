@@ -11,13 +11,17 @@ import sqlite3
 from collections import OrderedDict, deque
 from pathlib import Path
 from threading import RLock
-from time import time
+from time import perf_counter, time
 from typing import Any, Literal
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from easy_agents.constellation.commons_runtime import VaultId
+from easy_agents.constellation.conversation_journal import (
+    ConversationJournal,
+    JournalCaptureEvidence,
+)
 from easy_agents.constellation.natural_language import (
     ActionInvocation,
     NaturalLanguageActionExecutor,
@@ -36,6 +40,7 @@ from easy_agents.observability import EntityReference
 from easy_agents.constellation.satellite_tools import (
     LocalSatelliteRuntime,
 )
+from easy_agents.constellation.personality import GalaxyPersonality
 
 
 class ChatEntity(BaseModel):
@@ -115,6 +120,11 @@ class WormholeChatResponse(BaseModel):
     generation: GenerationEvidence | None = None
     warnings: tuple[str, ...] = ()
     retained_turns: int = Field(ge=2)
+    duration_ms: float = Field(
+        ge=0,
+        description="End-to-end server processing time, including journal capture.",
+    )
+    journal: JournalCaptureEvidence | None = None
 
 
 class ConversationStore:
@@ -326,8 +336,10 @@ class WormholeChatService:
         satellite_runtime: LocalSatelliteRuntime | None = None,
         language_planner: NaturalLanguagePlanner,
         action_executor: NaturalLanguageActionExecutor,
+        personality: GalaxyPersonality,
+        journal: ConversationJournal | None = None,
     ) -> None:
-        """Composes routing, Fleet execution, Satellites, and chat history."""
+        """Composes routing, execution, identity, history, and durable journals."""
 
         self.registry = registry
         self.fleet_runtime = fleet_runtime
@@ -336,10 +348,13 @@ class WormholeChatService:
         self.satellite_runtime = satellite_runtime
         self.language_planner = language_planner
         self.action_executor = action_executor
+        self.personality = personality
+        self.journal = journal
 
     def chat(self, request: WormholeChatRequest) -> WormholeChatResponse:
         """Routes and answers one user message with bounded prior-turn context."""
 
+        chat_started = perf_counter()
         conversation_id = request.conversation_id or f"chat-{uuid4().hex}"
         if request.reset_conversation:
             self.history.clear(conversation_id)
@@ -381,7 +396,13 @@ class WormholeChatService:
                 planned_turn.plan.model_dump(mode="json"),
                 sort_keys=True,
                 default=str,
-            )
+            ),
+            "galaxy_identity_and_capabilities": json.dumps(
+                self.personality.model_dump(mode="json"),
+                ensure_ascii=False,
+                sort_keys=True,
+                default=str,
+            ),
         }
         if recent_history:
             context["recent_conversation"] = recent_history
@@ -436,6 +457,7 @@ class WormholeChatService:
                 "Gemma did not produce a usable answer, no local action result exists, "
                 "and deterministic fallback is disabled."
             )
+        message_id = f"message-{uuid4().hex}"
         retained = self.history.append(
             conversation_id,
             ChatTurn(role="user", content=request.message),
@@ -474,9 +496,41 @@ class WormholeChatService:
             generation=generation,
             satellite_count=len(satellite_invocations),
         )
+        journal_evidence: JournalCaptureEvidence | None = None
+        response_warnings = [
+            *fleet_result.warnings,
+            "Gemma selected the Planet and action plan; no deterministic intent fallback was used.",
+        ]
+        if self.journal is not None:
+            try:
+                journal_evidence = self.journal.capture(
+                    conversation_id=conversation_id,
+                    message_id=message_id,
+                    mission_id=fleet_result.mission_id,
+                    user_message=request.message,
+                    assistant_message=answer,
+                    vault_id=request.vault_id,
+                    duration_ms=(perf_counter() - chat_started) * 1000,
+                    circle_ids=trajectory.circle_ids,
+                    planet_ids=trajectory.planet_ids,
+                    invoked_satellite_ids=tuple(
+                        item.satellite.id for item in satellite_invocations
+                    ),
+                    answer_source=answer_source,
+                )
+                if journal_evidence.status == "pending":
+                    response_warnings.append(
+                        "The complete turn was journaled, but model-generated semantic tags are pending."
+                    )
+            except Exception as exc:
+                response_warnings.append(
+                    "Conversation journal capture failed: "
+                    f"{type(exc).__name__}: {str(exc)[:300]}"
+                )
+        duration_ms = round((perf_counter() - chat_started) * 1000, 3)
         return WormholeChatResponse(
             conversation_id=conversation_id,
-            message_id=f"message-{uuid4().hex}",
+            message_id=message_id,
             mission_id=fleet_result.mission_id,
             status=response_status,
             answer=answer,
@@ -492,11 +546,10 @@ class WormholeChatService:
             answer_source=answer_source,
             used_model=used_model,
             generation=generation,
-            warnings=(
-                *tuple(fleet_result.warnings),
-                "Gemma selected the Planet and action plan; no deterministic intent fallback was used.",
-            ),
+            warnings=tuple(response_warnings),
             retained_turns=len(retained),
+            duration_ms=duration_ms,
+            journal=journal_evidence,
         )
 
     def requires_model(self, message: str, *, vault_id: VaultId = "personal") -> bool:

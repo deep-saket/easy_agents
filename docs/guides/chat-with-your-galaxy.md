@@ -31,6 +31,11 @@ cd /Users/saketm10/Projects/openclaw_agents
 
 Open `http://127.0.0.1:8030`, choose **Chat**, select a Vault, enter a message,
 and press Enter or **Send through Wormhole**. Shift+Enter inserts a new line.
+While the request is running, the transcript displays an animated processing
+card and elapsed time, and the composer remains disabled to prevent duplicate
+submission. A typical two-stage plan-and-answer turn takes 10–20 seconds on
+the local model. After completion, the end-to-end server time remains visible
+in the top-right corner of the Galaxy's chat bubble.
 
 ## How one message runs
 
@@ -48,9 +53,13 @@ Wormhole → Galaxy → selected Circle → selected Planet
     ↓
 Authorized local actions and Satellites
     ↓
-Gemma synthesis with verified local results
+Schema-validated Gemma synthesis with verified local results
     ↓
-Answer + plan evidence + action results + correlated trace
+Atomic JSON turn capture
+    ↓
+Answer + timing + pending journal receipt + plan evidence + correlated trace
+    ↓ after the response
+Gemma semantic journal analysis + atomic JSON update
 ```
 
 Constellations remain connected-graph context; they are not route hops.
@@ -118,6 +127,27 @@ The server retains at most 20 turns per conversation and 128 conversations.
 The normal launcher stores bounded history in `data/galaxy_chat.db`.
 Conversation history is not durable semantic memory.
 
+The standalone Control Room also captures every completed exchange in
+`data/conversation_journals/<conversation_id>.json`. This exploration journal
+is intentionally separate from working history and explicit Vault memory. The
+JSON contains the original messages, timing, route, invoked Satellites, answer
+provenance, and a Gemma-generated analysis of topics, tags, goals, named
+entities, facts worth remembering, decisions, opportunities, constraints,
+open questions, relevance, sensitivity, and suggested follow-ups. The complete
+turn is written before the answer returns; semantic analysis runs afterward so
+it cannot delay Chat. The UI polls the journal and replaces the pending state
+with the model-generated summary and tags. Deterministic code writes technical
+provenance and validates the schema; it never invents semantic tags. If semantic
+generation is unavailable, the full turn stays stored with
+`analysis_status: pending`.
+
+The Chat sidebar displays the latest summary and tags. **Review with Gemma**
+asks the model to inspect all captured turns and stores a cross-turn review with
+themes, direction, commitments, opportunities, unresolved questions, next
+steps, and knowledge worth preserving. See
+[Conversation Journals and Reviews](../reference/functionalities/conversation-journals.md)
+for the JSON and API contracts.
+
 An explicit model-selected `memory_write` stores a record in one of
 `working`, `long_term`, `personal`, `employer_authorized`, `exploration`, or
 the inactive-by-default `future_company` Vault. Search never crosses the
@@ -128,6 +158,13 @@ Exact local results are rendered before model commentary. If answer generation
 is rejected but a local action completed, Chat returns only verified action
 evidence. If neither usable generation nor an action result exists, Chat fails;
 it does not emit a canned fallback.
+
+For ordinary conversation, the pretrained Gemma base model produces a bounded
+JSON object containing `answer` and `next_action`. The runtime validates this
+object and may ask Gemma for one corrected attempt when the object is invalid.
+This replaced an unreliable raw continuation that could repeat until the token
+limit. The correction remains model-generated; no deterministic answer text is
+substituted.
 
 ## HTTP contract
 
@@ -146,7 +183,39 @@ response contains:
 - `action_invocations` for every completed local action;
 - compatibility `satellite_invocations` for the four tool-backed actions;
 - generation quality/provenance evidence;
+- `duration_ms`, end-to-end server time including immediate JSON capture but excluding post-response semantic analysis;
+- a `journal` receipt containing capture status, turn count, summary, and tags;
 - a visualization route for Map highlighting.
+
+Identity and journal endpoints:
+
+```bash
+# Versioned personality plus live technical facts
+curl -sS http://127.0.0.1:8030/api/v2/galaxy/identity
+
+# Full JSON journal for one conversation
+curl -sS http://127.0.0.1:8030/api/v2/wormhole/conversations/chat-ID/journal
+
+# Model-generated cross-turn review
+curl -sS -X POST \
+  http://127.0.0.1:8030/api/v2/wormhole/conversations/chat-ID/review
+```
+
+## Galaxy identity and self-knowledge
+
+The **Galaxy Identity Circle** owns questions such as “What is your name?”,
+“What is your personality?”, “What can you do?”, and “Explain your technical
+architecture.” The existing **Personal Steward** is its accountable Planet;
+no duplicate agent was added. Gemma routes these questions to that Circle and
+answers from the versioned `GalaxyPersonality` contract plus live registry
+counts and the complete 18-action Chat allow-list.
+
+The profile defines the name **Personal Agent Galaxy**, a curious, candid,
+practical, warm, evidence-oriented personality, and explicit boundaries. A
+semantic question receives a human-readable capability explanation. A
+technical question can enumerate the current Wormhole route, Circles, Planets,
+Satellites, Constellations, Rogue Stars, storage layers, model, action names,
+and the fact that autonomous external effects are disabled.
 
 Runtime readiness at `/api/v2/readiness` publishes the complete supported
 action list and explicitly reports `deterministic_intent_fallback: false`.

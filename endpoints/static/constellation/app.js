@@ -38,18 +38,18 @@ const LEGEND_LABELS = {
 };
 
 const KIND_COLORS = {
-  galaxy: "#6ee7d2",
-  rogue_star: "#ffcf5c",
-  constellation: "#f7df83",
-  specialist: "#b99cff",
-  guild: "#ffb866",
-  capability: "#52c7e8",
-  tool: "#78df91",
-  memory: "#f1d06f",
-  playbook: "#f28ec7",
-  policy: "#ff818f",
-  model: "#77a8ff",
-  service: "#d0e2e8",
+  galaxy: "#e0e0e0",
+  rogue_star: "#c8c8c8",
+  constellation: "#cfcfcf",
+  specialist: "#c0c0c0",
+  guild: "#bcbcbc",
+  capability: "#b8b8b8",
+  tool: "#c8c8c8",
+  memory: "#c4c4c4",
+  playbook: "#bdbdbd",
+  policy: "#acacac",
+  model: "#b5b5b5",
+  service: "#d8d8d8",
 };
 
 const KIND_GLYPHS = {
@@ -195,6 +195,11 @@ const elements = {
   runtimeEffectReadiness: document.getElementById("runtime-effect-readiness"),
   chatRouteStatus: document.getElementById("chat-route-status"),
   chatRouteContext: document.getElementById("chat-route-context"),
+  chatJournalStatus: document.getElementById("chat-journal-status"),
+  chatJournalSummary: document.getElementById("chat-journal-summary"),
+  chatJournalTags: document.getElementById("chat-journal-tags"),
+  chatJournalReview: document.getElementById("chat-journal-review"),
+  chatJournalReviewResult: document.getElementById("chat-journal-review-result"),
   commonsSummary: document.getElementById("commons-summary"),
   commonsNotice: document.getElementById("commons-notice"),
   commonsVault: document.getElementById("commons-vault"),
@@ -262,6 +267,7 @@ const state = {
     gemmaReady: false,
     readiness: null,
     visualizationRoute: null,
+    journalPollToken: 0,
   },
   commons: {
     loaded: false,
@@ -804,7 +810,7 @@ function renderInspector(node) {
   elements.inspectorKind.textContent = KIND_LABELS[node.kind] || node.kind;
   elements.inspectorKind.style.color = KIND_COLORS[node.kind] || "#ffffff";
   elements.inspectorStatus.textContent = node.status;
-  elements.inspectorStatus.style.color = isPlanned(node) ? "#ffb866" : "#6ee7d2";
+  elements.inspectorStatus.style.color = isPlanned(node) ? "#bcbcbc" : "#e0e0e0";
   elements.inspectorTitle.textContent = node.label;
   elements.inspectorId.textContent = node.id;
   elements.inspectorDescription.textContent = node.description || "No description recorded.";
@@ -1024,11 +1030,52 @@ function appendChatMessage(role, content, payload = null, extraClass = "") {
   avatar.textContent = role === "user" ? "U" : "✹";
   const bubble = document.createElement("div");
   bubble.className = "chat-bubble";
+  const bubbleHeader = document.createElement("div");
+  bubbleHeader.className = "chat-bubble-header";
   const heading = document.createElement("strong");
   heading.textContent = role === "user" ? "You" : "Personal Agent Galaxy";
+  bubbleHeader.append(heading);
+  if (payload && Number.isFinite(payload.duration_ms)) {
+    const duration = document.createElement("time");
+    duration.className = "chat-completed-duration";
+    duration.textContent = payload.duration_ms >= 1000
+      ? `${(payload.duration_ms / 1000).toFixed(1)}s`
+      : `${Math.round(payload.duration_ms)}ms`;
+    duration.title = `End-to-end server processing time: ${Math.round(payload.duration_ms)} ms`;
+    bubbleHeader.append(duration);
+  }
   const copy = document.createElement("p");
   copy.textContent = content;
-  bubble.append(heading, copy);
+  bubble.append(bubbleHeader);
+
+  if (extraClass.split(" ").includes("pending")) {
+    message.setAttribute("role", "status");
+    message.setAttribute("aria-live", "polite");
+    message.setAttribute("aria-busy", "true");
+    const waiting = document.createElement("div");
+    waiting.className = "chat-waiting";
+    const spinner = document.createElement("span");
+    spinner.className = "chat-waiting-spinner";
+    spinner.setAttribute("aria-hidden", "true");
+    const label = document.createElement("span");
+    label.textContent = "Request sent · processing";
+    const elapsed = document.createElement("span");
+    elapsed.className = "chat-waiting-elapsed";
+    elapsed.textContent = "0s";
+    waiting.append(spinner, label, elapsed);
+    copy.className = "chat-waiting-detail";
+    bubble.append(waiting, copy);
+    const startedAt = Date.now();
+    const timer = window.setInterval(() => {
+      elapsed.textContent = `${Math.floor((Date.now() - startedAt) / 1000)}s`;
+    }, 1000);
+    message.stopWaiting = () => {
+      window.clearInterval(timer);
+      message.removeAttribute("aria-busy");
+    };
+  } else {
+    bubble.append(copy);
+  }
 
   if (payload) {
     const meta = document.createElement("div");
@@ -1075,6 +1122,98 @@ function appendChatMessage(role, content, payload = null, extraClass = "") {
   elements.chatTranscript.append(message);
   elements.chatTranscript.scrollTop = elements.chatTranscript.scrollHeight;
   return message;
+}
+
+function renderChatJournal(payload) {
+  const journal = payload?.journal;
+  elements.chatJournalReviewResult.classList.add("hidden");
+  elements.chatJournalReviewResult.replaceChildren();
+  elements.chatJournalTags.replaceChildren();
+  if (!journal) {
+    elements.chatJournalStatus.textContent = "Journal capture unavailable";
+    elements.chatJournalSummary.textContent = "The response completed, but no durable journal receipt was returned.";
+    elements.chatJournalReview.disabled = true;
+    return;
+  }
+  elements.chatJournalStatus.textContent = journal.status === "captured"
+    ? `${journal.turn_count} turn${journal.turn_count === 1 ? "" : "s"} captured · tagged by Gemma`
+    : `${journal.turn_count} turn${journal.turn_count === 1 ? "" : "s"} captured · semantic tags pending`;
+  elements.chatJournalSummary.textContent = journal.summary
+    || "The complete exchange is stored in JSON. Semantic analysis can be retried during review.";
+  for (const tag of journal.tags || []) {
+    const chip = document.createElement("span");
+    chip.textContent = tag;
+    elements.chatJournalTags.append(chip);
+  }
+  elements.chatJournalReview.disabled = journal.status !== "captured";
+}
+
+async function pollJournalAnalysis(conversationId, messageId) {
+  const pollToken = ++state.chat.journalPollToken;
+  for (let attempt = 0; attempt < 90; attempt += 1) {
+    await new Promise((resolve) => window.setTimeout(resolve, 2000));
+    if (
+      pollToken !== state.chat.journalPollToken
+      || conversationId !== state.chat.conversationId
+    ) return;
+    try {
+      const response = await fetch(
+        `/api/v2/wormhole/conversations/${encodeURIComponent(conversationId)}/journal`,
+      );
+      if (!response.ok) continue;
+      const record = await response.json();
+      const turn = (record.turns || []).find((item) => item.message_id === messageId);
+      if (!turn || turn.analysis_status !== "captured" || !turn.analysis) continue;
+      elements.chatJournalStatus.textContent = `${record.turns.length} turn${record.turns.length === 1 ? "" : "s"} captured · tagged by Gemma`;
+      elements.chatJournalSummary.textContent = turn.analysis.summary;
+      elements.chatJournalTags.replaceChildren();
+      for (const tag of turn.analysis.tags || []) {
+        const chip = document.createElement("span");
+        chip.textContent = tag;
+        elements.chatJournalTags.append(chip);
+      }
+      elements.chatJournalReview.disabled = false;
+      return;
+    } catch (_error) {
+      // The next bounded poll retries transient local API failures.
+    }
+  }
+  if (pollToken === state.chat.journalPollToken) {
+    elements.chatJournalStatus.textContent = "Turn captured · semantic tags still pending";
+    elements.chatJournalReview.disabled = false;
+  }
+}
+
+async function reviewCurrentConversation() {
+  if (!state.chat.conversationId || state.chat.sending) return;
+  elements.chatJournalReview.disabled = true;
+  elements.chatJournalReview.textContent = "Reviewing…";
+  elements.chatJournalReviewResult.classList.remove("hidden");
+  elements.chatJournalReviewResult.textContent = "Gemma is reviewing the complete captured exploration…";
+  try {
+    const response = await fetch(
+      `/api/v2/wormhole/conversations/${encodeURIComponent(state.chat.conversationId)}/review`,
+      { method: "POST" },
+    );
+    const review = await response.json();
+    if (!response.ok) throw new Error(review.detail || `Journal review returned ${response.status}.`);
+    const title = document.createElement("strong");
+    title.textContent = "Exploration review";
+    const summary = document.createElement("p");
+    summary.textContent = review.summary;
+    const list = document.createElement("ul");
+    for (const item of review.recommended_next_steps || []) {
+      const row = document.createElement("li");
+      row.textContent = item;
+      list.append(row);
+    }
+    elements.chatJournalReviewResult.replaceChildren(title, summary, list);
+  } catch (error) {
+    elements.chatJournalReviewResult.textContent = error instanceof Error ? error.message : String(error);
+  } finally {
+    elements.chatJournalReview.disabled = false;
+    elements.chatJournalReview.textContent = "Review with Gemma";
+  }
 }
 
 function chatRouteStep(glyph, label, detail, kind = "") {
@@ -1663,10 +1802,19 @@ async function submitChat(event) {
   if (state.chat.sending || message.length < 3) return;
   appendChatMessage("user", message);
   elements.chatInput.value = "";
-  const pending = appendChatMessage("assistant", "Routing through the Wormhole and waiting for the selected Planet…", null, "pending");
+  const pending = appendChatMessage(
+    "assistant",
+    "Gemma is selecting a route and composing the Planet's answer. This usually takes 10–20 seconds…",
+    null,
+    "pending",
+  );
   state.chat.sending = true;
+  elements.chatInput.disabled = true;
+  elements.chatVault.disabled = true;
   elements.chatSend.disabled = true;
-  elements.chatSend.textContent = "Galaxy is thinking…";
+  elements.chatSend.classList.add("is-loading");
+  elements.chatSend.setAttribute("aria-busy", "true");
+  elements.chatSend.textContent = "Planning with Gemma…";
   try {
     const body = { message, vault_id: elements.chatVault.value || "personal" };
     if (state.chat.conversationId) body.conversation_id = state.chat.conversationId;
@@ -1679,6 +1827,7 @@ async function submitChat(event) {
     if (!response.ok) throw new Error(payload.detail || `Wormhole chat returned ${response.status}.`);
     state.chat.conversationId = payload.conversation_id;
     state.chat.visualizationRoute = payload.visualization_route;
+    pending.stopWaiting?.();
     pending.remove();
     appendChatMessage(
       "assistant",
@@ -1687,8 +1836,13 @@ async function submitChat(event) {
       payload.status === "completed" ? "" : "error",
     );
     renderChatRoute(payload);
+    renderChatJournal(payload);
+    if (payload.journal?.status === "pending") {
+      pollJournalAnalysis(payload.conversation_id, payload.message_id);
+    }
     elements.statusText.textContent = `Mission ${shortId(payload.mission_id)} · ${payload.route_context.planets?.[0]?.display_name || "Planet"}`;
   } catch (error) {
+    pending.stopWaiting?.();
     pending.remove();
     appendChatMessage(
       "assistant",
@@ -1699,7 +1853,11 @@ async function submitChat(event) {
     elements.chatRouteStatus.textContent = "Failed";
   } finally {
     state.chat.sending = false;
+    elements.chatInput.disabled = false;
+    elements.chatVault.disabled = false;
     elements.chatSend.disabled = false;
+    elements.chatSend.classList.remove("is-loading");
+    elements.chatSend.removeAttribute("aria-busy");
     elements.chatSend.textContent = "Send through Wormhole";
     elements.chatInput.focus();
   }
@@ -1721,6 +1879,7 @@ async function resetChat() {
   }
   state.chat.conversationId = null;
   state.chat.visualizationRoute = null;
+  state.chat.journalPollToken += 1;
   for (const message of [...elements.chatTranscript.querySelectorAll(".chat-message")].slice(1)) {
     message.remove();
   }
@@ -1738,6 +1897,12 @@ async function resetChat() {
   copy.textContent = "Your route, Constellation context, available Satellites, and model will appear here.";
   empty.append(glyph, title, copy);
   elements.chatRouteContext.append(empty);
+  elements.chatJournalStatus.textContent = "Waiting for a conversation";
+  elements.chatJournalSummary.textContent = "Each completed exchange is saved as structured JSON with model-generated topics, goals, decisions, opportunities, and follow-ups.";
+  elements.chatJournalTags.replaceChildren();
+  elements.chatJournalReviewResult.classList.add("hidden");
+  elements.chatJournalReviewResult.replaceChildren();
+  elements.chatJournalReview.disabled = true;
   elements.chatInput.value = "";
   elements.chatInput.focus();
   if (deletionError) {
@@ -2639,6 +2804,7 @@ function bindEvents() {
     }
   });
   elements.newChat.addEventListener("click", resetChat);
+  elements.chatJournalReview.addEventListener("click", reviewCurrentConversation);
   elements.commonsVault.addEventListener("change", () => {
     updateVaultDetail();
     loadVaultMemories().catch((error) => showCommonsNotice(error.message, true));

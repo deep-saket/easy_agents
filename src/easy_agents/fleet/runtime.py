@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import json
 import re
 from datetime import UTC, datetime
 from time import perf_counter
 from typing import Any, Mapping
 from uuid import uuid4
+
+from pydantic import BaseModel, ConfigDict, Field
 
 from easy_agents.fleet.models import (
     AgentResult,
@@ -34,6 +37,15 @@ from easy_agents.observability import EntityReference, Severity
 
 
 _DEFAULT_MODEL = object()
+
+
+class _StructuredAdvisoryResponse(BaseModel):
+    """Model-generated advisory answer validated before it reaches Chat."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, str_strip_whitespace=True)
+
+    answer: str = Field(min_length=8, max_length=4_000)
+    next_action: str = Field(min_length=3, max_length=1_000)
 
 
 class SpecialistAgent:
@@ -413,6 +425,9 @@ class SpecialistAgent:
                 if request.context
                 else response_prefix
             )
+        structured_generate = getattr(self.llm, "structured_generate", None)
+        use_structured_response = is_mac_gemma and callable(structured_generate)
+        call_kind = "structured_generate" if use_structured_response else "generate"
         model_entity_id = "mac_gemma" if is_mac_gemma else str(model_id)
         span_id = f"span-{uuid4()}"
         generation_id = f"generation-{uuid4()}"
@@ -427,14 +442,29 @@ class SpecialistAgent:
             subject=EntityReference(kind="model", id=model_entity_id),
             attributes={
                 "model_id": str(model_id),
-                "call_kind": "generate",
+                "call_kind": call_kind,
                 "generation_id": generation_id,
             },
         )
         model_started = perf_counter()
+        generation_attempts = 1
         try:
-            generate_result = getattr(self.llm, "generate_result", None)
-            if callable(generate_result):
+            if use_structured_response:
+                response, generation_attempts = self._generate_structured_advisory(
+                    request=request,
+                    playbook=playbook,
+                    decision=decision,
+                    structured_generate=structured_generate,
+                )
+                response_text = (
+                    f"{response.answer}\n\nNext action: {response.next_action}"
+                )
+                response_prefix = ""
+                finish_reason = "structured_json"
+                prompt_tokens = None
+                completion_tokens = None
+                total_tokens = None
+            elif callable(generate_result := getattr(self.llm, "generate_result", None)):
                 raw_generation = generate_result(system_prompt, user_prompt)
                 response_text = str(getattr(raw_generation, "content", "")).strip()
                 finish_reason = _optional_text(
@@ -473,9 +503,10 @@ class SpecialistAgent:
                 duration_ms=failure_duration_ms,
                 attributes={
                     "model_id": str(model_id),
-                    "call_kind": "generate",
+                    "call_kind": call_kind,
                     "error_type": type(exc).__name__,
                     "generation_id": generation_id,
+                    "attempts": generation_attempts,
                 },
             )
             try:
@@ -513,8 +544,9 @@ class SpecialistAgent:
             duration_ms=duration_ms,
             attributes={
                 "model_id": str(model_id),
-                "call_kind": "generate",
+                "call_kind": call_kind,
                 "generation_id": generation_id,
+                "attempts": generation_attempts,
                 "finish_reason": finish_reason,
                 "quality_status": quality_status,
                 "quality_checks": quality_checks,
@@ -550,6 +582,74 @@ class SpecialistAgent:
                 evidence,
             )
         return f"{response_prefix}{response_text}", str(model_id), evidence
+
+    def _generate_structured_advisory(
+        self,
+        *,
+        request: MissionRequest,
+        playbook: PlaybookSpec,
+        decision: PolicyDecision,
+        structured_generate: Any,
+        max_attempts: int = 2,
+    ) -> tuple[_StructuredAdvisoryResponse, int]:
+        """Gets a bounded Gemma answer, retrying invalid output through Gemma only."""
+
+        context = json.dumps(
+            request.context,
+            ensure_ascii=False,
+            sort_keys=True,
+            default=str,
+        )
+        example = json.dumps(
+            {
+                "answer": (
+                    "Start by identifying the one outcome that matters most, then "
+                    "reserve a focused block before lower-priority work. I do not "
+                    "know your meetings or deadlines yet."
+                ),
+                "next_action": (
+                    "List today's fixed commitments and top three candidate priorities."
+                ),
+            },
+            separators=(",", ":"),
+        )
+        prompt = f"""Produce a concise advisory response for the selected specialist.
+Use the Mission and supplied context. Separate supplied facts from assumptions,
+state uncertainty when context is missing, and do not claim an external action
+was performed. The next action must be safe, reversible, and specific.
+When the Mission asks about the Galaxy's name, personality, capabilities,
+architecture, or limitations, answer in first person from the supplied
+galaxy_identity_and_capabilities context. Match semantic or technical depth to
+the question and do not claim capabilities absent from that profile.
+
+Example Mission: Help me plan a focused workday.
+Example JSON: {example}
+
+Selected specialist: {self.manifest.display_name}
+Specialist purpose: {self.manifest.purpose}
+Playbook: {playbook.display_name}
+Authorized memory scope: {decision.memory_scope}
+Mission: {request.objective}
+Supplied context: {context}"""
+        correction = ""
+        for attempt in range(1, max_attempts + 1):
+            try:
+                response = structured_generate(
+                    f"{prompt}{correction}",
+                    _StructuredAdvisoryResponse,
+                )
+                if not isinstance(response, _StructuredAdvisoryResponse):
+                    response = _StructuredAdvisoryResponse.model_validate(response)
+                return response, attempt
+            except (TypeError, ValueError) as exc:
+                if attempt == max_attempts:
+                    raise
+                diagnostic = f"{type(exc).__name__}: {exc}"[:500]
+                correction = (
+                    "\n\nThe previous JSON was invalid. Correct it without adding "
+                    f"prose outside the object. Validation feedback: {diagnostic}"
+                )
+        raise AssertionError("unreachable structured generation loop")
 
     def _planned_response(
         self,

@@ -182,10 +182,16 @@ class MacGemmaLLM(BaseLLM):
         )
         return result
 
-    def generate_json(self, system_prompt: str, user_prompt: str) -> dict[str, Any]:
-        """Parses a JSON object from a non-streaming completion."""
+    def generate_json(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        """Parses JSON with optional bounded generation overrides."""
 
-        response = self.generate(system_prompt, user_prompt, stop=())
+        kwargs.setdefault("stop", ())
+        response = self.generate(system_prompt, user_prompt, **kwargs)
         candidate = HuggingFaceLLM._extract_json_object(response)
         return HuggingFaceLLM._load_dirty_json(candidate)
 
@@ -200,9 +206,6 @@ class MacGemmaLLM(BaseLLM):
             "system_prompt",
             "Continue with one JSON object and no surrounding prose.",
         )
-        if kwargs:
-            unsupported = ", ".join(sorted(kwargs))
-            raise TypeError(f"Unsupported structured Gemma options: {unsupported}")
         schema_json = json.dumps(
             schema.model_json_schema(),
             separators=(",", ":"),
@@ -213,7 +216,7 @@ class MacGemmaLLM(BaseLLM):
             "Continue with one JSON object that satisfies this JSON Schema:\n"
             f"{schema_json}\nJSON:"
         )
-        payload = self.generate_json(system_prompt, structured_prompt)
+        payload = self.generate_json(system_prompt, structured_prompt, **kwargs)
         return schema.model_validate(payload)
 
     @staticmethod

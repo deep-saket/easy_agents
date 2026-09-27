@@ -17,6 +17,14 @@ from easy_agents.constellation.commons import (
     build_commons_readiness,
 )
 from easy_agents.constellation.commons_runtime import CommonsRuntime, VaultId
+from easy_agents.constellation.conversation_journal import (
+    ConversationAnalysis,
+    ConversationJournal,
+    ConversationJournalRecord,
+    ConversationReview,
+    JournalCaptureEvidence,
+    JournalTurn,
+)
 from easy_agents.constellation.directory import ConstellationDirectory
 from easy_agents.constellation.feature_intake import FeatureIntakeService
 from easy_agents.constellation.knowledge_graph import (
@@ -47,6 +55,10 @@ from easy_agents.constellation.natural_language import (
     PlanningEvidence,
     SUPPORTED_ACTIONS,
 )
+from easy_agents.constellation.personality import (
+    GalaxyPersonality,
+    GalaxyTechnicalIdentity,
+)
 from easy_agents.constellation.satellite_tools import (
     LocalSatelliteRuntime,
     PlannedSatelliteCall,
@@ -66,15 +78,23 @@ __all__ = [
     "CommonsRuntimeFoundation",
     "CommonsRuntime",
     "ConversationStore",
+    "ConversationAnalysis",
+    "ConversationJournal",
+    "ConversationJournalRecord",
+    "ConversationReview",
     "DraftCharter",
     "FeatureDecision",
     "FeatureIntakeService",
     "FeatureProposal",
     "FeatureRequest",
+    "GalaxyPersonality",
+    "GalaxyTechnicalIdentity",
     "GuildDefinition",
     "KnowledgeGraph",
     "KnowledgeGraphEdge",
     "KnowledgeGraphNode",
+    "JournalCaptureEvidence",
+    "JournalTurn",
     "LifecycleStatus",
     "LocalSatelliteRuntime",
     "NaturalLanguageAction",

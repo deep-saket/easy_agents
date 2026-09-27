@@ -201,12 +201,17 @@ def test_structured_generation_includes_schema(monkeypatch) -> None:
 
     monkeypatch.setattr("src.llm.mac_gemma.request.urlopen", fake_urlopen)
 
-    result = client.structured_generate("Classify this article.", Classification)
+    result = client.structured_generate(
+        "Classify this article.",
+        Classification,
+        max_tokens=640,
+    )
 
     assert result == Classification(label="science")
     prompt = captured["body"]["prompt"]
     assert '"properties":{"label"' in prompt
     assert prompt.endswith("JSON:")
+    assert captured["body"]["max_tokens"] == 640
 
 
 def test_mailmind_and_collection_build_mac_gemma_provider(monkeypatch) -> None:
