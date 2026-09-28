@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark" />
     <title>Galaxy Map · Easy Agents</title>
-    <link rel="stylesheet" href="/static/styles.css?v=short-message-1" />
+    <link rel="stylesheet" href="/static/styles.css?v=identity-docs-1" />
   </head>
   <body>
     <div class="shell">
@@ -31,6 +31,7 @@
             <button class="mode-button" data-mode="chat" type="button">Chat</button>
             <button class="mode-button active" data-mode="map" type="button">Map</button>
             <button class="mode-button" data-mode="commons" type="button">Commons</button>
+            <button class="mode-button" data-mode="identity" type="button">Identity</button>
             <button class="mode-button" data-mode="live" type="button">Live</button>
             <button class="mode-button" data-mode="replay" type="button">Replay</button>
             <button class="mode-button" data-mode="guide" type="button">Guide</button>
@@ -472,6 +473,48 @@
           </div>
         </article>
 
+        <article id="identity-panel" class="identity-panel hidden" aria-label="Galaxy Identity documentation">
+          <div class="identity-wrap">
+            <header class="identity-hero">
+              <div>
+                <p class="eyebrow">Galaxy Identity Circle</p>
+                <h2>Documentation about the Galaxy itself</h2>
+                <p>This Circle is a read-only library of keyed pages covering the Galaxy’s name, personality, voice, values, capabilities, boundaries, architecture, storage, and terminology. It contains no performing Planet and never receives a Mission.</p>
+              </div>
+              <div id="identity-summary" class="identity-summary" aria-live="polite">Loading documentation…</div>
+            </header>
+
+            <section class="identity-selector" aria-labelledby="identity-selector-title">
+              <div>
+                <p class="section-label">Model-selected lookup</p>
+                <h3 id="identity-selector-title">Ask which pages are relevant</h3>
+                <p>Gemma chooses the smallest useful set of keys. The system retrieves those exact pages; it does not route work to this Circle.</p>
+              </div>
+              <form id="identity-query-form" class="identity-query-form">
+                <label class="sr-only" for="identity-query">Question about the Galaxy</label>
+                <input id="identity-query" type="text" maxlength="4000" placeholder="What is your personality and technical architecture?" required />
+                <button id="identity-select" type="submit">Choose pages with Gemma</button>
+              </form>
+              <div id="identity-selection" class="identity-selection" aria-live="polite">Select a page below, or ask Gemma to choose relevant keys.</div>
+            </section>
+
+            <div class="identity-library">
+              <nav id="identity-index" class="identity-index" aria-label="Identity document index"></nav>
+              <article id="identity-document" class="identity-document" aria-live="polite">
+                <p class="identity-document-key">Read-only document</p>
+                <h3 id="identity-document-title">Select an identity page</h3>
+                <p id="identity-document-summary">Each stable key opens a small key-value documentation page.</p>
+                <dl id="identity-document-entries" class="identity-document-entries"></dl>
+              </article>
+            </div>
+
+            <aside class="identity-boundary-note">
+              <strong>Execution boundary</strong>
+              <p>Questions about identity are operational requests: Wormhole → Galaxy → Commons Circle → Personal Steward Planet. Selected identity pages are supplied as read-only context, like reference material—not as an executing agent.</p>
+            </aside>
+          </div>
+        </article>
+
         <article id="guide-panel" class="guide-panel hidden" aria-label="Galaxy terminology guide">
           <div class="guide-wrap">
             <header class="guide-hero">
@@ -591,7 +634,7 @@
                 </article>
                 <article class="term-card featured">
                   <span class="term-symbol">◌</span>
-                  <div><h4>Circle</h4><p>A Galaxy-level responsibility or domain grouping such as Home, Energy, or Satellite Communications. It contains Planets and Components.</p></div>
+                  <div><h4>Circle</h4><p>A Galaxy-level responsibility or domain grouping such as Home, Energy, or Satellite Communications. Operational Circles contain Planets and Components; the Galaxy Identity Circle contains keyed read-only document Components and no Planets.</p></div>
                 </article>
                 <article class="term-card featured">
                   <span class="term-symbol">●</span>
@@ -725,6 +768,6 @@
       </footer>
     </div>
 
-    <script type="module" src="/static/app.js?v=short-message-1"></script>
+    <script type="module" src="/static/app.js?v=identity-docs-1"></script>
   </body>
 </html>

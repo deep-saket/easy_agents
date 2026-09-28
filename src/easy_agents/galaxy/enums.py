@@ -62,6 +62,7 @@ class ComponentKind(str, Enum):
     GATE = "gate"
     MODEL = "model"
     SERVICE = "service"
+    DOCUMENTATION = "documentation"
 
 
 class ResourceKind(str, Enum):

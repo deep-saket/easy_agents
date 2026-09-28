@@ -32,22 +32,26 @@ flowchart LR
 | **Rogue Star** | A shared external resource that belongs to no Galaxy and may be accessed by multiple Galaxies through explicit, policy-controlled Orbits. A Rogue Star can be a hosted model, service, or other shared dependency. The external Mac Gemma service is the current example. |
 | **Portal** | A human-facing channel into the Galaxy, such as chat, voice, UI, CLI, or API. Portals collect intent; they do not decide authority. |
 | **Wormhole** | The single logical ingress gateway at the Galaxy boundary. It accepts a Mission, enters the correct Galaxy, then selects one or more Circles and Planets. It produces an explainable Trajectory but never grants extra permissions. |
-| **Circle** | A Galaxy-level responsibility or domain grouping, such as Home, Energy, or Satellite Communications. A Circle contains Circle Members: Rocky Planets, Giant Planets, and Components. A member may participate in more than one Circle when policy permits. |
+| **Circle** | A Galaxy-level responsibility or domain grouping, such as Home, Energy, or Satellite Communications. An operational Circle contains Rocky Planets, Giant Planets, and Components. A documentation Circle may contain only non-agent document Components. A member may participate in more than one Circle when policy permits. |
 | **Circle Member** | The umbrella term for anything assigned to a Circle. Every Circle Member is a Planet—Rocky or Giant—or a non-agent Component. |
 | **Planet** | The user-facing term for an autonomous, accountable agent with a Charter, capabilities, policies, memory access, and lifecycle status. Every Planet is classified as either Rocky or Giant. A Planet is not necessarily a permanently running process. |
 | **Rocky Planet** | A specialist agent with a narrow domain or task Charter, such as RF link-budget analysis, clinical-evidence review, or pantry planning. It owns bounded expert work and can be reused wherever that expertise is needed. |
 | **Giant Planet** | A non-specialist agent with a broad, reusable Charter for varied routine work, coordination, triage, or synthesis. It delegates narrow expert work to Rocky Planets when the task exceeds its Charter. |
-| **Component** | A non-agent Circle Member that enables or constrains work: a capability, Satellite, Vault, Playbook, Gate or policy, model, or service. A Component does not independently own a Mission or make agentic decisions. |
+| **Component** | A non-agent Circle Member that enables, constrains, or documents work: a capability, Satellite, Vault, Playbook, Gate or policy, model, service, or read-only document. A Component does not independently own a Mission or make agentic decisions. |
 | **Satellite** | A callable tool that orbits a Planet by providing one bounded operation, such as searching memory, calculating a link budget, drafting an email, or checking inventory. A Satellite is a specialized Component, not an agent: it cannot own a Mission or make independent decisions. One implementation may be assigned to several Planets through separate Orbits. Stable technical identifiers may continue to use `tool:*`, and runtime events may continue to use `tool.*`. |
 | **Constellation** | A connected operational subgraph drawn from selected parts of one or more Circles. It can include Planets, Components, and their typed relationships. It is an overlay used to describe a coherent connected system—not an ownership container and not a required routing hop. |
 | **Solar System** | A Planet-centered view containing that Planet and everything directly connected to it: Satellites, capabilities, Playbooks, memory scopes, policies, models, services, and neighboring responsibilities. Solar Systems may overlap when components are shared. |
 
-The running Personal Agent Galaxy includes a **Galaxy Identity Circle**. It
-owns the system's name, personality, capability explanation, architectural
-self-knowledge, and honest limitations. The Personal Steward is the
-accountable Planet in that Circle as well as a liaison across other Circles.
-The personality is a versioned declarative contract supplied to Gemma; it is
-not a deterministic response template.
+The running Personal Agent Galaxy includes a **Galaxy Identity Circle**. It is
+a documentation-only Circle containing keyed, read-only document Components
+for the system's name, role, personality, voice, values, capabilities,
+boundaries, architecture, storage, and terminology. It contains no Rocky or
+Giant Planet, accepts no Mission, and has no `dispatches_to` Orbit. For a
+self-knowledge question, Gemma selects the smallest relevant set of document
+keys; the Mission still follows an operational route through the Commons
+Circle to the Personal Steward, which receives those pages as reference
+context. The pages inform language generation but are not deterministic answer
+templates.
 
 The ownership and routing path is **Wormhole → Galaxy → Circle → Planet**; it is
 not a requirement to run one process per entity. A Constellation is a connected
@@ -89,6 +93,8 @@ because that Galaxy can access it.
   of one or more Circles; never place it in the routing hierarchy.
 - Use **Circle**, not guild, in user-facing text. `guild` may remain in older
   catalog identifiers until a compatibility migration is planned.
+- Treat the **Galaxy Identity Circle** as an explicit exception to operational
+  Circle membership: it contains read-only document Components and no Planet.
 - Use **Wormhole**, not gateway, in user-facing text and new public APIs.
 - Use **Planet** in user-facing language for an agent. Use **Rocky Planet** for
   a narrow specialist Charter and **Giant Planet** for a broad non-specialist
@@ -116,6 +122,11 @@ Wormhole
     ├── Venture Exploration Circle
     ├── Energy Circle
     ├── Satellite Communications Circle
+    ├── Galaxy Identity Circle
+    │   ├── Name document
+    │   ├── Personality document
+    │   ├── Capabilities document
+    │   └── other keyed identity documents
     └── other registered Circles
 
 Personal Operations Constellation

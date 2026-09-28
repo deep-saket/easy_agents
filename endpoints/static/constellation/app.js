@@ -8,6 +8,7 @@ const KIND_ORDER = [
   "guild",
   "capability",
   "tool",
+  "document",
   "memory",
   "playbook",
   "policy",
@@ -23,6 +24,7 @@ const KIND_LABELS = {
   guild: "Circles",
   capability: "Capabilities",
   tool: "Satellites",
+  document: "Identity Documents",
   memory: "Memory",
   playbook: "Playbooks",
   policy: "Policies",
@@ -45,6 +47,7 @@ const KIND_COLORS = {
   guild: "#bcbcbc",
   capability: "#b8b8b8",
   tool: "#c8c8c8",
+  document: "#d4d4d4",
   memory: "#c4c4c4",
   playbook: "#bdbdbd",
   policy: "#acacac",
@@ -60,6 +63,7 @@ const KIND_GLYPHS = {
   guild: "◌",
   capability: "C",
   tool: "S",
+  document: "D",
   memory: "M",
   playbook: "P",
   policy: "!",
@@ -68,9 +72,9 @@ const KIND_GLYPHS = {
 };
 
 const PRESETS = {
-  overview: new Set(["galaxy", "rogue_star", "constellation", "specialist", "guild", "tool", "memory", "playbook", "policy", "model", "service"]),
+  overview: new Set(["galaxy", "rogue_star", "constellation", "specialist", "guild", "tool", "document", "memory", "playbook", "policy", "model", "service"]),
   agents: new Set(["galaxy", "rogue_star", "constellation", "specialist", "guild", "service"]),
-  components: new Set(["galaxy", "rogue_star", "constellation", "guild", "capability", "tool", "memory", "playbook", "policy", "model", "service"]),
+  components: new Set(["galaxy", "rogue_star", "constellation", "guild", "capability", "tool", "document", "memory", "playbook", "policy", "model", "service"]),
   full: new Set(KIND_ORDER),
 };
 
@@ -176,6 +180,17 @@ const elements = {
   entryPanel: document.getElementById("constellation-entry"),
   guidePanel: document.getElementById("guide-panel"),
   commonsPanel: document.getElementById("commons-panel"),
+  identityPanel: document.getElementById("identity-panel"),
+  identitySummary: document.getElementById("identity-summary"),
+  identityQueryForm: document.getElementById("identity-query-form"),
+  identityQuery: document.getElementById("identity-query"),
+  identitySelect: document.getElementById("identity-select"),
+  identitySelection: document.getElementById("identity-selection"),
+  identityIndex: document.getElementById("identity-index"),
+  identityDocument: document.getElementById("identity-document"),
+  identityDocumentTitle: document.getElementById("identity-document-title"),
+  identityDocumentSummary: document.getElementById("identity-document-summary"),
+  identityDocumentEntries: document.getElementById("identity-document-entries"),
   entryObjective: document.getElementById("entry-objective"),
   routeEntry: document.getElementById("route-entry"),
   entryResult: document.getElementById("entry-result"),
@@ -272,6 +287,13 @@ const state = {
   commons: {
     loaded: false,
     vaults: [],
+  },
+  identity: {
+    loaded: false,
+    library: null,
+    activeKey: null,
+    selectedKeys: new Set(),
+    selecting: false,
   },
   operations: {
     mode: "map",
@@ -1320,6 +1342,16 @@ function renderChatRoute(payload) {
     elements.chatRouteContext.append(planning);
   }
 
+  if (payload.planning?.identity_document_keys?.length) {
+    const identityDocs = chatRouteGroup("Read-only Identity documents · not a route hop");
+    for (const key of payload.planning.identity_document_keys) {
+      identityDocs.append(
+        chatRouteStep("D", key.replaceAll("_", " "), "Model-selected documentation key", "document"),
+      );
+    }
+    elements.chatRouteContext.append(identityDocs);
+  }
+
   const direct = chatRouteGroup("Direct Mission route");
   direct.append(chatRouteStep("◎", "Wormhole", "Controlled Galaxy ingress"));
   direct.append(chatRouteStep("✹", context.galaxy.display_name, "Galaxy ownership boundary"));
@@ -2327,13 +2359,130 @@ function setStreamState(connection, label) {
   }
 }
 
+function identityValueNode(value) {
+  if (Array.isArray(value)) {
+    const list = document.createElement("ul");
+    for (const item of value) {
+      const entry = document.createElement("li");
+      entry.textContent = String(item);
+      list.append(entry);
+    }
+    return list;
+  }
+  const text = document.createElement("span");
+  text.textContent = typeof value === "boolean" ? (value ? "Yes" : "No") : String(value);
+  return text;
+}
+
+function renderIdentityDocument(key) {
+  const documentPage = state.identity.library?.documents?.[key];
+  if (!documentPage) return;
+  state.identity.activeKey = key;
+  elements.identityDocument.querySelector(".identity-document-key").textContent = `Key · ${documentPage.key} · ${documentPage.source.replaceAll("_", " ")}`;
+  elements.identityDocumentTitle.textContent = documentPage.title;
+  elements.identityDocumentSummary.textContent = documentPage.summary;
+  elements.identityDocumentEntries.replaceChildren();
+  for (const [entryKey, value] of Object.entries(documentPage.entries || {})) {
+    const term = document.createElement("dt");
+    term.textContent = entryKey.replaceAll("_", " ");
+    const definition = document.createElement("dd");
+    definition.append(identityValueNode(value));
+    elements.identityDocumentEntries.append(term, definition);
+  }
+  renderIdentityIndex();
+}
+
+function renderIdentityIndex() {
+  const documents = state.identity.library?.documents || {};
+  elements.identityIndex.replaceChildren();
+  const heading = document.createElement("div");
+  heading.className = "identity-index-heading";
+  const title = document.createElement("strong");
+  title.textContent = "Document index";
+  const count = document.createElement("span");
+  count.textContent = `${Object.keys(documents).length} keyed pages`;
+  heading.append(title, count);
+  elements.identityIndex.append(heading);
+  for (const [key, documentPage] of Object.entries(documents)) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "identity-index-item";
+    button.classList.toggle("active", state.identity.activeKey === key);
+    button.classList.toggle("selected", state.identity.selectedKeys.has(key));
+    const keyLabel = document.createElement("span");
+    keyLabel.textContent = key;
+    const pageTitle = document.createElement("strong");
+    pageTitle.textContent = documentPage.title;
+    const summary = document.createElement("small");
+    summary.textContent = documentPage.summary;
+    button.append(keyLabel, pageTitle, summary);
+    button.addEventListener("click", () => renderIdentityDocument(key));
+    elements.identityIndex.append(button);
+  }
+}
+
+async function loadIdentity(force = false) {
+  if (state.identity.loaded && !force) return;
+  elements.identitySummary.textContent = "Loading documentation…";
+  try {
+    const response = await fetch("/api/v2/galaxy/identity");
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || `Identity API returned ${response.status}`);
+    state.identity.library = payload;
+    state.identity.loaded = true;
+    const pageCount = Object.keys(payload.documents || {}).length;
+    const planetCount = payload.executing_planet_ids?.length || 0;
+    elements.identitySummary.textContent = `${pageCount} read-only pages · ${planetCount} executing Planets`;
+    renderIdentityIndex();
+    if (!state.identity.activeKey && pageCount) renderIdentityDocument(Object.keys(payload.documents)[0]);
+  } catch (error) {
+    state.identity.loaded = false;
+    elements.identitySummary.textContent = "Documentation unavailable";
+    elements.identitySelection.textContent = error instanceof Error ? error.message : String(error);
+    elements.identitySelection.classList.add("error");
+  }
+}
+
+async function selectIdentityDocuments(event) {
+  event.preventDefault();
+  const query = elements.identityQuery.value.trim();
+  if (!query || state.identity.selecting) return;
+  state.identity.selecting = true;
+  elements.identitySelect.disabled = true;
+  elements.identitySelect.textContent = "Gemma is choosing…";
+  elements.identitySelection.textContent = "The external Gemma Rogue Star is selecting the smallest useful set of documentation keys…";
+  elements.identitySelection.classList.remove("error");
+  try {
+    const response = await fetch("/api/v2/galaxy/identity/select", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query }),
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.detail || `Identity selection failed (${response.status})`);
+    state.identity.selectedKeys = new Set(payload.keys || []);
+    renderIdentityIndex();
+    if (payload.keys?.length) renderIdentityDocument(payload.keys[0]);
+    const keys = (payload.keys || []).map((key) => `“${key}”`).join(", ");
+    elements.identitySelection.textContent = `Gemma selected ${keys} in ${Math.round(payload.duration_ms || 0)} ms · ${payload.reasoning_summary}`;
+  } catch (error) {
+    elements.identitySelection.textContent = error instanceof Error ? error.message : String(error);
+    elements.identitySelection.classList.add("error");
+  } finally {
+    state.identity.selecting = false;
+    elements.identitySelect.disabled = false;
+    elements.identitySelect.textContent = "Choose pages with Gemma";
+  }
+}
+
 async function setMode(mode) {
-  if (!new Set(["chat", "map", "commons", "live", "replay", "guide"]).has(mode)) return;
+  if (!new Set(["chat", "map", "commons", "identity", "live", "replay", "guide"]).has(mode)) return;
   state.operations.mode = mode;
   const operationsMode = mode === "live" || mode === "replay";
   document.body.classList.toggle("operations-mode", operationsMode);
   document.body.classList.toggle("chat-mode", mode === "chat");
   document.body.classList.toggle("commons-mode", mode === "commons");
+  document.body.classList.toggle("identity-mode", mode === "identity");
   document.body.classList.toggle("guide-mode", mode === "guide");
   document.querySelectorAll(".mode-button").forEach((button) => {
     button.classList.toggle("active", button.dataset.mode === mode);
@@ -2342,6 +2491,7 @@ async function setMode(mode) {
   elements.timeline.classList.toggle("hidden", !operationsMode);
   elements.chatPanel.classList.toggle("hidden", mode !== "chat");
   elements.commonsPanel.classList.toggle("hidden", mode !== "commons");
+  elements.identityPanel.classList.toggle("hidden", mode !== "identity");
   elements.guidePanel.classList.toggle("hidden", mode !== "guide");
 
   if (mode === "chat") {
@@ -2375,6 +2525,17 @@ async function setMode(mode) {
     elements.apiState.textContent = "Local runtime";
     elements.apiState.className = "health-pill ok";
     await loadCommons();
+    return;
+  }
+
+  if (mode === "identity") {
+    closeEventStream();
+    document.body.classList.remove("inspector-open");
+    elements.streamState.textContent = "Galaxy Identity Circle";
+    elements.statusText.textContent = "Keyed read-only documentation · no executing Planets";
+    elements.apiState.textContent = "Documentation";
+    elements.apiState.className = "health-pill ok";
+    await loadIdentity();
     return;
   }
 
@@ -2805,6 +2966,7 @@ function bindEvents() {
   });
   elements.newChat.addEventListener("click", resetChat);
   elements.chatJournalReview.addEventListener("click", reviewCurrentConversation);
+  elements.identityQueryForm.addEventListener("submit", selectIdentityDocuments);
   elements.commonsVault.addEventListener("change", () => {
     updateVaultDetail();
     loadVaultMemories().catch((error) => showCommonsNotice(error.message, true));

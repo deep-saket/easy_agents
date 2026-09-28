@@ -191,8 +191,16 @@ response contains:
 Identity and journal endpoints:
 
 ```bash
-# Versioned personality plus live technical facts
+# Complete keyed Identity Circle library
 curl -sS http://127.0.0.1:8030/api/v2/galaxy/identity
+
+# One stable read-only page
+curl -sS http://127.0.0.1:8030/api/v2/galaxy/identity/documents/personality
+
+# Ask Gemma to choose relevant page keys
+curl -sS -X POST http://127.0.0.1:8030/api/v2/galaxy/identity/select \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"Explain your personality and technical architecture"}'
 
 # Full JSON journal for one conversation
 curl -sS http://127.0.0.1:8030/api/v2/wormhole/conversations/chat-ID/journal
@@ -204,19 +212,25 @@ curl -sS -X POST \
 
 ## Galaxy identity and self-knowledge
 
-The **Galaxy Identity Circle** owns questions such as “What is your name?”,
-“What is your personality?”, “What can you do?”, and “Explain your technical
-architecture.” The existing **Personal Steward** is its accountable Planet;
-no duplicate agent was added. Gemma routes these questions to that Circle and
-answers from the versioned `GalaxyPersonality` contract plus live registry
-counts and the complete 18-action Chat allow-list.
+The **Galaxy Identity Circle** is a documentation-only Circle. It contains ten
+keyed pages—`name`, `role`, `personality`, `voice`, `values`, `capabilities`,
+`boundaries`, `architecture`, `storage`, and `terminology`—and contains no
+performing Planet. It cannot receive a Mission.
+
+For questions such as “What is your name?”, “What can you do?”, or “Explain
+your technical architecture,” Gemma selects the smallest useful set of keys.
+The operational route remains **Wormhole → Galaxy → Commons Circle → Personal
+Steward Planet**. Only the selected `GalaxyIdentityLibrary` pages are supplied
+to the answer model as read-only context, so the documentation Circle never
+appears as an execution hop.
 
 The profile defines the name **Personal Agent Galaxy**, a curious, candid,
 practical, warm, evidence-oriented personality, and explicit boundaries. A
 semantic question receives a human-readable capability explanation. A
-technical question can enumerate the current Wormhole route, Circles, Planets,
-Satellites, Constellations, Rogue Stars, storage layers, model, action names,
-and the fact that autonomous external effects are disabled.
+technical question can use the live `architecture` page to enumerate the
+current Wormhole route, Circles, Planets, Components, Satellites,
+Constellations, Rogue Stars, and model. The `boundaries` page records that
+autonomous external effects are disabled.
 
 Runtime readiness at `/api/v2/readiness` publishes the complete supported
 action list and explicitly reports `deterministic_intent_fallback: false`.

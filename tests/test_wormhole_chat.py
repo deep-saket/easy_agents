@@ -47,8 +47,14 @@ class FakeGemma:
         self.planning_calls.append((system_prompt, user_prompt))
         request = user_prompt.rsplit("Request: ", 1)[-1].split("\nPlan:", 1)[0]
         lowered = request.lower()
-        if "your name" in lowered or "what can you do" in lowered or "technical architecture" in lowered:
-            circle_id, planet_id = "galaxy_identity", "personal_steward"
+        identity_document_keys: list[str] = []
+        if "your name" in lowered or "what can you do" in lowered:
+            circle_id, planet_id = "commons", "personal_steward"
+            identity_document_keys = ["name", "personality", "capabilities"]
+            action, arguments = "respond", {}
+        elif "technical architecture" in lowered:
+            circle_id, planet_id = "commons", "personal_steward"
+            identity_document_keys = ["architecture", "boundaries"]
             action, arguments = "respond", {}
         elif "rf link budget" in lowered:
             circle_id, planet_id = "satcom", "rf_link_budget_specialist"
@@ -71,6 +77,7 @@ class FakeGemma:
         return {
             "circle_id": circle_id,
             "planet_id": planet_id,
+            "identity_document_keys": identity_document_keys,
             "actions": [
                 {
                     "action": action,
@@ -113,10 +120,18 @@ class StructuredAnswerGemma(RepetitiveGemma):
         super().__init__()
         self.structured_calls: list[str] = []
 
-    def structured_generate(self, prompt: str, schema: type) -> object:
+    def structured_generate(
+        self, prompt: str, schema: type, **kwargs: object
+    ) -> object:
         """Returns a model-shaped answer without invoking raw completion."""
 
+        del kwargs
         self.structured_calls.append(prompt)
+        if schema.__name__ == "IdentityDocumentSelectionPlan":
+            return schema(
+                keys=("personality", "architecture"),
+                reasoning_summary="These pages answer the semantic and technical question.",
+            )
         return schema(
             answer=(
                 "I can help plan work, explore technical ideas, use local memory, "
@@ -181,13 +196,7 @@ class SemanticJournalGemma(StructuredAnswerGemma):
                 recommended_next_steps=("select one sector and define a falsifiable question",),
                 knowledge_worth_preserving=("the user wants reusable exploration support",),
             )
-        return schema(
-            answer=(
-                "I am the Personal Agent Galaxy. I can organize daily work and "
-                "support structured scientific and deep-tech exploration."
-            ),
-            next_action="Choose one concrete outcome for us to work on.",
-        )
+        return super().structured_generate(prompt, schema)
 
 
 def test_wormhole_chat_routes_executes_and_explains_context() -> None:
@@ -315,6 +324,23 @@ def test_wormhole_chat_fails_cleanly_when_gemma_is_unavailable() -> None:
     assert "127.0.0.1:8080" in response.json()["detail"]
 
 
+def test_identity_page_browsing_works_but_model_selection_requires_gemma() -> None:
+    client = TestClient(
+        create_app(gemma_client=UnreadyGemma(), chat_history=ConversationStore())
+    )
+
+    page = client.get("/api/v2/galaxy/identity/documents/name")
+    selection = client.post(
+        "/api/v2/galaxy/identity/select",
+        json={"query": "Which pages explain your name?"},
+    )
+
+    assert page.status_code == 200
+    assert page.json()["key"] == "name"
+    assert selection.status_code == 503
+    assert "127.0.0.1:8080" in selection.json()["detail"]
+
+
 def test_wormhole_chat_does_not_use_deterministic_tool_fallback_when_gemma_is_unavailable() -> None:
     client = TestClient(
         create_app(gemma_client=UnreadyGemma(), chat_history=ConversationStore())
@@ -385,7 +411,7 @@ def test_wormhole_chat_accepts_a_two_character_greeting() -> None:
     assert "Mission: hi" in model.structured_calls[0]
 
 
-def test_wormhole_chat_routes_self_questions_to_identity_circle() -> None:
+def test_wormhole_chat_uses_selected_identity_docs_without_routing_to_them() -> None:
     model = StructuredAnswerGemma()
     client = TestClient(create_app(gemma_client=model, chat_history=ConversationStore()))
 
@@ -396,18 +422,47 @@ def test_wormhole_chat_routes_self_questions_to_identity_circle() -> None:
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["trajectory"]["circle_ids"] == ["galaxy_identity"]
+    assert payload["trajectory"]["circle_ids"] == ["commons"]
     assert payload["trajectory"]["planet_ids"] == ["personal_steward"]
+    assert payload["planning"]["identity_document_keys"] == [
+        "name",
+        "personality",
+        "capabilities",
+    ]
     assert payload["duration_ms"] > 0
-    assert "galaxy_identity_and_capabilities" in model.structured_calls[0]
+    assert "galaxy_identity_documents" in model.structured_calls[0]
+    assert "\"architecture\"" not in model.structured_calls[0]
 
     identity = client.get("/api/v2/galaxy/identity")
     assert identity.status_code == 200
-    assert identity.json()["name"] == "Personal Agent Galaxy"
-    assert identity.json()["identity_circle_id"] == "galaxy_identity"
-    assert identity.json()["technical"]["circle_count"] == 15
-    assert len(identity.json()["technical"]["supported_chat_actions"]) == 18
-    assert identity.json()["technical"]["autonomous_external_effects"] is False
+    library = identity.json()
+    assert library["version"] == 2
+    assert library["circle_id"] == "galaxy_identity"
+    assert library["circle_type"] == "documentation"
+    assert library["executing_planet_ids"] == []
+    assert len(library["documents"]) == 10
+    assert library["documents"]["name"]["entries"]["display_name"] == "Personal Agent Galaxy"
+    assert library["documents"]["architecture"]["entries"]["circles"] == 15
+    assert len(library["documents"]["capabilities"]["entries"]["chat_actions"]) == 18
+    assert library["documents"]["boundaries"]["entries"]["autonomous_external_effects"] is False
+
+    personality = client.get("/api/v2/galaxy/identity/documents/personality")
+    missing = client.get("/api/v2/galaxy/identity/documents/not-a-page")
+    assert personality.status_code == 200
+    assert personality.json()["key"] == "personality"
+    assert personality.json()["read_only"] is True
+    assert missing.status_code == 404
+
+    selected = client.post(
+        "/api/v2/galaxy/identity/select",
+        json={"query": "Explain your personality and technical architecture."},
+    )
+    assert selected.status_code == 200
+    assert selected.json()["keys"] == ["personality", "architecture"]
+    assert [page["key"] for page in selected.json()["documents"]] == [
+        "personality",
+        "architecture",
+    ]
 
 
 def test_wormhole_chat_captures_tagged_json_and_reviews_it(tmp_path: Path) -> None:

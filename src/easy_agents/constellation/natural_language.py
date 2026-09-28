@@ -29,6 +29,10 @@ from easy_agents.constellation.commons_runtime import (
     VaultId,
     VaultMemoryCreate,
 )
+from easy_agents.constellation.personality import (
+    IDENTITY_DOCUMENT_DEFINITIONS,
+    IdentityDocumentKey,
+)
 from easy_agents.constellation.satellite_tools import (
     LocalSatelliteRuntime,
     PlannedSatelliteCall,
@@ -105,6 +109,9 @@ class NaturalLanguagePlan(_StrictModel):
 
     circle_id: str = Field(min_length=1, max_length=160)
     planet_id: str = Field(min_length=1, max_length=160)
+    identity_document_keys: tuple[IdentityDocumentKey, ...] = Field(
+        default=(), max_length=5
+    )
     actions: tuple[NaturalLanguageAction, ...] = Field(min_length=1, max_length=5)
     reasoning_summary: str = Field(min_length=1, max_length=800)
 
@@ -115,6 +122,8 @@ class NaturalLanguagePlan(_StrictModel):
         names = [item.action for item in self.actions]
         if "respond" in names and len(names) != 1:
             raise ValueError("respond must be the only action in a plan")
+        if len(self.identity_document_keys) != len(set(self.identity_document_keys)):
+            raise ValueError("identity_document_keys must not contain duplicates")
         return self
 
 
@@ -126,6 +135,7 @@ class PlanningEvidence(_StrictModel):
     attempts: int = Field(ge=1, le=3)
     circle_id: str
     planet_id: str
+    identity_document_keys: tuple[IdentityDocumentKey, ...] = ()
     action_names: tuple[ActionName, ...]
     duration_ms: float = Field(ge=0)
 
@@ -299,6 +309,7 @@ class NaturalLanguagePlanner:
                 attempts=attempt,
                 circle_id=plan.circle_id,
                 planet_id=plan.planet_id,
+                identity_document_keys=plan.identity_document_keys,
                 action_names=tuple(item.action for item in plan.actions),
                 duration_ms=duration_ms,
             )
@@ -315,6 +326,9 @@ class NaturalLanguagePlanner:
                     "attempt": attempt,
                     "circle_id": plan.circle_id,
                     "planet_id": plan.planet_id,
+                    "identity_document_keys": list(
+                        evidence.identity_document_keys
+                    ),
                     "action_names": list(evidence.action_names),
                 },
             )
@@ -434,6 +448,10 @@ class NaturalLanguagePlanner:
                 LifecycleStatus.RETIRED,
             }
         )
+        identity_index = "\n".join(
+            f"- {key}: {title} — {summary}"
+            for key, title, summary in IDENTITY_DOCUMENT_DEFINITIONS
+        )
         correction = (
             f"\nThe previous plan was invalid: {error_feedback}. Correct it.\n"
             if error_feedback
@@ -466,7 +484,8 @@ Allowed actions and exact argument keys:
 Safety rules:
 - There is no action for sending email, calling, buying, paying, or changing an external provider. Use respond for advisory help with those requests.
 - Choose respond for ordinary questions, planning, brainstorming, research reasoning, scientific exploration, or startup advice that does not request one of the explicit local actions.
-- Route questions about the Galaxy's name, personality, abilities, architecture, terminology, or limitations to circle_id galaxy_identity and planet_id personal_steward with respond.
+- Galaxy Identity is a documentation-only Circle with no Planets and must never be selected as circle_id. For questions about the Galaxy itself, route the Mission to circle_id commons and planet_id personal_steward with respond, then choose the smallest useful identity_document_keys.
+- identity_document_keys must contain only keys from the documentation index below. Use an empty array when the request does not need identity documentation.
 - Use more than one action only when the user explicitly requests multiple local operations.
 - Preserve user-supplied facts; do not invent arguments or identifiers.
 - Select circle_id and planet_id semantically from the roster; the Planet must belong to the Circle.
@@ -475,12 +494,15 @@ Safety rules:
 Planet roster:
 {roster}
 
+Read-only Galaxy Identity documentation index:
+{identity_index}
+
 Examples:
 Request: What is your name, personality, and what can you do for me?
-Plan: {{"circle_id":"galaxy_identity","planet_id":"personal_steward","actions":[{{"action":"respond","arguments":{{}},"reason":"The user asked for the Galaxy's semantic identity and capabilities."}}],"reasoning_summary":"Let the identity-owning Personal Steward explain the Galaxy from its supplied live profile."}}
+Plan: {{"circle_id":"commons","planet_id":"personal_steward","identity_document_keys":["name","personality","capabilities"],"actions":[{{"action":"respond","arguments":{{}},"reason":"The user asked for the Galaxy's semantic identity and capabilities."}}],"reasoning_summary":"Use the selected read-only identity pages as context for an operational response."}}
 
 Request: Explain your technical architecture and list every Chat action you support.
-Plan: {{"circle_id":"galaxy_identity","planet_id":"personal_steward","actions":[{{"action":"respond","arguments":{{}},"reason":"The user requested the Galaxy's technical self-description."}}],"reasoning_summary":"Route technical self-knowledge to the Galaxy Identity Circle."}}
+Plan: {{"circle_id":"commons","planet_id":"personal_steward","identity_document_keys":["architecture","capabilities","boundaries"],"actions":[{{"action":"respond","arguments":{{}},"reason":"The user requested the Galaxy's technical self-description."}}],"reasoning_summary":"Let an operational Planet answer from selected documentation without routing work to the documentation Circle."}}
 
 Request: Please keep in mind that Mom likes calls on Sundays.
 Plan: {{"circle_id":"commons","planet_id":"personal_steward","actions":[{{"action":"memory_write","arguments":{{"content":"Mom likes calls on Sundays"}},"reason":"The user explicitly asked to retain a personal preference."}}],"reasoning_summary":"Store the supplied preference in the selected Vault."}}

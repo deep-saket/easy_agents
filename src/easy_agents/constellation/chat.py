@@ -40,7 +40,7 @@ from easy_agents.observability import EntityReference
 from easy_agents.constellation.satellite_tools import (
     LocalSatelliteRuntime,
 )
-from easy_agents.constellation.personality import GalaxyPersonality
+from easy_agents.constellation.personality import GalaxyIdentityLibrary
 
 
 class ChatEntity(BaseModel):
@@ -336,7 +336,7 @@ class WormholeChatService:
         satellite_runtime: LocalSatelliteRuntime | None = None,
         language_planner: NaturalLanguagePlanner,
         action_executor: NaturalLanguageActionExecutor,
-        personality: GalaxyPersonality,
+        identity_library: GalaxyIdentityLibrary,
         journal: ConversationJournal | None = None,
     ) -> None:
         """Composes routing, execution, identity, history, and durable journals."""
@@ -348,7 +348,7 @@ class WormholeChatService:
         self.satellite_runtime = satellite_runtime
         self.language_planner = language_planner
         self.action_executor = action_executor
-        self.personality = personality
+        self.identity_library = identity_library
         self.journal = journal
 
     def chat(self, request: WormholeChatRequest) -> WormholeChatResponse:
@@ -396,14 +396,21 @@ class WormholeChatService:
                 planned_turn.plan.model_dump(mode="json"),
                 sort_keys=True,
                 default=str,
-            ),
-            "galaxy_identity_and_capabilities": json.dumps(
-                self.personality.model_dump(mode="json"),
+            )
+        }
+        identity_documents = self.identity_library.select(
+            planned_turn.plan.identity_document_keys
+        )
+        if identity_documents:
+            context["galaxy_identity_documents"] = json.dumps(
+                {
+                    document.key: document.model_dump(mode="json")
+                    for document in identity_documents
+                },
                 ensure_ascii=False,
                 sort_keys=True,
                 default=str,
-            ),
-        }
+            )
         if recent_history:
             context["recent_conversation"] = recent_history
         if action_invocations:

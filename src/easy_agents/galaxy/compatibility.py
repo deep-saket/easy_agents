@@ -135,6 +135,15 @@ def registry_from_fleet(fleet: "FleetRegistry") -> GalaxyRegistry:
                     circles=usage["playbook"].get(identifier, {fallback_circle}),
                 )
             )
+        elif prefix == "document":
+            components.append(
+                _component_from_node(
+                    node,
+                    identifier=identifier,
+                    kind=ComponentKind.DOCUMENTATION,
+                    circles={str(node.metadata.get("circle_id", "galaxy_identity"))},
+                )
+            )
         elif prefix == "policy":
             profile = fleet.policies.get(identifier)
             components.append(

@@ -10,6 +10,7 @@ import yaml
 from pydantic import BaseModel, Field, model_validator
 
 from easy_agents.constellation.directory import ConstellationDirectory
+from easy_agents.constellation.personality import IDENTITY_DOCUMENT_DEFINITIONS
 
 
 GraphNodeKind = Literal[
@@ -25,6 +26,7 @@ GraphNodeKind = Literal[
     "policy",
     "model",
     "service",
+    "document",
 ]
 
 
@@ -241,6 +243,7 @@ def build_knowledge_graph(
         )
     )
     for guild in active_directory.guilds.values():
+        documentation_circle = guild.id == "galaxy_identity"
         nodes.append(
             KnowledgeGraphNode(
                 id=f"guild:{guild.id}",
@@ -251,14 +254,48 @@ def build_knowledge_graph(
                 tags=guild.tags,
                 metadata={
                     "member_term": "Circle Member",
-                    "member_types": [
-                        "Rocky Planet",
-                        "Giant Planet",
-                        "Component",
-                    ],
+                    "member_types": (
+                        ["Documentation Component"]
+                        if documentation_circle
+                        else ["Rocky Planet", "Giant Planet", "Component"]
+                    ),
+                    "circle_type": (
+                        "documentation" if documentation_circle else "operational"
+                    ),
+                    "accepts_missions": not documentation_circle,
                 },
             )
         )
+
+    if "galaxy_identity" in active_directory.guilds:
+        for key, title, summary in IDENTITY_DOCUMENT_DEFINITIONS:
+            document_id = f"document:{key}"
+            nodes.append(
+                KnowledgeGraphNode(
+                    id=document_id,
+                    kind="document",
+                    label=title,
+                    description=summary,
+                    status="implemented",
+                    group="galaxy_identity",
+                    tags=["identity", "documentation", "read-only", key],
+                    metadata={
+                        "circle_id": "galaxy_identity",
+                        "document_key": key,
+                        "read_only": True,
+                        "executable": False,
+                        "api_path": f"/api/v2/galaxy/identity/documents/{key}",
+                    },
+                )
+            )
+            edges.append(
+                _edge(
+                    source="guild:galaxy_identity",
+                    target=document_id,
+                    kind="contains_document",
+                    label="contains document",
+                )
+            )
 
     for capability in active_directory.capabilities.values():
         nodes.append(

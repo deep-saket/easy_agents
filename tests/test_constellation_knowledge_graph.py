@@ -44,10 +44,26 @@ def test_knowledge_graph_contains_roster_and_shared_components() -> None:
     ]
     assert nodes["specialist:personal_steward"].metadata["planet_class"] == "rocky_planet"
     assert nodes["guild:galaxy_identity"].label == "Galaxy Identity Circle"
+    assert nodes["guild:galaxy_identity"].metadata["circle_type"] == "documentation"
+    assert nodes["guild:galaxy_identity"].metadata["accepts_missions"] is False
+    assert nodes["guild:galaxy_identity"].metadata["member_types"] == [
+        "Documentation Component"
+    ]
+    assert nodes["document:personality"].kind == "document"
+    assert nodes["document:personality"].metadata["read_only"] is True
+    assert sum(node.kind == "document" for node in graph.nodes) == 10
+    assert not any(
+        edge.target == "guild:galaxy_identity" and edge.kind == "member_of"
+        for edge in graph.edges
+    )
+    assert not any(
+        edge.source == "guild:galaxy_identity" and edge.kind == "dispatches_to"
+        for edge in graph.edges
+    )
     assert any(
-        edge.source == "specialist:personal_steward"
-        and edge.target == "guild:galaxy_identity"
-        and edge.kind == "member_of"
+        edge.source == "guild:galaxy_identity"
+        and edge.target == "document:personality"
+        and edge.kind == "contains_document"
         for edge in graph.edges
     )
 
@@ -154,6 +170,10 @@ def test_constellation_ui_serves_local_assets(tmp_path) -> None:
     assert "Control Room mode" in page.text
     assert ">Chat<" in page.text
     assert ">Commons<" in page.text
+    assert ">Identity<" in page.text
+    assert "Documentation about the Galaxy itself" in page.text
+    assert "contains no performing Planet" in page.text
+    assert "Choose pages with Gemma" in page.text
     assert "Reusable local services" in page.text
     assert "Named memory boundary" in page.text
     assert "Talk to your agent Galaxy" in page.text
@@ -188,7 +208,9 @@ def test_constellation_ui_serves_local_assets(tmp_path) -> None:
     assert "rebuildReplay" in script.text
     assert "v2/readiness" in script.text
     assert "runtime-commons-readiness" in page.text
-    assert "short-message-1" in page.text
+    assert "identity-docs-1" in page.text
+    assert "/api/v2/galaxy/identity/select" in script.text
+    assert 'document: "Identity Documents"' in script.text
     assert "Exploration journal" in page.text
     assert "Review with Gemma" in page.text
     assert "/api/v2/commons/summary" in script.text

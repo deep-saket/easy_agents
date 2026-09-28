@@ -1,6 +1,6 @@
 # Functionality Catalog and Verification Matrix
 
-This catalog documents each implemented functional area separately and records how it was verified on branch `saket/framework_update` through 2026-09-26.
+This catalog documents each implemented functional area separately and records how it was verified on branch `saket/framework_update` through 2026-09-28.
 
 The status labels mean:
 
@@ -27,6 +27,7 @@ The status labels mean:
 | [Wormhole Chat](../../guides/chat-with-your-galaxy.md) | Verified model-planned local runtime | A public-API behavior matrix covers all 18 actions, multi-action execution, model-selected Circle/Planet routing, Charter rejection with model-only retry, no offline intent fallback, persistent history, durable Vault recall, generation quality, and correlated traces; the UI exposes planning evidence, action results, trajectory context, and Map handoff |
 | [Commons Circle runtime](./commons.md) | Verified local runtime; external effects disabled | A drift-checked 30-component inventory reports 23 operational, 3 partial, 0 declared, and 4 disabled; focused tests cover shared Chat/API Vault isolation, artifacts, knowledge citations, reviews, approvals, and calendar proposals |
 | [Conversation journals and reviews](./conversation-journals.md) | Verified local runtime | Complete turns are atomically stored as per-conversation JSON; Gemma generates validated semantic tags and cross-turn reviews; technical capture remains pending rather than inventing tags when the model is unavailable |
+| [Galaxy Identity Circle](./galaxy-identity-circle.md) | Verified documentation runtime | Ten keyed, read-only pages expose declarative identity and live topology; Gemma selects relevant keys without deterministic semantic routing; the Circle contains no performing Planet and never receives a Mission |
 | [Galaxy Map](../../guides/constellation-map.md) | Verified | Graph/API/UI contract tests, JavaScript syntax validation, and browser interaction checks passed; typed nodes and relationships load locally, with direct Galaxy-to-Circle ownership, Constellation overlays, Circle Member metadata, callable tool Components presented as Satellites, a shared external Mac Gemma Rogue Star, and route-only dispatch edges |
 | [Specialist fleet](../../guides/run-specialist-fleet.md) | Verified safe runtime | Focused tests compile and execute all 70 Rocky Planet Charters, then verify Wormhole → Galaxy → Circle → Planet routing, scope isolation, approval Gates, offline and medical blocking, team Work orders, the correlated whole-fleet audit, external Mac Gemma selection and readiness, local-model prompts, custom rosters, CLI, and API |
 
@@ -34,7 +35,9 @@ Focused counts overlap because some tests validate more than one capability. Do 
 
 ## Broad Test Run Excluding the Explicit Live Test
 
-The repository collected 350 tests. The explicitly live Groq connectivity test was excluded because it uses a configured account and the network:
+The broad command collected 365 tests after the explicitly live Groq
+connectivity test was excluded because it uses a configured account and the
+network:
 
 ```bash
 python -m pytest -q --ignore=tests/test_groq_connectivity.py
@@ -43,7 +46,7 @@ python -m pytest -q --ignore=tests/test_groq_connectivity.py
 Result:
 
 ```text
-319 passed, 1 skipped, 30 failed
+334 passed, 1 skipped, 30 failed
 ```
 
 The 30 failures were distributed as follows:

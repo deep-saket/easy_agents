@@ -403,7 +403,7 @@ def test_v1_adapter_preserves_all_current_roles_and_technical_ids() -> None:
         "galaxies": 1,
         "circles": 15,
         "planets": 70,
-        "components": 51,
+        "components": 61,
         "satellites": 11,
         "rogue_stars": 1,
         "constellations": 1,
@@ -413,6 +413,19 @@ def test_v1_adapter_preserves_all_current_roles_and_technical_ids() -> None:
     ).legacy_ids
     assert "tool:memory_search" in registry.satellites["memory_search"].legacy_ids
     assert registry.rogue_stars["mac_gemma"].model_name == "gemma-4-E4B"
+    identity_circle = registry.get_circle("galaxy_identity")
+    assert len(identity_circle.members) == 10
+    assert {member.kind for member in identity_circle.members} == {
+        EntityKind.COMPONENT
+    }
+    assert {
+        registry.components[member.id].component_kind
+        for member in identity_circle.members
+    } == {ComponentKind.DOCUMENTATION}
+    assert not any(
+        "galaxy_identity" in planet.circle_ids
+        for planet in registry.planets.values()
+    )
 
 
 def test_canonical_topology_uses_new_terms_and_wormhole_route() -> None:

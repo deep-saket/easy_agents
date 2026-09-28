@@ -30,7 +30,11 @@ def test_default_directory_has_cross_guild_liaisons() -> None:
     assert steward.liaison is True
     assert {"home", "science_lab", "venture_studio"}.issubset(steward.guilds)
     assert safety.liaison is True
-    assert set(safety.guilds) == set(directory.guilds)
+    assert set(safety.guilds) == set(directory.guilds) - {"galaxy_identity"}
+    assert not any(
+        "galaxy_identity" in specialist.guilds
+        for specialist in directory.specialists.values()
+    )
 
 
 def test_reuses_an_existing_research_capability(service: FeatureIntakeService) -> None:

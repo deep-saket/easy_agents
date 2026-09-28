@@ -34,7 +34,13 @@ from easy_agents.constellation.natural_language import (
     SUPPORTED_ACTIONS,
 )
 from easy_agents.constellation.operations_api import create_operations_router
-from easy_agents.constellation.personality import GalaxyPersonality
+from easy_agents.constellation.personality import (
+    GalaxyIdentityLibrary,
+    GalaxyIdentitySelector,
+    IdentityDocument,
+    IdentityDocumentSelectionRequest,
+    IdentityDocumentSelectionResult,
+)
 from easy_agents.constellation.satellite_tools import (
     LocalSatelliteRuntime,
     build_local_satellite_runtime,
@@ -133,9 +139,13 @@ def create_app(
         commons=active_commons,
         satellites=active_satellites,
     )
-    personality = GalaxyPersonality.from_registry(
+    identity_library = GalaxyIdentityLibrary.from_registry(
         galaxy_registry,
         supported_chat_actions=SUPPORTED_ACTIONS,
+    )
+    identity_selector = GalaxyIdentitySelector(
+        identity_library,
+        llm=active_gemma,
     )
     active_journal = conversation_journal or (
         ConversationJournal(
@@ -153,7 +163,7 @@ def create_app(
         satellite_runtime=active_satellites,
         language_planner=language_planner,
         action_executor=action_executor,
-        personality=personality,
+        identity_library=identity_library,
         journal=active_journal,
     )
 
@@ -187,7 +197,8 @@ def create_app(
     app.state.chat_service = chat_service
     app.state.satellite_runtime = active_satellites
     app.state.commons_runtime = active_commons
-    app.state.galaxy_personality = personality
+    app.state.galaxy_identity_library = identity_library
+    app.state.galaxy_identity_selector = identity_selector
     app.state.conversation_journal = active_journal
     app.include_router(create_operations_router(operations))
     app.include_router(create_commons_router(active_commons))
@@ -213,6 +224,7 @@ def create_app(
             "commons_counts": active_commons.counts(),
             "legacy_memories_migrated": active_satellites.legacy_memories_migrated,
             "executable_satellites": len(active_satellites.executable_ids),
+            "identity_documents": len(identity_library.documents),
         }
 
     @app.get("/api/models/mac-gemma/status")
@@ -268,6 +280,13 @@ def create_app(
                     "semantic_tagging": "model_driven",
                 },
             },
+            "galaxy_identity": {
+                "circle_type": identity_library.circle_type,
+                "document_keys": list(identity_library.documents),
+                "document_count": len(identity_library.documents),
+                "executing_planets": len(identity_library.executing_planet_ids),
+                "selection": "model_driven",
+            },
             "commons": {
                 "status": commons.status,
                 "summary": commons.summary,
@@ -315,11 +334,48 @@ def create_app(
 
         return galaxy_snapshot
 
-    @app.get("/api/v2/galaxy/identity", response_model=GalaxyPersonality)
-    def galaxy_identity() -> GalaxyPersonality:
-        """Returns the versioned personality and live technical self-knowledge."""
+    @app.get("/api/v2/galaxy/identity", response_model=GalaxyIdentityLibrary)
+    def galaxy_identity() -> GalaxyIdentityLibrary:
+        """Returns the complete keyed, read-only Identity Circle library."""
 
-        return personality
+        return identity_library
+
+    @app.get(
+        "/api/v2/galaxy/identity/documents/{document_key}",
+        response_model=IdentityDocument,
+    )
+    def galaxy_identity_document(document_key: str) -> IdentityDocument:
+        """Returns one addressable identity page without executing a Planet."""
+
+        for key, document in identity_library.documents.items():
+            if key == document_key:
+                return document
+        raise HTTPException(
+            status_code=404,
+            detail=f"Unknown Galaxy Identity document key: {document_key}",
+        )
+
+    @app.post(
+        "/api/v2/galaxy/identity/select",
+        response_model=IdentityDocumentSelectionResult,
+    )
+    def select_galaxy_identity_documents(
+        request: IdentityDocumentSelectionRequest,
+    ) -> IdentityDocumentSelectionResult:
+        """Asks Gemma to select relevant identity keys, then retrieves their pages."""
+
+        if not active_gemma.is_ready():
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Mac Gemma is not ready at 127.0.0.1:8080. Start the "
+                    "external mac-serving service before selecting identity pages."
+                ),
+            )
+        try:
+            return identity_selector.select(request.query)
+        except (RuntimeError, TypeError, ValueError) as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     @app.get("/api/v2/topology")
     def canonical_topology() -> dict[str, object]:

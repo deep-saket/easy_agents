@@ -56,8 +56,14 @@ from easy_agents.constellation.natural_language import (
     SUPPORTED_ACTIONS,
 )
 from easy_agents.constellation.personality import (
-    GalaxyPersonality,
+    GalaxyIdentityLibrary,
+    GalaxyIdentitySelector,
     GalaxyTechnicalIdentity,
+    IdentityDocument,
+    IdentityDocumentKey,
+    IdentityDocumentSelectionPlan,
+    IdentityDocumentSelectionRequest,
+    IdentityDocumentSelectionResult,
 )
 from easy_agents.constellation.satellite_tools import (
     LocalSatelliteRuntime,
@@ -87,7 +93,8 @@ __all__ = [
     "FeatureIntakeService",
     "FeatureProposal",
     "FeatureRequest",
-    "GalaxyPersonality",
+    "GalaxyIdentityLibrary",
+    "GalaxyIdentitySelector",
     "GalaxyTechnicalIdentity",
     "GuildDefinition",
     "KnowledgeGraph",
@@ -95,6 +102,11 @@ __all__ = [
     "KnowledgeGraphNode",
     "JournalCaptureEvidence",
     "JournalTurn",
+    "IdentityDocument",
+    "IdentityDocumentKey",
+    "IdentityDocumentSelectionPlan",
+    "IdentityDocumentSelectionRequest",
+    "IdentityDocumentSelectionResult",
     "LifecycleStatus",
     "LocalSatelliteRuntime",
     "NaturalLanguageAction",
